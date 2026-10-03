@@ -1080,7 +1080,9 @@ class _ProfileScreenState extends State<ProfileScreen>
         lang?.flag ??
         '';
     return Scaffold(
-      backgroundColor: SC.bg,
+      // Onglet Profil : transparent en clair (le shell pose fond + halo) ;
+      // le profil d'un autre est une page poussée, donc opaque.
+      backgroundColor: _isViewingOther ? SC.bg : SC.tabBg,
       // No header bar. When viewing someone else, the back button + â® menu
       // float directly over the content (added to the Stack below) so the
       // whole profile reads as one continuous page. The "my profile" tab is
@@ -1093,7 +1095,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               top: false,
               bottom: false,
               child: RefreshIndicator(
-                color: SC.accent,
+                color: SC.accentFg,
                 backgroundColor: SC.menu,
                 onRefresh: _reload,
                 child: _loading
@@ -1104,13 +1106,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                           Center(
                             child: Column(
                               children: [
-                                const CircularProgressIndicator(
-                                  color: SC.accent,
+                                CircularProgressIndicator(
+                                  color: SC.accentFg,
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
                                   AppStrings.t('profile_loading'),
-                                  style: const TextStyle(color: SC.textMuted),
+                                  style: TextStyle(color: SC.textMuted),
                                 ),
                               ],
                             ),
@@ -1215,7 +1217,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           color: SC.menu,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
-                            side: const BorderSide(color: SC.glassBorder),
+                            side: BorderSide(color: SC.glassBorder),
                           ),
                           onSelected: (v) {
                             if (v == 'unmatch') _unmatchPeer();
@@ -1228,7 +1230,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 value: 'unmatch',
                                 child: Row(
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.heart_broken_outlined,
                                       size: 18,
                                       color: SC.textPrimary,
@@ -1236,7 +1238,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     const SizedBox(width: 10),
                                     Text(
                                       AppStrings.t('unmatch'),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: SC.textPrimary,
                                       ),
                                     ),
@@ -1522,7 +1524,7 @@ class _IdentitySection extends StatelessWidget {
   static const double _coverHeight = 380;
 
   /// Le fond de la page, pour le fondu de la couverture.
-  static const Color _pageBg = Color(0xFF0E0E0E);
+  static Color get _pageBg => SC.bg;
 
   /// La couverture : la PDP — à défaut la première photo — en plein cadre,
   /// recouverte d'un fondu qui la raccorde au fond de la page. Sur mon profil
@@ -1571,25 +1573,24 @@ class _IdentitySection extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           image,
-          const IgnorePointer(
+          IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Color(0x590E0E0E), // 35 %
-                    Color(0x000E0E0E),
-                    Color(0xBF0E0E0E), // 75 %
+                    _pageBg.withValues(alpha: 0.35),
+                    _pageBg.withValues(alpha: 0),
+                    _pageBg.withValues(alpha: 0.75),
                     _pageBg,
                   ],
                   // Opaque un peu AVANT le bord : sinon la dernière ligne de pixels
                   // laisse transparaître la photo (fine ligne claire).
-                  stops: [0, 0.30, 0.78, 0.985],
+                  stops: const [0, 0.30, 0.78, 0.985],
                 ),
               ),
-            ),
-          ),
+            ),          ),
         ],
       ),
     );
@@ -1622,9 +1623,12 @@ class _IdentitySection extends StatelessWidget {
       fontSize: 36,
       letterSpacing: -1.8,
       height: 1,
-      color: Colors.white,
+      // Clair : le nom est posé sur le fondu BLANC de la couverture → encre.
+      color: SC.light ? SC.textPrimary : Colors.white,
     ).copyWith(
-      shadows: const [Shadow(color: Color(0x66000000), blurRadius: 12)],
+      shadows: SC.light
+          ? const []
+          : const [Shadow(color: Color(0x66000000), blurRadius: 12)],
     );
     final shown = displayName.trim().isEmpty
         ? AppStrings.t('profile_anonymous')
@@ -1687,7 +1691,9 @@ class _IdentitySection extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.ibmPlexMono(
                   fontSize: 12,
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: SC.light
+                      ? SC.textSecondary
+                      : Colors.white.withValues(alpha: 0.7),
                 ),
               ),
             ),
@@ -1826,7 +1832,7 @@ class _IdentitySection extends StatelessWidget {
               onSave: onEditBio,
               maxLength: profileBioMaxLength,
               maxLines: 3,
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textPrimary,
                 fontSize: 15,
                 height: 1.4,
@@ -1961,7 +1967,7 @@ class _IdentitySection extends StatelessWidget {
                       field: 'bio',
                       fromLang: personalInfo?.language ?? '',
                       textAlign: TextAlign.start,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: SC.textPrimary,
                         fontSize: 15,
                         height: 1.4,
@@ -2253,14 +2259,18 @@ class _ProfileSectionHeader extends StatelessWidget {
                 if (suffix.isNotEmpty)
                   TextSpan(
                     text: ' $suffix',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.55)),
+                    style: TextStyle(
+                      color: SC.light
+                          ? SC.textMuted
+                          : Colors.white.withValues(alpha: 0.55),
+                    ),
                   ),
               ],
             ),
             style: popupDisplay(
               fontSize: 17,
               letterSpacing: -0.5,
-              color: Colors.white,
+              color: SC.light ? SC.textPrimary : Colors.white,
             ),
           ),
         ),
@@ -2288,7 +2298,7 @@ class _EmptyPhotosPlaceholder extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.photo_camera_outlined,
             size: 34,
             color: SC.textMuted,
@@ -2296,7 +2306,7 @@ class _EmptyPhotosPlaceholder extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             AppStrings.t('profile_no_photos'),
-            style: const TextStyle(color: SC.textMuted, fontSize: 14),
+            style: TextStyle(color: SC.textMuted, fontSize: 14),
           ),
         ],
       ),
@@ -2311,8 +2321,28 @@ class _RewardHint extends StatelessWidget {
   final int points;
   @override
   Widget build(BuildContext context) {
-    // Pastille en verre, comme les ronds du haut de la page (blanc 13 %, bord
-    // blanc 30 %, flou 20). Ne se coupe jamais.
+    // Sombre : pastille en verre, comme les ronds du haut. Clair : le jaune ne
+    // se lit que EN FOND, avec du texte encre → pastille jaune pleine.
+    final label = Text(
+      '+$points pts',
+      maxLines: 1,
+      softWrap: false,
+      style: TextStyle(
+        color: SC.light ? SC.onAccent : Colors.white,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+    if (SC.light) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: SC.accent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: label,
+      );
+    }
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
       child: BackdropFilter(
@@ -2327,16 +2357,7 @@ class _RewardHint extends StatelessWidget {
               width: 1.2,
             ),
           ),
-          child: Text(
-            '+$points pts',
-            maxLines: 1,
-            softWrap: false,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          child: label,
         ),
       ),
     );
@@ -2490,7 +2511,7 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                             fit: BoxFit.cover,
                             width: frameW,
                             height: frameH,
-                            errorBuilder: (_, _, _) => const Padding(
+                            errorBuilder: (_, _, _) => Padding(
                               padding: EdgeInsets.all(40),
                               child: Icon(
                                 Icons.broken_image_outlined,
@@ -2971,13 +2992,13 @@ class _InlineEditableState extends State<_InlineEditable> {
       maxLength: widget.maxLength,
       maxLines: widget.maxLines,
       minLines: 1,
-      cursorColor: SC.accent,
+      cursorColor: SC.accentFg,
       textInputAction: TextInputAction.done,
       style: widget.style.copyWith(color: SC.textPrimary),
       decoration: InputDecoration(
         isDense: true,
         hintText: widget.placeholder,
-        hintStyle: const TextStyle(color: SC.textMuted),
+        hintStyle: TextStyle(color: SC.textMuted),
         counterText: '',
         filled: true,
         contentPadding: const EdgeInsets.symmetric(
@@ -2986,15 +3007,15 @@ class _InlineEditableState extends State<_InlineEditable> {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: SC.glassBorder),
+          borderSide: BorderSide(color: SC.glassBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: SC.glassBorder),
+          borderSide: BorderSide(color: SC.glassBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: SC.accent, width: 1.5),
+          borderSide: BorderSide(color: SC.accentFg, width: 1.5),
         ),
       ),
       onSubmitted: (_) => _commit(),
@@ -3024,12 +3045,12 @@ class _InterestAddChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.add_rounded, color: SC.accent, size: 17),
+            Icon(Icons.add_rounded, color: SC.accentFg, size: 17),
             const SizedBox(width: 4),
             Text(
               AppStrings.t('interests_add'),
-              style: const TextStyle(
-                color: SC.accent,
+              style: TextStyle(
+                color: SC.accentFg,
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
               ),
@@ -3259,7 +3280,7 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
                       color: Colors.white.withValues(alpha: 0.22),
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.close_rounded,
                     size: 20,
                     color: SC.textPrimary,
@@ -3405,7 +3426,7 @@ class _CategoryPage extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 interestLabel(cat.label),
-                style: const TextStyle(
+                style: TextStyle(
                   color: SC.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
@@ -3476,7 +3497,7 @@ TextSpan _highlightKeywords(String raw) {
         TextSpan(
           text: parts[i],
           style: i.isOdd
-              ? const TextStyle(color: SC.accent, fontWeight: FontWeight.w600)
+              ? TextStyle(color: SC.accentFg, fontWeight: FontWeight.w600)
               : null,
         ),
     ],
@@ -3621,7 +3642,7 @@ class _PhotoCell extends StatelessWidget {
                     photoUrl!,
                     fit: BoxFit.cover,
                     frameBuilder: popInFrameBuilder,
-                    errorBuilder: (_, _, _) => const Center(
+                    errorBuilder: (_, _, _) => Center(
                       child: Icon(
                         Icons.broken_image_outlined,
                         color: SC.textMuted,
@@ -3986,7 +4007,7 @@ class _EditAccountSheet extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     AppStrings.t('settings_section_account'),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: SC.textMuted,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -4108,7 +4129,7 @@ class _EditAccountRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   color: SC.textPrimary,
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -4128,11 +4149,11 @@ class _EditAccountRow extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.right,
-                style: const TextStyle(color: SC.textMuted, fontSize: 14),
+                style: TextStyle(color: SC.textMuted, fontSize: 14),
               ),
             ),
             const SizedBox(width: 6),
-            const Icon(Icons.chevron_right, size: 20, color: SC.textMuted),
+            Icon(Icons.chevron_right, size: 20, color: SC.textMuted),
           ],
         ),
       ),

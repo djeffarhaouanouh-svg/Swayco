@@ -101,7 +101,7 @@ class _LikedPhotosScreenState extends State<LikedPhotosScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: SC.accent))
+          ? Center(child: CircularProgressIndicator(color: SC.accentFg))
           : _items.isEmpty
           ? Center(
               child: Padding(
@@ -118,14 +118,14 @@ class _LikedPhotosScreenState extends State<LikedPhotosScreen> {
                     Text(
                       AppStrings.t('liked_photos_empty'),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: SC.textMuted, height: 1.4),
+                      style: TextStyle(color: SC.textMuted, height: 1.4),
                     ),
                   ],
                 ),
               ),
             )
           : RefreshIndicator(
-              color: SC.accent,
+              color: SC.accentFg,
               backgroundColor: SC.menu,
               onRefresh: _load,
               child: ListView.separated(
@@ -185,7 +185,7 @@ class _LikedRow extends StatelessWidget {
                         name,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: SC.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
@@ -218,7 +218,7 @@ class _LikedRow extends StatelessWidget {
                     height: 46,
                     color: SC.menu,
                     alignment: Alignment.center,
-                    child: const Icon(
+                    child: Icon(
                       Icons.broken_image_outlined,
                       color: SC.textMuted,
                       size: 18,

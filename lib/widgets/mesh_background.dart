@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/swayco_palette.dart';
 import '../theme/swayco_theme.dart';
 
 /// Midnight ambient background — a solid navy [SC.bg] fill with a soft
@@ -12,6 +13,8 @@ class MeshBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Mode clair : fond blanc + halo de marque (pas de voile sombre).
+    if (SC.light) return SwaycoBackground(child: child);
     return Container(
       color: SC.bg,
       child: Stack(

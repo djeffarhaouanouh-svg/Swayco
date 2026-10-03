@@ -721,7 +721,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     return Scaffold(
       // Classic flat black, matching the conversation thread — no blue mesh.
-      backgroundColor: SC.bg,
+      backgroundColor: SC.tabBg,
       body: Stack(
         children: [
           SafeArea(
@@ -806,7 +806,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ),
           child: Row(
             children: [
-              const Icon(Icons.search_rounded, color: Colors.white, size: 22),
+              Icon(Icons.search_rounded, color: SC.textPrimary, size: 22),
               const SizedBox(width: 10),
               Expanded(
                 child: TextField(
@@ -814,8 +814,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   focusNode: _searchFocus,
                   onChanged: _onSearchChanged,
                   textInputAction: TextInputAction.search,
-                  cursorColor: SC.accent,
-                  style: const TextStyle(color: Colors.white, fontSize: 15),
+                  cursorColor: SC.accentFg,
+                  style: TextStyle(color: SC.textPrimary, fontSize: 15),
                   decoration: InputDecoration(
                     isDense: true,
                     hintText: AppStrings.t('search_friend_hint'),
@@ -860,8 +860,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 AppStrings.t('messages_title'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: SC.textPrimary,
                   fontSize: 26,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.3,
@@ -895,7 +895,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         'online_count',
                         args: {'n': '$_onlineFriends'},
                       ),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: _kMono,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -926,9 +926,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       width: 1.2,
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.search_rounded,
-                    color: Colors.white,
+                    color: SC.textPrimary,
                     size: 22,
                   ),
                 ),
@@ -1051,7 +1051,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
         child: Text(
           AppStrings.t('search_no_result', args: {'q': q}),
-          style: const TextStyle(color: SC.textMuted, fontSize: 14),
+          style: TextStyle(color: SC.textMuted, fontSize: 14),
         ),
       );
     }
@@ -1107,7 +1107,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       builder: (context, constraints) {
         final fill = constraints.maxHeight - 12 - navBody;
         return RefreshIndicator(
-          color: SC.accent,
+          color: SC.accentFg,
           backgroundColor: SC.menu,
           onRefresh: _reload,
           child: ListView(
@@ -1339,7 +1339,7 @@ class _FriendChatRow extends StatelessWidget {
                     AppStrings.t(
                       isMuted ? 'calls_unmute' : 'calls_mute',
                     ),
-                    style: const TextStyle(color: SC.textPrimary),
+                    style: TextStyle(color: SC.textPrimary),
                   ),
                   onTap: () {
                     Navigator.of(ctx).pop();
@@ -1350,13 +1350,13 @@ class _FriendChatRow extends StatelessWidget {
             ),
             if (isMatched)
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.heart_broken_outlined,
                   color: SC.textPrimary,
                 ),
                 title: Text(
                   AppStrings.t('unmatch'),
-                  style: const TextStyle(color: SC.textPrimary),
+                  style: TextStyle(color: SC.textPrimary),
                 ),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -1367,7 +1367,7 @@ class _FriendChatRow extends StatelessWidget {
               leading: const Icon(Icons.block, color: Color(0xFFE53935)),
               title: Text(
                 AppStrings.t('block'),
-                style: const TextStyle(color: SC.textPrimary),
+                style: TextStyle(color: SC.textPrimary),
               ),
               onTap: () {
                 Navigator.of(ctx).pop();
@@ -1375,10 +1375,10 @@ class _FriendChatRow extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.flag_outlined, color: SC.textPrimary),
+              leading: Icon(Icons.flag_outlined, color: SC.textPrimary),
               title: Text(
                 AppStrings.t('report'),
-                style: const TextStyle(color: SC.textPrimary),
+                style: TextStyle(color: SC.textPrimary),
               ),
               onTap: () {
                 Navigator.of(ctx).pop();
@@ -1386,10 +1386,10 @@ class _FriendChatRow extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: SC.textPrimary),
+              leading: Icon(Icons.delete_outline, color: SC.textPrimary),
               title: Text(
                 AppStrings.t('delete_conversation'),
-                style: const TextStyle(color: SC.textPrimary),
+                style: TextStyle(color: SC.textPrimary),
               ),
               onTap: () {
                 Navigator.of(ctx).pop();
@@ -1421,15 +1421,15 @@ class _FriendChatRow extends StatelessWidget {
       // récent, et c'est le seul des deux qui attend quelque chose de moi.
       subtitleParts.add(TextSpan(
         text: '👋 ${AppStrings.t('wave_received')}',
-        style: const TextStyle(
-          color: SC.accent,
+        style: TextStyle(
+          color: SC.accentFg,
           fontWeight: FontWeight.w600,
         ),
       ));
     } else if (lastMessage != null &&
         (lastMessage!.body.isNotEmpty || lastMessage!.isImage)) {
       if (isMine) {
-        subtitleParts.add(const TextSpan(
+        subtitleParts.add(TextSpan(
           text: 'Vous : ',
           style: TextStyle(
             color: SC.textMuted,
@@ -1704,7 +1704,7 @@ class _SearchResultRow extends StatelessWidget {
                               : profile.displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: SC.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -1723,7 +1723,7 @@ class _SearchResultRow extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style:
-                          const TextStyle(color: SC.textMuted, fontSize: 13),
+                          TextStyle(color: SC.textMuted, fontSize: 13),
                     ),
                 ],
               ),
@@ -1948,7 +1948,7 @@ class _AdSlide extends StatelessWidget {
             left: 12,
             child: Text(
               AppStrings.t('ad_label'),
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textMuted,
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
@@ -2058,14 +2058,14 @@ class _NotifBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.notifications_off_rounded,
-              color: SC.accent, size: 22),
+          Icon(Icons.notifications_off_rounded,
+              color: SC.accentFg, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               AppStrings.t('notif_banner_text'),
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: SC.textPrimary,
                 fontSize: 13,
                 height: 1.3,
               ),
@@ -2075,7 +2075,7 @@ class _NotifBanner extends StatelessWidget {
           TextButton(
             onPressed: onEnable,
             style: TextButton.styleFrom(
-              foregroundColor: SC.accent,
+              foregroundColor: SC.accentFg,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               minimumSize: const Size(0, 36),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -2575,11 +2575,11 @@ class _NoFriendsEmpty extends StatelessWidget {
             Container(
               width: 72,
               height: 72,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: SC.menu,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.people_outline,
                 color: SC.textMuted,
                 size: 34,
@@ -2589,7 +2589,7 @@ class _NoFriendsEmpty extends StatelessWidget {
             Text(
               AppStrings.t('chat_no_friends_title'),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -2599,7 +2599,7 @@ class _NoFriendsEmpty extends StatelessWidget {
             Text(
               AppStrings.t('chat_no_friends_body'),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                   color: SC.textMuted,
                   fontSize: 13,
                   height: 1.4),

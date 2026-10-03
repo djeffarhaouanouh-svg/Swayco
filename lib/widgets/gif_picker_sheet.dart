@@ -129,12 +129,12 @@ class _GifPickerSheetState extends State<_GifPickerSheet> {
                     onChanged: _onQueryChanged,
                     textInputAction: TextInputAction.search,
                     onSubmitted: (_) => _load(),
-                    cursorColor: SC.accent,
+                    cursorColor: SC.accentFg,
                     style: SCText.subtitle.copyWith(fontSize: 15),
                     decoration: InputDecoration(
                       hintText: AppStrings.t('gif_search_hint'),
-                      hintStyle: const TextStyle(color: SC.textMuted),
-                      prefixIcon: const Icon(Icons.search, color: SC.textMuted),
+                      hintStyle: TextStyle(color: SC.textMuted),
+                      prefixIcon: Icon(Icons.search, color: SC.textMuted),
                       isDense: true,
                       filled: true,
                       fillColor: PopupTokens.ghost,
@@ -172,8 +172,8 @@ class _GifPickerSheetState extends State<_GifPickerSheet> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: SC.accent, strokeWidth: 2),
+      return Center(
+        child: CircularProgressIndicator(color: SC.accentFg, strokeWidth: 2),
       );
     }
     if (_gifs.isEmpty) {
@@ -212,10 +212,10 @@ class _GifPickerSheetState extends State<_GifPickerSheet> {
           ],
         ),
         if (_loadingMore)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Center(
-              child: CircularProgressIndicator(color: SC.accent, strokeWidth: 2),
+              child: CircularProgressIndicator(color: SC.accentFg, strokeWidth: 2),
             ),
           ),
       ],
@@ -242,7 +242,7 @@ class _GifTile extends StatelessWidget {
             child: Image.network(
               gif.previewUrl,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => const Center(
+              errorBuilder: (_, _, _) => Center(
                 child: Icon(Icons.broken_image_outlined, color: SC.textMuted),
               ),
             ),

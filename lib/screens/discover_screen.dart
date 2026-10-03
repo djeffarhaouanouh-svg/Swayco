@@ -94,7 +94,8 @@ const double _kMessageSize = 47.0;
 const double _kActionPadV = 16.0;
 
 /// Surfaces pleines du handoff : bulles pays, bouton message.
-const Color _kSurface = Color(0xFF1A1A1D);
+Color get _kSurface =>
+    SC.light ? const Color(0xFFF2F6FF) : const Color(0xFF1A1A1D);
 const Color _kSurfaceBorder = Color(0xFF2A2A2E);
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -718,7 +719,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final currentCardTop = _infoOpen ? safeTop + 4 : headerBottom;
 
     return Scaffold(
-      backgroundColor: SC.bg,
+      backgroundColor: SC.tabBg,
       extendBody: true,
       body: Stack(
         children: [
@@ -1139,7 +1140,7 @@ class _DiscoverHeader extends StatelessWidget {
           // (43 − 3 = 40 de zone utile).
           child: Padding(
             padding: EdgeInsets.fromLTRB(6, 0, 6, 3),
-            child: SwaycoWordmark(),
+            child: SwaycoWordmark(adaptive: true),
           ),
         ),
       ),
@@ -1251,7 +1252,7 @@ class _CountryRowState extends State<_CountryRow> {
                   gradient: SC.brandGradient,
                   shape: BoxShape.circle,
                 ),
-                child: const DecoratedBox(
+                child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: _kSurface,
                     shape: BoxShape.circle,
@@ -1290,7 +1291,7 @@ class _CountryRowState extends State<_CountryRow> {
                       shape: BoxShape.circle,
                     ),
                     child: Container(
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: _kSurface,
                         shape: BoxShape.circle,
                       ),
@@ -1348,9 +1349,9 @@ class _CountryRowState extends State<_CountryRow> {
                                           width: 1.5,
                                         ),
                                       ),
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.close_rounded,
-                                        color: SC.accent,
+                                        color: SC.accentFg,
                                         size: 11,
                                       ),
                                     ),
@@ -2860,9 +2861,9 @@ class _DiscoverDone extends StatelessWidget {
                       color: SC.accent.withValues(alpha: 0.35),
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.replay_rounded,
-                    color: SC.accent,
+                    color: SC.accentFg,
                     size: 34,
                   ),
                 ),
@@ -2892,10 +2893,10 @@ class _DiscoverDone extends StatelessWidget {
                 const SizedBox(height: 22),
                 TextButton.icon(
                   onPressed: onRestart,
-                  icon: const Icon(Icons.refresh, color: SC.accent),
+                  icon: Icon(Icons.refresh, color: SC.accentFg),
                   label: Text(
                     AppStrings.t('restart'),
-                    style: const TextStyle(color: SC.accent),
+                    style: TextStyle(color: SC.accentFg),
                   ),
                 ),
               ],
@@ -2959,10 +2960,10 @@ class _Empty extends StatelessWidget {
             const SizedBox(height: 20),
             TextButton.icon(
               onPressed: onReset,
-              icon: const Icon(Icons.refresh, color: SC.accent),
+              icon: Icon(Icons.refresh, color: SC.accentFg),
               label: Text(
                 AppStrings.t('restart'),
-                style: const TextStyle(color: SC.accent),
+                style: TextStyle(color: SC.accentFg),
               ),
             ),
           ],

@@ -11,6 +11,7 @@ class SwaycoWordmark extends StatelessWidget {
     this.letterSpacing = 0.3,
     this.shadows,
     this.oColor,
+    this.adaptive = false,
   });
 
   final double fontSize;
@@ -21,6 +22,11 @@ class SwaycoWordmark extends StatelessWidget {
   /// (connexion), le dégradé s'y perdrait.
   final Color? oColor;
 
+  /// Suit le thème : en mode clair, « swayc » en encre et « ø » en bleu (le
+  /// blanc et le jaune seraient illisibles sur blanc). Faux sur les écrans
+  /// de marque (connexion, splash, appel) qui restent sur fond bleu / sombre.
+  final bool adaptive;
+
   static const _oGradient = LinearGradient(
     begin: Alignment(-0.6, -1),
     end: Alignment(0.6, 1),
@@ -29,8 +35,10 @@ class SwaycoWordmark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onLight = adaptive && SC.light;
+    final Color? effO = oColor ?? (onLight ? SC.brandBlueDeep : null);
     final style = TextStyle(
-      color: Colors.white,
+      color: onLight ? SC.textPrimary : Colors.white,
       fontFamily: SC.brandFont,
       fontSize: fontSize,
       fontWeight: FontWeight.w700,
@@ -41,7 +49,7 @@ class SwaycoWordmark extends StatelessWidget {
       TextSpan(
         children: [
           const TextSpan(text: 'swayc'),
-          if (oColor case final c?)
+          if (effO case final c?)
             TextSpan(
               text: 'ø',
               style: TextStyle(color: c),

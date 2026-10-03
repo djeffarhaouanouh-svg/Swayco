@@ -290,7 +290,7 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
       child: Scaffold(
         backgroundColor: SC.bg,
         body: DecoratedBox(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -660,7 +660,7 @@ class _PerkRow extends StatelessWidget {
               child: Text(
                 label,
                 maxLines: 1,
-                style: const TextStyle(
+                style: TextStyle(
                   color: SC.textPrimary,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -843,7 +843,7 @@ class _BoostPaywallState extends State<_BoostPaywall> {
       child: Scaffold(
         backgroundColor: SC.bg,
         body: DecoratedBox(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -1037,12 +1037,12 @@ class _LikesWallPaywallState extends State<_LikesWallPaywall>
                       ),
                     ],
                   ),
-                  child: const DecoratedBox(
+                  child: DecoratedBox(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: SC.bg,
                     ),
-                    child: Icon(Icons.lock_rounded, size: 34, color: SC.accent),
+                    child: Icon(Icons.lock_rounded, size: 34, color: SC.accentFg),
                   ),
                 ),
               ),
@@ -1240,7 +1240,7 @@ class _BlurredWall extends StatelessWidget {
               ),
             ),
           ),
-          const DecoratedBox(
+          DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,

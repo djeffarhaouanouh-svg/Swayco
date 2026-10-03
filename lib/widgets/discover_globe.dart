@@ -528,7 +528,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                                   ),
                                 ),
                                 if (_selected.contains(key))
-                                  const Icon(
+                                  Icon(
                                     Icons.check_rounded,
                                     size: 18,
                                     color: SC.accent,
@@ -803,7 +803,7 @@ class _CountryChip extends StatelessWidget {
                         shape: BoxShape.circle,
                         border: Border.all(color: SC.accent, width: 1.5),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.close_rounded,
                         color: SC.accent,
                         size: 12,

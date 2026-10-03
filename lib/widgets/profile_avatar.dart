@@ -111,9 +111,9 @@ class ProfileAvatar extends StatelessWidget {
                   child: SizedBox(
                     width: size * 0.4,
                     height: size * 0.4,
-                    child: const CircularProgressIndicator(
+                    child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: SC.accent,
+                      color: SC.accentFg,
                     ),
                   ),
                 );

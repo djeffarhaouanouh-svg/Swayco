@@ -11,6 +11,13 @@ import '../theme/swayco_theme.dart';
 import 'spring_press.dart';
 import 'swayco_animations.dart';
 import 'swayco_nav_icons.dart';
+import '../theme/swayco_palette.dart';
+
+/// Couleurs de la barre : blanc en sombre ; en clair, bleu #1F5EFF pour l'onglet
+/// actif et gris-bleu pour les autres.
+Color _navActiveColor() => SC.light ? SC.brandBlueDeep : Colors.white;
+Color _navInactiveColor() =>
+    SC.light ? const Color(0xFF8A94B0) : Colors.white.withValues(alpha: 0.50);
 
 /// WhatsApp-style lens magnification for the nav icon at index [i], given the
 /// continuous pill position [frac]. The icon swells as the pill slides PAST it
@@ -228,11 +235,15 @@ class _GlassNavBarState extends State<GlassNavBar>
                     width: slot - 12,
                     height: height - 10,
                     decoration: BoxDecoration(
-                      color: Colors.white
-                          .withValues(alpha: _dragging ? 0.26 : 0.18),
+                      color: SC.light
+                          ? SwaycoPalette.light.navActive
+                          : Colors.white
+                              .withValues(alpha: _dragging ? 0.26 : 0.18),
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.28),
+                        color: SC.light
+                            ? Colors.transparent
+                            : Colors.white.withValues(alpha: 0.28),
                       ),
                     ),
                   ),
@@ -311,10 +322,10 @@ class _GlassNavBarState extends State<GlassNavBar>
         shape: const lg.LiquidRoundedSuperellipse(
           borderRadius: GlassNavBar.height / 2,
         ),
-        settings: const lg.LiquidGlassSettings(
+        settings: lg.LiquidGlassSettings(
           blur: 12,
           thickness: 14,
-          glassColor: Color(0x14FFFFFF),
+          glassColor: SC.light ? const Color(0xB8FFFFFF) : const Color(0x14FFFFFF),
           refractiveIndex: 1.28,
         ),
         child: inner,
@@ -328,12 +339,26 @@ class _GlassNavBarState extends State<GlassNavBar>
         filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.13),
+            color: SC.light
+                ? SwaycoPalette.light.navGlass
+                : Colors.white.withValues(alpha: 0.13),
             borderRadius: radius,
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.22),
+              color: SC.light
+                  ? SwaycoPalette.light.navBorder
+                  : Colors.white.withValues(alpha: 0.22),
               width: 1.2,
             ),
+            boxShadow: SC.light
+                ? const [
+                    BoxShadow(
+                      color: Color(0x3304123A),
+                      blurRadius: 30,
+                      spreadRadius: -10,
+                      offset: Offset(0, 10),
+                    ),
+                  ]
+                : null,
           ),
           child: inner,
         ),
@@ -451,9 +476,7 @@ class _NavItemState extends State<_NavItem>
                         kind: widget.data.kind!,
                         key: ValueKey(widget.selected),
                         size: 22,
-                        color: widget.selected
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.50),
+                        color: widget.selected ? _navActiveColor() : _navInactiveColor(),
                       )
                     : widget.data.assetIcon != null
                     ? SvgPicture.asset(
@@ -481,9 +504,7 @@ class _NavItemState extends State<_NavItem>
                             : widget.data.icon,
                         key: ValueKey(widget.selected),
                         size: 22,
-                        color: widget.selected
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.50),
+                        color: widget.selected ? _navActiveColor() : _navInactiveColor(),
                       ),
               ),
             ),
@@ -499,9 +520,7 @@ class _NavItemState extends State<_NavItem>
               fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
               letterSpacing: 0.1,
               height: 1,
-              color: widget.selected
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.50),
+              color: widget.selected ? _navActiveColor() : _navInactiveColor(),
             ),
           ),
         ],

@@ -147,7 +147,7 @@ class _MessageBannerViewState extends State<_MessageBannerView>
                                 : intent.senderName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: SC.textPrimary,
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
@@ -160,7 +160,7 @@ class _MessageBannerViewState extends State<_MessageBannerView>
                                 intent.preview,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: SC.textSecondary,
                                   fontSize: 13,
                                 ),

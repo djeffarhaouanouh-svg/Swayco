@@ -81,7 +81,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
         isDense: true,
         prefixIcon: Icon(icon, color: SC.textMuted),
         hintText: hint,
-        hintStyle: const TextStyle(color: SC.textMuted),
+        hintStyle: TextStyle(color: SC.textMuted),
         filled: true,
         fillColor: PopupTokens.ghost,
         contentPadding: const EdgeInsets.symmetric(vertical: 14),
@@ -156,7 +156,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           child: TextField(
-            cursorColor: SC.accent,
+            cursorColor: SC.accentFg,
             onChanged: (v) => setState(() => _search = v),
             style: SCText.subtitle.copyWith(fontSize: 15),
             decoration: _field(AppStrings.t('loc_search_country'), Icons.search),
@@ -166,15 +166,15 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 24),
             leading: _locating
-                ? const SizedBox(
+                ? SizedBox(
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: SC.accent,
+                      color: SC.accentFg,
                     ),
                   )
-                : const Icon(Icons.my_location_rounded, color: SC.accent),
+                : Icon(Icons.my_location_rounded, color: SC.accentFg),
             title: Text(
               AppStrings.t('onb_location_autodetect'),
               style: SCText.subtitle.copyWith(
@@ -185,7 +185,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
             subtitle: _detectFailed
                 ? Text(
                     AppStrings.t('loc_detect_failed'),
-                    style: const TextStyle(color: SC.textMuted, fontSize: 12),
+                    style: TextStyle(color: SC.textMuted, fontSize: 12),
                   )
                 : null,
             onTap: _detect,
@@ -205,7 +205,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                   c.name,
                   style: SCText.subtitle.copyWith(fontWeight: FontWeight.w700),
                 ),
-                trailing: const Icon(Icons.chevron_right, color: SC.textMuted),
+                trailing: Icon(Icons.chevron_right, color: SC.textMuted),
                 onTap: () => _pickCountry(c),
               );
             },
@@ -227,7 +227,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
               child: TextField(
                 controller: _otherCityCtrl,
                 textCapitalization: TextCapitalization.words,
-                cursorColor: SC.accent,
+                cursorColor: SC.accentFg,
                 style: SCText.subtitle.copyWith(fontSize: 15),
                 onSubmitted: (v) {
                   if (v.trim().isNotEmpty) _commitCity(v);
@@ -262,7 +262,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
               fontWeight: FontWeight.w700,
             ),
           ),
-          trailing: const Icon(Icons.chevron_right, color: SC.textMuted),
+          trailing: Icon(Icons.chevron_right, color: SC.textMuted),
           onTap: () => _commitCity(''),
         ),
         if (cities.isNotEmpty) const SizedBox(height: 8),
@@ -275,7 +275,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
             ),
             trailing: city == widget.initialCity &&
                     _country?.name == widget.initialCountry
-                ? const Icon(Icons.check_rounded, color: SC.accent)
+                ? Icon(Icons.check_rounded, color: SC.accentFg)
                 : null,
             onTap: () => _commitCity(city),
           ),

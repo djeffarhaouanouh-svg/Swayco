@@ -3177,10 +3177,10 @@ class _CallScreenState extends State<CallScreen> {
 
     if (_connectError != null) {
       return Scaffold(
-        backgroundColor: SC.bg,
+        backgroundColor: SC.dBg,
         appBar: AppBar(
-          backgroundColor: SC.bg,
-          foregroundColor: SC.textPrimary,
+          backgroundColor: SC.dBg,
+          foregroundColor: SC.dTextPrimary,
           title: Text(AppStrings.t('call_could_not_join')),
           leading: IconButton(
             icon: const Icon(Icons.close),
@@ -3198,7 +3198,7 @@ class _CallScreenState extends State<CallScreen> {
                 Text(
                   _connectError!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: SC.textMuted, height: 1.4),
+                  style: const TextStyle(color: SC.dTextMuted, height: 1.4),
                 ),
                 const SizedBox(height: 24),
                 FilledButton(
@@ -3227,7 +3227,7 @@ class _CallScreenState extends State<CallScreen> {
       // ne plus rien dire. Elle sert maintenant à ce qui améliore vraiment
       // l'appel qui commence : la façon de parler.
       return Scaffold(
-        backgroundColor: SC.bg,
+        backgroundColor: SC.dBg,
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
@@ -3261,7 +3261,7 @@ class _CallScreenState extends State<CallScreen> {
                   AppStrings.t('call_connecting_tip'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: SC.textMuted,
+                    color: SC.dTextMuted,
                     fontSize: 13,
                     height: 1.4,
                   ),
@@ -3295,11 +3295,11 @@ class _CallScreenState extends State<CallScreen> {
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light.copyWith(
           statusBarColor: Colors.transparent,
-          systemNavigationBarColor: SC.bg,
+          systemNavigationBarColor: SC.dBg,
           systemNavigationBarIconBrightness: Brightness.light,
         ),
         child: Scaffold(
-          backgroundColor: SC.bg,
+          backgroundColor: SC.dBg,
           // Don't shrink the video when the keyboard opens — keep it full
           // screen; only the chat composer lifts above the keyboard (it adds
           // viewInsets.bottom itself).
@@ -3364,7 +3364,7 @@ class _CallScreenState extends State<CallScreen> {
                   )
                 else
                   Container(
-                    color: SC.menu,
+                    color: SC.dMenu,
                     alignment: Alignment.center,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -5936,7 +5936,7 @@ class _FlagWheelState extends State<_FlagWheel> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(widget.icon, size: 13, color: SC.textMuted),
+            Icon(widget.icon, size: 13, color: SC.dTextMuted),
             const SizedBox(width: 5),
             Flexible(
               child: Text(
@@ -5944,7 +5944,7 @@ class _FlagWheelState extends State<_FlagWheel> {
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 style: const TextStyle(
-                  color: SC.textMuted,
+                  color: SC.dTextMuted,
                   fontSize: 12,
                   height: 1.25,
                 ),
@@ -5998,7 +5998,7 @@ class _FlagWheelState extends State<_FlagWheel> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            color: SC.textPrimary,
+            color: SC.dTextPrimary,
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -6092,12 +6092,12 @@ class _SheetLabel extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: SC.textMuted),
+          Icon(icon, size: 18, color: SC.dTextMuted),
           const SizedBox(width: 8),
           Text(
             text,
             style: const TextStyle(
-              color: SC.textPrimary,
+              color: SC.dTextPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),

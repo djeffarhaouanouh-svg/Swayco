@@ -254,7 +254,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SC.bg,
+      backgroundColor: SC.tabBg,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -280,7 +280,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: SC.accent));
+      return Center(child: CircularProgressIndicator(color: SC.accentFg));
     }
     if (_error != null) {
       return Padding(
@@ -342,7 +342,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     ];
     final navBody = GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     return RefreshIndicator(
-      color: SC.accent,
+      color: SC.accentFg,
       backgroundColor: SC.menu,
       onRefresh: _reload,
       child: rows.isEmpty
@@ -485,10 +485,10 @@ class _RequestRow extends StatelessWidget {
               subtitle,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: SC.textPrimary,
               ),
             ),
           ),
@@ -548,7 +548,7 @@ class _LikeRow extends StatelessWidget {
               subtitle,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w500,
                 color: SC.textMuted,
@@ -693,7 +693,7 @@ class _RejectButton extends StatelessWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: const Padding(
+        child: Padding(
           padding: EdgeInsets.all(6),
           child: Icon(Icons.close_rounded, color: SC.textMuted, size: 22),
         ),
@@ -722,9 +722,9 @@ class _NoRequestsEmpty extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(color: SC.accent.withValues(alpha: 0.35)),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.group_outlined,
-                color: SC.accent,
+                color: SC.accentFg,
                 size: 34,
               ),
             ),
@@ -733,7 +733,7 @@ class _NoRequestsEmpty extends StatelessWidget {
             Text(
               AppStrings.t('demandes_empty_title'),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -743,7 +743,7 @@ class _NoRequestsEmpty extends StatelessWidget {
             Text(
               AppStrings.t('demandes_empty_body'),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textMuted,
                 fontSize: 13,
                 height: 1.4,

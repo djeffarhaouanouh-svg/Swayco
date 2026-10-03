@@ -123,14 +123,14 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
                       shape: BoxShape.circle,
                       color: SC.accentDeep,
                     ),
-                    child: const Icon(Icons.videocam_rounded,
-                        color: Colors.white, size: 36),
+                    child: Icon(Icons.videocam_rounded,
+                        color: SC.textPrimary, size: 36),
                   ),
                   const SizedBox(height: 20),
                   Text(
                     AppStrings.t('guest_title'),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: SC.textPrimary,
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
@@ -140,7 +140,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
                   Text(
                     AppStrings.t('guest_subtitle'),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: SC.textMuted,
                       fontSize: 14,
                       height: 1.4,
@@ -149,7 +149,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
                   const SizedBox(height: 28),
                   Text(
                     AppStrings.t('guest_lang_label'),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: SC.textPrimary,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,

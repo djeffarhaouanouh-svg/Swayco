@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -385,7 +385,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       // bar with the back button + title, glass inputs with cyan focus,
       // and a SC.accent "Save" pill.
       return Scaffold(
-        backgroundColor: SC.bg,
+        backgroundColor: SC.dBg,
         body: SafeArea(
           child: Column(
             children: [
@@ -515,8 +515,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     // flash in before [_genderAlreadySet] resolves to true on returning
     // users. Cheap — _prefill is a single SharedPreferences read.
     if (!_prefillDone) {
-      return const Scaffold(
-        backgroundColor: SC.bg,
+      return Scaffold(
+        backgroundColor: SC.dBg,
         body: SafeArea(child: SizedBox.shrink()),
       );
     }
@@ -746,13 +746,13 @@ class _LanguageGrid extends StatelessWidget {
         (selected != null && supportedLanguages.any((l) => l.code == selected))
         ? selected
         : null;
-    final fill = onBlue ? Colors.white : SC.menu;
-    final ink = onBlue ? SC.bgDeep : SC.textPrimary;
+    final fill = onBlue ? Colors.white : SC.dMenu;
+    final ink = onBlue ? SC.bgDeep : SC.dTextPrimary;
     return Container(
       decoration: BoxDecoration(
         color: fill,
         borderRadius: BorderRadius.circular(onBlue ? SwayOnb.radius : 14),
-        border: onBlue ? null : Border.all(color: SC.glassBorder),
+        border: onBlue ? null : Border.all(color: SC.dGlassBorder),
       ),
       padding: EdgeInsets.symmetric(
         horizontal: 14,
@@ -768,7 +768,7 @@ class _LanguageGrid extends StatelessWidget {
           hint: Text(
             AppStrings.t('onb_language_picker_label'),
             style: TextStyle(
-              color: onBlue ? SwayOnb.hintOnWhite : SC.textMuted,
+              color: onBlue ? SwayOnb.hintOnWhite : SC.dTextMuted,
               fontSize: 15,
             ),
           ),
@@ -894,27 +894,27 @@ class _GlassTextField extends StatelessWidget {
         minLines: minLines,
         maxLines: maxLines,
         cursorColor: SC.accent,
-        style: const TextStyle(color: SC.textPrimary, fontSize: 15),
+        style: TextStyle(color: SC.dTextPrimary, fontSize: 15),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(color: SC.textMuted),
+          labelStyle: TextStyle(color: SC.dTextMuted),
           floatingLabelStyle: const TextStyle(color: SC.accent),
           floatingLabelBehavior: alwaysFloatLabel
               ? FloatingLabelBehavior.always
               : FloatingLabelBehavior.auto,
           hintText: hint,
-          hintStyle: const TextStyle(color: SC.textMuted),
-          prefixIcon: Icon(icon, color: SC.textMuted),
+          hintStyle: TextStyle(color: SC.dTextMuted),
+          prefixIcon: Icon(icon, color: SC.dTextMuted),
           filled: true,
           alignLabelWithHint: alignLabelWithHint,
-          counterStyle: const TextStyle(color: SC.textMuted),
+          counterStyle: TextStyle(color: SC.dTextMuted),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: SC.glassBorder),
+            borderSide: BorderSide(color: SC.dGlassBorder),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: SC.glassBorder),
+            borderSide: BorderSide(color: SC.dGlassBorder),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
@@ -948,7 +948,7 @@ class _GlassSelectField extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasValue = value.trim().isNotEmpty;
     return Material(
-      color: SC.menu,
+      color: SC.dMenu,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -957,11 +957,11 @@ class _GlassSelectField extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: SC.glassBorder),
+            border: Border.all(color: SC.dGlassBorder),
           ),
           child: Row(
             children: [
-              Icon(icon, color: SC.textMuted),
+              Icon(icon, color: SC.dTextMuted),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -971,7 +971,7 @@ class _GlassSelectField extends StatelessWidget {
                     Text(
                       label,
                       style: TextStyle(
-                        color: hasValue ? SC.accent : SC.textMuted,
+                        color: hasValue ? SC.accent : SC.dTextMuted,
                         fontSize: 12,
                       ),
                     ),
@@ -981,16 +981,16 @@ class _GlassSelectField extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: hasValue ? SC.textPrimary : SC.textMuted,
+                        color: hasValue ? SC.dTextPrimary : SC.dTextMuted,
                         fontSize: 15,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.keyboard_arrow_down_rounded,
-                color: SC.textMuted,
+                color: SC.dTextMuted,
               ),
             ],
           ),

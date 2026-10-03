@@ -100,7 +100,7 @@ class _DiscoverAdCardState extends State<DiscoverAdCard> {
                 ),
                 child: Text(
                   AppStrings.t('ad_label'),
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: SC.textMuted,
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,

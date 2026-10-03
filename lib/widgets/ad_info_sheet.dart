@@ -190,7 +190,7 @@ class _AdUpsellSheetState extends State<_AdUpsellSheet> {
             if (price != null)
               TextSpan(
                 text: '$price${AppStrings.t('paywall_period_month')}\n',
-                style: const TextStyle(
+                style: TextStyle(
                   color: SC.accent,
                   fontWeight: FontWeight.w800,
                 ),

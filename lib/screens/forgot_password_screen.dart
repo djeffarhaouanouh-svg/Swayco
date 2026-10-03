@@ -97,7 +97,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     Text(
                       AppStrings.t('forgot_pw_subtitle'),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: SC.textMuted,
                         fontSize: 14,
                         height: 1.35,

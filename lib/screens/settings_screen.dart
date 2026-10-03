@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/app_theme.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/auth_service.dart';
@@ -543,6 +544,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
 
                 _SectionHeader(
+                  label: AppStrings.t('settings_section_appearance'),
+                ),
+                const _SettingsCard(children: [_AppearanceRow()]),
+
+                _SectionHeader(
                   label: AppStrings.t('settings_section_call_lang'),
                 ),
                 _SettingsCard(
@@ -599,9 +605,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         icon: Icons.workspace_premium_outlined,
                         label: AppStrings.t('my_subscription_section'),
                         trailing: active
-                            ? const Icon(
+                            ? Icon(
                                 Icons.check_circle_rounded,
-                                color: SC.accent,
+                                color: SC.accentFg,
                                 size: 20,
                               )
                             : null,
@@ -724,8 +730,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 if (_busy) ...[
                   const SizedBox(height: 20),
-                  const Center(
-                    child: CircularProgressIndicator(color: SC.accent),
+                  Center(
+                    child: CircularProgressIndicator(color: SC.accentFg),
                   ),
                 ],
               ],
@@ -739,6 +745,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
 // ───── Section header / cards / rows ────────────────────────────────────
 
+/// « Apparence » : Système / Clair / Sombre. Mémorisé sur l'appareil ; le
+/// changement est immédiat (le thème de l'app écoute [AppTheme.mode]).
+class _AppearanceRow extends StatelessWidget {
+  const _AppearanceRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppTheme.mode,
+      builder: (context, mode, _) {
+        Widget seg(ThemeMode m, String label) {
+          final on = mode == m;
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => AppTheme.set(m),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: on
+                      ? (SC.light ? SC.brandBlueDeep : SC.accent)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: on
+                        ? (SC.light ? Colors.white : SC.onAccent)
+                        : SC.textMuted,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.brightness_6_outlined, size: 22, color: SC.textPrimary),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: SC.glass,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: SC.glassBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      seg(ThemeMode.system, AppStrings.t('appearance_system')),
+                      seg(ThemeMode.light, AppStrings.t('appearance_light')),
+                      seg(ThemeMode.dark, AppStrings.t('appearance_dark')),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.label});
   final String label;
@@ -749,7 +829,7 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(8, 20, 8, 8),
       child: Text(
         label.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           color: SC.textMuted,
           fontSize: 11,
           fontWeight: FontWeight.w700,
@@ -775,7 +855,7 @@ class _SettingsCard extends StatelessWidget {
             height: 1,
             thickness: 1,
             indent: 52,
-            color: Colors.white.withValues(alpha: 0.06),
+            color: SC.glassBorder,
           ),
         );
       }
@@ -830,9 +910,9 @@ class _SettingsRow extends StatelessWidget {
             ),
             if (trailing != null) ...[trailing!, const SizedBox(width: 8)],
             if (onTap != null && trailing == null)
-              const Icon(Icons.chevron_right, color: SC.textMuted, size: 22)
+              Icon(Icons.chevron_right, color: SC.textMuted, size: 22)
             else if (onTap != null)
-              const Icon(Icons.chevron_right, color: SC.textMuted, size: 22),
+              Icon(Icons.chevron_right, color: SC.textMuted, size: 22),
           ],
         ),
       ),
@@ -866,7 +946,7 @@ class _SettingsToggleRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   color: SC.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -896,7 +976,7 @@ class _SubtleText extends StatelessWidget {
       text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(color: SC.textMuted, fontSize: 13),
+      style: TextStyle(color: SC.textMuted, fontSize: 13),
     );
   }
 }
@@ -974,11 +1054,11 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
       ),
       body: MeshBackground(
         child: _loading
-            ? const Center(child: CircularProgressIndicator(color: SC.accent))
+            ? Center(child: CircularProgressIndicator(color: SC.accentFg))
             : _blocked.isEmpty
             ? const _BlockedEmptyState()
             : RefreshIndicator(
-                color: SC.accent,
+                color: SC.accentFg,
                 backgroundColor: SC.menu,
                 onRefresh: _load,
                 child: ListView.separated(
@@ -1019,7 +1099,7 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
                               children: [
                                 Text(
                                   p.displayName.isEmpty ? '—' : p.displayName,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: SC.textPrimary,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
@@ -1028,7 +1108,7 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
                                 if (p.handle.isNotEmpty)
                                   Text(
                                     '@${p.handle}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: SC.textMuted,
                                       fontSize: 12,
                                     ),
@@ -1040,7 +1120,7 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
                             onPressed: () => _unblock(p),
                             child: Text(
                               AppStrings.t('unblock'),
-                              style: const TextStyle(color: SC.accent),
+                              style: TextStyle(color: SC.accentFg),
                             ),
                           ),
                         ],
@@ -1065,11 +1145,11 @@ class _BlockedEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.block, size: 56, color: SC.textMuted),
+            Icon(Icons.block, size: 56, color: SC.textMuted),
             const SizedBox(height: 14),
             Text(
               AppStrings.t('blocked_empty_title'),
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -1079,7 +1159,7 @@ class _BlockedEmptyState extends StatelessWidget {
             Text(
               AppStrings.t('blocked_empty_body'),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textMuted,
                 fontSize: 13,
                 height: 1.4,

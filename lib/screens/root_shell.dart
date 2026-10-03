@@ -29,6 +29,7 @@ import '../services/token_api.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
+import '../theme/swayco_palette.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/match_overlay.dart';
@@ -780,8 +781,11 @@ class _RootShellState extends State<RootShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: SC.bg,
+    // Fond blanc + halo de marque posé UNE fois pour les 4 onglets (clair) ;
+    // en sombre : le même #0E0E0E qu'avant.
+    return SwaycoBackground(
+      child: Scaffold(
+      backgroundColor: SC.tabBg,
       extendBody: true,
       body: ValueListenableBuilder<int>(
         valueListenable: NavTab.index,
@@ -860,6 +864,7 @@ class _RootShellState extends State<RootShell> {
           ),
         ),
       ),
+    ),
     );
   }
 }

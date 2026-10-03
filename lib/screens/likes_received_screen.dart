@@ -98,13 +98,13 @@ class _LikesReceivedScreenState extends State<LikesReceivedScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: SC.accent))
+          ? Center(child: CircularProgressIndicator(color: SC.accentFg))
           : _likers.isEmpty
           ? const _EmptyState()
           : ValueListenableBuilder<bool>(
               valueListenable: RevenueCat.proActive,
               builder: (context, _, _) => RefreshIndicator(
-                color: SC.accent,
+                color: SC.accentFg,
                 backgroundColor: SC.menu,
                 onRefresh: _load,
                 child: ListView.separated(
@@ -188,7 +188,7 @@ class _LikerRow extends StatelessWidget {
                                 ? '—'
                                 : profile.displayName,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: SC.textPrimary,
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -219,7 +219,7 @@ class _LikerRow extends StatelessWidget {
                     if (revealed && profile.handle.isNotEmpty)
                       Text(
                         '@${profile.handle}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: SC.textMuted,
                           fontSize: 12,
                         ),
@@ -247,11 +247,11 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.favorite_border, size: 56, color: SC.textMuted),
+            Icon(Icons.favorite_border, size: 56, color: SC.textMuted),
             const SizedBox(height: 14),
             Text(
               AppStrings.t('no_one_liked_yet'),
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -261,7 +261,7 @@ class _EmptyState extends StatelessWidget {
             Text(
               AppStrings.t('like_explainer'),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textMuted,
                 fontSize: 13,
                 height: 1.4,

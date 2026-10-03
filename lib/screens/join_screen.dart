@@ -206,8 +206,8 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: SC.accent),
+      return Center(
+        child: CircularProgressIndicator(color: SC.accentFg),
       );
     }
     if (!isSupabaseReady) {
@@ -228,7 +228,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       );
     }
     return RefreshIndicator(
-      color: SC.accent,
+      color: SC.accentFg,
       backgroundColor: SC.menu,
       onRefresh: _bootstrap,
       child: ListView.separated(
@@ -293,8 +293,8 @@ class _CallableFriendRow extends StatelessWidget {
               ),
               child: Text(
                 initial,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: SC.textPrimary,
                   fontWeight: FontWeight.w700,
                   fontSize: 20,
                 ),
@@ -312,7 +312,7 @@ class _CallableFriendRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     softWrap: false,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: SC.textPrimary,
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
@@ -325,7 +325,7 @@ class _CallableFriendRow extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       softWrap: false,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: SC.textMuted,
                         fontSize: 13,
                       ),
@@ -352,9 +352,9 @@ class _CallableFriendRow extends StatelessWidget {
                             color: Colors.white,
                           ),
                         )
-                      : const Icon(
+                      : Icon(
                           Icons.videocam_rounded,
-                          color: Colors.white,
+                          color: SC.textPrimary,
                           size: 22,
                         ),
                 ),
@@ -403,7 +403,7 @@ class _MyProfileStrip extends StatelessWidget {
                   name.isEmpty ? 'Sans nom' : name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: SC.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -415,7 +415,7 @@ class _MyProfileStrip extends StatelessWidget {
                       : AppStrings.t('join_no_lang'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: SC.textMuted,
                     fontSize: 12,
                   ),
@@ -426,7 +426,7 @@ class _MyProfileStrip extends StatelessWidget {
           IconButton(
             onPressed: onEdit,
             tooltip: AppStrings.t('join_edit_profile'),
-            icon: const Icon(Icons.edit_outlined, color: SC.textMuted),
+            icon: Icon(Icons.edit_outlined, color: SC.textMuted),
           ),
         ],
       ),
@@ -455,7 +455,7 @@ class _CenteredHint extends StatelessWidget {
             Container(
               width: 72,
               height: 72,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: SC.menu,
                 shape: BoxShape.circle,
               ),
@@ -465,7 +465,7 @@ class _CenteredHint extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -475,7 +475,7 @@ class _CenteredHint extends StatelessWidget {
             Text(
               body,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textMuted,
                 fontSize: 13,
                 height: 1.4,
@@ -516,7 +516,7 @@ class _WhatsAppCallHeader extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.videocam, color: Colors.white, size: 28),
+                    child: Icon(Icons.videocam, color: SC.textPrimary, size: 28),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -525,8 +525,8 @@ class _WhatsAppCallHeader extends StatelessWidget {
                       children: [
                         Text(
                           AppStrings.t('join_header_title'),
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: SC.textPrimary,
                             fontSize: 22,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.2,
@@ -548,7 +548,7 @@ class _WhatsAppCallHeader extends StatelessWidget {
                       tooltip: AppStrings.t('join_header_profile_tooltip'),
                       icon: Icon(
                         Icons.manage_accounts_outlined,
-                        color: Colors.white.withValues(alpha: 0.92),
+                        color: SC.textPrimary.withValues(alpha: 0.92),
                       ),
                     ),
                 ],

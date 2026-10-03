@@ -28,7 +28,7 @@ class TranslationFeedbackRibbon extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (phase == TranslationFeedbackPhase.working)
-            const LinearProgressIndicator(
+            LinearProgressIndicator(
               minHeight: 2.5,
               backgroundColor: Colors.transparent,
               color: SC.accent,

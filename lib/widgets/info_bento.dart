@@ -124,14 +124,16 @@ class InfoBento extends StatelessWidget {
 TextStyle bentoLabelStyle() => GoogleFonts.ibmPlexMono(
       fontSize: 11,
       letterSpacing: 1.1,
-      color: Colors.white.withValues(alpha: 0.55),
+      color: SC.light ? SC.textMuted : Colors.white.withValues(alpha: 0.55),
     );
 
 /// Le cadre d'une tuile « verre » : rayon 20, fond blanc 10 %, bord blanc 16 %.
 BoxDecoration bentoTileDecoration() => BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.10),
+      color: SC.light ? SC.menu : Colors.white.withValues(alpha: 0.10),
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+      border: Border.all(
+        color: SC.light ? SC.glassBorder : Colors.white.withValues(alpha: 0.16),
+      ),
     );
 
 class _AgeTile extends StatelessWidget {
@@ -253,7 +255,10 @@ class _InfoTile extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: filled ? SC.accent : Colors.white.withValues(alpha: 0.45),
+              // Clair : le jaune n'est pas lisible sur blanc — la valeur passe en encre.
+              color: filled
+                  ? (SC.light ? SC.textPrimary : SC.accent)
+                  : (SC.light ? SC.textMuted : Colors.white.withValues(alpha: 0.45)),
               fontSize: 16,
               height: 1.2,
               fontWeight: filled ? FontWeight.w800 : FontWeight.w500,
@@ -273,7 +278,7 @@ class _InfoTile extends StatelessWidget {
         : ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 76),
             child: CustomPaint(
-              painter: _DashedTilePainter(SC.accent.withValues(alpha: 0.6)),
+              painter: _DashedTilePainter(SC.accentFg.withValues(alpha: 0.6)),
               child: Align(alignment: Alignment.centerLeft, child: content),
             ),
           );
@@ -305,7 +310,10 @@ class _DashedTilePainter extends CustomPainter {
     );
     canvas.drawRRect(
       rrect,
-      Paint()..color = Colors.white.withValues(alpha: 0.05),
+      Paint()
+        ..color = SC.light
+            ? SC.glass
+            : Colors.white.withValues(alpha: 0.05),
     );
     final paint = Paint()
       ..color = color
@@ -341,10 +349,14 @@ class InfoGlassFrame extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.10),
+            color: SC.light
+                ? const Color(0xB8FFFFFF)
+                : Colors.white.withValues(alpha: 0.10),
             borderRadius: r,
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.24),
+              color: SC.light
+                  ? SC.glassBorder
+                  : Colors.white.withValues(alpha: 0.24),
               width: 1.2,
             ),
           ),

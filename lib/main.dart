@@ -3,6 +3,7 @@ import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -18,6 +19,7 @@ import 'screens/login_screen.dart';
 import 'screens/new_password_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/root_shell.dart';
+import 'services/app_theme.dart';
 import 'services/muted_calls.dart';
 import 'services/analytics.dart';
 import 'services/app_settings.dart';
@@ -137,6 +139,8 @@ Future<void> main() async {
   // bisect proved the boot path is otherwise clean.
   await runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
+  // Apparence (clair / sombre / système) lue AVANT le premier build.
+  await AppTheme.load();
     FlutterError.onError = (details) {
       debugPrint('FlutterError: ${details.exception}');
       FlutterError.presentError(details);
@@ -681,17 +685,34 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     return ValueListenableBuilder<String>(
       valueListenable: AppStrings.currentBcp47,
       builder: (context, _, _) {
-        return MaterialApp(
+        return ValueListenableBuilder<ThemeMode>(
+          valueListenable: AppTheme.mode,
+          builder: (context, themeMode, _) => MaterialApp(
           title: 'Swayco',
           navigatorKey: rootNavigatorKey,
           debugShowCheckedModeBanner: false,
-          theme: SC.material(),
+          // Clair « halo de marque » / sombre ; "Système" suit le téléphone.
+          theme: SC.lightMaterial(),
+          darkTheme: SC.material(),
+          themeMode: themeMode,
           // Honour the device's "Larger Text" setting (good for readability)
           // but cap it at 1.3× so an extreme accessibility font size can never
           // overflow buttons / headers / labels and break the layout.
           builder: (context, child) {
+            // Les couleurs de fond / texte de SC suivent le thème actif : posées
+            // ICI, avant que l'arbre ne se construise.
+            final isLight = Theme.of(context).brightness == Brightness.light;
+            SC.apply(Theme.of(context).brightness);
             final mq = MediaQuery.of(context);
-            return MediaQuery(
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: isLight
+                  ? SystemUiOverlayStyle.dark.copyWith(
+                      statusBarColor: Colors.transparent,
+                    )
+                  : SystemUiOverlayStyle.light.copyWith(
+                      statusBarColor: Colors.transparent,
+                    ),
+              child: MediaQuery(
               data: mq.copyWith(
                 textScaler: mq.textScaler.clamp(maxScaleFactor: 1.3),
               ),
@@ -704,7 +725,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
                 onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
                 child: child ?? const SizedBox.shrink(),
               ),
-            );
+            ));
           },
           home: ValueListenableBuilder<bool>(
             valueListenable: AppBoot.homeReady,
@@ -741,7 +762,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
               );
             },
           ),
-        );
+        ));
       },
     );
   }

@@ -1839,8 +1839,8 @@ class _MessageBubbleState extends State<_MessageBubble> {
             padding: const EdgeInsets.only(bottom: 2),
             child: Text(
               message.senderName,
-              style: const TextStyle(
-                color: SC.accent,
+              style: TextStyle(
+                color: SC.accentFg,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
               ),
@@ -1865,7 +1865,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
                   child: Image.network(
                     message.discoverPhoto,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const SizedBox(
+                    errorBuilder: (_, _, _) => SizedBox(
                       height: 100,
                       width: 100,
                       child: Center(
@@ -1897,17 +1897,17 @@ class _MessageBubbleState extends State<_MessageBubble> {
                     fit: BoxFit.cover,
                     loadingBuilder: (ctx, child, progress) => progress == null
                         ? child
-                        : const SizedBox(
+                        : SizedBox(
                             height: 160,
                             width: 200,
                             child: Center(
                               child: CircularProgressIndicator(
-                                color: SC.accent,
+                                color: SC.accentFg,
                                 strokeWidth: 2,
                               ),
                             ),
                           ),
-                    errorBuilder: (_, _, _) => const SizedBox(
+                    errorBuilder: (_, _, _) => SizedBox(
                       height: 120,
                       width: 200,
                       child: Center(
@@ -2464,7 +2464,7 @@ class _BlockedComposerNotice extends StatelessWidget {
             Text(
               AppStrings.t('chat_blocked_title', args: {'name': firstName}),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textPrimary,
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
@@ -2474,7 +2474,7 @@ class _BlockedComposerNotice extends StatelessWidget {
             Text(
               AppStrings.t('chat_blocked_body'),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: SC.textMuted,
                 fontSize: 13,
                 height: 1.35,
@@ -2525,7 +2525,7 @@ class _BlockedAction extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: SC.textPrimary,
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -2812,8 +2812,8 @@ class _ComposerState extends State<_Composer>
                           maxLines: null,
                           textAlignVertical: TextAlignVertical.center,
                           textCapitalization: TextCapitalization.sentences,
-                          cursorColor: SC.accent,
-                          style: const TextStyle(color: SC.textPrimary),
+                          cursorColor: SC.accentFg,
+                          style: TextStyle(color: SC.textPrimary),
                           decoration: InputDecoration(
                             // Effacé dès que le champ a le focus.
                             // S'efface / revient en fondu avec le focus.
