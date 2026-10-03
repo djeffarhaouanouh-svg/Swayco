@@ -20,6 +20,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 import '../services/analytics.dart';
 import '../services/attribution.dart';
 import '../services/app_strings.dart';
+import '../services/swayco_sounds.dart';
 import '../swayco/asr/apple_stt_channel.dart';
 import '../swayco/asr/asr_service.dart';
 import '../services/audio_controller.dart';
@@ -1982,6 +1983,7 @@ class _CallScreenState extends State<CallScreen> {
           // First remote joining = call answered â†’ silence the caller's
           // dial tone (no-op on native via the stub).
           CallAlert.stop();
+          if (!_hadRemote) _playCallConnected();
           _hadRemote = true;
           unawaited(_refreshTranslationBinding(room));
           if (mounted) setState(() {});
@@ -2009,6 +2011,7 @@ class _CallScreenState extends State<CallScreen> {
       // peer later leaves. Re-seed from the current snapshot so both sides
       // are sent back to the live screen when either one ends the call.
       if (room.remoteParticipants.isNotEmpty) {
+        if (!_hadRemote) _playCallConnected();
         _hadRemote = true;
         // Peer was already here when we joined → no ParticipantConnectedEvent
         // fires for us, so keep re-binding until their language is known.
@@ -2119,6 +2122,14 @@ class _CallScreenState extends State<CallScreen> {
       if (t != null) return t;
     }
     return null;
+  }
+
+  /// Les deux personnes sont là : le contexte audio des sons suit celui de
+  /// WebRTC pour ne pas couper le micro, puis un petit son de connexion.
+  void _playCallConnected() {
+    SwaycoSounds.callActive = true;
+    HapticFeedback.mediumImpact();
+    SwaycoSounds.play(SwSound.callConnected);
   }
 
   Future<void> _toggleMic() async {
@@ -2613,6 +2624,7 @@ class _CallScreenState extends State<CallScreen> {
     final startedAt = _connectedAt;
     if (_hadRemote && startedAt != null && mounted) {
       _finalDuration = DateTime.now().difference(startedAt);
+      SwaycoSounds.play(SwSound.callEnded);
       setState(() => _ended = true);
       unawaited(_prepareEndedCard());
       return;
@@ -3111,6 +3123,7 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    SwaycoSounds.callActive = false;
     widget.translation.localTranscript?.removeListener(_onMyTranscript);
     AsrService.osRefusedKey.removeListener(_onSttRefused);
     _chatCtrl.dispose();
