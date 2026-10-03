@@ -337,7 +337,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
           gradient: RadialGradient(
             center: Alignment(0.2, 0.1),
             radius: 1.0,
-            colors: [Color(0xFF1F4FD6), Color(0xFF0F1A3A), Color(0xFF0E0E0E)],
+            colors: [Color(0xFF1F4FD6), Color(0xFF0F1A3A), Color(0xFF0A0F1C)],
             stops: [0, 0.55, 1],
           ),
         ),

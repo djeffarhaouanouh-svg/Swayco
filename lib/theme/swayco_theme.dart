@@ -21,11 +21,11 @@ abstract final class SC {
   // Valeurs SOMBRES figées : pour les écrans qui restent sombres (ou sur
   // dégradé bleu) quel que soit le thème — appel, onboarding, connexion,
   // recadrage photo, match. À la place de `SC.textPrimary` & co.
-  static const dBg = Color(0xFF0E0E0E);
+  static const dBg = Color(0xFF0A0F1C);
   static const dTextPrimary = Color(0xFFF5F7FF);
   static const dTextSecondary = Color(0xB3F5F7FF);
   static const dTextMuted = Color(0x80F5F7FF);
-  static const dMenu = Color(0xFF2B2B2B);
+  static const dMenu = Color(0xFF161D30);
   static const dBubbleIn = Color(0xFF1A2138);
   static const dBubbleInBorder = Color(0x14FFFFFF);
   static const dGlass = Color(0x0FFFFFFF);
@@ -39,10 +39,10 @@ abstract final class SC {
   /// en mode clair — le fond blanc + halo est posé une seule fois par le shell
   /// ([SwaycoBackground]), pour que le halo ne se double pas. Identique à [bg]
   /// en sombre. Les pages poussées gardent [bg] (opaque).
-  static Color get tabBg => light ? Colors.transparent : const Color(0xFF0E0E0E);
+  static Color get tabBg => Colors.transparent;
 
   // Backgrounds (inchangés en sombre)
-  static Color get bg => light ? const Color(0xFFFFFFFF) : const Color(0xFF0E0E0E);
+  static Color get bg => light ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F1C);
   /// Encre posée SUR l'accent jaune (texte des badges / boutons pleins).
   static const bgDeep        = Color(0xFF04123A);
 
@@ -92,7 +92,7 @@ abstract final class SC {
       light ? const Color(0xFF8A94B0) : const Color(0x80F5F7FF);
 
   static Color get menu =>
-      light ? const Color(0xFFF2F6FF) : const Color(0xFF2B2B2B);
+      light ? const Color(0xFFF2F6FF) : const Color(0xFF161D30);
 
   static Color get bubbleIn =>
       light ? const Color(0xFFF2F6FF) : const Color(0xFF1A2138);
@@ -124,9 +124,9 @@ abstract final class SC {
   static const msgOutText    = Color(0xFFFFFFFF);
 
   static ThemeData material() {
-    const dBg = Color(0xFF0E0E0E);
+    const dBg = Color(0xFF0A0F1C);
     const dText = Color(0xFFF5F7FF);
-    const dMenu = Color(0xFF2B2B2B);
+    const dMenu = Color(0xFF161D30);
     const dBorder = Color(0x1AFFFFFF);
     const base = ColorScheme.dark(
       primary: accent,

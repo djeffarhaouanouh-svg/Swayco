@@ -1,38 +1,14 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../theme/swayco_palette.dart';
-import '../theme/swayco_theme.dart';
 
-/// Midnight ambient background — a solid navy [SC.bg] fill with a soft
-/// vignette on top for legibility. Drop it just inside [Scaffold.body]
-/// when the scaffold's own background is transparent.
+/// Fond de marque des pages (Réglages…) : couleur pleine + halo bleu/cyan en
+/// haut — blanc en clair, #0A0F1C en sombre (variante 18d).
 class MeshBackground extends StatelessWidget {
   const MeshBackground({super.key, required this.child});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    // Mode clair : fond blanc + halo de marque (pas de voile sombre).
-    if (SC.light) return SwaycoBackground(child: child);
-    return Container(
-      color: SC.bg,
-      child: Stack(
-        children: [
-          // Vignette: nudges contrast up at the edges without going pitch black.
-          const Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  radius: 1.2,
-                  colors: [Colors.transparent, Color(0x33000000)],
-                ),
-              ),
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SwaycoBackground(child: child);
 }

@@ -46,7 +46,8 @@ import 'profile_screen.dart';
 /// name shown in the header. The header phone icon dials the peer directly
 /// via CallLauncher.
 /// Fond de la conversation 1b (handoff) — un cran au-dessus du noir pur.
-const Color _kThreadBg = Color(0xFF0B0B0C);
+/// Suit le thème : #0A0F1C en sombre, blanc en clair.
+Color get _kThreadBg => SC.bg;
 
 /// Opacité du fond DERRIÈRE le header et le composer. Constante sur toute
 /// leur hauteur : un dégradé qui baissait déjà derrière le prénom laissait
@@ -2910,7 +2911,7 @@ class _CircleActionButton extends StatelessWidget {
           height: 46,
           child: Center(
             child: busy
-                ? const SizedBox(
+                ? SizedBox(
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(

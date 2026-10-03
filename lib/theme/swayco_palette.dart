@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Swayco — palettes mode clair (« halo de marque », maquette 17d) et mode sombre.
+/// Swayco — fond 18d « noir + halo de marque ». Seule la palette `dark` est utilisée
+/// (l'app reste en mode sombre). `light` est gardée pour un futur mode clair.
 /// À utiliser à la place des couleurs « fond / texte / surfaces » de `SC`
 /// (`SC.bg`, `SC.textPrimary`, `SC.menu`, `SC.glass…`). Les couleurs de marque
 /// (`SC.accent` #F4FF1F, `SC.brandGradient`, `SC.brandBlue`…) ne changent pas.
@@ -67,19 +68,25 @@ class SwaycoPalette extends ThemeExtension<SwaycoPalette> {
     statusBar: Brightness.dark,
   );
 
+  /// Mode sombre « noir + halo de marque » (maquette 18d), pendant de 17d.
   static const dark = SwaycoPalette(
-    bg: Color(0xFF0E0E0E),
-    halo: null,
-    surface: Color(0xFF1F1F22),
+    bg: Color(0xFF0A0F1C),
+    halo: RadialGradient(
+      center: Alignment(0, -1),
+      radius: 1.2,
+      colors: [Color(0x611F5EFF), Color(0x1F18DDEA), Color(0x000A0F1C)],
+      stops: [0, .4, .75],
+    ),
+    surface: Color(0xFF161D30),
     card: Color(0x0FFFFFFF),
     line: Color(0x1AFFFFFF),
     ink: Color(0xFFF5F7FF),
-    inkSecondary: Color(0x99F5F7FF),
+    inkSecondary: Color(0x9EF5F7FF),
     inkMuted: Color(0x80FFFFFF),
     navGlass: Color(0x21FFFFFF),
     navBorder: Color(0x38FFFFFF),
     navActive: Color(0x2EFFFFFF),
-    cardShadow: [],
+    cardShadow: [BoxShadow(color: Color(0x99000000), blurRadius: 28, spreadRadius: -12, offset: Offset(0, 10))],
     statusBar: Brightness.light,
   );
 
@@ -94,7 +101,7 @@ class SwaycoPalette extends ThemeExtension<SwaycoPalette> {
       t < .5 ? this : (other as SwaycoPalette? ?? this);
 }
 
-/// Fond d'écran Swayco : couleur pleine + halo de marque (mode clair).
+/// Fond d'écran Swayco : couleur pleine + halo de marque (clair ET sombre).
 /// Remplace `backgroundColor: SC.bg` : mets le Scaffold en
 /// `backgroundColor: Colors.transparent` et enveloppe-le dans ce widget.
 class SwaycoBackground extends StatelessWidget {
