@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/app_strings.dart';
+import '../services/swayco_sounds.dart';
 import '../services/device_id.dart';
 import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
@@ -105,6 +106,8 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
     );
     if (!mounted) return;
     if (outcome == PurchaseOutcome.success) {
+      HapticFeedback.heavyImpact();
+      SwaycoSounds.play(SwSound.purchase);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppStrings.t('paywall_snack_activated'))),
       );
@@ -163,6 +166,8 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
       if (!mounted) return;
       setState(() => _busy = false);
       if (active.contains(RevenueCat.proEntitlementId)) {
+        HapticFeedback.heavyImpact();
+        SwaycoSounds.play(SwSound.purchase);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppStrings.t('paywall_snack_restored'))),
         );
@@ -816,6 +821,8 @@ class _BoostPaywallState extends State<_BoostPaywall> {
       );
     }
     if (outcome == PurchaseOutcome.success) {
+      HapticFeedback.heavyImpact();
+      SwaycoSounds.play(SwSound.boost);
       Navigator.of(context).maybePop();
       await widget.onPurchased();
     }

@@ -1,8 +1,8 @@
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/friendship_api.dart';
+import '../services/swayco_sounds.dart';
 import '../services/profile_api.dart';
 import 'match_card.dart';
 
@@ -36,7 +36,6 @@ class _MatchOverlayState extends State<MatchOverlay>
   late final Animation<double> _scrim;
   late final Animation<double> _body;
 
-  final AudioPlayer _sfx = AudioPlayer();
   bool _peaked = false;
 
   MatchCardKind _kind = MatchCardKind.standard;
@@ -61,7 +60,7 @@ class _MatchOverlayState extends State<MatchOverlay>
       if (!_peaked && _body.value > 0.35) {
         _peaked = true;
         HapticFeedback.heavyImpact();
-        _sfx.play(AssetSource('sounds/match_pop.wav')).ignore();
+        SwaycoSounds.play(SwSound.match);
       }
     });
     _resolve();
@@ -87,7 +86,6 @@ class _MatchOverlayState extends State<MatchOverlay>
   @override
   void dispose() {
     _c.dispose();
-    _sfx.dispose();
     super.dispose();
   }
 

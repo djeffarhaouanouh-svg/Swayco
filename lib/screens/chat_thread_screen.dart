@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
+import '../services/swayco_sounds.dart';
 import '../services/block_api.dart';
 import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
@@ -231,6 +232,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     );
     if (ok != true) return;
     await ChatUnread.markConversationCleared(widget.conversationId);
+    HapticFeedback.lightImpact();
+    SwaycoSounds.play(SwSound.deleted);
     if (!mounted) return;
     Navigator.of(context).maybePop();
   }
@@ -260,6 +263,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         );
       } else {
         await BlockApi.block(blockerId: _myId, blockedId: widget.peerDeviceId);
+        HapticFeedback.mediumImpact();
+        SwaycoSounds.play(SwSound.block);
       }
       if (!mounted) return;
       setState(() => _peerBlocked = !wasBlocked);
@@ -444,6 +449,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         // Seulement si le moteur a VRAIMENT traduit : en cas d'échec,
         // fetchTextTranslation rend le texte d'entrée tel quel, et graver ça
         // figerait un message non traduit pour toujours.
+        if (out.isNotEmpty &&
+            out != m.body &&
+            _messages.isNotEmpty &&
+            _messages.last.id == id) {
+          SwaycoSounds.play(SwSound.translation);
+        }
         if (out.isNotEmpty && out != m.body) {
           unawaited(TranslationCache.put(
             convId: widget.conversationId,
@@ -592,6 +603,16 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _sub = ChatApi.subscribeMessages(widget.conversationId).listen(
       (rows) {
         if (!mounted) return;
+        if (_messagesLoaded) {
+          final known = _messages.map((x) => x.id).toSet();
+          final incoming = rows.any(
+            (x) => x.id.isNotEmpty && x.senderId != _myId && !known.contains(x.id),
+          );
+          if (incoming) {
+            HapticFeedback.selectionClick();
+            SwaycoSounds.play(SwSound.msgReceived);
+          }
+        }
         setState(() {
           _messages = rows;
           _messagesLoaded = true;
@@ -751,8 +772,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         'message_sent',
         props: {'source': 'chat', 'type': 'text'},
       );
+      HapticFeedback.lightImpact();
+      SwaycoSounds.play(SwSound.msgSent);
       _inputCtrl.clear();
     } catch (e) {
+      HapticFeedback.vibrate();
+      SwaycoSounds.play(SwSound.error);
       setState(() => _error = 'Envoi échoué: $e');
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -799,7 +824,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         'message_sent',
         props: {'source': 'chat', 'type': 'image'},
       );
+      HapticFeedback.lightImpact();
+      SwaycoSounds.play(SwSound.msgSent);
     } catch (e) {
+      HapticFeedback.vibrate();
+      SwaycoSounds.play(SwSound.error);
       if (mounted) setState(() => _error = 'Envoi image échoué: $e');
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -847,7 +876,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         'message_sent',
         props: {'source': 'chat', 'type': 'gif'},
       );
+      HapticFeedback.lightImpact();
+      SwaycoSounds.play(SwSound.msgSent);
     } catch (e) {
+      HapticFeedback.vibrate();
+      SwaycoSounds.play(SwSound.error);
       if (mounted) setState(() => _error = 'Envoi GIF échoué: $e');
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -1068,6 +1101,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         next.remove(m.id);
         _reactionsByMessage = next;
       });
+      HapticFeedback.lightImpact();
+      SwaycoSounds.play(SwSound.deleted);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -1090,6 +1125,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       }
     }
     final next = nextReactionEmoji(current: current, tapped: emoji);
+    if (next != null) SwaycoSounds.play(SwSound.reaction);
     setState(() {
       final list = [
         ...?_reactionsByMessage[m.id]?.where((r) => r.userId != _myId),

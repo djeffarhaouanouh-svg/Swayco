@@ -20,6 +20,7 @@ import 'screens/new_password_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/root_shell.dart';
 import 'services/app_theme.dart';
+import 'services/swayco_sounds.dart';
 import 'services/muted_calls.dart';
 import 'services/analytics.dart';
 import 'services/app_settings.dart';
@@ -141,6 +142,7 @@ Future<void> main() async {
     WidgetsFlutterBinding.ensureInitialized();
   // Apparence (clair / sombre / système) lue AVANT le premier build.
   await AppTheme.load();
+  await SwaycoSounds.init();
     FlutterError.onError = (details) {
       debugPrint('FlutterError: ${details.exception}');
       FlutterError.presentError(details);

@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/analytics.dart';
 
 import '../services/app_strings.dart';
+import '../services/swayco_sounds.dart';
 import '../services/block_api.dart';
 import '../services/chat_unread.dart';
 import '../services/friend_request_unread.dart';
@@ -354,6 +355,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         await BlockApi.unblock(blockerId: _deviceId, blockedId: _targetId);
       } else {
         await BlockApi.block(blockerId: _deviceId, blockedId: _targetId);
+      HapticFeedback.mediumImpact();
+      SwaycoSounds.play(SwSound.block);
       }
       if (!mounted) return;
       setState(() => _peerBlocked = !wasBlocked);
@@ -597,6 +600,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
         currentDiscover: _remote?.discoverPhotoUrl ?? '',
       );
+      HapticFeedback.mediumImpact();
+      SwaycoSounds.play(SwSound.photoAdded);
       if (!mounted) return;
       await _reload();
     } catch (e) {
@@ -664,6 +669,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         bytes: bytes,
         contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
       );
+      HapticFeedback.mediumImpact();
+      SwaycoSounds.play(SwSound.photoAdded);
       if (!mounted) return;
       await _reload();
     } catch (e) {
@@ -720,6 +727,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         current: _remote?.photos ?? const <String>[],
         currentDiscover: _remote?.discoverPhotoUrl ?? '',
       );
+      HapticFeedback.lightImpact();
+      SwaycoSounds.play(SwSound.deleted);
       if (!mounted) return;
       await _reload();
     } catch (e) {
@@ -814,6 +823,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       return;
     }
     await UserPrefs.setFirstName(saved);
+    SwaycoSounds.play(SwSound.profileSaved);
     if (!mounted || _remote == null) return;
     // Reflect the new cooldown locally so it takes effect without a reload.
     setState(
@@ -834,6 +844,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       ).showSnackBar(SnackBar(content: Text(AppStrings.t('save_failed'))));
       return;
     }
+    SwaycoSounds.play(SwSound.profileSaved);
     if (!mounted || _remote == null) return;
     setState(() => _remote = _remote!.copyWith(bio: saved));
   }
@@ -862,6 +873,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           ? ProfileApi.unset
           : personaCategory,
     );
+    SwaycoSounds.play(SwSound.profileSaved);
     if (mounted) await _reload(silent: true);
   }
 
@@ -880,6 +892,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       ).showSnackBar(SnackBar(content: Text(AppStrings.t('save_failed'))));
       return;
     }
+    SwaycoSounds.play(SwSound.profileSaved);
     if (!mounted || _remote == null) return;
     setState(() => _remote = _remote!.copyWith(interests: saved));
   }
@@ -2625,8 +2638,14 @@ class _PhotoGallery extends StatelessWidget {
         // Le doigt décroche la tuile : petit coup sec, elle grossit et prend
         // une ombre — c'est ce qui fait qu'on la sent quitter la rangée. Au
         // repos, un second cran plus discret confirme qu'elle est reposée.
-        onReorderStart: (_) => HapticFeedback.mediumImpact(),
-        onReorderEnd: (_) => HapticFeedback.selectionClick(),
+        onReorderStart: (_) {
+          HapticFeedback.mediumImpact();
+          SwaycoSounds.play(SwSound.reorderPick);
+        },
+        onReorderEnd: (_) {
+          HapticFeedback.selectionClick();
+          SwaycoSounds.play(SwSound.reorderDrop);
+        },
         proxyDecorator: (child, index, animation) => AnimatedBuilder(
           animation: animation,
           builder: (context, _) {

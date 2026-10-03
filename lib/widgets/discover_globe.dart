@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 
 import '../services/app_strings.dart';
+import '../services/swayco_sounds.dart';
 import '../theme/swayco_theme.dart';
 import 'popup_kit.dart';
 
@@ -587,7 +588,11 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                       ),
                       GestureDetector(
                         onTap: canLaunch
-                            ? () => Navigator.of(context).pop(_selected)
+                            ? () {
+                HapticFeedback.mediumImpact();
+                SwaycoSounds.play(SwSound.globeLaunch);
+                Navigator.of(context).pop(_selected);
+              }
                             : null,
                         child: Container(
                           height: 54,

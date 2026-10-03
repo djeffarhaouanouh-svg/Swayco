@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_strings.dart';
+import '../services/swayco_sounds.dart';
 import '../services/auth_service.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/sway_onb_kit.dart';
@@ -92,6 +93,8 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } else {
         await AuthService.signIn(email: email, password: password);
+        HapticFeedback.mediumImpact();
+        SwaycoSounds.play(SwSound.welcome);
       }
       // Parent listens to auth state changes — it'll route us away.
     } on AuthException catch (e) {

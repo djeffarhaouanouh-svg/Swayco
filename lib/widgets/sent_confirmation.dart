@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 
+import '../services/swayco_sounds.dart';
 import '../theme/swayco_theme.dart';
 
 /// "Envoyé ✅" — the banking-app "transfer done" moment: the screen dims, a
@@ -70,6 +71,7 @@ class _SentConfirmationState extends State<_SentConfirmation>
       if (!_buzzed && _check.value >= 1) {
         _buzzed = true;
         if (!kIsWeb) HapticFeedback.mediumImpact();
+        SwaycoSounds.play(SwSound.sentCheck);
       }
     });
     _c.forward().whenComplete(widget.onDone);

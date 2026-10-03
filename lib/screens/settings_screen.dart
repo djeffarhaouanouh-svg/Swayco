@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/app_theme.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
+import '../services/swayco_sounds.dart';
 import '../services/auth_service.dart';
 import '../services/block_api.dart';
 import '../services/device_id.dart';
@@ -316,6 +318,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final uid = await DeviceId.getOrCreate();
       await NotificationClient.unregister(uid);
       await IosCallKit.unregisterToken(uid);
+      HapticFeedback.mediumImpact();
+      SwaycoSounds.play(SwSound.signOut);
       await AuthService.signOut();
       // AuthService.signOut() flips the ROOT widget's _authed flag, which
       // makes it build the login screen — but that only changes what the
@@ -360,6 +364,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // 4. Sign out locally, then actually pop back to the login screen
       //    (see _signOut — the auth listener alone only changes what the
       //    bottom route shows, it doesn't pop this pushed one).
+      HapticFeedback.mediumImpact();
+      SwaycoSounds.play(SwSound.signOut);
       await AuthService.signOut();
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -630,6 +636,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         setState(() => _push = v);
                         _saveBool(_kPush, v);
                         _applyPushPref(v);
+                      },
+                    ),
+                    _SettingsToggleRow(
+                      icon: Icons.volume_up_outlined,
+                      label: AppStrings.t('settings_app_sounds'),
+                      value: SwaycoSounds.enabled,
+                      onChanged: (v) {
+                        setState(() {});
+                        SwaycoSounds.setEnabled(v);
                       },
                     ),
                     _SettingsToggleRow(

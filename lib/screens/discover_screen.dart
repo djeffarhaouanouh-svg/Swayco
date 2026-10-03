@@ -10,6 +10,7 @@ import '../services/ad_service.dart';
 import '../services/analytics.dart';
 import '../services/app_boot.dart';
 import '../services/app_strings.dart';
+import '../services/swayco_sounds.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/fact_emojis.dart';
@@ -599,8 +600,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     // Standard Tinder convention: dragging/flying RIGHT is the like, LEFT
     // the refuse.
     if (isRight) {
-      HapticFeedback.lightImpact();
+      HapticFeedback.mediumImpact();
+      SwaycoSounds.play(SwSound.like);
       _likePeer(profile);
+    } else {
+      HapticFeedback.lightImpact();
+      SwaycoSounds.play(SwSound.pass);
     }
     if (!mounted || _cards.isEmpty) return;
     final next = _currentIndex + 1;
@@ -638,6 +643,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       return;
     }
     if (_currentIndex <= 0) return;
+    HapticFeedback.lightImpact();
+    SwaycoSounds.play(SwSound.undo);
     setState(() {
       _currentIndex -= 1;
       UserPrefs.saveDiscoverCursor(_cards[_currentIndex].profile.id);

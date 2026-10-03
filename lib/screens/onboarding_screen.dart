@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../swayco/asr/asr_service.dart';
 import '../services/app_strings.dart';
+import '../services/swayco_sounds.dart';
 import '../services/attribution.dart';
 import '../services/auth_service.dart';
 import '../services/device_id.dart';
@@ -319,6 +321,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
     // Done — kill the "finish your profile" reminder (pending or not).
     _finished = true;
+    HapticFeedback.mediumImpact();
+    SwaycoSounds.play(SwSound.welcome);
     LocalNotifications.cancelOnboardingReminder();
     // Make the rest of the app speak the user's chosen language right away.
     AppStrings.setFromCode(_selectedLang!);
@@ -589,10 +593,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   /// Advance one page with the shared transition.
-  void _next() => _pageController.nextPage(
-    duration: const Duration(milliseconds: 280),
-    curve: Curves.easeOutCubic,
-  );
+  void _next() {
+    HapticFeedback.selectionClick();
+    SwaycoSounds.play(SwSound.stepNext);
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   /// Go back one page with the shared transition.
   void _back() => _pageController.previousPage(

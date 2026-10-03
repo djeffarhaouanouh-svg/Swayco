@@ -248,7 +248,7 @@ flutter:
     # Official multicolour Google "G" — login "Continue with Google" button.
     - assets/google-logo-search-new-svgrepo-com.svg
     # Short chime played when the "It's a match" badge pops.
-    - assets/sounds/match_pop.wav
+    - assets/sounds/
     # Nav-bar glyphs drawn as SVG (the Discover coconut).
     - assets/icons/
     # Preview photo in the "Léa veut t'ajouter" onboarding tip card.
