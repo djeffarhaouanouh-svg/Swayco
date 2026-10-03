@@ -1045,6 +1045,8 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                                 bottom: _infoOpen ? 0 : -panelH,
                                 child: _ProfileInfoPanel(
                                   profile: me,
+                                  // Mon propre drapeau ne s'affiche pas (apercu).
+                                  hideFlag: true,
                                   onClose: () =>
                                       setState(() => _infoOpen = false),
                                 ),
@@ -1643,9 +1645,16 @@ class _GhostCard extends StatelessWidget {
 /// cherche), puis ses centres d'intérêt. Il reste DANS la carte — on ne change
 /// pas de page — et se rabat d'un glissement vers le bas.
 class _ProfileInfoPanel extends StatefulWidget {
-  const _ProfileInfoPanel({required this.profile, required this.onClose});
+  const _ProfileInfoPanel({
+    required this.profile,
+    required this.onClose,
+    this.hideFlag = false,
+  });
 
   final RemoteProfile profile;
+
+  /// Aperçu de MA carte : pas de drapeau (on voit celui des autres, pas le sien).
+  final bool hideFlag;
   final VoidCallback onClose;
 
   @override
@@ -1782,7 +1791,7 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                       // lit la fiche. L'âge le suit, et la paire de langues
                       // ferme la ligne — c'est la promesse de l'app, elle vaut
                       // d'être dite avant la bio.
-                      _PanelHeader(profile: p),
+                      _PanelHeader(profile: p, hideFlag: widget.hideFlag),
                       const SizedBox(height: 20),
                       if (p.bio.trim().isNotEmpty) ...[
                         _PanelSectionTitle(AppStrings.t('info_bio')),
@@ -1856,18 +1865,21 @@ class _PanelSectionTitle extends StatelessWidget {
 
 /// La première ligne du panneau : prénom + drapeau (l'âge est dans « À propos »).
 class _PanelHeader extends StatelessWidget {
-  const _PanelHeader({required this.profile});
+  const _PanelHeader({required this.profile, this.hideFlag = false});
 
   final RemoteProfile profile;
+  final bool hideFlag;
 
   @override
   Widget build(BuildContext context) {
     final name = profile.displayName.trim().isEmpty
         ? AppStrings.t('profile_anonymous')
         : profile.displayName.trim();
-    final flag = countryFlagFor(profile.country) ??
-        findLanguageByCode(profile.language)?.flag ??
-        '';
+    final flag = hideFlag
+        ? ''
+        : (countryFlagFor(profile.country) ??
+            findLanguageByCode(profile.language)?.flag ??
+            '');
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -2384,8 +2396,11 @@ class _TinderCardState extends State<_TinderCard> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      _NameFlag(profile: p),
+                      // Aperçu de ma carte : pas de drapeau (le mien).
+                      if (!widget.preview) ...[
+                        const SizedBox(width: 10),
+                        _NameFlag(profile: p),
+                      ],
                     ],
                   ),
                 ),

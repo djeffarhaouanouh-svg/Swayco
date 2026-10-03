@@ -1656,7 +1656,9 @@ class _IdentitySection extends StatelessWidget {
                       style: nameStyle,
                     ),
             ),
-            if (flag.isNotEmpty || country.isNotEmpty) ...[
+            // Mon propre drapeau ne s'affiche pas : on voit celui des autres,
+            // pas le sien (pour ne pas inciter à inventer une origine).
+            if (!editableName && (flag.isNotEmpty || country.isNotEmpty)) ...[
               const SizedBox(width: 10),
               _flagImage(),
             ],
@@ -2179,7 +2181,10 @@ class _PeerMediaStack extends StatelessWidget {
   final Set<String> likedPhotoUrls;
   final void Function(String photoUrl)? onTogglePhotoLike;
 
-  static const double _aspect = 4 / 3; // height / width (ratio 3 / 4)
+  /// Hauteur / largeur d'une vignette : le format de la carte Discover (un
+  /// peu moins haut qu'elle), borné pour rester une grille lisible.
+  static double _aspect(BuildContext context) =>
+      (1 / discoverCardAspect(context)).clamp(1.4, 1.75);
   static const double _spacing = 10;
   static const int _columns = 2;
 
@@ -2191,7 +2196,7 @@ class _PeerMediaStack extends StatelessWidget {
       builder: (context, constraints) {
         final tileWidth =
             (constraints.maxWidth - _spacing * (_columns - 1)) / _columns;
-        final tileHeight = tileWidth * _aspect;
+        final tileHeight = tileWidth * _aspect(context);
         return Wrap(
           spacing: _spacing,
           runSpacing: _spacing,

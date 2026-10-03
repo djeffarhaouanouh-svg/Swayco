@@ -182,7 +182,9 @@ class _GlassNavBarState extends State<GlassNavBar>
         badge: unreadChat,
       ),
       _NavItemData(
-        kind: SwaycoNavKind.discover,
+        // La Terre de Material (Icons.public) : aucune icône à maintenir.
+        icon: Icons.public,
+        selectedIcon: Icons.public,
         label: AppStrings.t('nav_search'),
       ),
       _NavItemData(
