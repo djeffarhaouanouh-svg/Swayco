@@ -53,7 +53,7 @@ import 'profile_screen.dart';
 /// Le fond du panneau déplié : opaque, un cran au-dessus du noir de la page —
 /// assez pour qu'on voie où il commence quand il recouvre la photo, assez peu
 /// pour rester du noir.
-const Color _kPanelBg = Color(0xFF141517);
+Color get _kPanelBg => SC.light ? Colors.white : const Color(0xFF141517);
 
 /// Marge latérale de la carte (handoff 3c).
 const double _kCardInset = 14.0;
@@ -1755,7 +1755,7 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
           // une photo n'est jamais assez uniforme pour porter du texte — selon
           // le cliché, un mot sur deux tombait sur une zone claire. Le panneau
           // est maintenant une page à lui, posée devant l'image.
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: _kPanelBg,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
@@ -1765,7 +1765,7 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                 top: Radius.circular(24),
               ),
               border: Border(
-                top: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+                top: BorderSide(color: SC.fgA(0.10)),
               ),
             ),
             child: Column(
@@ -1779,7 +1779,7 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                       width: 44,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.22),
+                        color: SC.fgA(0.22),
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -1818,7 +1818,7 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                           field: 'bio',
                           fromLang: p.language,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.92),
+                            color: SC.fgA(0.92),
                             fontSize: 15.5,
                             height: 1.45,
                           ),
@@ -1832,6 +1832,7 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                         InfoBento(
                           age: ageTile,
                           others: otherTiles,
+                          // Tuiles sombres + valeurs jaune fluo, même sur le panneau blanc.
                           forceDark: true,
                         ),
                         const SizedBox(height: 22),
@@ -1876,7 +1877,7 @@ class _PanelSectionTitle extends StatelessWidget {
     return Text(
       label.toUpperCase(),
       style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.45),
+        color: SC.fgA(0.45),
         fontSize: 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.1,
@@ -1916,7 +1917,7 @@ class _PanelHeader extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: Colors.white,
+            color: SC.fg,
             fontSize: 30,
             fontWeight: FontWeight.w900,
             letterSpacing: -0.4,
@@ -1938,7 +1939,7 @@ class _PanelHeader extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
+                    color: SC.fgA(0.85),
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
