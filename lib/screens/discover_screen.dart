@@ -43,6 +43,7 @@ import '../widgets/liquid_glass_button.dart';
 import '../widgets/lottie_icon_transition.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/sent_confirmation.dart';
+import '../services/special_message_quota.dart';
 import '../widgets/swayco_direct_message_sheet.dart';
 import '../widgets/swayco_wordmark.dart';
 import '../widgets/swipe_coach_overlay.dart';
@@ -322,11 +323,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       await showPaywallSheet(context);
       if (!mounted || !RevenueCat.proActive.value) return;
     }
+    final left = await SpecialMessageQuota.remaining(_myId);
+    if (!mounted) return;
     final body = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const SwaycoDirectMessageSheet(),
+      builder: (_) => SwaycoDirectMessageSheet(remaining: left),
     );
     if (body == null || body.trim().isEmpty || !mounted) return;
     try {
@@ -346,6 +349,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         recipientLang: peer.language,
         special: true,
       );
+      await SpecialMessageQuota.consume(_myId);
       Analytics.track('message_sent',
           props: {'source': 'discover_direct', 'type': 'text'});
       if (!mounted) return;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/app_strings.dart';
+import '../services/special_message_quota.dart';
 import '../theme/swayco_theme.dart';
 import 'popup_kit.dart';
 
@@ -8,7 +9,13 @@ import 'popup_kit.dart';
 /// (discover_screen) : rend le texte saisi, ou null si fermée. L'envoi reste
 /// fait par l'appelant.
 class SwaycoDirectMessageSheet extends StatefulWidget {
-  const SwaycoDirectMessageSheet({super.key});
+  const SwaycoDirectMessageSheet({
+    super.key,
+    this.remaining = SpecialMessageQuota.monthly,
+  });
+
+  /// Messages spéciaux qu'il reste ce mois-ci (3 → 0).
+  final int remaining;
 
   @override
   State<SwaycoDirectMessageSheet> createState() =>
@@ -50,6 +57,9 @@ class _SwaycoDirectMessageSheetState extends State<SwaycoDirectMessageSheet> {
                   child: PopupBadge(icon: Icons.chat_bubble_rounded, size: 52),
                 ),
                 const SizedBox(height: 14),
+                const SizedBox(height: 10),
+                Center(child: _QuotaPill(remaining: widget.remaining)),
+                const SizedBox(height: 12),
                 PopupBody(AppStrings.t('dm_explain')),
                 const SizedBox(height: 16),
                 TextField(
@@ -80,10 +90,12 @@ class _SwaycoDirectMessageSheetState extends State<SwaycoDirectMessageSheet> {
                 PopupButton(
                   label: AppStrings.t('send_emoji'),
                   height: 54,
-                  onPressed: () {
-                    final t = _ctrl.text.trim();
-                    if (t.isNotEmpty) Navigator.of(context).pop(t);
-                  },
+                  onPressed: widget.remaining <= 0
+                      ? null
+                      : () {
+                          final t = _ctrl.text.trim();
+                          if (t.isNotEmpty) Navigator.of(context).pop(t);
+                        },
                 ),
               ],
             ),
@@ -94,3 +106,40 @@ class _SwaycoDirectMessageSheetState extends State<SwaycoDirectMessageSheet> {
   }
 }
 
+
+/// « 3/3 messages spéciaux restants » — pastille sous l'icône.
+class _QuotaPill extends StatelessWidget {
+  const _QuotaPill({required this.remaining});
+
+  final int remaining;
+
+  @override
+  Widget build(BuildContext context) {
+    final empty = remaining <= 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: PopupTokens.ghost,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: PopupTokens.ghostBorder),
+      ),
+      child: Text(
+        empty
+            ? AppStrings.t('dm_quota_empty')
+            : AppStrings.t(
+                'dm_quota',
+                args: {
+                  'n': '$remaining',
+                  'max': '${SpecialMessageQuota.monthly}',
+                },
+              ),
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: empty ? PopupTokens.danger : PopupTokens.ink,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
