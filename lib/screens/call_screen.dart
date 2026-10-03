@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -9,6 +9,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:country_flags/country_flags.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
@@ -2611,20 +2613,207 @@ class _CallScreenState extends State<CallScreen> {
     if (_hadRemote && startedAt != null && mounted) {
       _finalDuration = DateTime.now().difference(startedAt);
       setState(() => _ended = true);
+      unawaited(_prepareEndedCard());
       return;
     }
     if (mounted) Navigator.of(context).pop();
   }
 
-  String _formatCallDuration(Duration d) {
-    final m = d.inMinutes;
-    final s = d.inSeconds % 60;
-    if (m <= 0) return '$s s';
-    return '$m min ${s.toString().padLeft(2, '0')} s';
+  // ── Fin d'appel 15a : drapeau flouté en fond ──────────────────────────────
+
+  /// Image du drapeau du pays du pair, chargée (precacheImage) avant
+  /// d'autoriser le partage : sans elle le PNG partagé n'aurait que le dégradé.
+  ImageProvider? _endedFlag;
+
+  /// Faux tant que le drapeau charge : le bouton Partager attend.
+  bool _endedReady = false;
+
+  /// Pays à dominante blanche : on ajoute un voile bleu nuit en haut pour que
+  /// le logo et la croix restent lisibles.
+  static const Set<String> _lightFlags = {'jp', 'kr', 'ca', 'fi'};
+
+  /// Lance le chargement du drapeau du pays du pair (flagcdn, code ISO).
+  Future<void> _prepareEndedCard() async {
+    final iso = countryIso2For(_peerProfile?.country ?? '').toLowerCase();
+    if (iso.isNotEmpty) {
+      final provider = NetworkImage('https://flagcdn.com/w1280/$iso.png');
+      try {
+        await precacheImage(provider, context);
+        if (!mounted) return;
+        setState(() => _endedFlag = provider);
+      } catch (e) {
+        debugPrint('[call-ended] flag precache failed: $e');
+      }
+    }
+    if (mounted) setState(() => _endedReady = true);
   }
 
-  /// Black "call ended" card: the peer's PDP + flag, the minutes spent, a
-  /// share button bottom-right and the swayco logo dead-centre at the bottom.
+  /// Capture la carte (le RepaintBoundary) en PNG et ouvre la feuille de
+  /// partage du système. La croix et le bouton Partager n'y sont pas.
+  Future<void> _shareEndedCard() async {
+    if (!_endedReady) return;
+    final boundary = _shareCardKey.currentContext?.findRenderObject()
+        as RenderRepaintBoundary?;
+    if (boundary == null) return;
+    final box = context.findRenderObject() as RenderBox?;
+    try {
+      final image = await boundary.toImage(pixelRatio: 3);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (data == null) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              data.buffer.asUint8List(),
+              mimeType: 'image/png',
+              name: 'swayco-call.png',
+            ),
+          ],
+          fileNameOverrides: const ['swayco-call.png'],
+          sharePositionOrigin:
+              box != null ? box.localToGlobal(Offset.zero) & box.size : null,
+        ),
+      );
+    } catch (e) {
+      // Feuille fermée ou partage indisponible : rien à faire.
+      debugPrint('[call-ended] share failed: $e');
+    }
+  }
+
+  /// Deux chiffres au minimum (trois au-delà de 99).
+  String _two(int n) => n.toString().padLeft(2, '0');
+
+  /// Une case du compteur : chiffres + libellé dessous. [hot] = la case des
+  /// secondes, en jaune.
+  Widget _counterBox(String value, String unit, {bool hot = false}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 82,
+          height: 80,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: hot ? SC.accent : Colors.white.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: hot ? SC.accent : Colors.white.withValues(alpha: 0.35),
+              width: 1.2,
+            ),
+          ),
+          child: Text(
+            value,
+            maxLines: 1,
+            style: GoogleFonts.dmSans(
+              fontSize: 40,
+              fontWeight: FontWeight.w800,
+              fontFeatures: const [ui.FontFeature.tabularFigures()],
+              color: hot ? SC.onAccent : Colors.white,
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          unit,
+          style: GoogleFonts.ibmPlexMono(
+            fontSize: 11,
+            letterSpacing: 2,
+            color: Colors.white.withValues(alpha: 0.8),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Le fond de la carte : dégradé de marque, drapeau flouté, voile bleu.
+  Widget _endedBackground(String iso) {
+    const s = 1.3; // saturation
+    const lr = 0.2126, lg = 0.7152, lb = 0.0722;
+    final flag = _endedFlag;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // 1. Base : sécurité si le drapeau ne charge pas, et couleur des bords.
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment(-0.34, -0.94),
+              end: Alignment(0.34, 0.94),
+              colors: [SC.brandBlueDeep, SC.brandBlue, SC.brandCyan],
+              stops: [0, 0.52, 1],
+            ),
+          ),
+        ),
+        // 2. Le drapeau, flouté (calculé une seule fois : écran statique).
+        if (flag != null)
+          Positioned(
+            left: -60,
+            top: -60,
+            right: -60,
+            bottom: -60,
+            child: RepaintBoundary(
+              child: Opacity(
+                opacity: 0.7,
+                child: ImageFiltered(
+                  imageFilter: ui.ImageFilter.blur(
+                    sigmaX: 36,
+                    sigmaY: 36,
+                    tileMode: TileMode.decal,
+                  ),
+                  child: ColorFiltered(
+                    colorFilter: const ColorFilter.matrix(<double>[
+                      (1 - s) * lr + s, (1 - s) * lg, (1 - s) * lb, 0, 0,
+                      (1 - s) * lr, (1 - s) * lg + s, (1 - s) * lb, 0, 0,
+                      (1 - s) * lr, (1 - s) * lg, (1 - s) * lb + s, 0, 0,
+                      0, 0, 0, 1, 0,
+                    ]),
+                    child: Image(
+                      image: flag,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        // 3. Voile bleu.
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x731F5EFF), Color(0x592B7FFF), Color(0x991F5EFF)],
+              stops: [0, 0.5, 1],
+            ),
+          ),
+        ),
+        // Drapeau à dominante blanche : voile bleu nuit en haut (logo, croix).
+        if (flag != null && _lightFlags.contains(iso))
+          const Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            height: 260,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x9904123A), Color(0x0004123A)],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Carte « appel terminé » (15a) : le drapeau du pays du pair, flouté, en
+  /// fond ; sa photo, son prénom + drapeau, la durée en trois cases. Tout ce
+  /// qui est dans le RepaintBoundary part dans le PNG partagé ; la croix et
+  /// « Partager » restent dehors.
   Widget _buildEndedSummary(BuildContext context) {
     final profile = _peerProfile;
     final name = (profile?.displayName.trim().isNotEmpty ?? false)
@@ -2632,119 +2821,280 @@ class _CallScreenState extends State<CallScreen> {
         : AppStrings.t('profile_anonymous');
     final firstName = name.split(RegExp(r'\s+')).first;
     final lang = profile?.language.trim() ?? '';
+    final iso = countryIso2For(profile?.country ?? '').toLowerCase();
     // Country flag once the peer's country is known (the spoken language
     // doesn't always match the country); language flag otherwise.
     final flagEmoji = countryFlagFor(profile?.country ?? '') ??
         (lang.isEmpty ? null : findLanguageByCode(lang)?.flag) ??
         '';
     final dur = _finalDuration ?? Duration.zero;
+    final hh = _two(dur.inHours);
+    final mm = _two(dur.inMinutes % 60);
+    final ss = _two(dur.inSeconds % 60);
+    final nameStyle = popupDisplay(
+      fontSize: 28,
+      letterSpacing: -1.1,
+      color: Colors.white,
+    );
 
     return Scaffold(
-      backgroundColor: SC.bg,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // The shareable card (everything captured into the PNG).
-            Positioned.fill(
-              child: RepaintBoundary(
-                key: _shareCardKey,
-                child: Container(
-                  color: SC.bg,
-                  child: Stack(
-                    children: [
-                      // Brand wordmark — top-centre, like the in-call screen.
-                      const Positioned(
-                        top: 12,
-                        left: 0,
-                        right: 0,
-                        child: Center(
-                          child: SwaycoWordmark(
-                            fontSize: 29,
-                            letterSpacing: 0.5,
-                            shadows: [
-                              Shadow(color: Colors.black54, blurRadius: 8),
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // La carte partagée : fond plein écran, sous la barre d'état aussi.
+          Positioned.fill(
+            child: RepaintBoundary(
+              key: _shareCardKey,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _endedBackground(iso),
+                  SafeArea(
+                    child: Stack(
+                      children: [
+                        // Logo : « swayc » blanc + « ø » jaune.
+                        const Positioned(
+                          top: 12,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: SwaycoWordmark(
+                              fontSize: 29,
+                              letterSpacing: 0.5,
+                              oColor: SC.accent,
+                            ),
+                          ),
+                        ),
+                        Align(
+                          alignment: const Alignment(0, -0.35),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.call_end_rounded,
+                                    size: 18,
+                                    color: Color(0xD9FFFFFF),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    AppStrings.t('call_ended_label')
+                                        .toUpperCase(),
+                                    style: GoogleFonts.ibmPlexMono(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: 2.5,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.85,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 18),
+                              // Photo : bordure blanche de 5, ombre bleu nuit.
+                              Container(
+                                width: 150,
+                                height: 150,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF04123A)
+                                          .withValues(alpha: 0.5),
+                                      blurRadius: 50,
+                                      spreadRadius: -12,
+                                      offset: const Offset(0, 24),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipOval(
+                                  child: ProfileAvatar(
+                                    displayName: name,
+                                    avatarUrl: profile?.avatarUrl,
+                                    fallbackUrl: profile?.fallbackPhotoUrl,
+                                    size: 140,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 24),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        firstName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: nameStyle,
+                                      ),
+                                    ),
+                                    if (_endedFlag != null) ...[
+                                      const SizedBox(width: 12),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(5),
+                                        child: Image(
+                                          image: _endedFlag!,
+                                          width: 36,
+                                          height: 24,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ] else if (flagEmoji.isNotEmpty) ...[
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        flagEmoji,
+                                        style: const TextStyle(fontSize: 26),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 26),
+                              // Durée : H · MIN · S en cases.
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _counterBox(
+                                    hh,
+                                    AppStrings.t('call_unit_h'),
+                                  ),
+                                  _counterColon(),
+                                  _counterBox(
+                                    mm,
+                                    AppStrings.t('call_unit_min'),
+                                  ),
+                                  _counterColon(),
+                                  _counterBox(
+                                    ss,
+                                    AppStrings.t('call_unit_s'),
+                                    hot: true,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Hors capture : la croix (en haut à gauche) et « Partager ».
+          SafeArea(
+            child: SizedBox.expand(
+              child: Stack(
+                children: [
+                  Positioned(
+                    top: 4,
+                    left: 4,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.4),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 24,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 20,
+                    bottom: 38,
+                    child: Opacity(
+                      opacity: _endedReady ? 1 : 0.5,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _shareEndedCard,
+                        child: Container(
+                          height: 56,
+                          padding: const EdgeInsets.fromLTRB(18, 0, 22, 0),
+                          decoration: BoxDecoration(
+                            color: SC.accent,
+                            borderRadius: BorderRadius.circular(999),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF04123A)
+                                    .withValues(alpha: 0.25),
+                                blurRadius: 28,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.ios_share,
+                                size: 22,
+                                color: SC.onAccent,
+                              ),
+                              const SizedBox(width: 9),
+                              Text(
+                                AppStrings.t('call_share'),
+                                style: popupDisplay(
+                                  fontSize: 15,
+                                  color: SC.onAccent,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                       ),
-                      // Peer PDP + first name + call duration, grouped in the
-                      // upper area (the duration sits right under the name and
-                      // is the biggest figure on the card).
-                      Align(
-                        alignment: const Alignment(0, -0.42),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ProfileAvatar(
-                              displayName: name,
-                              avatarUrl: profile?.avatarUrl,
-                              fallbackUrl: profile?.fallbackPhotoUrl,
-                              size: 132,
-                            ),
-                            const SizedBox(height: 20),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      firstName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                  if (flagEmoji.isNotEmpty) ...[
-                                    const SizedBox(width: 12),
-                                    Text(flagEmoji,
-                                        style: const TextStyle(fontSize: 30)),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 26),
-                            // Call duration — enlarged, just under the name.
-                            const Icon(Icons.schedule_rounded,
-                                color: SC.accent, size: 30),
-                            const SizedBox(height: 8),
-                            Text(
-                              _formatCallDuration(dur),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 34,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
-            // Close — top-left, kept OUT of the captured card.
-            Positioned(
-              top: 4,
-              left: 4,
-              child: IconButton(
-                // 32 : c'est la seule sortie de cette page, et elle est posée
-                // dans un coin sur du noir, sans rien autour pour la désigner.
-                icon: const Icon(Icons.close_rounded,
-                    color: Colors.white, size: 32),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+
+  /// Le « : » entre deux cases, aligné sur les chiffres (pas sur les libellés).
+  Widget _counterColon() => const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 8),
+        child: SizedBox(
+          height: 80,
+          child: Center(
+            child: Text(
+              ':',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 34,
+                fontWeight: FontWeight.w800,
+                height: 1,
+              ),
+            ),
+          ),
+        ),
+      );
 
   Future<void> _confirmLeave() async {
     final leave = await showSwaycoConfirm(
