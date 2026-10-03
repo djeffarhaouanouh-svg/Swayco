@@ -62,7 +62,11 @@ class InterestPill extends StatelessWidget {
             ? Colors.black.withValues(alpha: 0.28)
             : (SC.light && !forceDark
                 ? SC.fill
-                : Colors.white.withValues(alpha: prominent ? 0.10 : 0.07)),
+                // Style Discover : gris foncé (≈ blanc 10 % sur #141517),
+                // visible même posé sur un panneau blanc.
+                : (SC.light
+                    ? const Color(0xFF2A2B2E)
+                    : Colors.white.withValues(alpha: prominent ? 0.10 : 0.07))),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: onPhoto || !SC.light || forceDark

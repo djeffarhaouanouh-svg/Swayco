@@ -1847,6 +1847,8 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                               InterestPill(
                                 label: interestPillText(tag),
                                 prominent: true,
+                                // Mêmes puces que sur la carte Discover.
+                                forceDark: true,
                               ),
                           ],
                         ),
