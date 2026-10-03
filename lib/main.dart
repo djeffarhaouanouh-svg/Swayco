@@ -685,16 +685,16 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     return ValueListenableBuilder<String>(
       valueListenable: AppStrings.currentBcp47,
       builder: (context, _, _) {
-        return ValueListenableBuilder<ThemeMode>(
-          valueListenable: AppTheme.mode,
-          builder: (context, themeMode, _) => MaterialApp(
+        return ValueListenableBuilder<Appearance>(
+          valueListenable: AppTheme.appearance,
+          builder: (context, appearance, _) => MaterialApp(
           title: 'Swayco',
           navigatorKey: rootNavigatorKey,
           debugShowCheckedModeBanner: false,
           // Clair « halo de marque » / sombre ; "Système" suit le téléphone.
           theme: SC.lightMaterial(),
-          darkTheme: SC.material(),
-          themeMode: themeMode,
+          darkTheme: SC.material(classicBlack: appearance == Appearance.black),
+          themeMode: AppTheme.themeModeOf(appearance),
           // Honour the device's "Larger Text" setting (good for readability)
           // but cap it at 1.3× so an extreme accessibility font size can never
           // overflow buttons / headers / labels and break the layout.
@@ -702,7 +702,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
             // Les couleurs de fond / texte de SC suivent le thème actif : posées
             // ICI, avant que l'arbre ne se construise.
             final isLight = Theme.of(context).brightness == Brightness.light;
-            SC.apply(Theme.of(context).brightness);
+            SC.apply(
+              Theme.of(context).brightness,
+              classicBlack: appearance == Appearance.black,
+            );
             final mq = MediaQuery.of(context);
             return AnnotatedRegion<SystemUiOverlayStyle>(
               value: isLight

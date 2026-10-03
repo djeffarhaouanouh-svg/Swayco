@@ -95,7 +95,9 @@ const double _kActionPadV = 16.0;
 
 /// Surfaces pleines du handoff : bulles pays, bouton message.
 Color get _kSurface =>
-    SC.light ? const Color(0xFFF2F6FF) : const Color(0xFF161D30);
+    SC.light
+        ? const Color(0xFFF2F6FF)
+        : (SC.classic ? const Color(0xFF1A1A1D) : const Color(0xFF161D30));
 const Color _kSurfaceBorder = Color(0xFF2A2A2E);
 
 // ══════════════════════════════════════════════════════════════════════════════

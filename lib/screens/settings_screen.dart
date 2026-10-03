@@ -745,25 +745,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
 // ───── Section header / cards / rows ────────────────────────────────────
 
-/// « Apparence » : Système / Clair / Sombre. Mémorisé sur l'appareil ; le
-/// changement est immédiat (le thème de l'app écoute [AppTheme.mode]).
+/// « Apparence » : l'utilisateur choisit — Système, Clair, Sombre (noir bleuté
+/// + halo) ou Noir (l'ancien noir classique). Mémorisé sur l'appareil ; le
+/// changement est immédiat.
 class _AppearanceRow extends StatelessWidget {
   const _AppearanceRow();
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: AppTheme.mode,
-      builder: (context, mode, _) {
-        Widget seg(ThemeMode m, String label) {
-          final on = mode == m;
+    return ValueListenableBuilder<Appearance>(
+      valueListenable: AppTheme.appearance,
+      builder: (context, current, _) {
+        Widget seg(Appearance a, String label) {
+          final on = current == a;
           return Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => AppTheme.set(m),
+              onTap: () => AppTheme.set(a),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(vertical: 9),
+                padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 2),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: on
@@ -771,16 +772,18 @@ class _AppearanceRow extends StatelessWidget {
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: on
-                        ? (SC.light ? Colors.white : SC.onAccent)
-                        : SC.textMuted,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: on
+                          ? (SC.light ? Colors.white : SC.onAccent)
+                          : SC.textMuted,
+                    ),
                   ),
                 ),
               ),
@@ -793,7 +796,7 @@ class _AppearanceRow extends StatelessWidget {
           child: Row(
             children: [
               Icon(Icons.brightness_6_outlined, size: 22, color: SC.textPrimary),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.all(3),
@@ -804,9 +807,10 @@ class _AppearanceRow extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      seg(ThemeMode.system, AppStrings.t('appearance_system')),
-                      seg(ThemeMode.light, AppStrings.t('appearance_light')),
-                      seg(ThemeMode.dark, AppStrings.t('appearance_dark')),
+                      seg(Appearance.system, AppStrings.t('appearance_system')),
+                      seg(Appearance.light, AppStrings.t('appearance_light')),
+                      seg(Appearance.dark, AppStrings.t('appearance_dark')),
+                      seg(Appearance.black, AppStrings.t('appearance_black')),
                     ],
                   ),
                 ),
@@ -818,7 +822,6 @@ class _AppearanceRow extends StatelessWidget {
     );
   }
 }
-
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.label});
   final String label;

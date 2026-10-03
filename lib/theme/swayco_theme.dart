@@ -15,8 +15,14 @@ abstract final class SC {
   /// de fond / texte / surfaces ci-dessous suivent donc le thème actif.
   static bool light = false;
 
+  /// Apparence « Noir » : l'ancien fond #0E0E0E, sans halo.
+  static bool classic = false;
+
   /// Règle les couleurs « fond / texte / surfaces » sur le thème en cours.
-  static void apply(Brightness b) => light = b == Brightness.light;
+  static void apply(Brightness b, {bool classicBlack = false}) {
+    light = b == Brightness.light;
+    classic = classicBlack && !light;
+  }
 
   // Valeurs SOMBRES figées : pour les écrans qui restent sombres (ou sur
   // dégradé bleu) quel que soit le thème — appel, onboarding, connexion,
@@ -42,7 +48,9 @@ abstract final class SC {
   static Color get tabBg => Colors.transparent;
 
   // Backgrounds (inchangés en sombre)
-  static Color get bg => light ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F1C);
+  static Color get bg => light
+      ? const Color(0xFFFFFFFF)
+      : (classic ? const Color(0xFF0E0E0E) : const Color(0xFF0A0F1C));
   /// Encre posée SUR l'accent jaune (texte des badges / boutons pleins).
   static const bgDeep        = Color(0xFF04123A);
 
@@ -92,7 +100,9 @@ abstract final class SC {
       light ? const Color(0xFF8A94B0) : const Color(0x80F5F7FF);
 
   static Color get menu =>
-      light ? const Color(0xFFF2F6FF) : const Color(0xFF161D30);
+      light
+          ? const Color(0xFFF2F6FF)
+          : (classic ? const Color(0xFF2B2B2B) : const Color(0xFF161D30));
 
   static Color get bubbleIn =>
       light ? const Color(0xFFF2F6FF) : const Color(0xFF1A2138);
@@ -123,12 +133,13 @@ abstract final class SC {
   static const msgOutBorder  = brandBlue;
   static const msgOutText    = Color(0xFFFFFFFF);
 
-  static ThemeData material() {
-    const dBg = Color(0xFF0A0F1C);
+  static ThemeData material({bool classicBlack = false}) {
+    final dBg = classicBlack ? const Color(0xFF0E0E0E) : const Color(0xFF0A0F1C);
     const dText = Color(0xFFF5F7FF);
-    const dMenu = Color(0xFF161D30);
+    final dMenu =
+        classicBlack ? const Color(0xFF2B2B2B) : const Color(0xFF161D30);
     const dBorder = Color(0x1AFFFFFF);
-    const base = ColorScheme.dark(
+    final base = ColorScheme.dark(
       primary: accent,
       onPrimary: onAccent,
       secondary: brandBlue,
@@ -143,8 +154,8 @@ abstract final class SC {
       brightness: Brightness.dark,
       colorScheme: base,
       scaffoldBackgroundColor: dBg,
-      extensions: const [SwaycoPalette.dark],
-      appBarTheme: const AppBarTheme(
+      extensions: [classicBlack ? classicPalette : SwaycoPalette.dark],
+      appBarTheme: AppBarTheme(
         backgroundColor: dBg,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -192,6 +203,23 @@ abstract final class SC {
       dividerTheme: const DividerThemeData(color: dBorder),
     );
   }
+
+  /// Palette de l'apparence « Noir » : l'ancien fond #0E0E0E, sans halo.
+  static const classicPalette = SwaycoPalette(
+    bg: Color(0xFF0E0E0E),
+    halo: null,
+    surface: Color(0xFF1F1F22),
+    card: Color(0x0FFFFFFF),
+    line: Color(0x1AFFFFFF),
+    ink: Color(0xFFF5F7FF),
+    inkSecondary: Color(0x99F5F7FF),
+    inkMuted: Color(0x80FFFFFF),
+    navGlass: Color(0x21FFFFFF),
+    navBorder: Color(0x38FFFFFF),
+    navActive: Color(0x2EFFFFFF),
+    cardShadow: [],
+    statusBar: Brightness.light,
+  );
 
   /// Mode clair « halo de marque » : fond blanc, encre #04123A. Le Scaffold
   /// reste opaque (blanc) ; le halo est posé par [SwaycoBackground] sur les
