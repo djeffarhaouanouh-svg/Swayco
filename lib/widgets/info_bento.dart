@@ -171,7 +171,7 @@ class _AgeTile extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 150),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
+        decoration: solid ? bentoTileDecoration() : BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           gradient: LinearGradient(
             begin: Alignment(-0.34, -0.94),
@@ -199,14 +199,14 @@ class _AgeTile extends StatelessWidget {
                       letterSpacing: -2.3,
                       height: 1,
                       // Jaune fluo sur le dégradé bleu (panneau Discover, profil).
-                      color: SC.accent,
+                      color: solid ? SC.accentFg : SC.accent,
                     ),
                   ),
                   if (unit.isNotEmpty)
                     Text(
                       unit,
                       style: TextStyle(
-                        color: SC.accent,
+                        color: solid ? SC.accentFg : SC.accent,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -236,7 +236,7 @@ class _AgeTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white,
+                        color: solid ? SC.fg : Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                       ),
