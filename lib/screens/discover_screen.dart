@@ -1892,42 +1892,44 @@ class _PanelHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Le drapeau à côté du prénom ; dessous, « Pays - Ville ».
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Flexible(
-              child: Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.4,
-                  height: 1.1,
-                ),
-              ),
-            ),
-            if (flag.isNotEmpty) ...[
-              const SizedBox(width: 9),
-              Text(flag, style: const TextStyle(fontSize: 26)),
-            ],
-          ],
+        Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 30,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.4,
+            height: 1.1,
+          ),
         ),
+        // Sous le prénom : le drapeau, puis « Pays - Ville ».
         if (placeText.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(
-            placeText,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.85),
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            children: [
+              if (flag.isNotEmpty) ...[
+                Text(flag, style: const TextStyle(fontSize: 26, height: 1)),
+                const SizedBox(width: 10),
+              ],
+              Flexible(
+                child: Text(
+                  placeText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
+        ] else if (flag.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(flag, style: const TextStyle(fontSize: 26, height: 1)),
         ],
       ],
     );  }
