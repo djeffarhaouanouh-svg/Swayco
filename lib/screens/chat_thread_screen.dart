@@ -88,19 +88,48 @@ const Color _kMetaMuted = Color(0xFF77777D);
 /// Route for a conversation: slides in from the LEFT (toward the right) and,
 /// on close, goes back out to the left — the way the closing swipe goes.
 Route<void> chatThreadRoute({required WidgetBuilder builder}) {
-  return PageRouteBuilder<void>(
+  return _ChatThreadRoute(
     transitionDuration: const Duration(milliseconds: 320),
     reverseTransitionDuration: const Duration(milliseconds: 260),
     pageBuilder: (context, _, _) => builder(context),
-    transitionsBuilder: (context, animation, _, child) => SlideTransition(
-      position: Tween<Offset>(begin: const Offset(-1, 0), end: Offset.zero)
-          .animate(
-        CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-      ),
+    transitionsBuilder: (context, animation, _, child) => AnimatedBuilder(
+      animation: animation,
       child: child,
+      builder: (context, child) {
+        // Pendant (et juste apres) un geste du doigt la page suit le doigt
+        // 1:1 : courbe lineaire. Hors geste, l'entree garde son easing.
+        if (_threadLinear &&
+            !_threadDragging &&
+            (animation.isCompleted || animation.isDismissed)) {
+          _threadLinear = false;
+        }
+        final v = _threadLinear
+            ? animation.value
+            : Curves.easeOutCubic.transform(animation.value);
+        return FractionalTranslation(
+          translation: Offset(v - 1, 0),
+          child: child,
+        );
+      },
     ),
   );
 }
+
+/// PageRouteBuilder qui expose son controleur : la fermeture au doigt le pilote.
+class _ChatThreadRoute extends PageRouteBuilder<void> {
+  _ChatThreadRoute({
+    required super.pageBuilder,
+    required super.transitionsBuilder,
+    super.transitionDuration,
+    super.reverseTransitionDuration,
+  });
+
+  AnimationController? get dragController => controller;
+}
+
+/// Vrai tant que la fermeture suit le doigt (ou finit de se poser).
+bool _threadLinear = false;
+bool _threadDragging = false;
 
 class ChatThreadScreen extends StatefulWidget {
   const ChatThreadScreen({
@@ -749,6 +778,54 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     super.dispose();
   }
 
+  AnimationController? _closeCtrl;
+
+  void _closeDragStart(DragStartDetails _) {
+    final route = ModalRoute.of(context);
+    final c = route is _ChatThreadRoute ? route.dragController : null;
+    if (route == null || c == null || !route.isCurrent || c.isAnimating) return;
+    _closeCtrl = c;
+    _threadLinear = true;
+    _threadDragging = true;
+    Navigator.of(context).didStartUserGesture();
+  }
+
+  void _closeDragUpdate(DragUpdateDetails d) {
+    final c = _closeCtrl;
+    if (c == null) return;
+    final w = MediaQuery.sizeOf(context).width;
+    c.value = (c.value + (d.primaryDelta ?? 0) / w).clamp(0.0, 1.0);
+  }
+
+  void _closeDragEnd(double velocity) {
+    final c = _closeCtrl;
+    if (c == null) return;
+    _closeCtrl = null;
+    final nav = Navigator.of(context);
+    final close = velocity < -700 || (velocity <= 300 && c.value < 0.5);
+    _threadDragging = false;
+    final ms = (260 * (close ? c.value : 1 - c.value)).round().clamp(80, 260);
+    if (close) {
+      nav.pop();
+      if (c.isAnimating) {
+        c.animateBack(0.0, duration: Duration(milliseconds: ms), curve: Curves.linear);
+      }
+    } else {
+      c.animateTo(1.0, duration: Duration(milliseconds: ms), curve: Curves.linear);
+    }
+    if (c.isAnimating) {
+      void done(AnimationStatus s) {
+        if (s == AnimationStatus.completed || s == AnimationStatus.dismissed) {
+          c.removeStatusListener(done);
+          nav.didStopUserGesture();
+        }
+      }
+      c.addStatusListener(done);
+    } else {
+      nav.didStopUserGesture();
+    }
+  }
+
   Future<void> _send() async {
     final body = _inputCtrl.text.trim();
     if (body.isEmpty || _sending) return;
@@ -914,10 +991,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           if (!didPop) Navigator.of(context).pop();
         },
         child: GestureDetector(
-          // Balayer vers la GAUCHE, n'importe où, quitte la conversation.
-          onHorizontalDragEnd: (d) {
-            if ((d.primaryVelocity ?? 0) < -300) Navigator.of(context).maybePop();
-          },
+          // Fermeture au doigt : la page suit le doigt vers la GAUCHE, n'importe
+          // où ; au relacher elle part (assez loin ou lance) ou revient.
+          onHorizontalDragStart: _closeDragStart,
+          onHorizontalDragUpdate: _closeDragUpdate,
+          onHorizontalDragEnd: (d) => _closeDragEnd(d.primaryVelocity ?? 0),
+          onHorizontalDragCancel: () => _closeDragEnd(0),
           child: Stack(
             children: [
               // ── La liste, plein écran ─────────────────────────────────────
