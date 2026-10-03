@@ -2234,6 +2234,10 @@ class _TinderCardState extends State<_TinderCard> {
     // seul quand l'autre manque. La ville, plus petite, se distingue du pays.
     final country = p.country.trim();
     final city = p.city.trim();
+    // Drapeau du pays (à défaut celui de sa langue), pour la 2e ligne.
+    final flagEmoji = countryFlagFor(country) ??
+        findLanguageByCode(p.language)?.flag ??
+        '';
     final place = [if (country.isNotEmpty) country, if (city.isNotEmpty) city]
         .join(' - ');
     return Stack(
@@ -2398,10 +2402,6 @@ class _TinderCardState extends State<_TinderCard> {
                         ),
                       ),
                       // Aperçu de ma carte : pas de drapeau (le mien).
-                      if (!widget.preview) ...[
-                        const SizedBox(width: 10),
-                        _NameFlag(profile: p),
-                      ],
                     ],
                   ),
                 ),
@@ -2410,6 +2410,10 @@ class _TinderCardState extends State<_TinderCard> {
                   Text.rich(
                     TextSpan(
                       children: [
+                        // Le drapeau passe sur la 2e ligne, AVANT le pays (pas sur
+                        // l'aperçu de ma carte : on ne voit pas le sien).
+                        if (!widget.preview && flagEmoji.isNotEmpty)
+                          TextSpan(text: '$flagEmoji  '),
                         if (country.isNotEmpty) TextSpan(text: country),
                         if (country.isNotEmpty && city.isNotEmpty)
                           const TextSpan(text: ' - '),
@@ -2458,24 +2462,6 @@ class _TinderCardState extends State<_TinderCard> {
             ),
         ],
       );
-  }
-}
-
-/// Le drapeau posé après le prénom : l'EMOJI, le même que sur la page
-/// Messages (le handoff voulait une image 28×19 — refusé, 2026-09-29). Celui
-/// du PAYS ; à défaut, celui de la langue parlée.
-class _NameFlag extends StatelessWidget {
-  const _NameFlag({required this.profile});
-
-  final RemoteProfile profile;
-
-  @override
-  Widget build(BuildContext context) {
-    final flag = countryFlagFor(profile.country) ??
-        findLanguageByCode(profile.language)?.flag ??
-        '';
-    if (flag.isEmpty) return const SizedBox.shrink();
-    return Text(flag, style: const TextStyle(fontSize: 24, height: 1));
   }
 }
 
