@@ -155,7 +155,7 @@ class _GifPickerSheetState extends State<_GifPickerSheet> {
                   child: Text(
                     'POWERED BY GIPHY',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: SC.fg.withValues(alpha: 0.4),
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.2,

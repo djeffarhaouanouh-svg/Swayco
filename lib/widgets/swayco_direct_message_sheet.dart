@@ -65,7 +65,7 @@ class _SwaycoDirectMessageSheetState extends State<SwaycoDirectMessageSheet> {
                     hintText: AppStrings.t('dm_write_hint'),
                     hintStyle: SCText.subtitle.copyWith(
                       fontSize: 16,
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: SC.fg.withValues(alpha: 0.4),
                     ),
                     counterText: '',
                     filled: true,

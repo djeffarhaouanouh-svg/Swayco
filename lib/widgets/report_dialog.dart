@@ -133,7 +133,7 @@ class _ReportDialogState extends State<_ReportDialog> {
                           hintText: AppStrings.t('report_details_hint'),
                           hintStyle: SCText.subtitle.copyWith(
                             fontSize: 14,
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: SC.fg.withValues(alpha: 0.5),
                           ),
                           counterStyle: SCText.meta,
                           filled: true,
@@ -215,7 +215,7 @@ class _ReasonChip extends StatelessWidget {
           style: GoogleFonts.dmSans(
             fontSize: 13,
             fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-            color: selected ? SC.onAccent : Colors.white,
+            color: selected ? SC.onAccent : SC.fg,
           ),
         ),
       ),

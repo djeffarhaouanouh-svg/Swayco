@@ -735,7 +735,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 Divider(
                   height: 1,
                   thickness: 1,
-                  color: Colors.white.withValues(alpha: 0.10),
+                  color: SC.stroke.withValues(alpha: 0.10),
                 ),
                 Expanded(
                   // Loupe ouverte mais rien de tapé : la liste reste là.
@@ -800,9 +800,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.10),
+            color: SC.fill.withValues(alpha: 0.10), boxShadow: SC.lift,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            border: Border.all(color: SC.stroke.withValues(alpha: 0.18)),
           ),
           child: Row(
             children: [
@@ -820,7 +820,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     isDense: true,
                     hintText: AppStrings.t('search_friend_hint'),
                     hintStyle:
-                        const TextStyle(color: Colors.white54, fontSize: 15),
+                        TextStyle(color: SC.fgA(0.54), fontSize: 15),
                     // La pastille dessine déjà la surface : sans ça le thème
                     // peint son fond et son anneau cyan DANS la pastille.
                     filled: false,
@@ -834,11 +834,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: _closeSearch,
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.only(left: 6),
                   child: Icon(
                     Icons.close_rounded,
-                    color: Colors.white70,
+                    color: SC.fgA(0.7),
                     size: 20,
                   ),
                 ),
@@ -922,7 +922,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     color: SC.menu,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.18),
+                      color: SC.stroke.withValues(alpha: 0.18),
                       width: 1.2,
                     ),
                   ),
@@ -1031,7 +1031,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final navBody =
         GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     if (_searching && _searchResults.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.only(top: 32),
         child: Align(
           alignment: Alignment.topCenter,
@@ -1039,7 +1039,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             width: 20,
             height: 20,
             child: CircularProgressIndicator(
-              color: Colors.white,
+              color: SC.fg,
               strokeWidth: 2,
             ),
           ),
@@ -2088,8 +2088,8 @@ class _NotifBanner extends StatelessWidget {
           IconButton(
             onPressed: onDismiss,
             visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.close_rounded,
-                color: Colors.white54, size: 18),
+            icon: Icon(Icons.close_rounded,
+                color: SC.fgA(0.54), size: 18),
           ),
         ],
       ),
@@ -2403,7 +2403,7 @@ class _SectionHeader extends StatelessWidget {
           Text(
             title,
             style: _label.copyWith(
-              color: Colors.white.withValues(alpha: 0.45),
+              color: SC.fg.withValues(alpha: 0.45),
             ),
           ),
           if (count > 0) ...[
@@ -2470,7 +2470,7 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
                     final t = Curves.easeInOut.transform(_ctrl.value);
                     // 0.10 → 0.18 alpha so the shimmer breathes gently.
                     final shimmer =
-                        Colors.white.withValues(alpha: 0.10 + 0.08 * t);
+                        (SC.light ? Colors.transparent : Colors.white).withValues(alpha: 0.10 + 0.08 * t);
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [

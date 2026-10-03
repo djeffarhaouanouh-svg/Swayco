@@ -47,22 +47,18 @@ class SwaycoPalette extends ThemeExtension<SwaycoPalette> {
   final List<BoxShadow> cardShadow;
   final Brightness statusBar;
 
+  /// Mode clair 17b « Blanc bleuté » : fond #F5F8FE, surfaces blanches, sans halo.
   static const light = SwaycoPalette(
-    bg: Color(0xFFFFFFFF),
-    halo: RadialGradient(
-      center: Alignment(0, -1),
-      radius: 1.2,
-      colors: [Color(0x332B7FFF), Color(0x1A18DDEA), Color(0x00FFFFFF)],
-      stops: [0, .4, .75],
-    ),
-    surface: Color(0xFFF2F6FF),
+    bg: Color(0xFFF5F8FE),
+    halo: null,
+    surface: Color(0xFFFFFFFF),
     card: Color(0xFFFFFFFF),
     line: Color(0x1A1F5EFF),
     ink: Color(0xFF04123A),
     inkSecondary: Color(0xFF5A6890),
     inkMuted: Color(0xFF8A94B0),
-    navGlass: Color(0xB8FFFFFF),
-    navBorder: Color(0x1A04123A),
+    navGlass: Color(0xD9FFFFFF),
+    navBorder: Color(0x1A1F5EFF),
     navActive: Color(0x1A1F5EFF),
     cardShadow: [BoxShadow(color: Color(0x401F5EFF), blurRadius: 28, spreadRadius: -12, offset: Offset(0, 10))],
     statusBar: Brightness.dark,
@@ -118,16 +114,21 @@ class SwaycoBackground extends StatelessWidget {
       color: p.bg,
       child: Stack(
         children: [
-          if (p.halo != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: haloHeight,
-              child: IgnorePointer(
-                child: DecoratedBox(decoration: BoxDecoration(gradient: p.halo)),
-              ),
+          // Toujours DEUX enfants, halo ou pas : si la couche du halo disparaissait
+          // (mode Noir, clair 17b), l'écran glisserait à sa place dans la Stack et
+          // Flutter le reconstruirait de zéro — tout l'état perdu, et un écran
+          // gris (erreur) au changement d'apparence.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: haloHeight,
+            child: IgnorePointer(
+              child: p.halo == null
+                  ? const SizedBox.shrink()
+                  : DecoratedBox(decoration: BoxDecoration(gradient: p.halo)),
             ),
+          ),
           Positioned.fill(child: child),
         ],
       ),

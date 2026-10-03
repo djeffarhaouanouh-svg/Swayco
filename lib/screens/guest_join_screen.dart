@@ -1,4 +1,4 @@
-﻿import 'dart:math';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -104,7 +104,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SC.bg,
+      backgroundColor: SC.dBg,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -124,14 +124,14 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
                       color: SC.accentDeep,
                     ),
                     child: Icon(Icons.videocam_rounded,
-                        color: SC.textPrimary, size: 36),
+                        color: SC.dTextPrimary, size: 36),
                   ),
                   const SizedBox(height: 20),
                   Text(
                     AppStrings.t('guest_title'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: SC.textPrimary,
+                      color: SC.dTextPrimary,
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
                     ),
@@ -141,7 +141,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
                     AppStrings.t('guest_subtitle'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: SC.textMuted,
+                      color: SC.dTextMuted,
                       fontSize: 14,
                       height: 1.4,
                     ),
@@ -150,7 +150,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
                   Text(
                     AppStrings.t('guest_lang_label'),
                     style: TextStyle(
-                      color: SC.textPrimary,
+                      color: SC.dTextPrimary,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
@@ -226,10 +226,10 @@ class _LangChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected ? SC.accent : SC.menu;
+    final bg = selected ? SC.accent : SC.dMenu;
     final border =
         selected ? SC.accent : Colors.white.withValues(alpha: 0.08);
-    final fg = selected ? Colors.white : SC.textPrimary;
+    final fg = selected ? Colors.white : SC.dTextPrimary;
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(14),

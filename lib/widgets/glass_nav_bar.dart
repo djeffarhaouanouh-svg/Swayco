@@ -545,9 +545,13 @@ class _NavItemState extends State<_NavItem>
               ? Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(
+                  // Clair : contour blanc de 2 px pour détacher le jaune.
+                  decoration: BoxDecoration(
                     color: SC.accent,
                     shape: BoxShape.circle,
+                    border: SC.light
+                        ? Border.all(color: Colors.white, width: 2)
+                        : null,
                   ),
                 )
               : Container(
@@ -558,6 +562,9 @@ class _NavItemState extends State<_NavItem>
                   decoration: BoxDecoration(
                     color: SC.accent,
                     borderRadius: BorderRadius.circular(999),
+                    border: SC.light
+                        ? Border.all(color: Colors.white, width: 2)
+                        : null,
                   ),
                   child: Text(
                     label,

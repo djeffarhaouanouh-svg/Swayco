@@ -128,7 +128,7 @@ class _WheelPickerSheetState extends State<_WheelPickerSheet> {
                               style: GoogleFonts.dmSans(
                                 color: selected
                                     ? Colors.white
-                                    : Colors.white.withValues(alpha: 0.5),
+                                    : SC.fg.withValues(alpha: 0.5),
                                 fontSize: selected ? 21 : 17,
                                 fontWeight: selected
                                     ? FontWeight.w800
@@ -152,7 +152,7 @@ class _WheelPickerSheetState extends State<_WheelPickerSheet> {
                         child: Text(
                           AppStrings.t('delete'),
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.6),
+                            color: SC.fg.withValues(alpha: 0.6),
                             fontWeight: FontWeight.w700,
                           ),
                         ),

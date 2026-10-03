@@ -288,13 +288,13 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: SC.bg,
+        backgroundColor: SC.dBg,
         body: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF1A2040), Color(0xFF10121C), SC.bg],
+              colors: [Color(0xFF1A2040), Color(0xFF10121C), SC.dBg],
               stops: [0, 0.45, 1],
             ),
           ),
@@ -362,7 +362,7 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
                         tailBg: _pro
                             ? SC.accent
                             : Colors.white.withValues(alpha: 0.14),
-                        tailFg: _pro ? SC.onAccent : SC.textPrimary,
+                        tailFg: _pro ? SC.onAccent : SC.dTextPrimary,
                       ),
                       const SizedBox(height: 16),
                       _PerkRow(
@@ -431,7 +431,7 @@ class _FreeProSwitch extends StatelessWidget {
             style: TextStyle(
               color: active
                   ? SC.onAccent
-                  : SC.textPrimary.withValues(alpha: 0.6),
+                  : SC.dTextPrimary.withValues(alpha: 0.6),
               fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
@@ -661,7 +661,7 @@ class _PerkRow extends StatelessWidget {
                 label,
                 maxLines: 1,
                 style: TextStyle(
-                  color: SC.textPrimary,
+                  color: SC.dTextPrimary,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
@@ -673,7 +673,7 @@ class _PerkRow extends StatelessWidget {
             value,
             maxLines: 1,
             style: TextStyle(
-              color: on ? SC.accent : SC.textPrimary.withValues(alpha: 0.55),
+              color: on ? SC.accent : SC.dTextPrimary.withValues(alpha: 0.55),
               fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
@@ -841,13 +841,13 @@ class _BoostPaywallState extends State<_BoostPaywall> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: SC.bg,
+        backgroundColor: SC.dBg,
         body: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF1A2040), Color(0xFF10121C), SC.bg],
+              colors: [Color(0xFF1A2040), Color(0xFF10121C), SC.dBg],
               stops: [0, 0.45, 1],
             ),
           ),
@@ -909,7 +909,7 @@ class _BoostPaywallState extends State<_BoostPaywall> {
                         style: SCText.subtitle.copyWith(
                           fontSize: 14.5,
                           height: 1.5,
-                          color: SC.textPrimary.withValues(alpha: 0.75),
+                          color: SC.dTextPrimary.withValues(alpha: 0.75),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1006,7 +1006,7 @@ class _LikesWallPaywallState extends State<_LikesWallPaywall>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: SC.bg,
+        backgroundColor: SC.dBg,
         body: Stack(
           children: [
             Positioned(
@@ -1040,9 +1040,9 @@ class _LikesWallPaywallState extends State<_LikesWallPaywall>
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: SC.bg,
+                      color: SC.dBg,
                     ),
-                    child: Icon(Icons.lock_rounded, size: 34, color: SC.accentFg),
+                    child: Icon(Icons.lock_rounded, size: 34, color: SC.accent),
                   ),
                 ),
               ),
@@ -1118,7 +1118,7 @@ class _LikesWallPaywallState extends State<_LikesWallPaywall>
                         style: SCText.subtitle.copyWith(
                           fontSize: 14.5,
                           height: 1.5,
-                          color: SC.textPrimary.withValues(alpha: 0.75),
+                          color: SC.dTextPrimary.withValues(alpha: 0.75),
                         ),
                       ),
                     ),
@@ -1245,7 +1245,7 @@ class _BlurredWall extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0x260E0E0E), Color(0x401F5EFF), SC.bg],
+                colors: [Color(0x260E0E0E), Color(0x401F5EFF), SC.dBg],
                 stops: [0, 0.4, 1],
               ),
             ),
@@ -1295,7 +1295,7 @@ class _PlanCard extends StatelessWidget {
               children: [
                 Text(
                   'Swayco Pro',
-                  style: popupDisplay(fontSize: 16, color: SC.textPrimary),
+                  style: popupDisplay(fontSize: 16, color: SC.dTextPrimary),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -1303,7 +1303,7 @@ class _PlanCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: SC.textPrimary.withValues(alpha: 0.6),
+                    color: SC.dTextPrimary.withValues(alpha: 0.6),
                     fontSize: 12.5,
                   ),
                 ),
@@ -1319,7 +1319,7 @@ class _PlanCard extends StatelessWidget {
                 Text(
                   AppStrings.t('paywall_period_month'),
                   style: TextStyle(
-                    color: SC.textPrimary.withValues(alpha: 0.6),
+                    color: SC.dTextPrimary.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -1443,7 +1443,7 @@ class _HighlightTitle extends StatelessWidget {
       fontSize: fontSize,
       letterSpacing: -fontSize * 0.03,
       height: 1.18,
-      color: SC.textPrimary,
+      color: SC.dTextPrimary,
     );
     return Text.rich(
       TextSpan(
@@ -1503,7 +1503,7 @@ class _FooterLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = SC.textPrimary.withValues(alpha: 0.55);
+    final c = SC.dTextPrimary.withValues(alpha: 0.55);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -1533,7 +1533,7 @@ class _FooterDot extends StatelessWidget {
       child: Text(
         '·',
         style: TextStyle(
-          color: SC.textPrimary.withValues(alpha: 0.55),
+          color: SC.dTextPrimary.withValues(alpha: 0.55),
           fontSize: 12,
         ),
       ),

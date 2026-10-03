@@ -3,6 +3,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../theme/swayco_theme.dart';
 import '../services/interests.dart';
 
 /// « ⚽ Football » — le texte d'une puce d'intérêt : l'emoji de sa catégorie
@@ -51,21 +52,29 @@ class InterestPill extends StatelessWidget {
         vertical: prominent ? 8 : 7,
       ),
       decoration: BoxDecoration(
+        // Sur photo : verre sombre. Sur le fond : en clair, puce blanche +
+        // bord bleuté + ombre ; en sombre, blanc translucide comme avant.
         color: onPhoto
             ? Colors.black.withValues(alpha: 0.28)
-            : Colors.white.withValues(alpha: prominent ? 0.10 : 0.07),
+            : (SC.light
+                ? Colors.white
+                : Colors.white.withValues(alpha: prominent ? 0.10 : 0.07)),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: Colors.white.withValues(alpha: prominent ? 0.20 : 0.16),
+          color: onPhoto || !SC.light
+              ? Colors.white.withValues(alpha: prominent ? 0.20 : 0.16)
+              : SC.stroke,
         ),
+        boxShadow: onPhoto ? null : SC.lift,
       ),
       child: Text(
         label,
         maxLines: 1,
         softWrap: false,
-        style: prominent
-            ? textStyle.copyWith(fontWeight: FontWeight.w800)
-            : textStyle,
+        style: (prominent
+                ? textStyle.copyWith(fontWeight: FontWeight.w800)
+                : textStyle)
+            .copyWith(color: onPhoto ? Colors.white : SC.fg),
       ),
     );
     final surface = onPhoto

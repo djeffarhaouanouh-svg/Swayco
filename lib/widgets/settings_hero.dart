@@ -3,6 +3,8 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
+import '../theme/swayco_theme.dart';
+
 /// Place du rond « retour » des Réglages, comptée depuis le bord gauche : celle
 /// du bouton retour de l'AppBar (14 de marge).
 const double _kBackLeft = 14;
@@ -118,10 +120,10 @@ class SettingsDisc extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.13),
+              color: SC.fill.withValues(alpha: 0.13), boxShadow: SC.lift,
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
+                color: SC.stroke.withValues(alpha: 0.3),
                 width: 1.2,
               ),
             ),
@@ -132,10 +134,10 @@ class SettingsDisc extends StatelessWidget {
                 children: [
                   Opacity(
                     opacity: (1 - t * 1.6).clamp(0.0, 1.0),
-                    child: const Icon(
+                    child: Icon(
                       Icons.settings_outlined,
                       size: 22,
-                      color: Colors.white,
+                      color: SC.fg,
                     ),
                   ),
                   Opacity(
@@ -143,10 +145,10 @@ class SettingsDisc extends StatelessWidget {
                     // Contre-rotation : la flèche arrive à l'endroit.
                     child: Transform.rotate(
                       angle: t * math.pi,
-                      child: const Icon(
+                      child: Icon(
                         Icons.arrow_back_rounded,
                         size: 22,
-                        color: Colors.white,
+                        color: SC.fg,
                       ),
                     ),
                   ),

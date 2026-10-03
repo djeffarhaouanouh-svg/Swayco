@@ -96,7 +96,7 @@ const double _kActionPadV = 16.0;
 /// Surfaces pleines du handoff : bulles pays, bouton message.
 Color get _kSurface =>
     SC.light
-        ? const Color(0xFFF2F6FF)
+        ? const Color(0xFFFFFFFF)
         : (SC.classic ? const Color(0xFF1A1A1D) : const Color(0xFF161D30));
 const Color _kSurfaceBorder = Color(0xFF2A2A2E);
 
@@ -753,9 +753,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             right: _kCardInset,
             bottom: currentCardBottom,
             child: _feedLoading
-                ? const Center(
+                ? Center(
                     child: CircularProgressIndicator(
-                      color: Colors.white,
+                      color: SC.fg,
                       strokeWidth: 2,
                     ),
                   )
@@ -821,8 +821,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     alignment: const Alignment(0, 0.6),
                     child: Text(
                       AppStrings.t('profile_loading'),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: SC.fg,
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
                       ),
@@ -959,9 +959,9 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
             right: _kCardInset,
             height: cardH,
             child: _loading
-                ? const Center(
+                ? Center(
                     child: CircularProgressIndicator(
-                      color: Colors.white,
+                      color: SC.fg,
                       strokeWidth: 2,
                     ),
                   )
@@ -971,7 +971,7 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                           AppStrings.t('info_empty'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.55),
+                            color: SC.fg.withValues(alpha: 0.55),
                             fontSize: 14,
                           ),
                         ),
@@ -1101,7 +1101,7 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.70),
+                      color: SC.fg.withValues(alpha: 0.70),
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1261,7 +1261,7 @@ class _CountryRowState extends State<_CountryRow> {
                   ),
                   child: Icon(
                     Icons.tune_rounded,
-                    color: Colors.white,
+                    color: SC.fg,
                     size: 26,
                   ),
                 ),
@@ -1857,7 +1857,7 @@ class _PanelSectionTitle extends StatelessWidget {
     return Text(
       label.toUpperCase(),
       style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.45),
+        color: SC.fg.withValues(alpha: 0.45),
         fontSize: 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.1,
@@ -1896,8 +1896,8 @@ class _PanelHeader extends StatelessWidget {
           name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: SC.fg,
             fontSize: 30,
             fontWeight: FontWeight.w900,
             letterSpacing: -0.4,
@@ -1919,7 +1919,7 @@ class _PanelHeader extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
+                    color: SC.fg.withValues(alpha: 0.85),
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
@@ -2001,9 +2001,17 @@ class _DraggableCardState extends State<_DraggableCard>
   bool _flying = false;
   int _gen = 0;
 
-  late final AnimationController _ctrl = AnimationController(vsync: this)
-    ..addListener(_tick);
+  // Créé dans initState, PAS paresseusement : un late final jamais lu
+  // était créé… dans dispose(), sur un élément déjà démonté → exception à
+  // chaque carte retirée sans avoir été glissée.
+  late final AnimationController _ctrl;
   Animation<Offset>? _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this)..addListener(_tick);
+  }
 
   void _tick() {
     final a = _anim;
@@ -2580,9 +2588,9 @@ class _ScrollHintChevronsState extends State<_ScrollHintChevrons>
       offset: Offset(0, -12 * lift),
       child: Opacity(
         opacity: 0.75 + 0.25 * lift,
-        child: const Icon(
+        child: Icon(
           Icons.keyboard_arrow_up_rounded,
-          color: Colors.white,
+          color: SC.fg,
           size: 34,
           shadows: [Shadow(color: Color(0x66000000), blurRadius: 8)],
         ),
@@ -2616,7 +2624,7 @@ class _PhotoDots extends StatelessWidget {
             decoration: BoxDecoration(
               color: i == active
                   ? Colors.white
-                  : Colors.white.withValues(alpha: 0.45),
+                  : SC.fg.withValues(alpha: 0.45),
               borderRadius: BorderRadius.circular(3),
               boxShadow: const [
                 BoxShadow(color: Color(0x66000000), blurRadius: 4),
@@ -2759,10 +2767,10 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
                     ],
                   ),
                   alignment: Alignment.center,
-                  child: const Icon(
+                  child: Icon(
                     Icons.chat_bubble_rounded,
                     size: 21,
-                    color: Colors.white,
+                    color: SC.fg,
                   ),
                 ),
                 // ✦ en haut à droite : pastille jaune, liseré fond de page.
@@ -2821,9 +2829,9 @@ class _CardUndoButton extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: SC.glassBorderStrong),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.replay_rounded,
-              color: Colors.white,
+              color: SC.fg,
               size: 22,
             ),
           ),
@@ -2876,8 +2884,8 @@ class _DiscoverDone extends StatelessWidget {
                 Text(
                   AppStrings.t('discover_done'),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: SC.fg,
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.3,
@@ -2889,7 +2897,7 @@ class _DiscoverDone extends StatelessWidget {
                   AppStrings.t('discover_done_back'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.55),
+                    color: SC.fg.withValues(alpha: 0.55),
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                     height: 1.35,
@@ -2932,13 +2940,13 @@ class _Empty extends StatelessWidget {
               width: 70,
               height: 70,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
+                color: SC.fill.withValues(alpha: 0.06), boxShadow: SC.lift,
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+                border: Border.all(color: SC.stroke.withValues(alpha: 0.14)),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.favorite_border,
-                color: Colors.white54,
+                color: SC.fgA(0.54),
                 size: 32,
               ),
             ),
@@ -2946,8 +2954,8 @@ class _Empty extends StatelessWidget {
             Text(
               AppStrings.t('discover_empty_title'),
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white70,
+              style: TextStyle(
+                color: SC.fgA(0.7),
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -2957,7 +2965,7 @@ class _Empty extends StatelessWidget {
               body ?? AppStrings.t('discover_empty_body'),
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.45),
+                color: SC.fg.withValues(alpha: 0.45),
                 fontSize: 13.5,
                 height: 1.35,
               ),

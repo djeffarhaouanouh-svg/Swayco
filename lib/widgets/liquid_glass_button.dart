@@ -4,6 +4,7 @@ import 'package:cupertino_native_plus/cupertino_native_plus.dart' as cnp;
 import 'package:flutter/material.dart';
 
 import '../services/platform_glass.dart';
+import '../theme/swayco_theme.dart';
 
 /// A round glass button.
 ///
@@ -23,7 +24,7 @@ class LiquidGlassButton extends StatefulWidget {
     required this.onTap,
     this.size = 58,
     this.iconSize = 26,
-    this.iconColor = Colors.white,
+    this.iconColor,
     this.semanticLabel,
   });
 
@@ -35,7 +36,8 @@ class LiquidGlassButton extends StatefulWidget {
   final VoidCallback onTap;
   final double size;
   final double iconSize;
-  final Color iconColor;
+  /// Null = encre en clair, blanc en sombre ([SC.fg]).
+  final Color? iconColor;
   final String? semanticLabel;
 
   @override
@@ -59,10 +61,10 @@ class _LiquidGlassButtonState extends State<LiquidGlassButton> {
             icon: cnp.CNIcon.symbol(
               widget.sfSymbol,
               size: Size(widget.iconSize, widget.iconSize),
-              color: widget.iconColor,
+              color: widget.iconColor ?? SC.fg,
             ),
             onPressed: widget.onTap,
-            theme: cnp.CNButtonTheme(iconColor: widget.iconColor),
+            theme: cnp.CNButtonTheme(iconColor: widget.iconColor ?? SC.fg),
             config: cnp.CNButtonConfig(
               style: cnp.CNButtonStyle.glass,
               width: s,
@@ -94,16 +96,16 @@ class _LiquidGlassButtonState extends State<LiquidGlassButton> {
                 width: s,
                 height: s,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.13),
+                  color: SC.fill.withValues(alpha: 0.13), boxShadow: SC.lift,
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.22),
+                    color: SC.stroke.withValues(alpha: 0.22),
                     width: 1.2,
                   ),
                 ),
                 child: Icon(
                   widget.icon,
-                  color: widget.iconColor,
+                  color: widget.iconColor ?? SC.fg,
                   size: widget.iconSize,
                 ),
               ),

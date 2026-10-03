@@ -1539,7 +1539,7 @@ class _IdentitySection extends StatelessWidget {
           color: const Color(0xFF1B2A55),
           child: Center(
             child: editable
-                ? const Icon(Icons.photo_camera, size: 56, color: Colors.white54)
+                ? Icon(Icons.photo_camera, size: 56, color: SC.fgA(0.54))
                 : ProfileAvatar(displayName: displayName, size: 120),
           ),
         );
@@ -1693,7 +1693,7 @@ class _IdentitySection extends StatelessWidget {
                   fontSize: 12,
                   color: SC.light
                       ? SC.textSecondary
-                      : Colors.white.withValues(alpha: 0.7),
+                      : SC.fg.withValues(alpha: 0.7),
                 ),
               ),
             ),
@@ -2077,14 +2077,14 @@ class _GlassCircle extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.13),
+            color: SC.fill.withValues(alpha: 0.13), boxShadow: SC.lift,
             shape: BoxShape.circle,
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.3),
+              color: SC.stroke.withValues(alpha: 0.3),
               width: 1.2,
             ),
           ),
-          child: Icon(icon, size: 22, color: Colors.white),
+          child: Icon(icon, size: 22, color: SC.fg),
         ),
       ),
     );
@@ -2262,7 +2262,7 @@ class _ProfileSectionHeader extends StatelessWidget {
                     style: TextStyle(
                       color: SC.light
                           ? SC.textMuted
-                          : Colors.white.withValues(alpha: 0.55),
+                          : SC.fg.withValues(alpha: 0.55),
                     ),
                   ),
               ],
@@ -2293,7 +2293,7 @@ class _EmptyPhotosPlaceholder extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: SC.glassBorder),
-        color: Colors.white.withValues(alpha: 0.02),
+        color: SC.fill.withValues(alpha: 0.02), boxShadow: SC.lift,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2350,10 +2350,10 @@ class _RewardHint extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.13),
+            color: SC.fill.withValues(alpha: 0.13), boxShadow: SC.lift,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.3),
+              color: SC.stroke.withValues(alpha: 0.3),
               width: 1.2,
             ),
           ),
@@ -3266,7 +3266,7 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
           Align(
             alignment: Alignment.centerRight,
             child: Material(
-              color: Colors.white.withValues(alpha: 0.10),
+              color: SC.fill.withValues(alpha: 0.10),
               shape: const CircleBorder(),
               child: InkWell(
                 customBorder: const CircleBorder(),
@@ -3277,7 +3277,7 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.22),
+                      color: SC.stroke.withValues(alpha: 0.22),
                     ),
                   ),
                   child: Icon(
@@ -3515,7 +3515,7 @@ class _DiscoverVisibilityHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final muted = Colors.white.withValues(alpha: 0.6);
+    final muted = (SC.light ? Colors.transparent : Colors.white).withValues(alpha: 0.6);
     return InkWell(
       borderRadius: BorderRadius.circular(10),
       onTap: onTap,
@@ -3685,8 +3685,8 @@ class _PhotoCell extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           '$likesCount',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: SC.fg,
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
@@ -3740,18 +3740,18 @@ class _PhotoCell extends StatelessWidget {
                         shape: BoxShape.circle,
                         color: iLikePeer
                             ? SC.accent
-                            : Colors.white.withValues(alpha: 0.13),
+                            : SC.fg.withValues(alpha: 0.13),
                         border: Border.all(
                           color: iLikePeer
                               ? SC.accent
-                              : Colors.white.withValues(alpha: 0.3),
+                              : SC.stroke.withValues(alpha: 0.3),
                           width: 1.2,
                         ),
                       ),
                       child: Icon(
                         iLikePeer ? Icons.favorite : Icons.favorite_border,
                         size: 20,
-                        color: iLikePeer ? SC.onAccent : Colors.white,
+                        color: iLikePeer ? SC.onAccent : SC.fg,
                       ),
                     ),
                   ),
@@ -3917,7 +3917,7 @@ class _EditAccountSheet extends StatelessWidget {
                 width: 44,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.22),
+                  color: SC.fill.withValues(alpha: 0.22), boxShadow: SC.lift,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -3980,10 +3980,10 @@ class _EditAccountSheet extends StatelessWidget {
                               width: 2,
                             ),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.close_rounded,
                             size: 13,
-                            color: Colors.white,
+                            color: SC.fg,
                           ),
                         ),
                       ),
@@ -3996,7 +3996,7 @@ class _EditAccountSheet extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: popupDisplay(
-                  color: Colors.white,
+                  color: SC.fg,
                   fontSize: 18,
                   letterSpacing: -0.5,
                 ),
@@ -4034,7 +4034,7 @@ class _EditAccountSheet extends StatelessWidget {
                       Divider(
                         height: 1,
                         thickness: 1,
-                        color: Colors.white.withValues(alpha: 0.08),
+                        color: SC.stroke.withValues(alpha: 0.08),
                       ),
                       _EditAccountRow(
                         icon: Icons.location_city_outlined,
@@ -4045,7 +4045,7 @@ class _EditAccountSheet extends StatelessWidget {
                       Divider(
                         height: 1,
                         thickness: 1,
-                        color: Colors.white.withValues(alpha: 0.08),
+                        color: SC.stroke.withValues(alpha: 0.08),
                       ),
                       _EditAccountRow(
                         // Une icône de l'app et non l'emoji 📞, qui arrivait

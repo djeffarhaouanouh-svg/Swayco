@@ -1482,7 +1482,7 @@ class _ThreadHeader extends StatelessWidget {
                   final nameStyle = popupDisplay(
                     fontSize: 16,
                     letterSpacing: -0.3,
-                    color: Colors.white,
+                    color: SC.fg,
                   ).copyWith(
                     shadows: const [
                       Shadow(color: Color(0x99000000), blurRadius: 8),
@@ -1595,7 +1595,7 @@ class _DeadCallIcon extends StatelessWidget {
     return SizedBox(
       width: 44,
       height: 44,
-      child: Icon(icon, size: 21, color: Colors.white.withValues(alpha: 0.32)),
+      child: Icon(icon, size: 21, color: SC.fg.withValues(alpha: 0.32)),
     );
   }
 }
@@ -2017,7 +2017,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
                         border: mine
                             ? null
                             : Border.all(
-                                color: Colors.white.withValues(alpha: 0.12),
+                                color: SC.stroke.withValues(alpha: 0.12),
                               ),
                       ),
                 child: hugContent ? IntrinsicWidth(child: content) : content,
@@ -2207,8 +2207,8 @@ class _ReactionChip extends StatelessWidget {
                   if (count > 0)
                     TextSpan(
                       text: ' $count',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: SC.fg,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
@@ -2240,9 +2240,9 @@ class _QuickReactionBar extends StatelessWidget {
         height: 30,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: SC.fill.withValues(alpha: 0.08), boxShadow: SC.lift,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          border: Border.all(color: SC.stroke.withValues(alpha: 0.14)),
         ),
         child: child,
       );
@@ -2520,9 +2520,9 @@ class _BlockedAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: SC.fill.withValues(alpha: 0.08), boxShadow: SC.lift,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+          border: Border.all(color: SC.stroke.withValues(alpha: 0.16)),
         ),
         child: Text(
           label,
@@ -2820,7 +2820,7 @@ class _ComposerState extends State<_Composer>
                             // S'efface / revient en fondu avec le focus.
                             hintText: _hintFade.value == 0 ? null : _typedHint,
                             hintStyle: TextStyle(
-                              color: Colors.white.withValues(
+                              color: SC.fg.withValues(
                                 alpha: 0.55 *
                                     Curves.easeOut.transform(_hintFade.value),
                               ),
@@ -2859,7 +2859,7 @@ class _ComposerState extends State<_Composer>
                         child: Icon(
                           Icons.add_photo_alternate_outlined,
                           size: 23,
-                          color: Colors.white.withValues(alpha: 0.75),
+                          color: SC.fg.withValues(alpha: 0.75),
                         ),
                       ),
                     ),
@@ -2957,7 +2957,7 @@ class _TranslatePill extends StatelessWidget {
     final pair = from.isNotEmpty && to.isNotEmpty && from != to
         ? '$from → $to'
         : '';
-    final fg = active ? Colors.white : Colors.white.withValues(alpha: 0.6);
+    final fg = active ? (SC.light ? Colors.transparent : Colors.white) : (SC.light ? Colors.transparent : Colors.white).withValues(alpha: 0.6);
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Center(
@@ -2970,10 +2970,10 @@ class _TranslatePill extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 0, 6, 0),
             decoration: BoxDecoration(
               gradient: active ? SC.brandGradient : null,
-              color: active ? null : Colors.white.withValues(alpha: 0.1),
+              color: active ? null : SC.fg.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color: Colors.white.withValues(alpha: active ? 0.3 : 0.2),
+                color: SC.stroke.withValues(alpha: active ? 0.3 : 0.2),
               ),
             ),
             child: Row(
@@ -2984,7 +2984,7 @@ class _TranslatePill extends StatelessWidget {
                   size: 18,
                   color: active
                       ? SC.accent
-                      : Colors.white.withValues(alpha: 0.6),
+                      : SC.fg.withValues(alpha: 0.6),
                 ),
                 const SizedBox(width: 9),
                 Text(
@@ -3017,7 +3017,7 @@ class _TranslatePill extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: active
                         ? SC.accent
-                        : Colors.white.withValues(alpha: 0.22),
+                        : SC.fg.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: AnimatedAlign(
@@ -3030,7 +3030,7 @@ class _TranslatePill extends StatelessWidget {
                       height: 18,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: active ? SC.onAccent : Colors.white,
+                        color: active ? SC.onAccent : SC.fg,
                       ),
                     ),
                   ),
@@ -3260,15 +3260,15 @@ class _SuggestionChips extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: SC.fill.withValues(alpha: 0.08), boxShadow: SC.lift,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+              border: Border.all(color: SC.stroke.withValues(alpha: 0.18)),
             ),
             child: Text(
               suggestions[i],
               maxLines: 1,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: SC.fg,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -3323,7 +3323,7 @@ class _TypingBubbleState extends State<_TypingBubble>
             bottomLeft: Radius.circular(6),
             bottomRight: Radius.circular(20),
           ),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          border: Border.all(color: SC.stroke.withValues(alpha: 0.12)),
         ),
         child: AnimatedBuilder(
           animation: _c,
@@ -3371,16 +3371,16 @@ class _HelloPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: yellow ? SC.accent : Colors.white.withValues(alpha: 0.14),
+        color: yellow ? SC.accent : SC.fg.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
         border: yellow
             ? null
-            : Border.all(color: Colors.white.withValues(alpha: 0.3)),
+            : Border.all(color: SC.stroke.withValues(alpha: 0.3)),
       ),
       child: Text(
         text,
         style: TextStyle(
-          color: yellow ? SC.onAccent : Colors.white,
+          color: yellow ? SC.onAccent : SC.fg,
           fontSize: 13,
           fontWeight: yellow ? FontWeight.w800 : FontWeight.w700,
         ),
@@ -3423,9 +3423,10 @@ class _ActivationWaveOverlay extends StatelessWidget {
                   stops: const [0.0, 0.35, 0.5, 0.65, 1.0],
                   colors: [
                     Colors.white.withValues(alpha: 0),
-                    Colors.white.withValues(alpha: 0.10 * fade),
-                    Colors.white.withValues(alpha: 0.28 * fade),
-                    Colors.white.withValues(alpha: 0.10 * fade),
+                    // Reflet : invisible en clair (blanc sur blanc).
+                    Colors.white.withValues(alpha: 0.10 * fade * (SC.light ? 0 : 1)),
+                    Colors.white.withValues(alpha: 0.28 * fade * (SC.light ? 0 : 1)),
+                    Colors.white.withValues(alpha: 0.10 * fade * (SC.light ? 0 : 1)),
                     Colors.white.withValues(alpha: 0),
                   ],
                 ),

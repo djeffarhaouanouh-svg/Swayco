@@ -1,4 +1,4 @@
-﻿import 'dart:math';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -177,7 +177,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
     final myLang = findLanguageByCode(_mySourceLang);
 
     return Scaffold(
-      backgroundColor: SC.bg,
+      backgroundColor: SC.dBg,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -207,7 +207,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
   Widget _buildBody() {
     if (_loading) {
       return Center(
-        child: CircularProgressIndicator(color: SC.accentFg),
+        child: CircularProgressIndicator(color: SC.accent),
       );
     }
     if (!isSupabaseReady) {
@@ -228,8 +228,8 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       );
     }
     return RefreshIndicator(
-      color: SC.accentFg,
-      backgroundColor: SC.menu,
+      color: SC.accent,
+      backgroundColor: SC.dMenu,
       onRefresh: _bootstrap,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -294,7 +294,7 @@ class _CallableFriendRow extends StatelessWidget {
               child: Text(
                 initial,
                 style: TextStyle(
-                  color: SC.textPrimary,
+                  color: SC.dTextPrimary,
                   fontWeight: FontWeight.w700,
                   fontSize: 20,
                 ),
@@ -313,7 +313,7 @@ class _CallableFriendRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     softWrap: false,
                     style: TextStyle(
-                      color: SC.textPrimary,
+                      color: SC.dTextPrimary,
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),
@@ -326,7 +326,7 @@ class _CallableFriendRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       softWrap: false,
                       style: TextStyle(
-                        color: SC.textMuted,
+                        color: SC.dTextMuted,
                         fontSize: 13,
                       ),
                     ),
@@ -354,7 +354,7 @@ class _CallableFriendRow extends StatelessWidget {
                         )
                       : Icon(
                           Icons.videocam_rounded,
-                          color: SC.textPrimary,
+                          color: SC.dTextPrimary,
                           size: 22,
                         ),
                 ),
@@ -384,7 +384,7 @@ class _MyProfileStrip extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
       padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
       decoration: BoxDecoration(
-        color: SC.menu,
+        color: SC.dMenu,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -404,7 +404,7 @@ class _MyProfileStrip extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: SC.textPrimary,
+                    color: SC.dTextPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -416,7 +416,7 @@ class _MyProfileStrip extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: SC.textMuted,
+                    color: SC.dTextMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -426,7 +426,7 @@ class _MyProfileStrip extends StatelessWidget {
           IconButton(
             onPressed: onEdit,
             tooltip: AppStrings.t('join_edit_profile'),
-            icon: Icon(Icons.edit_outlined, color: SC.textMuted),
+            icon: Icon(Icons.edit_outlined, color: SC.dTextMuted),
           ),
         ],
       ),
@@ -456,17 +456,17 @@ class _CenteredHint extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: SC.menu,
+                color: SC.dMenu,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: SC.textMuted, size: 34),
+              child: Icon(icon, color: SC.dTextMuted, size: 34),
             ),
             const SizedBox(height: 18),
             Text(
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: SC.textPrimary,
+                color: SC.dTextPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
@@ -476,7 +476,7 @@ class _CenteredHint extends StatelessWidget {
               body,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: SC.textMuted,
+                color: SC.dTextMuted,
                 fontSize: 13,
                 height: 1.4,
               ),
@@ -500,7 +500,7 @@ class _WhatsAppCallHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: SC.bg,
+      color: SC.dBg,
       child: SafeArea(
         bottom: false,
         child: Padding(
@@ -516,7 +516,7 @@ class _WhatsAppCallHeader extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.videocam, color: SC.textPrimary, size: 28),
+                    child: Icon(Icons.videocam, color: SC.dTextPrimary, size: 28),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -526,7 +526,7 @@ class _WhatsAppCallHeader extends StatelessWidget {
                         Text(
                           AppStrings.t('join_header_title'),
                           style: TextStyle(
-                            color: SC.textPrimary,
+                            color: SC.dTextPrimary,
                             fontSize: 22,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.2,
@@ -548,7 +548,7 @@ class _WhatsAppCallHeader extends StatelessWidget {
                       tooltip: AppStrings.t('join_header_profile_tooltip'),
                       icon: Icon(
                         Icons.manage_accounts_outlined,
-                        color: SC.textPrimary.withValues(alpha: 0.92),
+                        color: SC.dTextPrimary.withValues(alpha: 0.92),
                       ),
                     ),
                 ],

@@ -91,9 +91,9 @@ class _SheetShell extends StatelessWidget {
                           color: PopupTokens.ghost,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.close_rounded,
-                          color: Colors.white70,
+                          color: SC.fgA(0.7),
                           size: 18,
                         ),
                       ),
@@ -154,7 +154,7 @@ class _SkipIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: PopupTokens.ghostBorder),
       ),
-      child: Icon(icon, color: Colors.white, size: 20),
+      child: Icon(icon, color: SC.fg, size: 20),
     );
   }
 }
@@ -202,7 +202,7 @@ class _AdUpsellSheetState extends State<_AdUpsellSheet> {
         style: SCText.subtitle.copyWith(
           fontSize: 14,
           height: 1.45,
-          color: Colors.white.withValues(alpha: 0.72),
+          color: SC.fg.withValues(alpha: 0.72),
         ),
       ),
       ctaLabel: AppStrings.t('ad_upsell_cta'),

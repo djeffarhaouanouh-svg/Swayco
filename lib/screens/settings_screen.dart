@@ -960,7 +960,8 @@ class _SettingsToggleRow extends StatelessWidget {
               value: value,
               onChanged: onChanged,
               activeThumbColor: Colors.white,
-              activeTrackColor: SC.accent,
+              // Clair : piste bleue (le jaune sur blanc ne se voit pas).
+              activeTrackColor: SC.light ? SC.brandBlueDeep : SC.accent,
             ),
           ],
         ),

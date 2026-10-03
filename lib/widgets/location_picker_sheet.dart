@@ -111,9 +111,9 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                   children: [
                     if (_onCityStep)
                       IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.arrow_back_rounded,
-                          color: Colors.white,
+                          color: SC.fg,
                         ),
                         onPressed: () => setState(() => _onCityStep = false),
                       )

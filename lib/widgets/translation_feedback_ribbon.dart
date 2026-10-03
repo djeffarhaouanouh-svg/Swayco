@@ -42,7 +42,7 @@ class TranslationFeedbackRibbon extends StatelessWidget {
                     : 'Getting translation ready…',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.82),
+                  color: SC.fg.withValues(alpha: 0.82),
                   fontSize: 12,
                   height: 1.25,
                 ),
@@ -61,7 +61,7 @@ class TranslationFeedbackRibbon extends StatelessWidget {
                   border: Border.all(
                     color: remoteHot
                         ? SC.accent.withValues(alpha: 0.95)
-                        : Colors.white.withValues(alpha: 0.12),
+                        : SC.stroke.withValues(alpha: 0.12),
                     width: remoteHot ? 1.5 : 1,
                   ),
                   boxShadow: remoteHot
@@ -82,7 +82,7 @@ class TranslationFeedbackRibbon extends StatelessWidget {
                     Text(
                       remoteHot ? 'Translation · listening' : 'Translation on',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.92),
+                        color: SC.fg.withValues(alpha: 0.92),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),

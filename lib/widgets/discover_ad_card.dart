@@ -95,7 +95,7 @@ class _DiscoverAdCardState extends State<DiscoverAdCard> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: SC.fill.withValues(alpha: 0.08), boxShadow: SC.lift,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -117,12 +117,12 @@ class _DiscoverAdCardState extends State<DiscoverAdCard> {
                         height: banner.size.height.toDouble(),
                         child: AdWidget(ad: banner),
                       )
-                    : const SizedBox(
+                    : SizedBox(
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white24,
+                          color: SC.fgA(0.24),
                         ),
                       ),
               ),
@@ -132,8 +132,8 @@ class _DiscoverAdCardState extends State<DiscoverAdCard> {
               child: FilledButton(
                 onPressed: widget.onDone,
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.10),
-                  foregroundColor: Colors.white,
+                  backgroundColor: SC.fg.withValues(alpha: 0.10),
+                  foregroundColor: SC.fg,
                   minimumSize: const Size.fromHeight(50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),

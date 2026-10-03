@@ -92,12 +92,12 @@ class BoostButton extends StatelessWidget {
                   style: popupDisplay(
                     fontSize: 15,
                     letterSpacing: -0.3,
-                    color: active ? SC.brandCyan : Colors.white,
+                    color: active ? SC.brandCyan : SC.fg,
                   ),
                 ),
               ),
               if (!active)
-                const Icon(Icons.chevron_right, size: 22, color: Colors.white),
+                Icon(Icons.chevron_right, size: 22, color: SC.fg),
             ],
           ),
         ),
@@ -127,11 +127,11 @@ class BoostButton extends StatelessWidget {
             : () => showBoostPaywall(context, onPurchased: onPurchased),
         style: FilledButton.styleFrom(
           backgroundColor: Colors.transparent,
-          foregroundColor: Colors.white,
+          foregroundColor: SC.fg,
           disabledBackgroundColor: active
               ? SC.brandBlue.withValues(alpha: 0.18)
               : Colors.transparent,
-          disabledForegroundColor: active ? SC.brandCyan : Colors.white,
+          disabledForegroundColor: active ? SC.brandCyan : SC.fg,
           shadowColor: Colors.transparent,
           elevation: 0,
           // Resserré : largeur du contenu, pas toute la page.
