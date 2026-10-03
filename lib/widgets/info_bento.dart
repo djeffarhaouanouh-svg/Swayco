@@ -45,6 +45,7 @@ class InfoBento extends StatelessWidget {
     required this.others,
     this.editable = false,
     this.forceDark = false,
+    this.solidAge = false,
   });
 
   final BentoTileData age;
@@ -54,6 +55,10 @@ class InfoBento extends StatelessWidget {
   /// Posé sur un panneau sombre (Discover) : style sombre même en mode clair
   /// — valeurs en jaune « fluo », tuiles grises.
   final bool forceDark;
+
+  /// Page Profil : la tuile Âge a le dégradé de marque PLEIN (clair et sombre).
+  /// Faux sur le panneau Discover : dégradé translucide, comme avant.
+  final bool solidAge;
 
   static const double _gap = 10;
 
@@ -73,12 +78,12 @@ class InfoBento extends StatelessWidget {
       rest = smalls.skip(right.length).toList();
       rows.add(
         right.isEmpty
-            ? _AgeTile(data: age, editable: editable)
+            ? _AgeTile(data: age, editable: editable, solid: solidAge)
             : IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(child: _AgeTile(data: age, editable: editable)),
+                    Expanded(child: _AgeTile(data: age, editable: editable, solid: solidAge)),
                     const SizedBox(width: _gap),
                     Expanded(
                       child: Column(
@@ -146,7 +151,14 @@ BoxDecoration bentoTileDecoration({bool dark = false}) => BoxDecoration(
     );
 
 class _AgeTile extends StatelessWidget {
-  const _AgeTile({required this.data, required this.editable});
+  const _AgeTile({
+    required this.data,
+    required this.editable,
+    this.solid = false,
+  });
+
+  /// Dégradé de marque plein (profil) au lieu du translucide (Discover).
+  final bool solid;
 
   final BentoTileData data;
   final bool editable;
@@ -161,10 +173,12 @@ class _AgeTile extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             begin: Alignment(-0.34, -0.94),
             end: Alignment(0.34, 0.94),
-            colors: [Color(0xBF1F5EFF), Color(0x992B7FFF), Color(0x8C18DDEA)],
+            colors: solid
+                ? [SC.brandBlueDeep, SC.brandBlue, SC.brandCyan]
+                : const [Color(0xBF1F5EFF), Color(0x992B7FFF), Color(0x8C18DDEA)],
           ),
         ),
         child: Column(

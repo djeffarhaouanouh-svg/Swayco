@@ -1976,6 +1976,7 @@ class _IdentitySection extends StatelessWidget {
                     const SizedBox(height: 10),
                   ],
                   InfoBento(
+                    solidAge: true,
                     age: _ageTile(personalInfo),
                     others: _otherTiles(personalInfo),
                   ),
@@ -2855,6 +2856,7 @@ class _PersonalInfoSection extends StatelessWidget {
         children: [
           if (top != null) ...[top!, const SizedBox(height: 10)],
           InfoBento(
+            solidAge: true,
             editable: true,
             age: BentoTileData(
               emoji: kFactEmojiAge,
