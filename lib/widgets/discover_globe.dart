@@ -795,7 +795,10 @@ class _CountryChip extends StatelessWidget {
                   height: 44,
                   child: Align(
                     alignment: Alignment.topRight,
-                    child: Container(
+                    // Posé SUR le coin haut-droit de la puce (et non au-dessus).
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 3, right: 6),
+                      child: Container(
                       width: 18,
                       height: 18,
                       decoration: BoxDecoration(
@@ -808,6 +811,7 @@ class _CountryChip extends StatelessWidget {
                         color: SC.accent,
                         size: 12,
                       ),
+                    ),
                     ),
                   ),
                 ),
