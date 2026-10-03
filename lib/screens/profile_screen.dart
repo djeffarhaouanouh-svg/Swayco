@@ -2353,22 +2353,23 @@ class _PhotoViewerState extends State<_PhotoViewer> {
       onTap: onTap,
       child: Opacity(
         opacity: onTap == null ? 0.25 : 1,
-        // Frosted-glass circle (blur + faint white tint), not a flat black fill.
-        child: ClipOval(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-            child: Container(
-              width: size,
-              height: size,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.14),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.22),
+        // Verre transparent (flou + voile blanc leger) cerne d'un anneau de 1 px
+        // au degrade de marque, trace PAR-DESSUS pour ne pas teinter le fond.
+        child: CustomPaint(
+          foregroundPainter: const BrandRingPainter(),
+          child: ClipOval(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: Container(
+                width: size,
+                height: size,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
                 ),
+                child: Icon(icon, color: Colors.white, size: size * 0.55),
               ),
-              child: Icon(icon, color: Colors.white, size: size * 0.55),
             ),
           ),
         ),
