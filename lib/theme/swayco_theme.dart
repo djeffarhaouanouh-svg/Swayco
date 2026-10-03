@@ -61,7 +61,7 @@ abstract final class SC {
 
   // Backgrounds (inchangés en sombre)
   static Color get bg => light
-      ? const Color(0xFFF5F8FE)
+      ? const Color(0xFFFFFFFF)
       : (classic ? const Color(0xFF0E0E0E) : const Color(0xFF0A0F1C));
   /// Encre posée SUR l'accent jaune (texte des badges / boutons pleins).
   static const bgDeep        = Color(0xFF04123A);
@@ -83,7 +83,7 @@ abstract final class SC {
   static const meshCyan      = brandCyan;
   static const meshNavy      = Color(0xFF1A4FD6);
 
-  // ── Aides du mode clair 17b : un blanc posé sur le FOND devient de l'encre.
+  // ── Aides du mode clair 17d : un blanc posé sur le FOND devient de l'encre.
   /// Texte / icône posé sur le fond de l'écran (pas sur photo, dégradé ou jaune).
   static Color get fg => light ? const Color(0xFF04123A) : Colors.white;
 
@@ -92,9 +92,9 @@ abstract final class SC {
       ? const Color(0xFF04123A).withValues(alpha: (a * 1.1).clamp(0.0, 1.0))
       : Colors.white.withValues(alpha: a);
 
-  /// Remplissage « verre » (blanc 6–18 %) sur le fond.
+  /// Remplissage « verre » (blanc 6–18 %) sur le fond : surface #F2F6FF en clair.
   static Color get fill =>
-      light ? const Color(0xFFFFFFFF) : Colors.white.withValues(alpha: 0.10);
+      light ? const Color(0xFFF2F6FF) : Colors.white.withValues(alpha: 0.10);
 
   /// Bord fin (blanc 12–35 %) sur le fond.
   static Color get stroke =>
@@ -142,19 +142,19 @@ abstract final class SC {
 
   static Color get menu =>
       light
-          ? const Color(0xFFFFFFFF)
+          ? const Color(0xFFF2F6FF)
           : (classic ? const Color(0xFF2B2B2B) : const Color(0xFF161D30));
 
   static Color get bubbleIn =>
-      light ? const Color(0xFFFFFFFF) : const Color(0xFF1A2138);
+      light ? const Color(0xFFF2F6FF) : const Color(0xFF1A2138);
   static Color get bubbleInBorder =>
       light ? const Color(0x1A1F5EFF) : const Color(0x14FFFFFF);
 
   // Glass
   static Color get glass =>
-      light ? const Color(0x0A1F5EFF) : const Color(0x0FFFFFFF);
+      light ? const Color(0x0A04123A) : const Color(0x0FFFFFFF);
   static Color get glassStrong =>
-      light ? const Color(0x141F5EFF) : const Color(0x1AFFFFFF);
+      light ? const Color(0x0F04123A) : const Color(0x1AFFFFFF);
   static Color get glassBorder =>
       light ? const Color(0x1A1F5EFF) : const Color(0x1AFFFFFF);
   static Color get glassBorderStrong =>
@@ -165,7 +165,7 @@ abstract final class SC {
   static const outBubbleEnd   = brandBlue;
 
   static Color get msgInBg =>
-      light ? const Color(0xFFFFFFFF) : const Color(0xFF2F333B);
+      light ? const Color(0xFFF2F6FF) : const Color(0xFF2F333B);
   static Color get msgInText =>
       light ? const Color(0xFF04123A) : const Color(0xFFF5F7FF);
   static Color get msgInBorder =>
@@ -267,7 +267,7 @@ abstract final class SC {
   /// écrans principaux.
   static ThemeData lightMaterial() {
     const ink = Color(0xFF04123A);
-    const surface = Color(0xFFFFFFFF);
+    const surface = Color(0xFFF2F6FF);
     const line = Color(0x1A1F5EFF);
     const base = ColorScheme.light(
       primary: brandBlueDeep,
@@ -283,10 +283,10 @@ abstract final class SC {
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: base,
-      scaffoldBackgroundColor: const Color(0xFFF5F8FE),
+      scaffoldBackgroundColor: const Color(0xFFFFFFFF),
       extensions: const [SwaycoPalette.light],
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFFF5F8FE),
+        backgroundColor: Color(0xFFFFFFFF),
         foregroundColor: ink,
         elevation: 0,
         scrolledUnderElevation: 0,

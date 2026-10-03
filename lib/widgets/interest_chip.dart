@@ -57,7 +57,7 @@ class InterestPill extends StatelessWidget {
         color: onPhoto
             ? Colors.black.withValues(alpha: 0.28)
             : (SC.light
-                ? Colors.white
+                ? SC.fill
                 : Colors.white.withValues(alpha: prominent ? 0.10 : 0.07)),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
