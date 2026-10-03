@@ -184,14 +184,15 @@ class _AgeTile extends StatelessWidget {
                       fontSize: 46,
                       letterSpacing: -2.3,
                       height: 1,
-                      color: Colors.white,
+                      // Jaune fluo sur le dégradé bleu (panneau Discover, profil).
+                      color: SC.accent,
                     ),
                   ),
                   if (unit.isNotEmpty)
                     Text(
                       unit,
                       style: TextStyle(
-                        color: Colors.white,
+                        color: SC.accent,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
