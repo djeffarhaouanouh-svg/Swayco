@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/app_theme.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
+import '../services/presence_service.dart';
 import '../services/swayco_sounds.dart';
 import '../services/auth_service.dart';
 import '../services/block_api.dart';
@@ -138,6 +139,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _saveBool(_kHideOnline, !value);
       AppSettings.hideOnlineLocal.value = !value;
       _toast(AppStrings.t('settings_save_failed'));
+    } else if (!value) {
+      // Statut reaffiche : on reparait tout de suite.
+      PresenceService.touchNow();
     }
   }
 

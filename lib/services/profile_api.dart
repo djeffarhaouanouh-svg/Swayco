@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_service.dart';
 import 'debug_overlay.dart';
 import 'looking_for.dart';
+import 'app_settings.dart';
 import 'supabase_service.dart';
 import 'user_prefs.dart';
 
@@ -1026,6 +1027,9 @@ abstract final class ProfileApi {
           .from('profiles')
           .update({
             'hide_online_status': hide,
+            // Masque = on n'affiche plus de derniere presence du tout : meme
+            // un client qui ne lirait pas le drapeau ne verrait personne.
+            if (hide) 'last_seen': null,
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
           .eq('id', userId);
@@ -1162,6 +1166,9 @@ abstract final class ProfileApi {
   /// (migration 0018 not applied yet) just no-ops via the catch.
   static Future<void> touchLastSeen(String userId) async {
     if (!isSupabaseReady || userId.isEmpty) return;
+    // Statut masque : on ne publie JAMAIS de presence (pas seulement le
+    // drapeau : la colonne reste vide, donc personne ne peut me voir en ligne).
+    if (AppSettings.hideOnlineLocal.value) return;
     try {
       await _c
           .from('profiles')
