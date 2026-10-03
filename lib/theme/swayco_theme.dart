@@ -165,11 +165,42 @@ abstract final class SC {
   static const outBubbleEnd   = brandBlue;
 
   static Color get msgInBg =>
-      light ? const Color(0xFFF2F6FF) : const Color(0xFF2F333B);
+      light ? const Color(0xFFFFFFFF) : const Color(0xFF2F333B);
   static Color get msgInText =>
       light ? const Color(0xFF04123A) : const Color(0xFFF5F7FF);
   static Color get msgInBorder =>
-      light ? const Color(0x1A1F5EFF) : const Color(0x1FFFFFFF);
+      light ? const Color(0x241F5EFF) : const Color(0x1FFFFFFF);
+
+  /// Bulle envoyée : dégradé de marque (clair ET sombre), texte blanc.
+  static const outBubbleGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [brandBlueDeep, brandBlue, brandCyan],
+    stops: [0, .55, 1],
+  );
+  static const outBubbleText = Color(0xFFFFFFFF);
+
+  /// Ombres sous les bulles en mode clair (blanc sur blanc sinon).
+  static List<BoxShadow> get msgInShadow => light
+      ? const [
+          BoxShadow(
+            color: Color(0x591F5EFF),
+            blurRadius: 16,
+            spreadRadius: -10,
+            offset: Offset(0, 6),
+          ),
+        ]
+      : const [];
+  static List<BoxShadow> get msgOutShadow => light
+      ? const [
+          BoxShadow(
+            color: Color(0x8C1F5EFF),
+            blurRadius: 20,
+            spreadRadius: -10,
+            offset: Offset(0, 8),
+          ),
+        ]
+      : const [];
   static const msgOutBg      = Color(0xFF123C9E);
   static const msgOutBorder  = brandBlue;
   static const msgOutText    = Color(0xFFFFFFFF);

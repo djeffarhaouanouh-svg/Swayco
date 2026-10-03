@@ -80,12 +80,6 @@ LinearGradient _chromeGradient({required double solid, required bool top}) {
   );
 }
 
-/// Bulle reçue (8c) : gris ardoise, liseré blanc 12 % posé dans la bulle.
-const Color _kBubbleIn = Color(0xFF2F333B);
-
-/// Bulle envoyée : le cyan d'avant la 8c, gardé ici alors que [SC.accent]
-/// est passé au jaune.
-const Color _kBubbleMine = Color(0xFF22D3EE);
 
 /// « traduit · voir l'original » (1b : text-muted).
 const Color _kMetaMuted = Color(0xFF77777D);
@@ -1797,7 +1791,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
     final align = mine ? Alignment.centerRight : Alignment.centerLeft;
     // Envoyé = cyan plein, texte encre ; reçu = gris ardoise liseré, texte
     // blanc. Le petit coin (6) pointe vers l'auteur (maquette 8c).
-    final bubbleText = mine ? SC.onAccent : Colors.white;
+    final bubbleText = mine ? SC.outBubbleText : SC.msgInText;
     final radius = mine
         ? const BorderRadius.only(
             topLeft: Radius.circular(20),
@@ -2002,13 +1996,13 @@ class _MessageBubbleState extends State<_MessageBubble> {
                 decoration: bareMedia
                     ? null
                     : BoxDecoration(
-                        color: mine ? _kBubbleMine : _kBubbleIn,
+                        // Envoyé : dégradé de marque ; reçu : blanc (clair) /
+                        // gris ardoise (sombre).
+                        color: mine ? null : SC.msgInBg,
+                        gradient: mine ? SC.outBubbleGradient : null,
                         borderRadius: radius,
-                        border: mine
-                            ? null
-                            : Border.all(
-                                color: SC.stroke.withValues(alpha: 0.12),
-                              ),
+                        border: mine ? null : Border.all(color: SC.msgInBorder),
+                        boxShadow: mine ? SC.msgOutShadow : SC.msgInShadow,
                       ),
                 child: hugContent ? IntrinsicWidth(child: content) : content,
               ),
@@ -3329,14 +3323,15 @@ class _TypingBubbleState extends State<_TypingBubble>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: _kBubbleIn,
+          color: SC.msgInBg,
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(20),
             topRight: Radius.circular(20),
             bottomLeft: Radius.circular(6),
             bottomRight: Radius.circular(20),
           ),
-          border: Border.all(color: SC.stroke.withValues(alpha: 0.12)),
+          border: Border.all(color: SC.msgInBorder),
+          boxShadow: SC.msgInShadow,
         ),
         child: AnimatedBuilder(
           animation: _c,
@@ -3357,8 +3352,7 @@ class _TypingBubbleState extends State<_TypingBubble>
                         height: 8,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.white
-                              .withValues(alpha: 0.35 + 0.45 * wave),
+                          color: SC.fg.withValues(alpha: 0.35 + 0.45 * wave),
                         ),
                       ),
                     );
@@ -3425,6 +3419,7 @@ class _ActivationWaveOverlay extends StatelessWidget {
         // Quick fade-in / fade-out so the band never appears or disappears
         // abruptly at the edges of the sweep.
         final fade = (t < 0.15) ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1.0);
+        final wave = SC.light ? SC.brandBlue : Colors.white;
         return ClipRect(
           child: FractionalTranslation(
             translation: Offset(0, dy),
@@ -3434,13 +3429,14 @@ class _ActivationWaveOverlay extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   stops: const [0.0, 0.35, 0.5, 0.65, 1.0],
+                  // La vague : reflet blanc en sombre (comme avant) ; en clair le blanc
+                  // ne se verrait pas sur le fond, elle est bleue.
                   colors: [
-                    Colors.white.withValues(alpha: 0),
-                    // Reflet : invisible en clair (blanc sur blanc).
-                    Colors.white.withValues(alpha: 0.10 * fade * (SC.light ? 0 : 1)),
-                    Colors.white.withValues(alpha: 0.28 * fade * (SC.light ? 0 : 1)),
-                    Colors.white.withValues(alpha: 0.10 * fade * (SC.light ? 0 : 1)),
-                    Colors.white.withValues(alpha: 0),
+                    wave.withValues(alpha: 0),
+                    wave.withValues(alpha: (SC.light ? 0.14 : 0.10) * fade),
+                    wave.withValues(alpha: (SC.light ? 0.34 : 0.28) * fade),
+                    wave.withValues(alpha: (SC.light ? 0.14 : 0.10) * fade),
+                    wave.withValues(alpha: 0),
                   ],
                 ),
               ),
