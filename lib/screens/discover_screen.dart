@@ -1846,9 +1846,8 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                             for (final tag in p.interests)
                               InterestPill(
                                 label: interestPillText(tag),
+                                // Comme sur la page Profil.
                                 prominent: true,
-                                // Mêmes puces que sur la carte Discover.
-                                forceDark: true,
                               ),
                           ],
                         ),
