@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Les apparences au choix dans les Réglages.
@@ -44,6 +44,20 @@ abstract final class AppTheme {
     } catch (_) {
       // Lecture impossible : on suit le téléphone.
     }
+  }
+
+  /// Reconstruit TOUT l'arbre. Les couleurs SC.* sont lues à la construction
+  /// seulement (aucune dépendance Flutter à suivre) : sans ça, un écran déjà
+  /// affiché ou gardé en vie (onglets, page Réglages ouverte…) garderait ses
+  /// anciennes couleurs — du blanc en mode sombre, ou l'inverse.
+  static void rebuildAll() {
+    void mark(Element e) {
+      e.markNeedsBuild();
+      e.visitChildren(mark);
+    }
+
+    final root = WidgetsBinding.instance.rootElement;
+    if (root != null) mark(root);
   }
 
   static Future<void> set(Appearance a) async {

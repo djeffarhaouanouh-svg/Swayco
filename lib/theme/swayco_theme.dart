@@ -19,9 +19,21 @@ abstract final class SC {
   static bool classic = false;
 
   /// Règle les couleurs « fond / texte / surfaces » sur le thème en cours.
-  static void apply(Brightness b, {bool classicBlack = false}) {
+  static bool? _lastLight;
+  static bool? _lastClassic;
+
+  /// Règle les couleurs sur le thème actif. Renvoie VRAI quand l'apparence a
+  /// CHANGÉ depuis le dernier appel (hors tout premier appel) : les écrans déjà
+  /// construits ne lisent SC.* qu'à leur construction — il faut alors les
+  /// reconstruire tous (voir AppTheme.rebuildAll).
+  static bool apply(Brightness b, {bool classicBlack = false}) {
     light = b == Brightness.light;
     classic = classicBlack && !light;
+    final changed =
+        _lastLight != null && (_lastLight != light || _lastClassic != classic);
+    _lastLight = light;
+    _lastClassic = classic;
+    return changed;
   }
 
   // Valeurs SOMBRES figées : pour les écrans qui restent sombres (ou sur

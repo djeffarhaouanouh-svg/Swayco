@@ -702,10 +702,18 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
             // Les couleurs de fond / texte de SC suivent le thème actif : posées
             // ICI, avant que l'arbre ne se construise.
             final isLight = Theme.of(context).brightness == Brightness.light;
-            SC.apply(
+            final themeChanged = SC.apply(
               Theme.of(context).brightness,
               classicBlack: appearance == Appearance.black,
             );
+            // L'apparence vient de changer (réglage ou téléphone) : on
+            // reconstruit tous les écrans, sinon ils gardent leurs anciennes
+            // couleurs.
+            if (themeChanged) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => AppTheme.rebuildAll(),
+              );
+            }
             final mq = MediaQuery.of(context);
             return AnnotatedRegion<SystemUiOverlayStyle>(
               value: isLight
