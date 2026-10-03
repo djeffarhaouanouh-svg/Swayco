@@ -17,7 +17,7 @@ Future<bool?> showSwaycoConfirm({
 }) {
   return showDialog<bool>(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.6),
+    barrierColor: PopupTokens.scrim,
     builder: (ctx) => _SwaycoConfirmDialog(
       title: title,
       body: body,

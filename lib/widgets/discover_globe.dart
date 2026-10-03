@@ -333,12 +333,15 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
     return Material(
       type: MaterialType.transparency,
       child: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: RadialGradient(
-            center: Alignment(0.2, 0.1),
+            center: const Alignment(0.2, 0.1),
             radius: 1.0,
-            colors: [Color(0xFF1F4FD6), Color(0xFF0F1A3A), Color(0xFF0A0F1C)],
-            stops: [0, 0.55, 1],
+            // Clair : bleu très pâle → blanc (17d). Sombre : valeurs d'avant.
+            colors: SC.light
+                ? const [Color(0xFFCFE0FF), Color(0xFFEAF2FF), Color(0xFFFFFFFF)]
+                : const [Color(0xFF1F4FD6), Color(0xFF0F1A3A), Color(0xFF0A0F1C)],
+            stops: const [0, 0.55, 1],
           ),
         ),
         child: Stack(
@@ -366,12 +369,12 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                                   boxShadow: [
                                     BoxShadow(
                                       color: SC.brandBlue
-                                          .withValues(alpha: 0.5),
+                                          .withValues(alpha: SC.light ? 0.28 : 0.5),
                                       spreadRadius: 5,
                                     ),
                                     BoxShadow(
                                       color: SC.brandBlue
-                                          .withValues(alpha: 0.3),
+                                          .withValues(alpha: SC.light ? 0.16 : 0.3),
                                       blurRadius: 90,
                                       spreadRadius: 12,
                                     ),
@@ -393,12 +396,12 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                     ),
             ),
             if (_world == null)
-              const Center(
+              Center(
                 child: SizedBox(
                   width: 26,
                   height: 26,
                   child: CircularProgressIndicator(
-                    color: Colors.white54,
+                    color: SC.light ? SC.brandBlueDeep : Colors.white54,
                     strokeWidth: 2,
                   ),
                 ),
@@ -428,12 +431,12 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                     onTap: () => Navigator.of(context).pop(),
                     child: _Glass(
                       radius: 99,
-                      child: const SizedBox(
+                      child: SizedBox(
                         width: 44,
                         height: 44,
                         child: Icon(
                           Icons.close_rounded,
-                          color: Colors.white,
+                          color: SC.light ? SC.textPrimary : Colors.white,
                           size: 22,
                         ),
                       ),
@@ -451,7 +454,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                             Icon(
                               Icons.search_rounded,
                               size: 20,
-                              color: Colors.white.withValues(alpha: 0.65),
+                              color: SC.light ? SC.textMuted : Colors.white.withValues(alpha: 0.65),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -459,10 +462,10 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                                 controller: _search,
                                 focusNode: _searchFocus,
                                 textInputAction: TextInputAction.search,
-                                cursorColor: SC.accent,
+                                cursorColor: SC.accentFg,
                                 style: GoogleFonts.dmSans(
                                   fontSize: 14,
-                                  color: Colors.white,
+                                  color: SC.light ? SC.textPrimary : Colors.white,
                                 ),
                                 decoration: InputDecoration(
                                   isCollapsed: true,
@@ -473,8 +476,9 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                                   hintText: AppStrings.t('globe_search_hint'),
                                   hintStyle: GoogleFonts.dmSans(
                                     fontSize: 14,
-                                    color:
-                                        Colors.white.withValues(alpha: 0.65),
+                                    color: SC.light
+                                        ? SC.textMuted
+                                        : Colors.white.withValues(alpha: 0.65),
                                   ),
                                 ),
                               ),
@@ -523,7 +527,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                                     style: GoogleFonts.dmSans(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w800,
-                                      color: Colors.white,
+                                      color: SC.light ? SC.textPrimary : Colors.white,
                                     ),
                                   ),
                                 ),
@@ -531,7 +535,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                                   Icon(
                                     Icons.check_rounded,
                                     size: 18,
-                                    color: SC.accent,
+                                    color: SC.accentFg,
                                   ),
                               ],
                             ),
@@ -575,7 +579,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                               style: GoogleFonts.dmSans(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.white.withValues(alpha: 0.75),
+                                color: SC.light ? SC.textSecondary : Colors.white.withValues(alpha: 0.75),
                               ),
                             ),
                           ],
@@ -591,7 +595,9 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                           decoration: BoxDecoration(
                             color: canLaunch
                                 ? SC.accent
-                                : Colors.white.withValues(alpha: 0.14),
+                                : (SC.light
+                                    ? const Color(0x1F1F5EFF)
+                                    : Colors.white.withValues(alpha: 0.14)),
                             borderRadius: BorderRadius.circular(99),
                           ),
                           child: Text(
@@ -609,7 +615,9 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                               fontSize: 15,
                               color: canLaunch
                                   ? SC.onAccent
-                                  : Colors.white.withValues(alpha: 0.55),
+                                  : (SC.light
+                                      ? SC.textMuted
+                                      : Colors.white.withValues(alpha: 0.55)),
                             ),
                           ),
                         ),
@@ -632,9 +640,12 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
       fontSize: 30,
       height: 1.1,
       letterSpacing: -0.6,
-      color: Colors.white,
+      color: SC.light ? const Color(0xFF04123A) : Colors.white,
     ).copyWith(
-      shadows: const [Shadow(color: Color(0x66000000), blurRadius: 12)],
+      // Clair : pas d'ombre sous le titre.
+      shadows: SC.light
+          ? const []
+          : const [Shadow(color: Color(0x66000000), blurRadius: 12)],
     );
     final raw = AppStrings.t('globe_title_v2');
     final cut = raw.indexOf('|');
@@ -684,12 +695,18 @@ class _Glass extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: tint > 0.13
-                ? SC.onAccent.withValues(alpha: tint)
-                : Colors.white.withValues(alpha: tint),
+            color: SC.light
+                ? (tint > 0.13
+                    ? const Color(0xE6FFFFFF)
+                    : const Color(0x141F5EFF))
+                : (tint > 0.13
+                    ? SC.onAccent.withValues(alpha: tint)
+                    : Colors.white.withValues(alpha: tint)),
             borderRadius: r,
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.22),
+              color: SC.light
+                  ? const Color(0x331F5EFF)
+                  : Colors.white.withValues(alpha: 0.22),
               width: 1.2,
             ),
           ),
@@ -762,7 +779,9 @@ class _CountryChip extends StatelessWidget {
                 height: 34,
                 padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
                 decoration: BoxDecoration(
-                  color: SC.onAccent.withValues(alpha: 0.55),
+                  color: SC.light
+                      ? const Color(0x1F1F5EFF)
+                      : SC.onAccent.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(99),
                 ),
                 child: Row(
@@ -777,7 +796,7 @@ class _CountryChip extends StatelessWidget {
                       style: GoogleFonts.dmSans(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
-                        color: Colors.white,
+                        color: SC.light ? SC.textPrimary : Colors.white,
                       ),
                     ),
                   ],
@@ -802,13 +821,16 @@ class _CountryChip extends StatelessWidget {
                       width: 18,
                       height: 18,
                       decoration: BoxDecoration(
-                        color: SC.onAccent,
+                        color: SC.light ? SC.brandBlueDeep : SC.onAccent,
                         shape: BoxShape.circle,
-                        border: Border.all(color: SC.accent, width: 1.5),
+                        border: Border.all(
+                          color: SC.light ? Colors.white : SC.accent,
+                          width: 1.5,
+                        ),
                       ),
                       child: Icon(
                         Icons.close_rounded,
-                        color: SC.accent,
+                        color: SC.light ? Colors.white : SC.accent,
                         size: 12,
                       ),
                     ),
@@ -1139,7 +1161,9 @@ class _GlobePainter extends CustomPainter {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = picked ? 2 : 1
-          ..color = picked ? SC.accent : const Color(0xFFC9C2B2),
+          ..color = picked
+              ? (SC.light ? SC.brandBlueDeep : SC.accent)
+              : const Color(0xFFC9C2B2),
       );
       // Country code.
       final tp = TextPainter(

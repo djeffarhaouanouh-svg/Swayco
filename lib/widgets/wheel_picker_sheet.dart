@@ -20,7 +20,7 @@ Future<int?> showWheelPicker({
   return showModalBottomSheet<int>(
     context: context,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.6),
+    barrierColor: PopupTokens.scrim,
     builder: (_) => _WheelPickerSheet(
       title: title,
       labels: labels,
@@ -105,7 +105,7 @@ class _WheelPickerSheetState extends State<_WheelPickerSheet> {
                           color: SC.accent.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: SC.accent.withValues(alpha: 0.5),
+                            color: SC.accentFg.withValues(alpha: 0.5),
                           ),
                         ),
                       ),
@@ -127,7 +127,7 @@ class _WheelPickerSheetState extends State<_WheelPickerSheet> {
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.dmSans(
                                 color: selected
-                                    ? Colors.white
+                                    ? PopupTokens.ink
                                     : SC.fg.withValues(alpha: 0.5),
                                 fontSize: selected ? 21 : 17,
                                 fontWeight: selected

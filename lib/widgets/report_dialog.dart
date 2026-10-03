@@ -16,7 +16,7 @@ Future<bool> showReportDialog(
 }) async {
   final result = await showDialog<bool>(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.6),
+    barrierColor: PopupTokens.scrim,
     builder: (ctx) => _ReportDialog(
       reporterId: reporterId,
       reportedId: reportedId,
@@ -127,7 +127,7 @@ class _ReportDialogState extends State<_ReportDialog> {
                         minLines: 3,
                         maxLines: 4,
                         maxLength: 500,
-                        cursorColor: SC.accent,
+                        cursorColor: SC.accentFg,
                         style: SCText.subtitle.copyWith(fontSize: 14),
                         decoration: InputDecoration(
                           hintText: AppStrings.t('report_details_hint'),
@@ -141,7 +141,7 @@ class _ReportDialogState extends State<_ReportDialog> {
                           contentPadding: const EdgeInsets.all(14),
                           border: _border(PopupTokens.ghostBorder),
                           enabledBorder: _border(PopupTokens.ghostBorder),
-                          focusedBorder: _border(SC.accent),
+                          focusedBorder: _border(SC.accentFg),
                         ),
                       ),
                     ],
@@ -207,7 +207,7 @@ class _ReasonChip extends StatelessWidget {
           color: selected ? SC.accent : PopupTokens.ghost,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: selected ? SC.accent : PopupTokens.ghostBorder,
+            color: selected ? SC.accentFg : PopupTokens.ghostBorder,
           ),
         ),
         child: Text(

@@ -43,7 +43,7 @@ Future<T?> _show<T>(BuildContext context, Widget sheet) =>
     showModalBottomSheet<T>(
       context: context,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.6),
+      barrierColor: PopupTokens.scrim,
       isScrollControlled: true,
       builder: (_) => sheet,
     );
@@ -87,7 +87,7 @@ class _SheetShell extends StatelessWidget {
                       child: Container(
                         width: 30,
                         height: 30,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: PopupTokens.ghost,
                           shape: BoxShape.circle,
                         ),
@@ -191,7 +191,7 @@ class _AdUpsellSheetState extends State<_AdUpsellSheet> {
               TextSpan(
                 text: '$price${AppStrings.t('paywall_period_month')}\n',
                 style: TextStyle(
-                  color: SC.accent,
+                  color: SC.accentFg,
                   fontWeight: FontWeight.w800,
                 ),
               ),

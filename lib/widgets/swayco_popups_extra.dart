@@ -20,7 +20,7 @@ Future<bool?> showSwaycoNotice({
 }) {
   return showDialog<bool>(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.6),
+    barrierColor: PopupTokens.scrim,
     builder: (ctx) => Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -41,7 +41,7 @@ Future<bool?> showSwaycoNotice({
                 style: SCText.subtitle.copyWith(
                   fontSize: 15,
                   height: 1.45,
-                  color: Colors.white,
+                  color: PopupTokens.ink,
                 ),
               ),
               const SizedBox(height: 22),
@@ -110,7 +110,7 @@ class SwaycoTextPromptDialog extends StatelessWidget {
                 autofocus: true,
                 maxLength: maxLength,
                 textCapitalization: TextCapitalization.words,
-                cursorColor: SC.accent,
+                cursorColor: SC.accentFg,
                 style: SCText.subtitle.copyWith(fontSize: 16),
                 decoration: InputDecoration(
                   filled: true,
@@ -119,7 +119,7 @@ class SwaycoTextPromptDialog extends StatelessWidget {
                   counterStyle: SCText.meta,
                   border: _b(PopupTokens.ghostBorder),
                   enabledBorder: _b(PopupTokens.ghostBorder),
-                  focusedBorder: _b(SC.accent, 1.5),
+                  focusedBorder: _b(SC.accentFg, 1.5),
                 ),
                 onSubmitted: (v) => Navigator.of(context).pop(v),
               ),
@@ -231,7 +231,7 @@ class _SwaycoIncomingCallDialogState extends State<SwaycoIncomingCallDialog> {
                       ),
                       child: Container(
                         padding: const EdgeInsets.all(3),
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: PopupTokens.surface,
                         ),
@@ -249,7 +249,7 @@ class _SwaycoIncomingCallDialogState extends State<SwaycoIncomingCallDialog> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: popupDisplay(
-                        color: Colors.white,
+                        color: PopupTokens.ink,
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.66,
@@ -260,7 +260,7 @@ class _SwaycoIncomingCallDialogState extends State<SwaycoIncomingCallDialog> {
                       AppStrings.t('incoming_call_label'),
                       style: SCText.subtitle.copyWith(
                         fontSize: 14,
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: PopupTokens.inkSecondary,
                       ),
                     ),
                   ],
@@ -333,7 +333,7 @@ class _RoundAction extends StatelessWidget {
           style: SCText.subtitle.copyWith(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: PopupTokens.ink,
           ),
         ),
       ],

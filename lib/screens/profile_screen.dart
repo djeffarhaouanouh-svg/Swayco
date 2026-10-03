@@ -1001,7 +1001,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     final ctrl = TextEditingController(text: current);
     final result = await showDialog<String>(
       context: ctx,
-      barrierColor: Colors.black.withValues(alpha: 0.6),
+      barrierColor: PopupTokens.scrim,
       builder: (dCtx) => SwaycoTextPromptDialog(
         title: AppStrings.t('settings_first_name'),
         controller: ctrl,

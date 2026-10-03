@@ -23,13 +23,60 @@ TextStyle popupDisplay({
       color: color,
     );
 
+/// Couleurs des pop-ups. Sombre / Noir : le #16161B d'avant. Clair (17d) : fond
+/// blanc, encre #04123A, halo bleu en haut. Lues à l'affichage ([SC.light]) :
+/// aucune valeur en dur dans les pop-ups.
 abstract final class PopupTokens {
-  static const surface = Color(0xFF16161B);
-  static const border = Color(0x1FFFFFFF);
-  static const ghost = Color(0x14FFFFFF);
-  static const ghostBorder = Color(0x29FFFFFF);
+  static Color get surface =>
+      SC.light ? const Color(0xFFFFFFFF) : const Color(0xFF16161B);
+  static Color get border =>
+      SC.light ? const Color(0x261F5EFF) : const Color(0x1FFFFFFF);
+  static Color get ghost =>
+      SC.light ? const Color(0x0F1F5EFF) : const Color(0x14FFFFFF);
+  static Color get ghostBorder =>
+      SC.light ? const Color(0x331F5EFF) : const Color(0x29FFFFFF);
   static const danger = Color(0xFFEF4444);
   static const radius = 28.0;
+
+  /// Texte / icône / trait posé sur le fond d'une pop-up : encre en clair.
+  static Color get ink =>
+      SC.light ? const Color(0xFF04123A) : Colors.white;
+
+  /// Texte secondaire (≈ alpha .6) et texte de corps (72–78 %).
+  static Color get inkSecondary =>
+      SC.light ? const Color(0xFF5A6890) : Colors.white.withValues(alpha: 0.6);
+  static Color get inkMuted =>
+      SC.light ? const Color(0xFF8A94B0) : Colors.white.withValues(alpha: 0.45);
+  static Color get textBody => SC.light
+      ? const Color(0xFF04123A).withValues(alpha: 0.78)
+      : Colors.white.withValues(alpha: 0.72);
+
+  /// Poignée des feuilles.
+  static Color get handle =>
+      SC.light ? const Color(0x381F5EFF) : Colors.white.withValues(alpha: 0.22);
+
+  /// Fond de la carte : blanc pur en clair, dégradé sombre sinon.
+  static List<Color> get gradient => SC.light
+      ? const [Color(0xFFFFFFFF), Color(0xFFFFFFFF), Color(0xFFFFFFFF)]
+      : const [Color(0xFF1A2040), Color(0xFF16161E), Color(0xFF131318)];
+
+  /// Ombre de la carte (pas pour une feuille).
+  static BoxShadow get shadow => SC.light
+      ? const BoxShadow(
+          color: Color(0x4D1F5EFF),
+          blurRadius: 50,
+          spreadRadius: -14,
+          offset: Offset(0, 22),
+        )
+      : BoxShadow(
+          color: Colors.black.withValues(alpha: 0.6),
+          blurRadius: 60,
+          offset: const Offset(0, 24),
+        );
+
+  /// Voile derrière une pop-up : bleu nuit en clair.
+  static Color get scrim =>
+      SC.light ? const Color(0x4D04123A) : Colors.black.withValues(alpha: 0.55);
 }
 
 /// Fond d'une pop-up. [sheet] = coins arrondis en haut seulement.
@@ -54,23 +101,15 @@ class PopupSurface extends StatelessWidget {
         : BorderRadius.circular(PopupTokens.radius);
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF1A2040), Color(0xFF16161E), Color(0xFF131318)],
-          stops: [0, 0.5, 1],
+          colors: PopupTokens.gradient,
+          stops: const [0, 0.5, 1],
         ),
         borderRadius: radius,
         border: Border.all(color: PopupTokens.border),
-        boxShadow: sheet
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  blurRadius: 60,
-                  offset: const Offset(0, 24),
-                ),
-              ],
+        boxShadow: sheet ? null : [PopupTokens.shadow],
       ),
       child: ClipRRect(
         borderRadius: radius,
@@ -88,13 +127,17 @@ class PopupSurface extends StatelessWidget {
                     radius: 1.1,
                     colors: danger
                         ? [
-                            PopupTokens.danger.withValues(alpha: 0.5),
-                            PopupTokens.danger.withValues(alpha: 0.1),
+                            PopupTokens.danger
+                                .withValues(alpha: SC.light ? 0.16 : 0.5),
+                            PopupTokens.danger
+                                .withValues(alpha: SC.light ? 0.05 : 0.1),
                             PopupTokens.danger.withValues(alpha: 0),
                           ]
                         : [
-                            SC.brandBlue.withValues(alpha: 0.6),
-                            SC.brandCyan.withValues(alpha: 0.14),
+                            SC.brandBlue
+                                .withValues(alpha: SC.light ? 0.22 : 0.6),
+                            SC.brandCyan
+                                .withValues(alpha: SC.light ? 0.10 : 0.14),
                             SC.brandBlueDeep.withValues(alpha: 0),
                           ],
                     stops: const [0, 0.42, 0.75],
@@ -120,7 +163,7 @@ class PopupHandle extends StatelessWidget {
         height: 4,
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.22),
+          color: PopupTokens.handle,
           borderRadius: BorderRadius.circular(999),
         ),
       );
@@ -175,7 +218,7 @@ class PopupTitle extends StatelessWidget {
       fontWeight: FontWeight.w800,
       letterSpacing: -fontSize * 0.03,
       height: 1.18,
-      color: Colors.white,
+      color: PopupTokens.ink,
     );
     final i = text.lastIndexOf(' ');
     if (!highlightLast || i < 0) {
@@ -221,7 +264,7 @@ class PopupBody extends StatelessWidget {
         style: SCText.subtitle.copyWith(
           fontSize: 14,
           height: 1.45,
-          color: Colors.white.withValues(alpha: 0.72),
+          color: PopupTokens.textBody,
         ),
       );
 }
@@ -301,15 +344,15 @@ class PopupGhostButton extends StatelessWidget {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           backgroundColor: PopupTokens.ghost,
-          foregroundColor: Colors.white,
-          side: const BorderSide(color: PopupTokens.ghostBorder),
+          foregroundColor: PopupTokens.ink,
+          side: BorderSide(color: PopupTokens.ghostBorder),
           shape: const StadiumBorder(),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 20, color: Colors.white),
+              Icon(icon, size: 20, color: PopupTokens.ink),
               const SizedBox(width: 8),
             ],
             Flexible(
@@ -319,7 +362,7 @@ class PopupGhostButton extends StatelessWidget {
                 style: SCText.subtitle.copyWith(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white,
+                  color: PopupTokens.ink,
                 ),
               ),
             ),

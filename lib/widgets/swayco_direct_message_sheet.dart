@@ -58,7 +58,7 @@ class _SwaycoDirectMessageSheetState extends State<SwaycoDirectMessageSheet> {
                   minLines: 3,
                   maxLines: 6,
                   maxLength: 500,
-                  cursorColor: SC.accent,
+                  cursorColor: SC.accentFg,
                   textCapitalization: TextCapitalization.sentences,
                   style: SCText.subtitle.copyWith(fontSize: 16),
                   decoration: InputDecoration(
@@ -73,7 +73,7 @@ class _SwaycoDirectMessageSheetState extends State<SwaycoDirectMessageSheet> {
                     contentPadding: const EdgeInsets.all(16),
                     border: _b(PopupTokens.ghostBorder),
                     enabledBorder: _b(PopupTokens.ghostBorder),
-                    focusedBorder: _b(SC.accent, 1.5),
+                    focusedBorder: _b(SC.accentFg, 1.5),
                   ),
                 ),
                 const SizedBox(height: 14),

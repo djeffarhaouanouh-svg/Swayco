@@ -254,7 +254,8 @@ class _CallScreenState extends State<CallScreen> {
     setState(() => _sheetOpen = true);
     return showModalBottomSheet<void>(
       context: context,
-      backgroundColor: PopupTokens.surface,
+      // L'appel reste sombre en toute apparence : surface figée.
+      backgroundColor: const Color(0xFF16161B),
       // Pas de voile : c'est l'écran d'appel qui floute, sous le galet. Un
       // voile par-dessus le flouterait lui aussi.
       barrierColor: Colors.transparent,

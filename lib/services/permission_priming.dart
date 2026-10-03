@@ -18,7 +18,7 @@ abstract final class PermissionPriming {
     final res = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.6),
+      barrierColor: PopupTokens.scrim,
       isScrollControlled: true,
       builder: (ctx) => _PrimingSheet(
         icon: icon,

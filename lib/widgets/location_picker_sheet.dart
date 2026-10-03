@@ -87,7 +87,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
         contentPadding: const EdgeInsets.symmetric(vertical: 14),
         border: _b(PopupTokens.ghostBorder),
         enabledBorder: _b(PopupTokens.ghostBorder),
-        focusedBorder: _b(SC.accent, 1.5),
+        focusedBorder: _b(SC.accentFg, 1.5),
       );
 
   @override
@@ -178,7 +178,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
             title: Text(
               AppStrings.t('onb_location_autodetect'),
               style: SCText.subtitle.copyWith(
-                color: SC.accent,
+                color: SC.accentFg,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -190,7 +190,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 : null,
             onTap: _detect,
           ),
-          const Divider(height: 1, color: PopupTokens.border),
+          Divider(height: 1, color: PopupTokens.border),
         ],
         Expanded(
           child: ListView.builder(

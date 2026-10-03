@@ -13,7 +13,7 @@ Future<GiphyGif?> showGifPicker(BuildContext context) {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.6),
+    barrierColor: PopupTokens.scrim,
     builder: (_) => const _GifPickerSheet(),
   );
 }
@@ -141,7 +141,7 @@ class _GifPickerSheetState extends State<_GifPickerSheet> {
                       contentPadding: const EdgeInsets.symmetric(vertical: 14),
                       border: _b(PopupTokens.ghostBorder),
                       enabledBorder: _b(PopupTokens.ghostBorder),
-                      focusedBorder: _b(SC.accent, 1.5),
+                      focusedBorder: _b(SC.accentFg, 1.5),
                     ),
                   ),
                 ),

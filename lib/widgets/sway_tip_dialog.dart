@@ -70,7 +70,7 @@ class SwayTipDialog extends StatelessWidget {
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.white70,
+                    foregroundColor: PopupTokens.inkSecondary,
                     minimumSize: const Size.fromHeight(40),
                   ),
                   child: Text(
@@ -116,7 +116,7 @@ class _TipTitle extends StatelessWidget {
       fontWeight: FontWeight.w800,
       height: 1.25,
       letterSpacing: -0.66,
-      color: Colors.white,
+      color: PopupTokens.ink,
     );
     return Text.rich(
       TextSpan(
@@ -247,7 +247,7 @@ class _FrontRequestCard extends StatelessWidget {
                   style: GoogleFonts.dmSans(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: PopupTokens.ink,
                   ),
                 ),
                 Text(
@@ -255,7 +255,7 @@ class _FrontRequestCard extends StatelessWidget {
                   style: GoogleFonts.dmSans(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: PopupTokens.inkSecondary,
                   ),
                 ),
               ],
