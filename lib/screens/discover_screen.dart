@@ -1863,7 +1863,7 @@ class _PanelSectionTitle extends StatelessWidget {
     return Text(
       label.toUpperCase(),
       style: TextStyle(
-        color: SC.fg.withValues(alpha: 0.45),
+        color: Colors.white.withValues(alpha: 0.45),
         fontSize: 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.1,
@@ -1903,7 +1903,7 @@ class _PanelHeader extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: SC.fg,
+            color: Colors.white,
             fontSize: 30,
             fontWeight: FontWeight.w900,
             letterSpacing: -0.4,
@@ -1925,7 +1925,7 @@ class _PanelHeader extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: SC.fg.withValues(alpha: 0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
@@ -2596,7 +2596,7 @@ class _ScrollHintChevronsState extends State<_ScrollHintChevrons>
         opacity: 0.75 + 0.25 * lift,
         child: Icon(
           Icons.keyboard_arrow_up_rounded,
-          color: SC.fg,
+          color: Colors.white,
           size: 34,
           shadows: [Shadow(color: Color(0x66000000), blurRadius: 8)],
         ),
@@ -2776,7 +2776,7 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
                   child: Icon(
                     Icons.chat_bubble_rounded,
                     size: 21,
-                    color: SC.fg,
+                    color: Colors.white,
                   ),
                 ),
                 // ✦ en haut à droite : pastille jaune, liseré fond de page.
@@ -2837,7 +2837,7 @@ class _CardUndoButton extends StatelessWidget {
             ),
             child: Icon(
               Icons.replay_rounded,
-              color: SC.fg,
+              color: Colors.white,
               size: 22,
             ),
           ),

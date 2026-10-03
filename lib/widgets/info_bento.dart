@@ -184,14 +184,14 @@ class _AgeTile extends StatelessWidget {
                       fontSize: 46,
                       letterSpacing: -2.3,
                       height: 1,
-                      color: SC.fg,
+                      color: Colors.white,
                     ),
                   ),
                   if (unit.isNotEmpty)
                     Text(
                       unit,
                       style: TextStyle(
-                        color: SC.fg,
+                        color: Colors.white,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -221,7 +221,7 @@ class _AgeTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: SC.fg,
+                        color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                       ),
