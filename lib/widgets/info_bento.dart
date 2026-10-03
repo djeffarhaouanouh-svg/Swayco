@@ -271,8 +271,9 @@ class _InfoTile extends StatelessWidget {
               // Clair : le jaune n'est pas lisible sur blanc — la valeur passe en encre.
               color: filled
                   ? (SC.light && !dark ? SC.textPrimary : SC.accent)
+                  // « Add » : même bleu que le pill « + Add » des centres d'intérêt.
                   : (SC.light && !dark
-                      ? SC.textMuted
+                      ? SC.accentFg
                       : Colors.white.withValues(alpha: 0.45)),
               fontSize: 16,
               height: 1.2,
