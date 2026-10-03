@@ -1665,10 +1665,6 @@ class _ProfileInfoPanel extends StatefulWidget {
 }
 
 class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
-  /// Drapeau du pays de la personne (à défaut celui de sa langue).
-  String _panelFlag(RemoteProfile p) =>
-      countryFlagFor(p.country) ?? findLanguageByCode(p.language)?.flag ?? '';
-
   /// Distance parcourue vers le bas depuis le début du geste. Fermer sur le
   /// seul élan demandait un coup sec : un glissement lent, celui qu'on fait
   /// quand on croit scroller, mourait à zéro de vélocité et le panneau
@@ -1838,40 +1834,7 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                           ],
                         ),
                       ],
-                      // Le pays - ville, en bas du panneau, avec son drapeau
-                      // (pas de drapeau sur l'aperçu de MA carte).
-                      if (p.country.trim().isNotEmpty ||
-                          p.city.trim().isNotEmpty) ...[
-                        const SizedBox(height: 22),
-                        Row(
-                          children: [
-                            if (!widget.hideFlag &&
-                                _panelFlag(p).isNotEmpty) ...[
-                              Text(
-                                _panelFlag(p),
-                                style: const TextStyle(fontSize: 26, height: 1),
-                              ),
-                              const SizedBox(width: 10),
-                            ],
-                            Flexible(
-                              child: Text(
-                                [
-                                  if (p.country.trim().isNotEmpty)
-                                    p.country.trim(),
-                                  if (p.city.trim().isNotEmpty) p.city.trim(),
-                                ].join(' - '),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],                      ],
+                      ],
                       ),
                     ),
                   ),
@@ -1920,30 +1883,56 @@ class _PanelHeader extends StatelessWidget {
         : (countryFlagFor(profile.country) ??
             findLanguageByCode(profile.language)?.flag ??
             '');
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    final country = profile.country.trim();
+    final city = profile.city.trim();
+    final placeText = [
+      if (country.isNotEmpty) country,
+      if (city.isNotEmpty) city,
+    ].join(' - ');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Flexible(
-          child: Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 30,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.4,
-              height: 1.1,
-            ),
+        Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 30,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.4,
+            height: 1.1,
           ),
         ),
-        if (flag.isNotEmpty) ...[
-          const SizedBox(width: 9),
-          Text(flag, style: const TextStyle(fontSize: 26)),
+        // Sous le prénom : le drapeau, puis « Pays - Ville ».
+        if (placeText.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              if (flag.isNotEmpty) ...[
+                Text(flag, style: const TextStyle(fontSize: 26, height: 1)),
+                const SizedBox(width: 10),
+              ],
+              Flexible(
+                child: Text(
+                  placeText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ] else if (flag.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(flag, style: const TextStyle(fontSize: 26, height: 1)),
         ],
       ],
-    );
-  }
+    );  }
 }
 
 class _StackCard extends StatelessWidget {
@@ -2444,7 +2433,8 @@ class _TinderCardState extends State<_TinderCard> {
                     ],
                   ),
                 ),
-                if (place.isNotEmpty) ...[
+                // Pays seul (la ville n'est plus affichée sur la carte).
+                if (country.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text.rich(
                     TextSpan(
@@ -2457,19 +2447,6 @@ class _TinderCardState extends State<_TinderCard> {
                             style: const TextStyle(fontSize: 22),
                           ),
                         if (country.isNotEmpty) TextSpan(text: country),
-                        if (country.isNotEmpty && city.isNotEmpty)
-                          const TextSpan(text: ' - '),
-                        // La ville : un cran plus petite que le pays, mais bien
-                        // lisible (blanc 85 %).
-                        if (city.isNotEmpty)
-                          TextSpan(
-                            text: city,
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white.withValues(alpha: 0.85),
-                            ),
-                          ),
                       ],
                     ),
                     maxLines: 1,
