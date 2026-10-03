@@ -1663,6 +1663,10 @@ class _ProfileInfoPanel extends StatefulWidget {
 }
 
 class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
+  /// Drapeau du pays de la personne (à défaut celui de sa langue).
+  String _panelFlag(RemoteProfile p) =>
+      countryFlagFor(p.country) ?? findLanguageByCode(p.language)?.flag ?? '';
+
   /// Distance parcourue vers le bas depuis le début du geste. Fermer sur le
   /// seul élan demandait un coup sec : un glissement lent, celui qu'on fait
   /// quand on croit scroller, mourait à zéro de vélocité et le panneau
@@ -1832,7 +1836,40 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                           ],
                         ),
                       ],
-                      ],
+                      // Le pays - ville, en bas du panneau, avec son drapeau
+                      // (pas de drapeau sur l'aperçu de MA carte).
+                      if (p.country.trim().isNotEmpty ||
+                          p.city.trim().isNotEmpty) ...[
+                        const SizedBox(height: 22),
+                        Row(
+                          children: [
+                            if (!widget.hideFlag &&
+                                _panelFlag(p).isNotEmpty) ...[
+                              Text(
+                                _panelFlag(p),
+                                style: const TextStyle(fontSize: 26, height: 1),
+                              ),
+                              const SizedBox(width: 10),
+                            ],
+                            Flexible(
+                              child: Text(
+                                [
+                                  if (p.country.trim().isNotEmpty)
+                                    p.country.trim(),
+                                  if (p.city.trim().isNotEmpty) p.city.trim(),
+                                ].join(' - '),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],                      ],
                       ),
                     ),
                   ),
@@ -2413,7 +2450,10 @@ class _TinderCardState extends State<_TinderCard> {
                         // Le drapeau passe sur la 2e ligne, AVANT le pays (pas sur
                         // l'aperçu de ma carte : on ne voit pas le sien).
                         if (!widget.preview && flagEmoji.isNotEmpty)
-                          TextSpan(text: '$flagEmoji  '),
+                          TextSpan(
+                            text: '$flagEmoji  ',
+                            style: const TextStyle(fontSize: 22),
+                          ),
                         if (country.isNotEmpty) TextSpan(text: country),
                         if (country.isNotEmpty && city.isNotEmpty)
                           const TextSpan(text: ' - '),
@@ -2423,7 +2463,7 @@ class _TinderCardState extends State<_TinderCard> {
                           TextSpan(
                             text: city,
                             style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 14.5,
                               fontWeight: FontWeight.w500,
                               color: Colors.white.withValues(alpha: 0.85),
                             ),
@@ -2434,7 +2474,7 @@ class _TinderCardState extends State<_TinderCard> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 14,
+                      fontSize: 17,
                       fontWeight: FontWeight.w600,
                       shadows: const [
                         Shadow(color: Color(0x66000000), blurRadius: 8),
