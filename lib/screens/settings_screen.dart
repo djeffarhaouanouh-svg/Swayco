@@ -27,7 +27,6 @@ import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_popups_extra.dart';
-import 'liked_photos_screen.dart';
 import 'paywall_screen.dart';
 
 /// Hosts every secondary account-level action that doesn't belong on the
@@ -448,12 +447,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _openLikedPhotos() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => const LikedPhotosScreen()),
-    );
-  }
-
   void _openHelp() => _openExternal('https://www.swayco.fr/help');
   void _contactSupport() => _openExternal('mailto:support@swayco.fr');
   void _openTerms() => _openExternal('https://www.swayco.fr/terms');
@@ -663,11 +656,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: Icons.block,
                       label: AppStrings.t('settings_blocked'),
                       onTap: _openBlockedUsers,
-                    ),
-                    _SettingsRow(
-                      icon: Icons.favorite_border,
-                      label: AppStrings.t('settings_liked_photos'),
-                      onTap: _openLikedPhotos,
                     ),
                     _SettingsToggleRow(
                       icon: Icons.visibility_off_outlined,

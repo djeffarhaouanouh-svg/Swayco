@@ -9,12 +9,10 @@ import '../services/device_id.dart';
 import '../services/friend_request_unread.dart';
 import '../services/friendship_api.dart';
 import '../services/languages.dart';
-import '../services/like_api.dart';
 import '../services/locations.dart';
 import '../services/match_celebration.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
-import '../services/received_activity_unread.dart';
 import '../services/revenue_cat.dart';
 import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
@@ -41,7 +39,6 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   String _myId = '';
   List<IncomingFriendRequest> _requests = const [];
   // Profiles who liked one of my photos, newest first.
-  List<RemoteProfile> _likers = const [];
   LikesLock? _lock;
   bool _loading = true;
   String? _error;
@@ -132,7 +129,6 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       setState(() {
         _loading = false;
         _requests = const [];
-        _likers = const [];
       });
       return;
     }
@@ -146,16 +142,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       final friendships = await FriendshipApi.fetchIncomingPendingWithProfiles(
         _myId,
       );
-      // Only show likes received since the feature went live, so stale
-      // historical activity (e.g. an old like on a now-deleted photo) never
-      // surfaces here.
-      final since = ReceivedActivityUnread.featureStartAt;
-      final likers = await LikeApi.fetchLikersSince(_myId, since);
       final lock = await LikesLock.load(_myId);
       if (!mounted) return;
       setState(() {
         _requests = friendships;
-        _likers = likers;
         _lock = lock;
         _loading = false;
       });
@@ -315,7 +305,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         myId: _myId,
         profile: p,
         likers: [
-          for (final q in [for (final r in _requests) r.requester, ..._likers])
+          for (final q in [for (final r in _requests) r.requester, ])
             if (q != null && seen.add(q.id)) q,
         ],
         onRevealed: () {
@@ -332,12 +322,6 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           onOpenProfile: () => openOrUnlock(req.requester),
           onAccept: () => _accept(req),
           onReject: () => _reject(req),
-        ),
-      for (final p in _likers)
-        _LikeRow(
-          liker: p,
-          revealed: revealed(p),
-          onOpenProfile: () => openOrUnlock(p),
         ),
     ];
     final navBody = GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
@@ -496,67 +480,6 @@ class _RequestRow extends StatelessWidget {
           _AcceptButton(onTap: onAccept),
           const SizedBox(width: 6),
           _RejectButton(onTap: onReject),
-        ],
-      ),
-    );
-  }
-}
-
-/// A "X liked your photo ❤" row on the Demandes feed.
-class _LikeRow extends StatelessWidget {
-  const _LikeRow({
-    required this.liker,
-    required this.revealed,
-    required this.onOpenProfile,
-  });
-
-  final RemoteProfile liker;
-  final bool revealed;
-  final VoidCallback onOpenProfile;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = !revealed
-        ? AppStrings.t('likes_someone')
-        : liker.displayName.isNotEmpty
-        ? liker.displayName
-        : (liker.handle.isNotEmpty
-              ? '@${liker.handle}'
-              : AppStrings.t('chat_no_name'));
-    final subtitle = AppStrings.t(
-      'demandes_liked_your_photo',
-      args: {'name': name},
-    );
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: SC.menu,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          _AvatarWithFlag(
-            profile: liker,
-            revealed: revealed,
-            onTap: onOpenProfile,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
-                color: SC.textMuted,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          _PopInEmoji(id: 'like_${liker.id}', emoji: '❤', fontSize: 24),
         ],
       ),
     );

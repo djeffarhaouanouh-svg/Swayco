@@ -188,9 +188,7 @@ class SettingsDisc extends StatelessWidget {
               boxShadow: SC.lift,
               shape: BoxShape.circle,
               border: Border.all(
-                color: SC.light
-                    ? SC.stroke
-                    : Colors.white.withValues(alpha: 0.3),
+                color: SC.light ? SC.stroke : const Color(0x731F5EFF),
                 width: 1.2,
               ),
             ),

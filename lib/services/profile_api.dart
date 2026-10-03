@@ -1454,36 +1454,8 @@ abstract final class ProfileApi {
         myPersonaCategory = me?.personaCategory.trim() ?? '';
       } catch (_) {}
 
-      // Batched popularity counts for every candidate in one round-
-      // trip via the `received_likes_counts` SECURITY DEFINER RPC
-      // (migration 0027). Inlined rather than going through LikeApi
-      // because that file imports profile_api and we'd create a
-      // circular import. Best-effort: a failure just skips the
-      // popularity boost — every candidate is treated as 0 likes.
-      Map<String, int> likeCounts = const {};
-      try {
-        final result = await _c.rpc(
-          'received_likes_counts',
-          params: {
-            'p_ids': candidates
-                .map((p) => p.id)
-                .where((id) => id.isNotEmpty)
-                .toList(),
-          },
-        );
-        if (result is List) {
-          final out = <String, int>{};
-          for (final row in result) {
-            final m = Map<String, dynamic>.from(row as Map);
-            final id = m['liked']?.toString() ?? '';
-            final n = (m['n'] as num?)?.toInt() ?? 0;
-            if (id.isNotEmpty) out[id] = n;
-          }
-          likeCounts = out;
-        }
-      } catch (e) {
-        debugPrint('ProfileApi.fetchDiscoverFeed: like counts failed: $e');
-      }
+      // Les likes de photos n'existent plus : pas de bonus de popularite.
+      const Map<String, int> likeCounts = {};
 
       // Score each candidate up front so the random jitter in
       // [_scoreDiscoverCandidate] is computed once per row and the

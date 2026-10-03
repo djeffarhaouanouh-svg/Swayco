@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'chat_api.dart';
-import 'like_api.dart';
 import 'supabase_service.dart';
 
 /// Counts received "activity" the local user hasn't seen yet — likes on their
@@ -81,9 +80,8 @@ abstract final class ReceivedActivityUnread {
   static Future<void> refresh() async {
     if (_meId.isEmpty || !isSupabaseReady) return;
     try {
-      final likes = await LikeApi.countReceivedLikesSince(_meId, _seenAt);
       final reactions = await ChatApi.countPhotoReactionsSince(_meId, _seenAt);
-      final n = likes + reactions;
+      final n = reactions;
       if (count.value != n) count.value = n;
     } catch (e) {
       debugPrint('ReceivedActivityUnread.refresh failed: $e');

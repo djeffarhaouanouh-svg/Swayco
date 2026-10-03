@@ -23,7 +23,6 @@ import '../services/job_sectors.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/looking_for.dart';
-import '../services/like_api.dart';
 import '../services/match_celebration.dart';
 import '../services/nav_tab.dart';
 import '../services/persona_categories.dart';
@@ -57,7 +56,6 @@ import 'photo_crop_screen.dart';
 // L'aperÃ§u "ma carte" vit dans le Discover : il rÃ©utilise le widget de carte
 // du feed pour que l'aperÃ§u soit le rendu rÃ©el, pas une copie qui dÃ©rive.
 import 'discover_screen.dart' show MyCardPreviewScreen, discoverCardAspect;
-import 'likes_received_screen.dart';
 import 'onboarding_screen.dart';
 import 'settings_screen.dart';
 
@@ -90,18 +88,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   String _deviceId = '';
   RemoteProfile? _remote;
   ProfileSnapshot? _local;
-  // Own profile: likes received per photo URL â drives each gallery photo's
-  // heart badge. Likes belong to a specific photo now.
-  Map<String, int> _likesByPhoto = const {};
   bool _loading = true;
   // Viewer-mode only: am I currently blocking the displayed user?
   bool _peerBlocked = false;
   // Viewer-mode only: has the displayed user blocked ME? Hides the
   // relationship actions (their edge with me is dead on their side).
   bool _peerBlockedMe = false;
-  // Viewer-mode only: which of the peer's photo URLs I've liked. Drives the
-  // filled heart on each of the peer's gallery photos.
-  Set<String> _likedPhotoUrls = const {};
   // Viewer-mode only: where the two of us stand.
   //   `_matched`     â we liked each other: it's a match.
   //   `_iLiked`      â my like is waiting for their answer.
@@ -180,11 +172,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       isSupabaseReady
           ? ProfileApi.fetchById(targetId)
           : Future<Object?>.value(),
-      // Les likes reÃ§us n'ont de sens que sur mon profil : le compte d'un pair
-      // trahirait qui l'a likÃ©.
-      !viewer && isSupabaseReady
-          ? LikeApi.countLikesPerPhoto(targetId)
-          : Future<Object?>.value(const <String, int>{}),
       viewer && canQuery
           ? BlockApi.isBlocked(blockerId: deviceId, otherId: targetId)
           : Future<Object?>.value(false),
@@ -192,13 +179,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       // l'arÃªte est morte de son cÃ´tÃ©.
       viewer && canQuery
           ? BlockApi.fetchMyBlockerIds().catchError(
-              (_) => <String>{},
-            )
-          : Future<Object?>.value(<String>{}),
-      // Ses photos que j'ai likÃ©es, pour que chaque cÅur soit dans le bon Ã©tat
-      // dÃ¨s le premier rendu.
-      viewer && canQuery
-          ? LikeApi.fetchMyLikedPhotos(deviceId).catchError(
               (_) => <String>{},
             )
           : Future<Object?>.value(<String>{}),
@@ -211,20 +191,16 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (!mounted) return;
     final local = results[0] as ProfileSnapshot?;
     final remote = results[1] as RemoteProfile?;
-    final likesByPhoto = results[2] as Map<String, int>;
-    final blocked = results[3] as bool;
-    final blockerIds = results[4] as Set<String>;
-    final likedPhotoUrls = results[5] as Set<String>;
-    final rel = results[6] as ({bool matched, bool iLiked, bool peerLikedMe})?;
+    final blocked = results[2] as bool;
+    final blockerIds = results[3] as Set<String>;
+    final rel = results[4] as ({bool matched, bool iLiked, bool peerLikedMe})?;
 
     setState(() {
       _deviceId = deviceId;
       _local = local;
       _remote = remote;
-      _likesByPhoto = likesByPhoto;
       _peerBlocked = blocked;
       _peerBlockedMe = blockerIds.contains(targetId);
-      _likedPhotoUrls = likedPhotoUrls;
       _matched = rel?.matched ?? false;
       _iLiked = rel?.iLiked ?? false;
       _peerLikedMe = rel?.peerLikedMe ?? false;
@@ -245,58 +221,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         return;
       }
     }
-  }
-
-  /// Optimistic like/unlike of one of the peer's photos (viewer mode). Roll
-  /// back the local set if the DB write fails.
-  Future<void> _togglePhotoLike(String photoUrl) async {
-    if (!_isViewingOther ||
-        _deviceId.isEmpty ||
-        _targetId.isEmpty ||
-        photoUrl.isEmpty) {
-      return;
-    }
-    final key = LikeApi.stablePhotoUrl(photoUrl);
-    if (key.isEmpty) return;
-    final wasLiked = _likedPhotoUrls.contains(key);
-    setState(() {
-      _likedPhotoUrls = wasLiked
-          ? ({..._likedPhotoUrls}..remove(key))
-          : {..._likedPhotoUrls, key};
-    });
-    try {
-      if (wasLiked) {
-        await LikeApi.unlike(
-          likerId: _deviceId,
-          likedId: _targetId,
-          photoUrl: key,
-        );
-      } else {
-        await LikeApi.like(
-          likerId: _deviceId,
-          likedId: _targetId,
-          photoUrl: key,
-        );
-        Analytics.track('like_sent', props: {'source': 'profile'});
-      }
-    } catch (e) {
-      debugPrint('photo like failed: $e');
-      if (!mounted) return;
-      setState(() {
-        _likedPhotoUrls = wasLiked
-            ? {..._likedPhotoUrls, key}
-            : ({..._likedPhotoUrls}..remove(key));
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('like_save_failed'))),
-      );
-    }
-  }
-
-  void _openLikesReceived() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => const LikesReceivedScreen()),
-    );
   }
 
   Future<void> _unmatchPeer() async {
@@ -1161,20 +1085,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                             photos: _remote?.photos ?? const [],
                             avatarUrl: _remote?.avatarUrl ?? '',
                             onReorderPhotos: _reorderPhotos,
-                            likesByPhoto: _likesByPhoto,
                             viewerMode: _isViewingOther,
                             matched: _matched,
                             iLiked: _iLiked,
                             peerLikedMe: _peerLikedMe,
                             peerBlocked: _peerBlocked,
                             peerBlockedMe: _peerBlockedMe,
-                            likedPhotoUrls: _likedPhotoUrls,
                             onEditName: _saveName,
                             onEditBio: _saveBio,
                             onEditInterests: _saveInterests,
                             personalInfo: _remote,
                             onSavePersonalInfo: _savePersonalInfo,
-                            onTapLikes: _openLikesReceived,
                             onPickPhoto: _pickAndAddPhoto,
                             onPickAvatar: _pickAndSetAvatar,
                             onRemovePhoto: _removePhoto,
@@ -1186,7 +1107,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onLikePeer: _likePeer,
                             onAcceptPeer: _acceptPeer,
                             onToggleBlock: _toggleBlock,
-                            onTogglePhotoLike: _togglePhotoLike,
                             onMessagePeer: _openChatWithPeer,
                             aboveGallery: (!_isViewingOther && !widget.preview)
                                 ? BoostButton(
@@ -1363,14 +1283,12 @@ class _IdentitySection extends StatelessWidget {
     required this.photos,
     required this.avatarUrl,
     this.onReorderPhotos,
-    required this.likesByPhoto,
     required this.onEditName,
     required this.onEditBio,
     this.onPickAvatar,
     this.onEditInterests,
     this.personalInfo,
     this.onSavePersonalInfo,
-    required this.onTapLikes,
     required this.onPickPhoto,
     required this.onRemovePhoto,
     required this.onEdit,
@@ -1388,8 +1306,6 @@ class _IdentitySection extends StatelessWidget {
     this.onLikePeer,
     this.onAcceptPeer,
     this.onToggleBlock,
-    this.likedPhotoUrls = const {},
-    this.onTogglePhotoLike,
     this.onMessagePeer,
   });
 
@@ -1425,9 +1341,6 @@ class _IdentitySection extends StatelessWidget {
   /// est déjà celle d'après le déplacement. Voir _reorderPhotos.
   final void Function(int from, int to)? onReorderPhotos;
 
-  /// Likes received per photo URL. Only shown on my own profile (private).
-  final Map<String, int> likesByPhoto;
-
   /// Persist the edited display name (own profile, inline).
   final Future<void> Function(String) onEditName;
   final Future<void> Function(String) onEditBio;
@@ -1446,7 +1359,6 @@ class _IdentitySection extends StatelessWidget {
     Object? lookingFor,
     Object? personaCategory,
   })? onSavePersonalInfo;
-  final VoidCallback onTapLikes;
 
   /// Own profile: append a photo to the gallery.
   final VoidCallback onPickPhoto;
@@ -1509,13 +1421,6 @@ class _IdentitySection extends StatelessWidget {
   /// Viewer-mode only: block / unblock the displayed peer. Drives the
   /// "DÃ©bloquer" action button shown while [peerBlocked] is true.
   final VoidCallback? onToggleBlock;
-
-  /// Viewer-mode only: the peer's photo URLs I've liked. Drives the filled
-  /// heart on each of their gallery photos.
-  final Set<String> likedPhotoUrls;
-
-  /// Viewer-mode only: like/unlike one of the peer's photos by URL.
-  final void Function(String photoUrl)? onTogglePhotoLike;
 
   /// Viewer-mode only: opens the DM thread with this peer.
   final VoidCallback? onMessagePeer;
@@ -1810,8 +1715,6 @@ class _IdentitySection extends StatelessWidget {
             viewerMode: false,
             onPick: onPickPhoto,
             onRemove: onRemovePhoto,
-            likesByPhoto: likesByPhoto,
-            onTapLikes: onTapLikes,
             onReorderPhotos: onReorderPhotos,
           ),
         ),
@@ -1956,11 +1859,7 @@ class _IdentitySection extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-          child: _PeerMediaStack(
-            photos: photos,
-            likedPhotoUrls: likedPhotoUrls,
-            onTogglePhotoLike: onTogglePhotoLike,
-          ),
+          child: _PeerMediaStack(photos: photos),
         ),
         // Bio + faits + centres d'intérêt : le même panneau « Mes infos », en
         // lecture seule (une tuile sans valeur n'apparaît pas).
@@ -2093,8 +1992,11 @@ class _GlassCircle extends StatelessWidget {
           decoration: BoxDecoration(
             color: SC.fill.withValues(alpha: 0.13), boxShadow: SC.lift,
             shape: BoxShape.circle,
+            // Petit contour bleute, clair comme sombre.
             border: Border.all(
-              color: SC.stroke.withValues(alpha: 0.3),
+              color: SC.light
+                  ? SC.stroke.withValues(alpha: 0.3)
+                  : const Color(0x731F5EFF),
               width: 1.2,
             ),
           ),
@@ -2188,18 +2090,11 @@ class _DashedRRectPainter extends CustomPainter {
       old.strokeWidth != strokeWidth;
 }
 
-/// Grille 2 colonnes de photos sur le profil d'un pair. Tap â viewer plein
-/// Ã©cran ; cÅur â like de cette photo.
+/// Grille 2 colonnes de photos sur le profil d'un pair. Tap : viewer plein ecran.
 class _PeerMediaStack extends StatelessWidget {
-  const _PeerMediaStack({
-    required this.photos,
-    required this.likedPhotoUrls,
-    required this.onTogglePhotoLike,
-  });
+  const _PeerMediaStack({required this.photos});
 
   final List<String> photos;
-  final Set<String> likedPhotoUrls;
-  final void Function(String photoUrl)? onTogglePhotoLike;
 
   // Grille d'avant la DA : 2 colonnes, vignettes 3 / 4 (hauteur / largeur).
   static const double _aspect = 216 / 162;
@@ -2232,12 +2127,6 @@ class _PeerMediaStack extends StatelessWidget {
                     index: i,
                     viewerMode: true,
                   ),
-                  iLikePeer: likedPhotoUrls.contains(
-                    LikeApi.stablePhotoUrl(photos[i]),
-                  ),
-                  onTogglePeerLike: onTogglePhotoLike != null
-                      ? () => onTogglePhotoLike!(photos[i])
-                      : null,
                   // Chez un pair : aucun lisere. Le cadre cyan dit "ta photo
                   // de profil", ce qui n'a de sens que sur mon propre profil.
                 ),
@@ -2596,8 +2485,6 @@ class _PhotoGallery extends StatelessWidget {
     required this.viewerMode,
     required this.onPick,
     required this.onRemove,
-    this.likesByPhoto = const {},
-    this.onTapLikes,
     this.onReorderPhotos,
   });
 
@@ -2610,9 +2497,6 @@ class _PhotoGallery extends StatelessWidget {
   final void Function(String url) onRemove;
   // Own profile: reorder the gallery by dragging a tile (final positions).
   final void Function(int from, int to)? onReorderPhotos;
-  // Own profile: likes received per photo URL.
-  final Map<String, int> likesByPhoto;
-  final VoidCallback? onTapLikes;
 
   // Portrait tiles (3:4) â a single horizontal, scrollable row of larger tiles.
   static const double _spacing = 10;
@@ -2715,12 +2599,6 @@ class _PhotoGallery extends StatelessWidget {
                     index: photoIndex,
                   ),
                   onDelete: () => onRemove(url),
-                  likesCount: likesByPhoto[LikeApi.stablePhotoUrl(url)] ??
-                      likesByPhoto[url] ??
-                      0,
-                  onTapLikes: onTapLikes,
-                  iLikePeer: false,
-                  onTogglePeerLike: null,
                   isPrimary: photoIndex == 0,
                 ),
               ),
@@ -3609,10 +3487,6 @@ class _PhotoCell extends StatelessWidget {
     required this.viewerMode,
     required this.onTap,
     this.onDelete,
-    this.likesCount = 0,
-    this.onTapLikes,
-    this.iLikePeer = false,
-    this.onTogglePeerLike,
     this.isPrimary = false,
   });
 
@@ -3623,10 +3497,6 @@ class _PhotoCell extends StatelessWidget {
   /// When non-null and a photo is set on my own profile, a small trash
   /// button appears top-right to delete the photo.
   final VoidCallback? onDelete;
-  final int likesCount;
-  final VoidCallback? onTapLikes;
-  final bool iLikePeer;
-  final VoidCallback? onTogglePeerLike;
 
   /// Premiere photo de la galerie : elle seule porte le lisere cyan.
   final bool isPrimary;
@@ -3635,15 +3505,6 @@ class _PhotoCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
     final tappable = !viewerMode;
-    // Only render the â¤ badge when there's actually a photo to attach it
-    // to (else it floats above an empty "add photo" cell and looks broken)
-    // and when there's at least one like to show.
-    final showLikesBadge =
-        !viewerMode && onTapLikes != null && hasPhoto && likesCount > 0;
-    // In viewer mode, render a heart button on the photo so I can like
-    // the peer right from their profile. Hidden when there's no photo
-    // (the empty cell is already a "image_not_supported" glyph).
-    final showLikeAction = viewerMode && hasPhoto && onTogglePeerLike != null;
     // Trash button: only on my own profile when a photo is actually set.
     final showDeleteAction = !viewerMode && hasPhoto && onDelete != null;
     return Material(
@@ -3680,44 +3541,6 @@ class _PhotoCell extends StatelessWidget {
                     ),
                   ),
           ),
-          if (showLikesBadge)
-            Positioned(
-              left: 6,
-              bottom: 6,
-              child: Material(
-                color: Colors.black.withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(999),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(999),
-                  onTap: onTapLikes,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.favorite,
-                          size: 12,
-                          color: Color(0xFFFF3B5C),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$likesCount',
-                          style: TextStyle(
-                            color: SC.fg,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
           if (showDeleteAction)
             Positioned(
               right: 4,
@@ -3741,44 +3564,7 @@ class _PhotoCell extends StatelessWidget {
                 ),
               ),
             ),
-          if (showLikeAction)
-            Positioned(
-              right: 8,
-              bottom: 8,
-              child: GestureDetector(
-                // Absorb the tap so the photo InkWell underneath doesn't also
-                // open the viewer when the heart is hit.
-                onTap: onTogglePeerLike,
-                behavior: HitTestBehavior.opaque,
-                // Rond de 38 en verre ; jaune plein une fois la photo likée.
-                child: ClipOval(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: iLikePeer
-                            ? SC.accent
-                            : SC.fg.withValues(alpha: 0.13),
-                        border: Border.all(
-                          color: iLikePeer
-                              ? SC.accent
-                              : SC.stroke.withValues(alpha: 0.3),
-                          width: 1.2,
-                        ),
-                      ),
-                      child: Icon(
-                        iLikePeer ? Icons.favorite : Icons.favorite_border,
-                        size: 20,
-                        color: iLikePeer ? SC.onAccent : SC.fg,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),          // Le lisere cyan ne designe QUE la premiere photo de la galerie
+          // Le lisere cyan ne designe QUE la premiere photo de la galerie
           // (la photo de profil) : sur les suivantes il transformait la rangee
           // en mur de cadres. Pas sur la cellule vide, qui n'est pas une photo.
           if (hasPhoto && isPrimary)
