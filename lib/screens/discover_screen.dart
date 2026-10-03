@@ -1188,9 +1188,29 @@ class _CountryRow extends StatefulWidget {
 class _CountryRowState extends State<_CountryRow> {
   final _scroll = ScrollController();
 
+  /// Les pays dans l'ordre de leur DERNIER TOUCHER (choix ou retrait), le plus
+  /// récent en tête. Un pays décoché reste donc en tête — là où on vient de le
+  /// toucher — au lieu de retomber à sa place d'origine. Les pays jamais
+  /// touchés suivent, dans l'ordre normal.
+  late List<String> _recent = [
+    ...widget.selected.where(kGlobeCountries.containsKey).toList().reversed,
+  ];
+
+  void _touch(Iterable<String> keys) {
+    for (final k in keys) {
+      if (!kGlobeCountries.containsKey(k)) continue;
+      _recent.remove(k);
+      _recent.insert(0, k);
+    }
+  }
+
   @override
   void didUpdateWidget(_CountryRow old) {
     super.didUpdateWidget(old);
+    // Ajoutés d'abord (dans l'ordre où ils ont été choisis), puis retirés : le
+    // dernier pays touché passe en première position, choisi ou décoché.
+    _touch(widget.selected.where((k) => !old.selected.contains(k)));
+    _touch(old.selected.where((k) => !widget.selected.contains(k)));
     // Une sélection vient de changer : le pays choisi est passé en tête —
     // on y ramène la bande pour qu'il reste sous les yeux.
     if (old.selected.length != widget.selected.length ||
@@ -1213,18 +1233,11 @@ class _CountryRowState extends State<_CountryRow> {
     super.dispose();
   }
 
-  List<String> get _orderedKeys {
-    final picked = widget.selected
-        .where(kGlobeCountries.containsKey)
-        .toList()
-        .reversed
-        .toList();
-    return [
-      ...picked,
-      for (final k in kGlobeCountries.keys)
-        if (!widget.selected.contains(k)) k,
-    ];
-  }
+  List<String> get _orderedKeys => [
+        ..._recent,
+        for (final k in kGlobeCountries.keys)
+          if (!_recent.contains(k)) k,
+      ];
 
   @override
   Widget build(BuildContext context) {
