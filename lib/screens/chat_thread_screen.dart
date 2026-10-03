@@ -2909,9 +2909,31 @@ class _CircleActionButton extends StatelessWidget {
                       color: SC.onAccent,
                     ),
                   )
-                : SwapIcon(
-                    icon: send ? Icons.send_rounded : Icons.gif_box_rounded,
-                    color: SC.onAccent,
+                // Champ vide : le mot « GIF » ; dès qu'il y a du texte : la flèche
+                // d'envoi (fondu entre les deux).
+                : AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    switchInCurve: Curves.easeOutBack,
+                    transitionBuilder: (child, anim) => ScaleTransition(
+                      scale: anim,
+                      child: FadeTransition(opacity: anim, child: child),
+                    ),
+                    child: send
+                        ? Icon(
+                            Icons.send_rounded,
+                            key: const ValueKey('send'),
+                            color: SC.onAccent,
+                            size: 22,
+                          )
+                        : Text(
+                            'GIF',
+                            key: const ValueKey('gif'),
+                            style: popupDisplay(
+                              fontSize: 14,
+                              letterSpacing: 0.2,
+                              color: SC.onAccent,
+                            ),
+                          ),
                   ),
           ),
         ),
