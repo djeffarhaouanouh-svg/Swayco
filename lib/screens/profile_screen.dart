@@ -2355,8 +2355,9 @@ class _PhotoViewerState extends State<_PhotoViewer> {
         opacity: onTap == null ? 0.25 : 1,
         // Verre transparent (flou + voile blanc leger) cerne d'un anneau de 1 px
         // au degrade de marque, trace PAR-DESSUS pour ne pas teinter le fond.
+        // Clair : le meme bord que les autres boutons du profil.
         child: CustomPaint(
-          foregroundPainter: const BrandRingPainter(),
+          foregroundPainter: SC.light ? null : const BrandRingPainter(),
           child: ClipOval(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
@@ -2367,6 +2368,12 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.10),
                   shape: BoxShape.circle,
+                  border: SC.light
+                      ? Border.all(
+                          color: SC.stroke.withValues(alpha: 0.3),
+                          width: 1.2,
+                        )
+                      : null,
                 ),
                 child: Icon(icon, color: Colors.white, size: size * 0.55),
               ),
