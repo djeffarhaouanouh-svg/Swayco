@@ -1797,7 +1797,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
     final align = mine ? Alignment.centerRight : Alignment.centerLeft;
     // Envoyé = cyan plein, texte encre ; reçu = gris ardoise liseré, texte
     // blanc. Le petit coin (6) pointe vers l'auteur (maquette 8c).
-    final bubbleText = mine ? _kThreadBg : Colors.white;
+    final bubbleText = mine ? SC.onAccent : Colors.white;
     final radius = mine
         ? const BorderRadius.only(
             topLeft: Radius.circular(20),
@@ -2916,12 +2916,12 @@ class _CircleActionButton extends StatelessWidget {
                     width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: _kThreadBg,
+                      color: SC.onAccent,
                     ),
                   )
                 : SwapIcon(
                     icon: send ? Icons.send_rounded : Icons.gif_box_rounded,
-                    color: _kThreadBg,
+                    color: SC.onAccent,
                   ),
           ),
         ),
