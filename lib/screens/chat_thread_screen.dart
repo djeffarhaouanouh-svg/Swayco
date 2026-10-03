@@ -1835,18 +1835,8 @@ class _MessageBubbleState extends State<_MessageBubble> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (!mine && message.senderName.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 2),
-            child: Text(
-              message.senderName,
-              style: TextStyle(
-                color: SC.accentFg,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
-            ),
-          ),
+        // Le prénom de l'autre n'est plus affiché dans les bulles : il est
+        // déjà dans l'en-tête de la conversation.
         // Discover reaction / intro: a small Snapchat-style thumbnail
         // of the photo it was about, with the message stuck below it.
         if (message.hasDiscoverPhoto)
