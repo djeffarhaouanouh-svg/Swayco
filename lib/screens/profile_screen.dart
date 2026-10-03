@@ -1992,12 +1992,12 @@ class _GlassCircle extends StatelessWidget {
           decoration: BoxDecoration(
             color: SC.fill.withValues(alpha: 0.13), boxShadow: SC.lift,
             shape: BoxShape.circle,
-            // Meme bord que la tuile Interets, en 1 px.
+            // Clair : bord d'avant. Sombre / Noir : bord de la tuile Interets, 1 px.
             border: Border.all(
               color: SC.light
-                  ? SC.glassBorder
+                  ? SC.stroke.withValues(alpha: 0.3)
                   : Colors.white.withValues(alpha: 0.16),
-              width: 1,
+              width: SC.light ? 1.2 : 1,
             ),
           ),
           child: Icon(icon, size: 22, color: SC.fg),

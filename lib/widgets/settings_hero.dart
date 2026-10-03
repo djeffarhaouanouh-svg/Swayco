@@ -189,9 +189,9 @@ class SettingsDisc extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(
                 color: SC.light
-                    ? SC.glassBorder
+                    ? SC.stroke
                     : Colors.white.withValues(alpha: 0.16),
-                width: 1,
+                width: SC.light ? 1.2 : 1,
               ),
             ),
             child: Transform.rotate(
