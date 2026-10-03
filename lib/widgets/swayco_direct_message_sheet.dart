@@ -11,10 +11,10 @@ import 'popup_kit.dart';
 class SwaycoDirectMessageSheet extends StatefulWidget {
   const SwaycoDirectMessageSheet({
     super.key,
-    this.remaining = SpecialMessageQuota.monthly,
+    this.remaining = SpecialMessageQuota.total,
   });
 
-  /// Messages spéciaux qu'il reste ce mois-ci (3 → 0).
+  /// Messages spéciaux qu'il reste (3 → 0).
   final int remaining;
 
   @override
@@ -130,7 +130,7 @@ class _QuotaPill extends StatelessWidget {
                 'dm_quota',
                 args: {
                   'n': '$remaining',
-                  'max': '${SpecialMessageQuota.monthly}',
+                  'max': '${SpecialMessageQuota.total}',
                 },
               ),
         textAlign: TextAlign.center,

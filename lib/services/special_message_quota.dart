@@ -3,38 +3,32 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_service.dart';
 
-/// Messages spéciaux (Discover, bouton doré) : [monthly] par mois pour les
+/// Messages spéciaux (Discover, bouton doré) : [total] à vie pour les
 /// abonnés Premium. Le compteur vit en base (migration 0063, fonctions
 /// `special_messages_remaining` / `consume_special_message`) ; si elle n'est
 /// pas encore appliquée, repli sur un compteur local par compte.
 abstract final class SpecialMessageQuota {
-  static const int monthly = 3;
-
-  static String _month() {
-    final n = DateTime.now();
-    return '${n.year}-${n.month.toString().padLeft(2, '0')}';
-  }
+  static const int total = 3;
 
   static Future<int> _localUsed(SharedPreferences p, String uid) async {
-    if (p.getString('special_msg_month_$uid') != _month()) return 0;
     return p.getInt('special_msg_used_$uid') ?? 0;
   }
 
-  /// Messages spéciaux qu'il reste à envoyer ce mois-ci (3 → 0).
+  /// Messages spéciaux qu'il reste à envoyer (3 → 0).
   static Future<int> remaining(String uid) async {
     if (isSupabaseReady) {
       try {
         final r = await Supabase.instance.client
             .rpc('special_messages_remaining');
-        if (r is num) return r.toInt().clamp(0, monthly);
+        if (r is num) return r.toInt().clamp(0, total);
       } catch (_) {}
     }
     try {
       final p = await SharedPreferences.getInstance();
-      final left = monthly - await _localUsed(p, uid);
+      final left = total - await _localUsed(p, uid);
       return left < 0 ? 0 : left;
     } catch (_) {
-      return monthly;
+      return total;
     }
   }
 
@@ -49,7 +43,6 @@ abstract final class SpecialMessageQuota {
     try {
       final p = await SharedPreferences.getInstance();
       final used = await _localUsed(p, uid);
-      await p.setString('special_msg_month_$uid', _month());
       await p.setInt('special_msg_used_$uid', used + 1);
     } catch (_) {}
   }
