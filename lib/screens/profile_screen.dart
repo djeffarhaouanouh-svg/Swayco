@@ -1983,27 +1983,41 @@ class _GlassCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final circle = ClipOval(
+    final light = SC.light;
+    final disc = ClipOval(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
-          width: 44,
-          height: 44,
+          width: light ? 44 : 42,
+          height: light ? 44 : 42,
           decoration: BoxDecoration(
             color: SC.fill.withValues(alpha: 0.13), boxShadow: SC.lift,
             shape: BoxShape.circle,
-            // Clair : bord d'avant. Sombre / Noir : bord de la tuile Interets, 1 px.
-            border: Border.all(
-              color: SC.light
-                  ? SC.stroke.withValues(alpha: 0.3)
-                  : Colors.white.withValues(alpha: 0.16),
-              width: SC.light ? 1.2 : 1,
-            ),
+            // Clair : bord d'avant. Sombre / Noir : l'anneau de la bulle Filtrer.
+            border: light
+                ? Border.all(
+                    color: SC.stroke.withValues(alpha: 0.3),
+                    width: 1.2,
+                  )
+                : null,
           ),
           child: Icon(icon, size: 22, color: SC.fg),
         ),
       ),
     );
+    // Sombre / Noir : anneau de 1 px au degrade de marque, comme « Filtrer ».
+    final circle = light
+        ? disc
+        : Container(
+            width: 44,
+            height: 44,
+            padding: const EdgeInsets.all(1),
+            decoration: const BoxDecoration(
+              gradient: SC.brandGradient,
+              shape: BoxShape.circle,
+            ),
+            child: disc,
+          );
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,

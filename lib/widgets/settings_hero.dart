@@ -179,7 +179,16 @@ class SettingsDisc extends StatelessWidget {
     return SizedBox(
       width: 44,
       height: 44,
-      child: ClipOval(
+      child: Container(
+        // Sombre / Noir : anneau de 1 px au degrade de marque (bulle Filtrer).
+        padding: SC.light ? EdgeInsets.zero : const EdgeInsets.all(1),
+        decoration: SC.light
+            ? null
+            : const BoxDecoration(
+                gradient: SC.brandGradient,
+                shape: BoxShape.circle,
+              ),
+        child: ClipOval(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
@@ -187,12 +196,9 @@ class SettingsDisc extends StatelessWidget {
               color: SC.light ? SC.fill : Colors.white.withValues(alpha: 0.13),
               boxShadow: SC.lift,
               shape: BoxShape.circle,
-              border: Border.all(
-                color: SC.light
-                    ? SC.stroke
-                    : Colors.white.withValues(alpha: 0.16),
-                width: SC.light ? 1.2 : 1,
-              ),
+              border: SC.light
+                  ? Border.all(color: SC.stroke, width: 1.2)
+                  : null,
             ),
             child: Transform.rotate(
               angle: -t * math.pi,
@@ -223,6 +229,7 @@ class SettingsDisc extends StatelessWidget {
               ),
             ),
           ),
+        ),
         ),
       ),
     );
