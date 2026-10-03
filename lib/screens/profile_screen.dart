@@ -2181,12 +2181,10 @@ class _PeerMediaStack extends StatelessWidget {
   final Set<String> likedPhotoUrls;
   final void Function(String photoUrl)? onTogglePhotoLike;
 
-  /// Toutes les photos au MÊME format : celui de la carte Discover, un peu
-  /// plus haut (+ 8 %). Une colonne pleine largeur — aussi larges que la carte.
-  static double _aspect(BuildContext context) =>
-      (1 / discoverCardAspect(context)) * 1.08;
-  static const double _spacing = 14;
-  static const int _columns = 1;
+  // Grille d'avant la DA : 2 colonnes, vignettes 3 / 4 (hauteur / largeur).
+  static const double _aspect = 216 / 162;
+  static const double _spacing = 8;
+  static const int _columns = 2;
 
   @override
   Widget build(BuildContext context) {
@@ -2196,7 +2194,7 @@ class _PeerMediaStack extends StatelessWidget {
       builder: (context, constraints) {
         final tileWidth =
             (constraints.maxWidth - _spacing * (_columns - 1)) / _columns;
-        final tileHeight = tileWidth * _aspect(context);
+        final tileHeight = tileWidth * _aspect;
         return Wrap(
           spacing: _spacing,
           runSpacing: _spacing,
@@ -2452,6 +2450,16 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final multi = widget.photos.length > 1;
+    // Le cadre : pleine largeur (14 de marge) au ratio de la carte Discover,
+    // borné en hauteur pour laisser respirer l'écran.
+    final aspect = discoverCardAspect(context);
+    var frameW = size.width - 28;
+    var frameH = frameW / aspect;
+    final maxH = size.height * 0.82;
+    if (frameH > maxH) {
+      frameH = maxH;
+      frameW = frameH * aspect;
+    }
     return Scaffold(
       backgroundColor: Colors.black.withValues(alpha: 0.78),
       body: Stack(
@@ -2467,11 +2475,11 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: size.width - 28,
-                        maxHeight: size.height * 0.78,
-                      ),
+                    // Cadre FIXE au format de la carte Discover : toutes les
+                    // photos s'affichent pareil, recadrées (cover).
+                    SizedBox(
+                      width: frameW,
+                      height: frameH,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: InteractiveViewer(
@@ -2479,7 +2487,9 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                           maxScale: 4,
                           child: Image.network(
                             widget.photos[i],
-                            fit: BoxFit.contain,
+                            fit: BoxFit.cover,
+                            width: frameW,
+                            height: frameH,
                             errorBuilder: (_, _, _) => const Padding(
                               padding: EdgeInsets.all(40),
                               child: Icon(
