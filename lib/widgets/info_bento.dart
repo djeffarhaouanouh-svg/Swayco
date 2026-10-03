@@ -282,9 +282,10 @@ class _InfoTile extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              // Clair : le jaune n'est pas lisible sur blanc — la valeur passe en encre.
+              // Valeur en encre sur fond clair, en blanc sinon : seul l'age
+              // garde le jaune fluo.
               color: filled
-                  ? (SC.light && !dark ? SC.textPrimary : SC.accent)
+                  ? (SC.light && !dark ? SC.textPrimary : Colors.white)
                   // « Add » : même bleu que le pill « + Add » des centres d'intérêt.
                   : (SC.light && !dark
                       ? SC.accentFg
