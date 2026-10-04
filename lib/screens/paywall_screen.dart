@@ -370,22 +370,15 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
                         tailFg: _pro ? SC.onAccent : SC.dTextPrimary,
                       ),
                       const SizedBox(height: 16),
-                      _PerkRow(
-                        icon: Icons.favorite_rounded,
-                        label: AppStrings.t('pw_row_likes'),
-                        value: AppStrings.t(
-                          _pro ? 'pw_row_visible' : 'pw_row_blurred',
-                        ),
+                      // Les arguments : le badge Populaire d'abord.
+                      _PerkGrid(
                         on: _pro,
-                      ),
-                      const SizedBox(height: 10),
-                      _PerkRow(
-                        icon: Icons.verified_rounded,
-                        label: AppStrings.t('pw_row_badge'),
-                        value: _pro
-                            ? AppStrings.t('paywall_popular').toUpperCase()
-                            : AppStrings.t('pw_row_none'),
-                        on: _pro,
+                        labels: [
+                          AppStrings.t('pw_arg_badge'),
+                          AppStrings.t('pw_arg_likes'),
+                          AppStrings.t('pw_arg_visibility'),
+                          AppStrings.t('pw_arg_special'),
+                        ],
                       ),
                       const Spacer(),
                       const SizedBox(height: 22),
@@ -1544,6 +1537,83 @@ class _FooterDot extends StatelessWidget {
           fontSize: 12,
         ),
       ),
+    );
+  }
+}
+
+/// Les arguments du Pro : grille 2 x 2 de pastilles (coche jaune + texte).
+/// Hors Pro, les coches et le texte s'eteignent.
+class _PerkGrid extends StatelessWidget {
+  const _PerkGrid({required this.labels, required this.on});
+
+  final List<String> labels;
+  final bool on;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget chip(String label) {
+      return Container(
+        constraints: const BoxConstraints(minHeight: 58),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 22,
+              height: 22,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: on ? SC.accent : Colors.white.withValues(alpha: 0.18),
+              ),
+              child: Icon(
+                Icons.check_rounded,
+                size: 14,
+                color: on ? SC.onAccent : Colors.white.withValues(alpha: 0.5),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: SC.dTextPrimary.withValues(alpha: on ? 1 : 0.5),
+                  fontSize: 14,
+                  height: 1.15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        for (var i = 0; i < labels.length; i += 2) ...[
+          if (i > 0) const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: chip(labels[i])),
+              const SizedBox(width: 10),
+              Expanded(
+                child: i + 1 < labels.length
+                    ? chip(labels[i + 1])
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }
