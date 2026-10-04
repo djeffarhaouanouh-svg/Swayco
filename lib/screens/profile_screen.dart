@@ -51,6 +51,7 @@ import '../widgets/swayco_popups_extra.dart';
 import '../widgets/translated_profile_text.dart';
 import '../widgets/wheel_picker_sheet.dart';
 import '../widgets/boost_button.dart';
+import '../widgets/pro_banner.dart';
 import 'chat_thread_screen.dart';
 import 'photo_crop_screen.dart';
 // L'aperÃ§u "ma carte" vit dans le Discover : il rÃ©utilise le widget de carte
@@ -1109,8 +1110,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onToggleBlock: _toggleBlock,
                             onMessagePeer: _openChatWithPeer,
                             aboveGallery: (!_isViewingOther && !widget.preview)
-                                ? BoostButton(
-                                    wide: true,
+                                ? const ProBanner()
+                                : null,
+                            coverCenter: (!_isViewingOther && !widget.preview)
+                                ? BoostPill(
                                     boostedUntil: _remote?.boostedUntil,
                                     onPurchased: _awaitBoostCredit,
                                   )
@@ -1296,6 +1299,7 @@ class _IdentitySection extends StatelessWidget {
     this.onEditAccount,
     this.onPreview,
     this.aboveGallery,
+    this.coverCenter,
     this.preview = false,
     this.viewerMode = false,
     this.matched = false,
@@ -1383,6 +1387,9 @@ class _IdentitySection extends StatelessWidget {
 
   /// Own profile only: shown just above the "Mes photos" header (Boost).
   final Widget? aboveGallery;
+
+  /// Pastille « Booster mon profil » au centre de la barre du haut (mon profil).
+  final Widget? coverCenter;
 
   /// True quand CETTE instance EST l'aperÃ§u (rendu viewer sur mes donnÃ©es) :
   /// masque toutes les actions relationnelles.
@@ -1647,7 +1654,11 @@ class _IdentitySection extends StatelessWidget {
                       icon: Icons.arrow_back_rounded,
                       onTap: () => NavTab.select(NavTab.discover),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Center(child: coverCenter ?? const SizedBox.shrink()),
+                    ),
+                    const SizedBox(width: 8),
                     _GlassCircle(
                       icon: Icons.visibility_outlined,
                       tooltip: AppStrings.t('profile_preview'),

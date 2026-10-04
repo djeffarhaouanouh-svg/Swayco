@@ -5,6 +5,71 @@ import '../services/app_strings.dart';
 import '../theme/swayco_theme.dart';
 import 'popup_kit.dart';
 
+/// « Booster mon profil » en pastille jaune (barre du haut du profil) : même
+/// offre que [BoostButton], format compact.
+class BoostPill extends StatelessWidget {
+  const BoostPill({
+    super.key,
+    required this.boostedUntil,
+    required this.onPurchased,
+  });
+
+  final DateTime? boostedUntil;
+  final Future<void> Function() onPurchased;
+
+  @override
+  Widget build(BuildContext context) {
+    final until = boostedUntil;
+    final active = until != null && until.isAfter(DateTime.now());
+    final label = active
+        ? AppStrings.t(
+            'boost_active_until',
+            args: {
+              'time': MaterialLocalizations.of(context)
+                  .formatTimeOfDay(TimeOfDay.fromDateTime(until)),
+            },
+          )
+        : AppStrings.t('boost_my_profile');
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: active
+          ? null
+          : () => showBoostPaywall(context, onPurchased: onPurchased),
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: active ? SC.brandBlue.withValues(alpha: 0.3) : SC.accent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.rocket_launch_rounded,
+                size: 18,
+                color: active ? SC.brandCyan : SC.onAccent,
+              ),
+              const SizedBox(width: 7),
+              Text(
+                label,
+                maxLines: 1,
+                style: popupDisplay(
+                  fontSize: 14,
+                  letterSpacing: -0.2,
+                  color: active ? SC.brandCyan : SC.onAccent,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// "Booster mon profil" — opens the Boost offer screen ([showBoostPaywall]),
 /// which buys the consumable Boost package through RevenueCat. The backend
 /// webhook credits it (24 h at the top of Discover); while it runs the button

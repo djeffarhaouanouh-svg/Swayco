@@ -6,6 +6,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../widgets/ai_badge.dart';
 import '../services/ad_service.dart';
 import '../services/analytics.dart';
 import '../services/app_boot.dart';
@@ -1143,18 +1144,68 @@ class _DiscoverHeader extends StatelessWidget {
   /// dans la bande. (Le SVG du handoff a été retiré à la demande.)
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    return SizedBox(
       height: height,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16),
-        child: Align(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Stack(
           alignment: Alignment.center,
-          // Centre à 20 px du haut de la bande, comme avant le resserrement
-          // (43 − 3 = 40 de zone utile).
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(6, 0, 6, 3),
-            child: SwaycoWordmark(adaptive: true),
-          ),
+          children: [
+            // Centre à 20 px du haut de la bande, comme avant le resserrement
+            // (43 − 3 = 40 de zone utile).
+            const Padding(
+              padding: EdgeInsets.fromLTRB(6, 0, 6, 3),
+              child: SwaycoWordmark(adaptive: true),
+            ),
+            // En haut à droite : le bouton Pro, même lien que Réglages >
+            // Mon abonnement (le paywall).
+            Positioned(
+              right: 0,
+              top: 6,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => showPaywallSheet(context),
+                child: Container(
+                  height: 30,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [SC.brandBlue, SC.brandCyan],
+                    ),
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color: SC.brandBlue.withValues(alpha: 0.45),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(
+                        Icons.workspace_premium_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                      SizedBox(width: 5),
+                      Text(
+                        'Pro',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1921,17 +1972,27 @@ class _PanelHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: SC.fg,
-            fontSize: 30,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.4,
-            height: 1.1,
-          ),
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: SC.fg,
+                  fontSize: 30,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.4,
+                  height: 1.1,
+                ),
+              ),
+            ),
+            if (profile.isAi) ...[
+              const SizedBox(width: 10),
+              const AiBadge(fontSize: 14),
+            ],
+          ],
         ),
         // Sous le prénom : le drapeau, puis « Pays - Ville ».
         if (placeText.isNotEmpty) ...[
