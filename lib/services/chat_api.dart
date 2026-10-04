@@ -19,6 +19,7 @@ class ChatMessage {
     this.language = '',
     this.imageUrl = '',
     this.discoverPhoto = '',
+    this.special = false,
   });
 
   final String id;
@@ -48,6 +49,13 @@ class ChatMessage {
   /// thumbnail above the message. Empty otherwise.
   final String discoverPhoto;
 
+  /// Message special envoye depuis la bulle message de Discover (colonne
+  /// `special`, migration 0065).
+  final bool special;
+
+  /// Un message special recu : carte speciale + demande Accepter / Refuser.
+  bool get isSpecial => special;
+
   /// True when this message carries an image.
   bool get isImage => imageUrl.isNotEmpty;
 
@@ -72,6 +80,7 @@ class ChatMessage {
       language: m['language']?.toString().trim() ?? '',
       imageUrl: m['image_url']?.toString() ?? '',
       discoverPhoto: m['discover_photo']?.toString() ?? '',
+      special: m['special'] == true,
     );
   }
 }
@@ -223,7 +232,7 @@ abstract final class ChatApi {
     // sure it exists first, else a launch that skipped the profile sync
     // crashes with 23503 "key not present in table profiles".
     await ProfileApi.ensureMyProfileRow();
-    await _client.from('messages').insert({
+    final row = <String, dynamic>{
       'conversation_id': conversationId,
       'sender': senderId,
       'recipient': recipientId,
@@ -233,7 +242,19 @@ abstract final class ChatApi {
       // Stamp the Discover photo this intro was sent from (empty otherwise),
       // so the "one message per photo" rule survives restarts.
       if (discoverPhoto.isNotEmpty) 'discover_photo': discoverPhoto,
-    });
+      if (special) 'special': true,
+    };
+    try {
+      await _client.from('messages').insert(row);
+    } on PostgrestException catch (e) {
+      // Colonne `special` absente (migration 0065 pas encore appliquee) : on
+      // envoie quand meme, sans le marquage.
+      if (!special || !(e.message.contains('special') || e.code == 'PGRST204')) {
+        rethrow;
+      }
+      row.remove('special');
+      await _client.from('messages').insert(row);
+    }
     // Fire-and-forget push to the recipient, localised into THEIR language.
     // Best-effort; never block or fail the send on a notification hiccup.
     // [recipientLang] is passed by the chat thread (peer profile already in

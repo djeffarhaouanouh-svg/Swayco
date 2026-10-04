@@ -5,6 +5,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
+import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
@@ -28,6 +29,7 @@ import '../services/friendship_api.dart';
 import '../services/guest_invite_api.dart';
 import '../services/nav_tab.dart';
 import '../services/notif_enable_flow.dart';
+import '../services/special_request.dart';
 import '../services/notification_client.dart';
 import '../services/profile_api.dart';
 import '../services/presence_service.dart';
@@ -75,6 +77,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Peer ids with an accepted friendship — drives "Supprimer le match".
   Set<String> _matchedIds = const {};
   Map<String, ChatMessage> _latestByConv = const {};
+
+  /// Demandes de message special deja traitees (acceptees ou refusees).
+  Set<String> _specialHandled = const {};
   // Raw inbound messages (not yet known-seen at _reload() time) — the read
   // pointer itself is NOT cached here. [_isUnread]/[_unreadCountFor] read
   // it live from [ChatUnread.threadSeenAt] (never the global floor — that
@@ -467,8 +472,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           if (lb == null) return -1;
           return lb.compareTo(la); // most recent first
         });
+      final specialHandled = await SpecialRequest.handled(id);
       if (!mounted || seq != _reloadSeq) return;
       setState(() {
+        _specialHandled = specialHandled;
         _myId = id;
         _friends = friends;
         _matchedIds = {for (final p in matches) p.id};
@@ -1141,13 +1148,31 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                      if (_friends.isNotEmpty)
+                      // Messages speciaux recus : section a part, en tete.
+                      if (_friends.any(_isSpecialPending)) ...[
+                        _SectionHeader(
+                          label: AppStrings.t('special_section'),
+                          count: _friends.where(_isSpecialPending).length,
+                        ),
+                        for (final p in _friends.where(_isSpecialPending))
+                          _SpecialChatRow(
+                            key: ValueKey('special-${p.id}'),
+                            profile: p,
+                            lastMessage:
+                                _latestByConv[_conversationIdFor(p.id)]!,
+                            unread: _isUnread(p),
+                            onTap: () => _openThread(p),
+                            onViewProfile: () => _viewProfile(p),
+                          ),
+                      ],
+                      if (_friends.any((p) => !_isSpecialPending(p)))
                         _SectionHeader(
                           label: AppStrings.t('messages_section'),
                           count: _unreadConversations,
                         ),
                       // Conversation rows.
-                      for (final (i, p) in _friends.indexed)
+                      for (final (i, p)
+                          in _friends.where((p) => !_isSpecialPending(p)).indexed)
                         FadeSlideIn(
                           key: ValueKey(p.id),
                           delay: Duration(milliseconds: i * 55),
@@ -1192,6 +1217,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Message special recu, pas encore accepte ni refuse, hors match : la
+  /// conversation va dans la section « Message special ».
+  bool _isSpecialPending(RemoteProfile p) {
+    final last = _latestByConv[_conversationIdFor(p.id)];
+    return last != null &&
+        last.isSpecial &&
+        last.senderId != _myId &&
+        !_matchedIds.contains(p.id) &&
+        !_specialHandled.contains(p.id);
+  }
+
   /// True when the peer's last message is newer than the last time I
   /// opened the thread (or I've never opened it). Drives the cyan dot.
   /// La ligne bleue ne suit QUE le point de lecture du fil — jamais le
@@ -1226,6 +1262,216 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (seen == null || m.createdAt.isAfter(seen)) n++;
     }
     return n;
+  }
+}
+
+/// Ligne d'un message special recu : bord de 1,5 px au degrade de marque,
+/// lueur bleue, avatar cerne avec etincelle, puce SPECIAL, aperçu du message.
+class _SpecialChatRow extends StatelessWidget {
+  const _SpecialChatRow({
+    super.key,
+    required this.profile,
+    required this.lastMessage,
+    required this.unread,
+    required this.onTap,
+    required this.onViewProfile,
+  });
+
+  final RemoteProfile profile;
+  final ChatMessage lastMessage;
+  final bool unread;
+  final VoidCallback onTap;
+  final VoidCallback onViewProfile;
+
+  String _time(DateTime dt) {
+    final now = DateTime.now();
+    if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final light = SC.light;
+    final fill = light ? Colors.white : const Color(0xFF10172F);
+    final ring = light ? const Color(0xFF1F5EFF) : SC.accent;
+    final textColor = light ? SC.textPrimary : Colors.white;
+    final name = profile.displayName.isNotEmpty
+        ? profile.displayName
+        : (profile.handle.isNotEmpty
+            ? '@${profile.handle}'
+            : AppStrings.t('chat_no_name'));
+    final flag = countryFlagFor(profile.country) ??
+        findLanguageByCode(profile.language)?.flag ??
+        '';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(1.5),
+          decoration: BoxDecoration(
+            gradient: SC.brandGradient,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0xB32B7FFF),
+                blurRadius: 34,
+                spreadRadius: -14,
+                offset: Offset(0, 14),
+              ),
+            ],
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: fill,
+              borderRadius: BorderRadius.circular(22.5),
+            ),
+            child: Row(
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onViewProfile,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: ring, width: 2),
+                        ),
+                        child: ProfileAvatar(
+                          displayName: profile.displayName,
+                          avatarUrl: profile.avatarUrl,
+                          fallbackUrl: profile.fallbackPhotoUrl,
+                          size: 50,
+                        ),
+                      ),
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: SC.accent,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: fill, width: 2),
+                          ),
+                          child: const Text(
+                            '✦',
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1,
+                              color: SC.onAccent,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: textColor,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          if (flag.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 5),
+                              child: Text(
+                                flag,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          const SizedBox(width: 7),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: SC.accent,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              AppStrings.t('special_chip'),
+                              style: GoogleFonts.ibmPlexMono(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1,
+                                color: SC.onAccent,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        lastMessage.body,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _time(lastMessage.createdAt),
+                      style: GoogleFonts.ibmPlexMono(
+                        fontSize: 11,
+                        fontWeight: light ? FontWeight.w700 : FontWeight.w400,
+                        color: ring,
+                      ),
+                    ),
+                    if (unread) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: ring,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

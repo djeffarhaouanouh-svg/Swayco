@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -16,6 +18,8 @@ import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_reads.dart';
 import '../services/chat_unread.dart';
+import '../services/friendship_api.dart';
+import '../services/special_request.dart';
 import '../services/message_reactions.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
@@ -234,6 +238,47 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// Cached "has this peer blocked ME" flag. When true the composer and the
   /// call button are disabled — messages / calls would go into a black hole.
   bool _peerBlockedMe = false;
+
+  /// Message special recu : la demande « Accepter / Refuser » remplace le
+  /// champ de saisie tant qu'elle n'est pas traitee.
+  Set<String> _specialHandled = {};
+  bool _matchedWithPeer = false;
+  bool _specialBusy = false;
+
+  bool get _showSpecialRequest =>
+      !_peerBlockedMe &&
+      !_matchedWithPeer &&
+      !_specialHandled.contains(widget.peerDeviceId) &&
+      _messages.any((m) => m.isSpecial && m.senderId != _myId) &&
+      !_messages.any((m) => m.senderId == _myId);
+
+  /// Accepter : on ecrit a l'expediteur (le champ revient) et une demande
+  /// d'ami lui est envoyee.
+  Future<void> _acceptSpecial() async {
+    if (_specialBusy || _myId.isEmpty) return;
+    HapticFeedback.lightImpact();
+    setState(() {
+      _specialBusy = true;
+      _specialHandled = {..._specialHandled, widget.peerDeviceId};
+    });
+    await SpecialRequest.markHandled(_myId, widget.peerDeviceId);
+    try {
+      await FriendshipApi.like(meId: _myId, peerId: widget.peerDeviceId);
+    } catch (e) {
+      debugPrint('special accept: friend request failed: $e');
+    }
+    if (mounted) setState(() => _specialBusy = false);
+  }
+
+  /// Refuser : la demande disparait du fil (et de la liste « Message special »).
+  Future<void> _refuseSpecial() async {
+    if (_specialBusy || _myId.isEmpty) return;
+    HapticFeedback.lightImpact();
+    setState(() {
+      _specialHandled = {..._specialHandled, widget.peerDeviceId};
+    });
+    await SpecialRequest.markHandled(_myId, widget.peerDeviceId);
+  }
 
   Future<void> _reportPeer() async {
     if (_myId.isEmpty || widget.peerDeviceId.isEmpty) return;
@@ -553,6 +598,17 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       conversationId: widget.conversationId,
       meId: id,
     ));
+    final specialHandled = await SpecialRequest.handled(id);
+    var matchedWithPeer = false;
+    if (isSupabaseReady && id.isNotEmpty && widget.peerDeviceId.isNotEmpty) {
+      try {
+        matchedWithPeer = (await FriendshipApi.matchStateWith(
+          meId: id,
+          peerId: widget.peerDeviceId,
+        ))
+            .matched;
+      } catch (_) {}
+    }
     if (!mounted) return;
     // « … en train d'écrire » dans les deux sens, tant que le fil est ouvert.
     _typing = TypingSignal(
@@ -591,6 +647,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       _peer = peer;
       _peerBlocked = blocked;
       _peerBlockedMe = blockedMe;
+      _specialHandled = specialHandled;
+      _matchedWithPeer = matchedWithPeer;
     });
     // Les messages ont pu arriver avant ma langue : les propositions suivent.
     _refreshSuggestions();
@@ -1102,6 +1160,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             : widget.title,
                         onReport: _reportPeer,
                         onDelete: _deleteConversation,
+                      )
+                    : _showSpecialRequest
+                    ? _SpecialRequestBlock(
+                        name: (_peer?.displayName.isNotEmpty == true
+                                ? _peer!.displayName
+                                : widget.title)
+                            .trim()
+                            .split(RegExp(r'\s+'))
+                            .first,
+                        busy: _specialBusy,
+                        onAccept: _acceptSpecial,
+                        onRefuse: _refuseSpecial,
                       )
                     : Column(
                         mainAxisSize: MainAxisSize.min,
@@ -1901,8 +1971,166 @@ class _MessageBubbleState extends State<_MessageBubble> {
     Overlay.of(context).insert(entry);
   }
 
+  /// Carte du message special recu : dégradé de marque, etiquette « Message
+  /// special » a cheval sur le bord haut, texte blanc, pied « envoye depuis
+  /// Discover ».
+  Widget _specialCard(String time) {
+    final card = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 34, 20, 18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment(-0.6, -1),
+          end: Alignment(0.6, 1),
+          colors: [SC.brandBlueDeep, SC.brandBlue, SC.brandCyan],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xBF2B7FFF),
+            blurRadius: 50,
+            spreadRadius: -18,
+            offset: Offset(0, 24),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (message.hasDiscoverPhoto)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: GestureDetector(
+                onTap: () => _openFullImage(context, message.discoverPhoto),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(maxHeight: 150, maxWidth: 120),
+                    child: Image.network(
+                      message.discoverPhoto,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          Text(
+            displayBody,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              height: 1.45,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 14),
+          DefaultTextStyle.merge(
+            style: GoogleFonts.ibmPlexMono(
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.style_rounded,
+                        size: 15,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          AppStrings.t('special_from_discover'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(time),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 22, 16, 8),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onDoubleTap: _thumbsUp,
+        onLongPress: _openPicker,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            card,
+            Positioned(
+              top: -16,
+              left: 20,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: SC.accent,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: SC.accent.withValues(alpha: 0.55),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 17,
+                      color: SC.onAccent,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      AppStrings.t('special_label'),
+                      style: popupDisplay(fontSize: 12, color: SC.onAccent),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_burstEmoji != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: _EmojiBurst(
+                    key: ValueKey(_burstEmoji),
+                    emoji: _burstEmoji!,
+                    onDone: () {
+                      if (mounted) setState(() => _burstEmoji = null);
+                    },
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (message.isSpecial && !mine) {
+      final t =
+          '${message.createdAt.hour.toString().padLeft(2, '0')}:${message.createdAt.minute.toString().padLeft(2, '0')}';
+      return _specialCard(t);
+    }
     final align = mine ? Alignment.centerRight : Alignment.centerLeft;
     // Envoyé = cyan plein, texte encre ; reçu = gris ardoise liseré, texte
     // blanc. Le petit coin (6) pointe vers l'auteur (maquette 8c).
@@ -3581,6 +3809,150 @@ class _ErrorBanner extends StatelessWidget {
           height: 1.35,
         ),
       ),
+    );
+  }
+}
+
+
+/// Demande « {name} veut t'ecrire. Tu acceptes ? » : remplace le champ de
+/// saisie sous un message special recu. Refuser la fait simplement disparaitre ;
+/// Accepter rend le champ et envoie une demande d'ami a l'expediteur.
+class _SpecialRequestBlock extends StatelessWidget {
+  const _SpecialRequestBlock({
+    required this.name,
+    required this.busy,
+    required this.onAccept,
+    required this.onRefuse,
+  });
+
+  final String name;
+  final bool busy;
+  final VoidCallback onAccept;
+  final VoidCallback onRefuse;
+
+  @override
+  Widget build(BuildContext context) {
+    final light = SC.light;
+    final ink = light ? SC.textPrimary : Colors.white;
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    Widget button({
+      required String label,
+      required VoidCallback? onTap,
+      required Color fill,
+      required Color border,
+      required Color fg,
+      List<BoxShadow>? shadow,
+    }) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          height: 50,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(999),
+            border: border == Colors.transparent
+                ? null
+                : Border.all(color: border),
+            boxShadow: shadow,
+          ),
+          child: Text(label, style: popupDisplay(fontSize: 14, color: fg)),
+        ),
+      );
+    }
+
+    final body = Container(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+      decoration: BoxDecoration(
+        color: light ? Colors.white : Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: light
+              ? const Color(0x381F5EFF)
+              : Colors.white.withValues(alpha: 0.22),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: light
+                ? const Color(0x801F5EFF)
+                : Colors.black.withValues(alpha: 0.7),
+            blurRadius: 40,
+            spreadRadius: -16,
+            offset: const Offset(0, 18),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            AppStrings.t('special_req_title', args: {'name': name}),
+            style: popupDisplay(fontSize: 16, color: ink),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            AppStrings.t('special_req_body'),
+            style: TextStyle(
+              color: ink.withValues(alpha: light ? 0.7 : 0.75),
+              fontSize: 13.5,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: button(
+                  label: AppStrings.t('special_req_refuse'),
+                  onTap: busy ? null : onRefuse,
+                  fill: light
+                      ? const Color(0x141F5EFF)
+                      : Colors.white.withValues(alpha: 0.12),
+                  border: light
+                      ? const Color(0x401F5EFF)
+                      : Colors.white.withValues(alpha: 0.30),
+                  fg: ink,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 12,
+                child: button(
+                  label: AppStrings.t('special_req_accept'),
+                  onTap: busy ? null : onAccept,
+                  fill: SC.accent,
+                  border: Colors.transparent,
+                  fg: SC.onAccent,
+                  shadow: [
+                    BoxShadow(
+                      color: SC.accent.withValues(alpha: 0.6),
+                      blurRadius: 24,
+                      spreadRadius: -10,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14, 0, 14, 26 + bottom * 0.4),
+      child: light
+          ? body
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                child: body,
+              ),
+            ),
     );
   }
 }
