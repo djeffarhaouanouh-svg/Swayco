@@ -267,8 +267,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                         horizontal: 14,
                         vertical: 7,
                       ),
+                      // Rose et blanc, comme le coeur de Discover.
                       decoration: BoxDecoration(
-                        color: SC.accent,
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFFF7D97), Color(0xFFE8385F)],
+                        ),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Row(
@@ -277,13 +282,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                           const Icon(
                             Icons.favorite_rounded,
                             size: 16,
-                            color: SC.onAccent,
+                            color: Colors.white,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             '${_requests.length}',
                             style: const TextStyle(
-                              color: SC.onAccent,
+                              color: Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
                             ),
