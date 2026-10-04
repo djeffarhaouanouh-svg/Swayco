@@ -338,8 +338,12 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
                           children: [
                             Align(
                               alignment: Alignment.centerLeft,
-                              child: _CloseButton(
-                                onTap: () => Navigator.of(context).maybePop(),
+                              // Colle a l'angle (14 / 6), comme les boutons du profil.
+                              child: Transform.translate(
+                                offset: const Offset(-8, -6),
+                                child: _CloseButton(
+                                  onTap: () => Navigator.of(context).maybePop(),
+                                ),
                               ),
                             ),
                             _FreeProSwitch(
@@ -883,8 +887,11 @@ class _BoostPaywallState extends State<_BoostPaywall> {
                         height: 44,
                         child: Align(
                           alignment: Alignment.centerLeft,
-                          child: _CloseButton(
-                            onTap: () => Navigator.of(context).maybePop(),
+                          child: Transform.translate(
+                            offset: const Offset(-8, -6),
+                            child: _CloseButton(
+                              onTap: () => Navigator.of(context).maybePop(),
+                            ),
                           ),
                         ),
                       ),
