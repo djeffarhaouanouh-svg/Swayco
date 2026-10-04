@@ -6,7 +6,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../widgets/ai_badge.dart';
 import '../services/ad_service.dart';
 import '../services/analytics.dart';
 import '../services/app_boot.dart';
@@ -1988,10 +1987,6 @@ class _PanelHeader extends StatelessWidget {
                 ),
               ),
             ),
-            if (profile.isAi) ...[
-              const SizedBox(width: 10),
-              const AiBadge(fontSize: 14),
-            ],
           ],
         ),
         // Sous le prénom : le drapeau, puis « Pays - Ville ».
