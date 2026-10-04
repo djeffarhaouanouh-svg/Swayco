@@ -1656,7 +1656,11 @@ class _IdentitySection extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Center(child: coverCenter ?? const SizedBox.shrink()),
+                      // Colle a droite, contre l'oeil.
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: coverCenter ?? const SizedBox.shrink(),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     _GlassCircle(
