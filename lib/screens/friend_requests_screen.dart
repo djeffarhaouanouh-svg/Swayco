@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -316,7 +317,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
 
     final rows = <Widget>[
       for (final req in _requests)
-        _RequestRow(
+        _RequestTile(
           request: req,
           revealed: revealed(req.requester),
           onOpenProfile: () => openOrUnlock(req.requester),
@@ -340,9 +341,16 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                 ),
               ],
             )
-          : ListView.builder(
+          : GridView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.fromLTRB(16, 4, 16, navBody + 8),
+              // Des carres : la premiere photo de la galerie de chaque personne.
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1,
+              ),
               itemCount: rows.length,
               // Rows ease in (fade + slide) in a quick cascade.
               itemBuilder: (context, i) => FadeSlideIn(
@@ -354,73 +362,11 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   }
 }
 
-/// Circular avatar with a small flag badge at the bottom-right — same
-/// country-else-language fallback as the Discover card header. Tapping the
-/// avatar itself opens the peer's profile.
-class _AvatarWithFlag extends StatelessWidget {
-  const _AvatarWithFlag({
-    required this.profile,
-    required this.revealed,
-    required this.onTap,
-  });
-
-  final RemoteProfile? profile;
-  final bool revealed;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = profile;
-    final flag = p == null
-        ? ''
-        : countryFlagFor(p.country) ??
-            findLanguageByCode(p.language)?.flag ??
-            '';
-    return SizedBox(
-      width: 52,
-      height: 52,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          if (revealed)
-            ProfileAvatar(
-              displayName: p?.displayName ?? '',
-              avatarUrl: p?.avatarUrl,
-              fallbackUrl: p?.fallbackPhotoUrl,
-              size: 52,
-              onTap: onTap,
-            )
-          else
-            GestureDetector(
-              onTap: onTap,
-              child: BlurredAvatar(profile: p, size: 52),
-            ),
-          if (flag.isNotEmpty)
-            Positioned(
-              bottom: -2,
-              right: -2,
-              child: IgnorePointer(
-                child: Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: SC.menu,
-                    border: Border.all(color: SC.bg, width: 2),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(flag, style: const TextStyle(fontSize: 12)),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RequestRow extends StatelessWidget {
-  const _RequestRow({
+/// Une demande en carre : la premiere photo de la galerie en plein cadre
+/// (floutee tant que la personne n'est pas revelee), drapeau en haut a gauche,
+/// prenom (ou « Quelqu'un ») et boutons Add / ✕ en bas.
+class _RequestTile extends StatelessWidget {
+  const _RequestTile({
     required this.request,
     required this.revealed,
     required this.onOpenProfile,
@@ -434,53 +380,132 @@ class _RequestRow extends StatelessWidget {
   final VoidCallback onAccept;
   final VoidCallback onReject;
 
+  /// La premiere photo de la galerie ; a defaut la photo Discover, puis l'avatar.
+  static String _photoOf(RemoteProfile? p) {
+    if (p == null) return '';
+    for (final u in p.photos) {
+      if (u.isNotEmpty) return u;
+    }
+    if (p.discoverPhotoUrl.isNotEmpty) return p.discoverPhotoUrl;
+    return p.avatarUrl;
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = request.requester;
+    final photo = _photoOf(p);
     final name = !revealed
         ? AppStrings.t('likes_someone')
         : p?.displayName.isNotEmpty == true
-        ? p!.displayName
-        : (p?.handle.isNotEmpty == true
-              ? '@${p!.handle}'
-              : AppStrings.t('chat_no_name'));
-    final subtitle = AppStrings.t(
-      'demandes_wants_to_match',
-      args: {'name': name},
-    );
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: SC.menu,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          _AvatarWithFlag(
-            profile: p,
-            revealed: revealed,
-            onTap: onOpenProfile,
+            ? p!.displayName
+            : (p?.handle.isNotEmpty == true
+                ? '@${p!.handle}'
+                : AppStrings.t('chat_no_name'));
+    final flag = p == null
+        ? ''
+        : countryFlagFor(p.country) ??
+            findLanguageByCode(p.language)?.flag ??
+            '';
+    Widget image() {
+      if (photo.isEmpty) {
+        return ColoredBox(
+          color: SC.menu,
+          child: Center(
+            child: revealed
+                ? ProfileAvatar(
+                    displayName: p?.displayName ?? '',
+                    avatarUrl: p?.avatarUrl,
+                    size: 72,
+                  )
+                : BlurredAvatar(profile: p, size: 72),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                color: SC.textPrimary,
+        );
+      }
+      final img = Image.network(
+        photo,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => ColoredBox(color: SC.menu),
+      );
+      if (revealed) return img;
+      // Floute, et agrandi un peu pour que le flou ne laisse pas de bord clair.
+      return Transform.scale(
+        scale: 1.15,
+        child: ImageFiltered(
+          imageFilter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: img,
+        ),
+      );
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onOpenProfile,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            image(),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x00000000), Color(0xD9000000)],
+                  stops: [0.4, 1],
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          _AcceptButton(onTap: onAccept),
-          const SizedBox(width: 6),
-          _RejectButton(onTap: onReject),
-        ],
+            if (!revealed)
+              const Center(
+                child: Icon(Icons.lock_rounded, color: Colors.white, size: 30),
+              ),
+            if (flag.isNotEmpty)
+              Positioned(
+                top: 10,
+                left: 10,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withValues(alpha: 0.45),
+                  ),
+                  child: Text(flag, style: const TextStyle(fontSize: 15)),
+                ),
+              ),
+            Positioned(
+              left: 10,
+              right: 10,
+              bottom: 8,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      _AcceptButton(onTap: onAccept),
+                      const SizedBox(width: 4),
+                      _RejectButton(onTap: onReject),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -618,7 +643,11 @@ class _RejectButton extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: EdgeInsets.all(6),
-          child: Icon(Icons.close_rounded, color: SC.textMuted, size: 22),
+          child: Icon(
+            Icons.close_rounded,
+            color: Colors.white.withValues(alpha: 0.85),
+            size: 22,
+          ),
         ),
       ),
     );
