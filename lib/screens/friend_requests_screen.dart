@@ -252,9 +252,46 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(AppStrings.t('demandes_title'), style: SCText.h1),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      AppStrings.t('demandes_title'),
+                      style: SCText.h1,
+                    ),
+                  ),
+                  // Pastille : le nombre de likes recus, en haut a droite.
+                  if (!_loading)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: SC.accent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.favorite_rounded,
+                            size: 16,
+                            color: SC.onAccent,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_requests.length}',
+                            style: const TextStyle(
+                              color: SC.onAccent,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
             Expanded(
