@@ -38,6 +38,9 @@ class FriendRequestsScreen extends StatefulWidget {
 class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     with WidgetsBindingObserver {
   String _myId = '';
+  /// Cartes en train de sortir (accepte / refuse) : elles s'effacent avant
+  /// que la grille se referme.
+  final Set<String> _leaving = {};
   List<IncomingFriendRequest> _requests = const [];
   // Profiles who liked one of my photos, newest first.
   LikesLock? _lock;
@@ -162,10 +165,20 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
 
   /// Accepting a like IS the match — the celebration fires right here.
   Future<void> _accept(IncomingFriendRequest req) async {
+    HapticFeedback.mediumImpact();
+    SwaycoSounds.play(SwSound.friendAccepted);
+    // La carte se retire d'abord en douceur ; les autres glissent ensuite
+    // vers le haut pour combler la place.
+    setState(() => _leaving.add(req.friendship.id));
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    if (!mounted) return;
     final next = _requests
         .where((r) => r.friendship.id != req.friendship.id)
         .toList();
-    setState(() => _requests = next);
+    setState(() {
+      _leaving.remove(req.friendship.id);
+      _requests = next;
+    });
     FriendRequestUnread.setCount(next.length);
     try {
       await FriendshipApi.accept(req.friendship.id);
@@ -221,10 +234,20 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   }
 
   Future<void> _reject(IncomingFriendRequest req) async {
+    HapticFeedback.lightImpact();
+    SwaycoSounds.play(SwSound.pass);
+    // La carte se retire d'abord en douceur ; les autres glissent ensuite
+    // vers le haut pour combler la place.
+    setState(() => _leaving.add(req.friendship.id));
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    if (!mounted) return;
     final next = _requests
         .where((r) => r.friendship.id != req.friendship.id)
         .toList();
-    setState(() => _requests = next);
+    setState(() {
+      _leaving.remove(req.friendship.id);
+      _requests = next;
+    });
     FriendRequestUnread.setCount(next.length);
     try {
       await FriendshipApi.reject(req.friendship.id);
@@ -267,13 +290,8 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                         horizontal: 14,
                         vertical: 7,
                       ),
-                      // Rose et blanc, comme le coeur de Discover.
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFFFF7D97), Color(0xFFE8385F)],
-                        ),
+                        color: SC.accent,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Row(
@@ -282,13 +300,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                           const Icon(
                             Icons.favorite_rounded,
                             size: 16,
-                            color: Colors.white,
+                            color: SC.onAccent,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             '${_requests.length}',
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: SC.onAccent,
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
                             ),
@@ -361,6 +379,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       for (final req in _requests)
         _RequestTile(
           request: req,
+          leaving: _leaving.contains(req.friendship.id),
           revealed: revealed(req.requester),
           onOpenProfile: () => openOrUnlock(req.requester),
           onAccept: () => _accept(req),
@@ -383,22 +402,40 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                 ),
               ],
             )
-          : GridView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(16, 4, 16, navBody + 8),
-              // Des carres : la premiere photo de la galerie de chaque personne.
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 1,
-              ),
-              itemCount: rows.length,
-              // Rows ease in (fade + slide) in a quick cascade.
-              itemBuilder: (context, i) => FadeSlideIn(
-                delay: Duration(milliseconds: i * 55),
-                child: rows[i],
-              ),
+          : LayoutBuilder(
+              builder: (context, c) {
+                // Grille a la main : chaque carte est un AnimatedPositioned, donc
+                // quand l'une part, les suivantes glissent vers le haut.
+                const gap = 10.0;
+                final tile = (c.maxWidth - 32 - gap) / 2;
+                final rowsCount = (rows.length + 1) ~/ 2;
+                final height = rowsCount * tile + (rowsCount - 1) * gap;
+                return SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(16, 4, 16, navBody + 8),
+                  child: SizedBox(
+                    height: height,
+                    child: Stack(
+                      children: [
+                        for (var i = 0; i < rows.length; i++)
+                          AnimatedPositioned(
+                            key: ValueKey(_requests[i].friendship.id),
+                            duration: const Duration(milliseconds: 350),
+                            curve: Curves.easeOutCubic,
+                            left: (i % 2) * (tile + gap),
+                            top: (i ~/ 2) * (tile + gap),
+                            width: tile,
+                            height: tile,
+                            child: FadeSlideIn(
+                              delay: Duration(milliseconds: i * 55),
+                              child: rows[i],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
     );
   }
@@ -414,9 +451,11 @@ class _RequestTile extends StatelessWidget {
     required this.onOpenProfile,
     required this.onAccept,
     required this.onReject,
+    this.leaving = false,
   });
 
   final IncomingFriendRequest request;
+  final bool leaving;
   final bool revealed;
   final VoidCallback onOpenProfile;
   final VoidCallback onAccept;
@@ -479,7 +518,13 @@ class _RequestTile extends StatelessWidget {
       );
     }
 
-    return GestureDetector(
+    return AnimatedOpacity(
+      opacity: leaving ? 0 : 1,
+      duration: const Duration(milliseconds: 200),
+      child: AnimatedScale(
+        scale: leaving ? 0.85 : 1,
+        duration: const Duration(milliseconds: 200),
+        child: GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onOpenProfile,
       child: ClipRRect(
@@ -547,6 +592,8 @@ class _RequestTile extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );
