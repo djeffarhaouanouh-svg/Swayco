@@ -9,6 +9,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/app_strings.dart';
 import '../services/swayco_sounds.dart';
 import '../services/device_id.dart';
+import '../services/languages.dart';
+import '../services/locations.dart';
 import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
 import '../services/stripe_api.dart';
@@ -494,9 +496,12 @@ class _PreviewCard extends StatelessWidget {
         p.city.trim()
       else if (p != null && p.country.trim().isNotEmpty)
         p.country.trim(),
-      if (p != null && p.language.trim().isNotEmpty)
-        p.language.trim().toUpperCase(),
-    ].join(' · ');
+      // Le vrai drapeau (pays, sinon langue) a la place du code « EN ».
+      if (p != null)
+        (countryFlagFor(p.country) ??
+            findLanguageByCode(p.language)?.flag ??
+            ''),
+    ].where((s) => s.isNotEmpty).join(' · ');
     final photo = _photo;
     return Transform.rotate(
       angle: -3 * math.pi / 180,
