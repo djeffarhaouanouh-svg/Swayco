@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/analytics.dart';
@@ -15,6 +16,7 @@ import '../services/match_celebration.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
+import '../services/swayco_sounds.dart';
 import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/appear.dart';
