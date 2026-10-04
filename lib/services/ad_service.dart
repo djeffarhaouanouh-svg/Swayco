@@ -82,8 +82,8 @@ abstract final class AdService {
   }
 
   /// Whether the ad card should appear in the deck for this viewer.
-  static bool get cardAdsEnabled =>
-      bannerAdUnitId != null && !RevenueCat.proActive.value;
+  /// Les abonnes Pro en voient AUSSI, mais moins (voir Discover._nextAdGap).
+  static bool get cardAdsEnabled => bannerAdUnitId != null;
 
   static String get _adUnitId {
     if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -100,7 +100,6 @@ abstract final class AdService {
   /// short-circuit.
   static Future<void> preload() async {
     if (!isSupported || _loading || _interstitial != null) return;
-    if (RevenueCat.proActive.value) return;
     _loading = true;
     try {
       await InterstitialAd.load(
@@ -126,13 +125,17 @@ abstract final class AdService {
   }
 
   /// Shows the preloaded Discover interstitial and returns whether it
-  /// actually displayed. Never shows to a Pro subscriber. Always preloads
+  /// actually displayed. Pro subscribers get it three times less often. Always preloads
   /// the next one right after this ad is dismissed or fails, so the next
   /// call has a fresh ad ready.
   static Future<bool> showDiscoverInterstitial() async {
-    if (!isSupported || RevenueCat.proActive.value) return false;
+    if (!isSupported) return false;
     final last = _lastInterstitialAt;
-    if (last != null && DateTime.now().difference(last) < _kInterstitialMinGap) {
+    // Pro : « moins de pub » — un plein ecran au plus tous les 3x l'intervalle.
+    final gap = RevenueCat.proActive.value
+        ? _kInterstitialMinGap * 3
+        : _kInterstitialMinGap;
+    if (last != null && DateTime.now().difference(last) < gap) {
       return false;
     }
     final ad = _interstitial;

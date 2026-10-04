@@ -416,7 +416,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   // until the user taps "Continuer". Not part of [_cards], so the deck, its
   // saved cursor and the swipe counters are untouched.
   static final Random _adRng = Random();
-  static int _nextAdGap() => _adRng.nextInt(5) + 2;
+  // Pro : « moins de pub », une carte pub deux fois plus espacee.
+  static int _nextAdGap() =>
+      (_adRng.nextInt(5) + 2) * (RevenueCat.proActive.value ? 2 : 1);
   int _swipesSinceAd = 0;
   int _adAfter = _nextAdGap();
   bool _showAdCard = false;
