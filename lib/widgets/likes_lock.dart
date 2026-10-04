@@ -52,16 +52,22 @@ class LikesLock {
 /// A liker's avatar, blurred just enough to hide who it is while still
 /// letting the shape/colours show through — a teaser, not a solid smudge.
 class BlurredAvatar extends StatelessWidget {
-  const BlurredAvatar({super.key, required this.profile, required this.size});
+  const BlurredAvatar({
+    super.key,
+    required this.profile,
+    required this.size,
+    this.sigma = 4,
+  });
 
   final RemoteProfile? profile;
   final double size;
+  final double sigma;
 
   @override
   Widget build(BuildContext context) {
     return ClipOval(
       child: ImageFiltered(
-        imageFilter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+        imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
         child: ProfileAvatar(
           displayName: '',
           avatarUrl: profile?.avatarUrl,
@@ -103,5 +109,6 @@ Future<void> showLikesUnlockSheet(
     likers: likers.isEmpty ? [profile] : likers,
     videoAvailable: RewardedVideo.isAvailable,
     onWatchVideo: () => unawaited(watchVideo()),
+    profile: profile,
   );
 }

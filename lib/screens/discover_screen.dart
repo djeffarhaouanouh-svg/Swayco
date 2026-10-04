@@ -329,7 +329,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => SwaycoDirectMessageSheet(remaining: left),
+      builder: (_) => SwaycoDirectMessageSheet(remaining: left, peer: peer),
     );
     if (body == null || body.trim().isEmpty || !mounted) return;
     try {

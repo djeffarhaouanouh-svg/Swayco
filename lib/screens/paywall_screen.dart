@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +16,7 @@ import '../services/revenue_cat.dart';
 import '../services/stripe_api.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/fade_scale_route.dart';
+import '../widgets/likes_lock.dart' show BlurredAvatar;
 import '../widgets/popup_kit.dart';
 import '../widgets/profile_avatar.dart';
 
@@ -52,15 +52,19 @@ Future<void> showLikesWallPaywall(
   required List<RemoteProfile?> likers,
   required bool videoAvailable,
   required VoidCallback onWatchVideo,
+  RemoteProfile? profile,
 }) {
-  return Navigator.of(context).push<void>(
-    MaterialPageRoute<void>(
-      fullscreenDialog: true,
-      builder: (_) => _LikesWallPaywall(
-        likers: likers,
-        videoAvailable: videoAvailable,
-        onWatchVideo: onWatchVideo,
-      ),
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    barrierColor:
+        SC.light ? const Color(0x4D04123A) : const Color(0x99040A1E),
+    builder: (_) => _LikesSheet(
+      likers: likers,
+      profile: profile ?? (likers.isEmpty ? null : likers.first),
+      videoAvailable: videoAvailable,
+      onWatchVideo: onWatchVideo,
     ),
   );
 }
@@ -209,7 +213,7 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
 
   /// Auto-renewable subscription disclosure required by App Store Guideline
   /// 3.1.2(c) — kept on both paywalls even though the mock-ups omit it.
-  Widget _legalDisclosure() {
+  Widget _legalDisclosure({Color? color}) {
     final price = _price;
     final tiers = price == null
         ? 'Pro'
@@ -221,7 +225,7 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
       ),
       textAlign: TextAlign.center,
       style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.4),
+        color: color ?? Colors.white.withValues(alpha: 0.4),
         fontSize: 10,
         height: 1.35,
       ),
@@ -229,22 +233,24 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
   }
 
   /// "Restaurer · Conditions · Confidentialité" on ONE line.
-  Widget _footer() {
+  Widget _footer({Color? color}) {
     return FittedBox(
       fit: BoxFit.scaleDown,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _FooterLink(AppStrings.t('paywall_restore'), _restore),
-          const _FooterDot(),
+          _FooterLink(AppStrings.t('paywall_restore'), _restore, color: color),
+          _FooterDot(color: color),
           _FooterLink(
             AppStrings.t('paywall_terms'),
             () => _openExternal('https://www.swayco.fr/terms'),
+            color: color,
           ),
-          const _FooterDot(),
+          _FooterDot(color: color),
           _FooterLink(
             AppStrings.t('paywall_privacy'),
             () => _openExternal('https://www.swayco.fr/privacy'),
+            color: color,
           ),
         ],
       ),
@@ -999,388 +1005,392 @@ class _BoostPaywallState extends State<_BoostPaywall> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// 1b — Wall of blurred likes
+// Pop-up Likes (A / A2) — feuille du bas sur la liste des demandes
 // ══════════════════════════════════════════════════════════════════════════
 
-class _LikesWallPaywall extends StatefulWidget {
-  const _LikesWallPaywall({
+class _LikesSheet extends StatefulWidget {
+  const _LikesSheet({
     required this.likers,
+    required this.profile,
     required this.videoAvailable,
     required this.onWatchVideo,
   });
 
   final List<RemoteProfile?> likers;
+
+  /// La personne touchée dans la liste.
+  final RemoteProfile? profile;
   final bool videoAvailable;
   final VoidCallback onWatchVideo;
 
   @override
-  State<_LikesWallPaywall> createState() => _LikesWallPaywallState();
+  State<_LikesSheet> createState() => _LikesSheetState();
 }
 
-class _LikesWallPaywallState extends State<_LikesWallPaywall>
-    with _PaywallPurchase {
+class _LikesSheetState extends State<_LikesSheet> with _PaywallPurchase {
   @override
   void initState() {
     super.initState();
     _loadPrice();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final safe = MediaQuery.paddingOf(context);
-    final count = widget.likers.length;
-    final countLabel = count == 1
-        ? AppStrings.t('pw_likes_count_one')
-        : AppStrings.t('pw_likes_count', args: {'n': '$count'});
-    final price = _price;
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor: SC.dBg,
-        body: Stack(
-          children: [
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 430,
-              child: _BlurredWall(likers: widget.likers),
-            ),
-            // Lock in the middle of the wall.
-            Positioned(
-              top: 210,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  width: 76,
-                  height: 76,
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: SC.brandGradient,
-                    boxShadow: [
-                      BoxShadow(
-                        color: SC.brandBlue.withValues(alpha: 0.9),
-                        blurRadius: 40,
-                        spreadRadius: -6,
-                      ),
-                    ],
-                  ),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: SC.dBg,
-                    ),
-                    child: Icon(Icons.lock_rounded, size: 34, color: SC.accent),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: safe.top + 12,
-              left: 18,
-              child: _CloseButton(
-                onTap: () => Navigator.of(context).maybePop(),
-              ),
-            ),
-            Positioned.fill(
-              top: 330,
-              child: _ScrollFill(
-                padding: EdgeInsets.fromLTRB(22, 0, 22, safe.bottom + 14),
-                child: Column(
-                  children: [
-                    if (count > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 9,
-                        ),
-                        decoration: BoxDecoration(
-                          color: SC.accent,
-                          borderRadius: BorderRadius.circular(999),
-                          boxShadow: [
-                            BoxShadow(
-                              color: SC.accent.withValues(alpha: 0.45),
-                              blurRadius: 28,
-                              spreadRadius: -4,
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.favorite_rounded,
-                              size: 18,
-                              color: SC.onAccent,
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                countLabel,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: SC.onAccent,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    const SizedBox(height: 18),
-                    _HighlightTitle(
-                      head: AppStrings.t('pw_likes_title_head'),
-                      tail: AppStrings.t('pw_likes_title_tail'),
-                      fontSize: 28,
-                      tailBg: SC.accent,
-                      tailFg: SC.onAccent,
-                    ),
-                    const SizedBox(height: 12),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 320),
-                      child: Text(
-                        AppStrings.t('pw_likes_sub'),
-                        textAlign: TextAlign.center,
-                        style: SCText.subtitle.copyWith(
-                          fontSize: 14.5,
-                          height: 1.5,
-                          color: SC.dTextPrimary.withValues(alpha: 0.75),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    _PlanCard(price: price),
-                    const Spacer(),
-                    const SizedBox(height: 20),
-                    PopupButton(
-                      label: AppStrings.t('paywall_cta'),
-                      height: 56,
-                      busy: _busy,
-                      onPressed: _subscribe,
-                    ),
-                    const SizedBox(height: 8),
-                    _VideoButton(
-                      label: widget.videoAvailable
-                          ? AppStrings.t('pw_video_reveal')
-                          : '${AppStrings.t('pw_video_reveal')} · '
-                              '${AppStrings.t('likes_video_soon')}',
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        widget.onWatchVideo();
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _legalDisclosure(),
-                    const SizedBox(height: 10),
-                    _footer(),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  /// « au Japon », « en France », « aux États-Unis » : la préposition française
+  /// dépend du pays ; les autres langues portent la leur dans la chaîne.
+  String _countryLabel(String country, String iso) {
+    final localized = iso.isEmpty ? '' : AppStrings.t('country_$iso');
+    final name =
+        localized.isNotEmpty && localized != 'country_$iso' ? localized : country;
+    if (!AppStrings.currentBcp47.value.toLowerCase().startsWith('fr')) {
+      return name;
+    }
+    const plural = {'États-Unis', 'Pays-Bas', 'Émirats arabes unis'};
+    const masculineE = {'Mexique', 'Cambodge', 'Mozambique'};
+    if (plural.contains(country)) return 'aux $name';
+    if (masculineE.contains(country)) return 'au $name';
+    final feminine = country.endsWith('e') || country == 'Corée du Sud';
+    return feminine ? 'en $name' : 'au $name';
   }
-}
-
-/// 3×2 wall of tiles, tilted −4° and blurred: the likers' real photos when
-/// there are some, warm colour tiles otherwise. Fades into blue, then black.
-class _BlurredWall extends StatelessWidget {
-  const _BlurredWall({required this.likers});
-
-  final List<RemoteProfile?> likers;
-
-  static const _swatches = [
-    [Color(0xFFC2715A), Color(0xFF6B3B30)],
-    [Color(0xFF8C8A4B), Color(0xFF3B3C22)],
-    [Color(0xFF9B6F66), Color(0xFF463531)],
-    [Color(0xFFB0596E), Color(0xFF4A2230)],
-    [Color(0xFFA26C54), Color(0xFF45291F)],
-    [Color(0xFF5E9A5B), Color(0xFF26431F)],
-  ];
 
   @override
   Widget build(BuildContext context) {
-    final photos = [
-      for (final p in likers)
-        if (p != null && p.fallbackPhotoUrl.isNotEmpty)
-          p.fallbackPhotoUrl
-        else if (p != null && p.avatarUrl.isNotEmpty)
-          p.avatarUrl,
+    final p = widget.profile;
+    final others = [
+      for (final l in widget.likers)
+        if (l != null && l.id != p?.id) l,
     ];
-    Widget tile(int i) {
-      final sw = _swatches[i % _swatches.length];
-      return Container(
-        height: 180,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(26),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: sw,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: i < photos.length
-            ? Image.network(
-                photos[i],
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              )
-            : null,
-      );
+    final many = widget.likers.length > 1;
+    final total = widget.likers.length;
+    final country = p?.country.trim() ?? '';
+    final iso = countryIso2For(country);
+    final hasCountry = country.isNotEmpty;
+    final price = _price;
+    final perMonth = AppStrings.t('paywall_period_month');
+
+    // Drapeaux des AUTRES likers : pays distincts d'abord, 5 au plus.
+    final seen = <String>{};
+    final flagIsos = <String>[];
+    var extra = 0;
+    if (many) {
+      for (final o in others) {
+        final c = countryIso2For(o.country.trim());
+        if (c.isEmpty || c == iso) continue;
+        if (seen.add(c)) {
+          if (flagIsos.length < 5) {
+            flagIsos.add(c);
+          } else {
+            extra++;
+          }
+        }
+      }
     }
 
-    return ClipRect(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Positioned(
-            top: -20,
-            left: -20,
-            right: -20,
-            bottom: -20,
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Transform.rotate(
-                angle: -4 * math.pi / 180,
-                child: Transform.scale(
-                  scale: 1.1,
-                  child: Column(
-                    children: [
-                      for (var r = 0; r < 2; r++) ...[
-                        if (r > 0) const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            for (var c = 0; c < 3; c++) ...[
-                              if (c > 0) const SizedBox(width: 10),
-                              Expanded(child: tile(r * 3 + c)),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ],
+    final proSub = many
+        ? AppStrings.t('pw_pro_reveal_n', args: {'n': '$total'})
+        : AppStrings.t('pw_pro_all_likes');
+    final proSubFull =
+        price == null ? proSub : '$proSub · $price$perMonth';
+    final videoLabel = widget.videoAvailable
+        ? AppStrings.t(many ? 'pw_video_reveal_only' : 'pw_video_reveal_one')
+        : AppStrings.t('likes_video_soon');
+
+    final ink = PopupTokens.ink;
+    final titleStyle = popupDisplay(
+      fontSize: 25,
+      letterSpacing: -0.75,
+      height: 1.2,
+      color: ink,
+    );
+    final head = hasCountry
+        ? AppStrings.t(
+            'pw_likes_one_title',
+            args: {'country': _countryLabel(country, iso)},
+          )
+        : AppStrings.t('pw_likes_one_title_nocountry');
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: PopupSurface(
+        sheet: true,
+        washHeight: 170,
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(22, 12, 22, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Center(child: PopupHandle()),
+                const SizedBox(height: 6),
+                Center(
+                  child: _LockedAvatar(
+                    profile: p,
+                    iso: hasCountry ? iso : '',
+                    country: hasCountry ? country : '',
                   ),
                 ),
-              ),
+                const SizedBox(height: 14),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  runSpacing: 2,
+                  children: [
+                    Text(head, textAlign: TextAlign.center, style: titleStyle),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: SC.accent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        AppStrings.t('pw_likes_pill'),
+                        softWrap: false,
+                        style: titleStyle.copyWith(color: SC.onAccent),
+                      ),
+                    ),
+                    Text('!', style: titleStyle),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  many
+                      ? AppStrings.t(
+                          'pw_likes_many_sub',
+                          args: {'n': '${total - 1}'},
+                        )
+                      : AppStrings.t('pw_likes_one_sub'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: PopupTokens.textBody,
+                    fontSize: 14,
+                    height: 1.45,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (flagIsos.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 7,
+                    runSpacing: 7,
+                    children: [
+                      for (final c in flagIsos)
+                        Container(
+                          width: 34,
+                          height: 34,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: PopupTokens.ghost,
+                            border: Border.all(color: PopupTokens.ghostBorder),
+                          ),
+                          child: _RoundFlag(iso: c, size: 20),
+                        ),
+                      if (extra > 0)
+                        Container(
+                          height: 34,
+                          constraints: const BoxConstraints(minWidth: 34),
+                          padding: const EdgeInsets.symmetric(horizontal: 9),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: SC.accent,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '+$extra',
+                            style: const TextStyle(
+                              color: SC.onAccent,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 14),
+                _TwoLineCta(
+                  title: AppStrings.t('pw_pro_switch'),
+                  subtitle: proSubFull,
+                  busy: _busy,
+                  onPressed: _subscribe,
+                ),
+                const SizedBox(height: 10),
+                _VideoButton(
+                  title: AppStrings.t('pw_watch_ad'),
+                  subtitle: videoLabel,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    widget.onWatchVideo();
+                  },
+                ),
+                const SizedBox(height: 4),
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    child: Text(
+                      AppStrings.t('pw_later'),
+                      style: TextStyle(
+                        color: ink.withValues(alpha: 0.6),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                _legalDisclosure(color: ink.withValues(alpha: 0.4)),
+                const SizedBox(height: 8),
+                _footer(color: ink.withValues(alpha: 0.5)),
+              ],
             ),
           ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0x260E0E0E), Color(0x401F5EFF), SC.dBg],
-                stops: [0, 0.4, 1],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-/// "Swayco Pro — Likes révélés · badge Pro — 6,99 € / mois", selected look.
-class _PlanCard extends StatelessWidget {
-  const _PlanCard({required this.price});
+/// Avatar flouté (96) dans un anneau de marque de 3 px, cadenas jaune en haut
+/// à droite, pastille drapeau du pays en bas à droite.
+class _LockedAvatar extends StatelessWidget {
+  const _LockedAvatar({
+    required this.profile,
+    required this.iso,
+    required this.country,
+  });
 
-  final String? price;
+  final RemoteProfile? profile;
+  final String iso;
+  final String country;
 
   @override
   Widget build(BuildContext context) {
-    final p = price;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: SC.accent.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: SC.accent, width: 1.6),
-      ),
-      child: Row(
+    final surface = PopupTokens.surface;
+    return SizedBox(
+      width: 96,
+      height: 96,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
           Container(
-            width: 24,
-            height: 24,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
+            width: 96,
+            height: 96,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: SC.accent,
-            ),
-            child: const Icon(
-              Icons.check_rounded,
-              size: 15,
-              color: SC.onAccent,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Swayco Pro',
-                  style: popupDisplay(fontSize: 16, color: SC.dTextPrimary),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  AppStrings.t('pw_plan_perks'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: SC.dTextPrimary.withValues(alpha: 0.6),
-                    fontSize: 12.5,
-                  ),
+              gradient: SC.brandGradient,
+              boxShadow: [
+                BoxShadow(
+                  color: SC.brandBlue.withValues(alpha: 0.8),
+                  blurRadius: 26,
+                  spreadRadius: -8,
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
-          ),
-          if (p != null) ...[
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(p, style: popupDisplay(fontSize: 16, color: SC.accent)),
-                Text(
-                  AppStrings.t('paywall_period_month'),
-                  style: TextStyle(
-                    color: SC.dTextPrimary.withValues(alpha: 0.6),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: surface, width: 3),
+              ),
+              child: BlurredAvatar(profile: profile, size: 84, sigma: 9),
             ),
-          ],
+          ),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: SC.accent,
+                shape: BoxShape.circle,
+                border: Border.all(color: surface, width: 3),
+              ),
+              child: const Icon(Icons.lock_rounded, size: 15, color: SC.onAccent),
+            ),
+          ),
+          if (iso.isNotEmpty || country.isNotEmpty)
+            Positioned(
+              right: -10,
+              bottom: -10,
+              child: Container(
+                width: 42,
+                height: 42,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: SC.accent, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: SC.accent.withValues(alpha: 0.45),
+                      blurRadius: 24,
+                    ),
+                  ],
+                ),
+                child: _RoundFlag(iso: iso, country: country, size: 24),
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-/// Secondary action of 1b: brand-gradient pill, white label, blue shadow.
-class _VideoButton extends StatelessWidget {
-  const _VideoButton({required this.label, required this.onTap});
+/// Drapeau rond (flagcdn) ; l'emoji du pays à défaut.
+class _RoundFlag extends StatelessWidget {
+  const _RoundFlag({required this.iso, this.country = '', required this.size});
 
-  final String label;
+  final String iso;
+  final String country;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final emoji = country.isEmpty ? null : countryFlagFor(country);
+    Widget fallback() => emoji == null
+        ? SizedBox(width: size, height: size)
+        : Text(emoji, style: TextStyle(fontSize: size * 0.8, height: 1));
+    if (iso.isEmpty) return fallback();
+    return ClipOval(
+      child: Image.network(
+        'https://flagcdn.com/w80/${iso.toLowerCase()}.png',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback(),
+      ),
+    );
+  }
+}
+
+/// Action secondaire : pilule au dégradé de marque, texte blanc, deux lignes.
+class _VideoButton extends StatelessWidget {
+  const _VideoButton({
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 48,
+      height: 56,
       decoration: BoxDecoration(
         gradient: SC.brandGradient,
         borderRadius: BorderRadius.circular(999),
         boxShadow: [
           BoxShadow(
-            color: SC.brandBlue.withValues(alpha: 0.4),
+            color: SC.brandBlue.withValues(alpha: 0.6),
             blurRadius: 24,
-            offset: const Offset(0, 8),
+            spreadRadius: -8,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -1391,30 +1401,44 @@ class _VideoButton extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.play_circle_outline_rounded,
-                      size: 20,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      label,
-                      maxLines: 1,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.play_circle_outline_rounded,
+                  size: 22,
+                  color: Colors.white,
                 ),
-              ),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -1526,14 +1550,15 @@ class _CloseButton extends StatelessWidget {
 }
 
 class _FooterLink extends StatelessWidget {
-  const _FooterLink(this.label, this.onTap);
+  const _FooterLink(this.label, this.onTap, {this.color});
 
   final String label;
   final VoidCallback onTap;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    final c = SC.dTextPrimary.withValues(alpha: 0.55);
+    final c = color ?? SC.dTextPrimary.withValues(alpha: 0.55);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -1554,7 +1579,9 @@ class _FooterLink extends StatelessWidget {
 }
 
 class _FooterDot extends StatelessWidget {
-  const _FooterDot();
+  const _FooterDot({this.color});
+
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -1563,7 +1590,7 @@ class _FooterDot extends StatelessWidget {
       child: Text(
         '·',
         style: TextStyle(
-          color: SC.dTextPrimary.withValues(alpha: 0.55),
+          color: color ?? SC.dTextPrimary.withValues(alpha: 0.55),
           fontSize: 12,
         ),
       ),
