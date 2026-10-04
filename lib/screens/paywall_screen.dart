@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/app_strings.dart';
@@ -379,11 +380,27 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
                       // Les arguments : le badge Populaire d'abord.
                       _PerkGrid(
                         on: _pro,
-                        labels: [
-                          AppStrings.t('pw_arg_badge'),
-                          AppStrings.t('pw_arg_likes'),
-                          AppStrings.t('pw_arg_visibility'),
-                          AppStrings.t('pw_arg_special'),
+                        items: [
+                          (
+                            'assets/icons/pro/pro_populaire.svg',
+                            AppStrings.t('pw_arg_badge'),
+                          ),
+                          (
+                            'assets/icons/pro/pro_qui_ma_like.svg',
+                            AppStrings.t('pw_arg_likes'),
+                          ),
+                          (
+                            'assets/icons/pro/pro_visibilite.svg',
+                            AppStrings.t('pw_arg_visibility'),
+                          ),
+                          (
+                            'assets/icons/pro/pro_messages_speciaux.svg',
+                            AppStrings.t('pw_arg_special'),
+                          ),
+                          (
+                            'assets/icons/pro/pro_moins_de_pub.svg',
+                            AppStrings.t('pw_arg_less_ads'),
+                          ),
                         ],
                       ),
                       const Spacer(),
@@ -657,7 +674,8 @@ class _PerkRow extends StatelessWidget {
                 colors: [SC.brandBlueDeep, SC.brandCyan],
               ),
             ),
-            child: Icon(icon, size: 17, color: Colors.white),
+            // Icone en jaune ; le rond garde son fond degrade.
+            child: Icon(icon, size: 17, color: SC.accent),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1553,79 +1571,95 @@ class _FooterDot extends StatelessWidget {
   }
 }
 
-/// Les arguments du Pro : grille 2 x 2 de pastilles (coche jaune + texte).
-/// Hors Pro, les coches et le texte s'eteignent.
+/// Les arguments du Pro : grille a 2 colonnes (icone sur fond degrade + texte) ;
+/// un dernier argument seul prend toute la largeur. Hors Pro, tout s'eteint.
 class _PerkGrid extends StatelessWidget {
-  const _PerkGrid({required this.labels, required this.on});
+  const _PerkGrid({required this.items, required this.on});
 
-  final List<String> labels;
+  /// (icone SVG, libelle)
+  final List<(String, String)> items;
   final bool on;
 
   @override
   Widget build(BuildContext context) {
-    Widget chip(String label) {
-      return Container(
-        constraints: const BoxConstraints(minHeight: 58),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-        ),
-        child: Row(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 22,
-              height: 22,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: on ? SC.accent : Colors.white.withValues(alpha: 0.18),
-              ),
-              child: Icon(
-                Icons.check_rounded,
-                size: 14,
-                color: on ? SC.onAccent : Colors.white.withValues(alpha: 0.5),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: SC.dTextPrimary.withValues(alpha: on ? 1 : 0.5),
-                  fontSize: 14,
-                  height: 1.15,
-                  fontWeight: FontWeight.w800,
+    Widget chip((String, String) item) {
+      return Opacity(
+        opacity: on ? 1 : 0.5,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 74),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1B1F2D),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment(-0.6, -1),
+                    end: Alignment(0.6, 1),
+                    colors: [SC.brandBlueDeep, SC.brandBlue, SC.brandCyan],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0xD92B7FFF),
+                      blurRadius: 18,
+                      spreadRadius: -8,
+                      offset: Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: SvgPicture.asset(
+                  item.$1,
+                  width: 36,
+                  height: 36,
+                  colorFilter: const ColorFilter.mode(
+                    SC.accent,
+                    BlendMode.srcIn,
+                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  item.$2,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    height: 1.15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return Column(
       children: [
-        for (var i = 0; i < labels.length; i += 2) ...[
+        for (var i = 0; i < items.length; i += 2) ...[
           if (i > 0) const SizedBox(height: 10),
           // IntrinsicHeight : la ligne est dans une colonne a hauteur libre,
-          // un Row « stretch » y planterait (hauteur infinie) et la grille
-          // disparaitrait.
+          // un Row « stretch » y planterait (hauteur infinie).
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(child: chip(labels[i])),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: i + 1 < labels.length
-                      ? chip(labels[i + 1])
-                      : const SizedBox.shrink(),
-                ),
+                Expanded(child: chip(items[i])),
+                if (i + 1 < items.length) ...[
+                  const SizedBox(width: 10),
+                  Expanded(child: chip(items[i + 1])),
+                ],
               ],
             ),
           ),

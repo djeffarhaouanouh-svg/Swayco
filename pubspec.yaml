@@ -251,6 +251,7 @@ flutter:
     - assets/sounds/
     # Nav-bar glyphs drawn as SVG (the Discover coconut).
     - assets/icons/
+    - assets/icons/pro/
     # Preview photo in the "Léa veut t'ajouter" onboarding tip card.
     - assets/tips/lea_preview.jpg
     # Natural Earth 110m country outlines (GeoJSON, coords rounded to 2dp) —
