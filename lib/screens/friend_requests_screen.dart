@@ -23,6 +23,7 @@ import '../widgets/appear.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/likes_lock.dart';
 import '../widgets/match_overlay.dart';
+import '../widgets/popup_kit.dart' show popupDisplay;
 import '../widgets/profile_avatar.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
@@ -379,14 +380,23 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
 
     final rows = <Widget>[
       for (final req in _requests)
-        _RequestTile(
-          request: req,
-          leaving: _leaving.contains(req.friendship.id),
-          revealed: revealed(req.requester),
-          onOpenProfile: () => openOrUnlock(req.requester),
-          onAccept: () => _accept(req),
-          onReject: () => _reject(req),
-        ),
+        if (revealed(req.requester))
+          _RevealedTile(
+            request: req,
+            leaving: _leaving.contains(req.friendship.id),
+            onOpenProfile: () => openOrUnlock(req.requester),
+            onAccept: () => _accept(req),
+            onReject: () => _reject(req),
+          )
+        else
+          _RequestTile(
+            request: req,
+            leaving: _leaving.contains(req.friendship.id),
+            revealed: false,
+            onOpenProfile: () => openOrUnlock(req.requester),
+            onAccept: () => _accept(req),
+            onReject: () => _reject(req),
+          ),
     ];
     final navBody = GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     return RefreshIndicator(
@@ -596,6 +606,276 @@ class _RequestTile extends StatelessWidget {
           ],
         ),
       ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tuile d'un like REVELE (Pro, femme ou debloque par pub) — V2 « bouton pleine
+/// largeur » : photo en plein cadre sous un voile sombre, drapeau rond en haut
+/// a gauche, refuser (rouge transparent) en haut a droite, prenom + age, ville
+/// et un grand bouton « Ajouter » en bas.
+class _RevealedTile extends StatelessWidget {
+  const _RevealedTile({
+    required this.request,
+    required this.onOpenProfile,
+    required this.onAccept,
+    required this.onReject,
+    this.leaving = false,
+  });
+
+  final IncomingFriendRequest request;
+  final bool leaving;
+  final VoidCallback onOpenProfile;
+  final VoidCallback onAccept;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = request.requester;
+    final photo = _RequestTile._photoOf(p);
+    final name = p?.displayName.isNotEmpty == true
+        ? p!.displayName
+        : (p?.handle.isNotEmpty == true
+            ? '@${p!.handle}'
+            : AppStrings.t('chat_no_name'));
+    final age = p?.age;
+    final city = (p?.city.trim().isNotEmpty ?? false)
+        ? p!.city.trim()
+        : (p?.country.trim() ?? '');
+    final country = p?.country.trim() ?? '';
+    final iso = countryIso2For(country);
+    final emoji = country.isEmpty ? null : countryFlagFor(country);
+    final initial = (p?.displayName.trim().isNotEmpty ?? false)
+        ? p!.displayName.trim().characters.first.toUpperCase()
+        : '?';
+
+    return AnimatedOpacity(
+      opacity: leaving ? 0 : 1,
+      duration: const Duration(milliseconds: 200),
+      child: AnimatedScale(
+        scale: leaving ? 0.85 : 1,
+        duration: const Duration(milliseconds: 200),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onOpenProfile,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: SC.light
+                  ? const [
+                      BoxShadow(
+                        color: Color(0x591F5EFF),
+                        blurRadius: 22,
+                        spreadRadius: -10,
+                        offset: Offset(0, 8),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: LayoutBuilder(
+                builder: (context, c) => Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (photo.isNotEmpty)
+                      Image.network(
+                        photo,
+                        fit: BoxFit.cover,
+                        alignment: const Alignment(0, -0.6),
+                        errorBuilder: (_, _, _) =>
+                            const ColoredBox(color: Color(0xFF1A2040)),
+                      )
+                    else ...[
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0xFF1A2040), Color(0xFF10121C)],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: c.maxHeight * 0.27,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            width: 66,
+                            height: 66,
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFFEC4899), Color(0xFF9D2B6B)],
+                              ),
+                            ),
+                            child: Text(
+                              initial,
+                              style: popupDisplay(
+                                fontSize: 28,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    // Voile : toujours present, le texte blanc doit rester lisible.
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0x00040A1E), Color(0xE0040A1E)],
+                          stops: [0.38, 1],
+                        ),
+                      ),
+                    ),
+                    if (iso.isNotEmpty || emoji != null)
+                      Positioned(
+                        left: 10,
+                        top: 10,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0x8C04123A),
+                            border: Border.all(
+                              color: const Color(0x59FFFFFF),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: iso.isNotEmpty
+                              ? ClipOval(
+                                  child: Image.network(
+                                    'https://flagcdn.com/w80/${iso.toLowerCase()}.png',
+                                    width: 17,
+                                    height: 17,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => Text(
+                                      emoji ?? '',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        height: 1,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  emoji ?? '',
+                                  style: const TextStyle(fontSize: 14, height: 1),
+                                ),
+                        ),
+                      ),
+                    Positioned(
+                      right: 10,
+                      top: 10,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onReject,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0x80EF4444),
+                            border: Border.all(color: const Color(0xD9EF4444)),
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 12,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: popupDisplay(
+                                    fontSize: 16,
+                                    letterSpacing: -0.5,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              if (age != null) ...[
+                                const SizedBox(width: 6),
+                                Text(
+                                  '$age',
+                                  maxLines: 1,
+                                  style: popupDisplay(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (city.isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              city,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.75),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 6),
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: onAccept,
+                            child: Container(
+                              height: 40,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: SC.accent,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                AppStrings.t('add_friend_short'),
+                                maxLines: 1,
+                                style: popupDisplay(
+                                  fontSize: 13,
+                                  color: SC.onAccent,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
