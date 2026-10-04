@@ -29,7 +29,7 @@ class BoostPill extends StatelessWidget {
                   .formatTimeOfDay(TimeOfDay.fromDateTime(until)),
             },
           )
-        : AppStrings.t('boost_my_profile');
+        : AppStrings.t('boost_pill');
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: active

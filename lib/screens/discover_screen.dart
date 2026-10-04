@@ -1160,7 +1160,9 @@ class _DiscoverHeader extends StatelessWidget {
             // Mon abonnement (le paywall).
             Positioned(
               right: 0,
-              top: 6,
+              // Centre un peu sous celui de la boite du logo : les minuscules de
+              // « swaycø » pesent vers le bas, le bouton s'aligne sur leur milieu.
+              top: 9,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => showPaywallSheet(context),

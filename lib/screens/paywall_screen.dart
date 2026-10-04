@@ -1600,17 +1600,22 @@ class _PerkGrid extends StatelessWidget {
       children: [
         for (var i = 0; i < labels.length; i += 2) ...[
           if (i > 0) const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: chip(labels[i])),
-              const SizedBox(width: 10),
-              Expanded(
-                child: i + 1 < labels.length
-                    ? chip(labels[i + 1])
-                    : const SizedBox.shrink(),
-              ),
-            ],
+          // IntrinsicHeight : la ligne est dans une colonne a hauteur libre,
+          // un Row « stretch » y planterait (hauteur infinie) et la grille
+          // disparaitrait.
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: chip(labels[i])),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: i + 1 < labels.length
+                      ? chip(labels[i + 1])
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
           ),
         ],
       ],
