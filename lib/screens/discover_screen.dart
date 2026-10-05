@@ -1748,6 +1748,15 @@ class _ProfileInfoPanel extends StatefulWidget {
   State<_ProfileInfoPanel> createState() => _ProfileInfoPanelState();
 }
 
+/// Coins du passeport : 28 en haut, ceux de la carte en bas — le panneau
+/// epouse le cadre au lieu de laisser deborder des angles carres.
+const BorderRadius _kPassportRadius = BorderRadius.only(
+  topLeft: Radius.circular(28),
+  topRight: Radius.circular(28),
+  bottomLeft: Radius.circular(_kCardRadius),
+  bottomRight: Radius.circular(_kCardRadius),
+);
+
 class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
     with SingleTickerProviderStateMixin {
   /// Toute la mise en scène sur UN contrôleur : couverture à 350 ms (950 ms de
@@ -1996,15 +2005,13 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
             child: Container(
               decoration: BoxDecoration(
                 color: const Color(0xFF161B2E),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(28)),
+                borderRadius: _kPassportRadius,
                 border: const Border(
                   top: BorderSide(color: Color(0x4DFFFFFF), width: 1.2),
                 ),
               ),
               child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(28)),
+                borderRadius: _kPassportRadius,
                 child: Stack(
                   children: [
                     // Lueur bleue en haut de la page, DANS le cadre : une ombre
@@ -2193,7 +2200,7 @@ class _PassportCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      borderRadius: _kPassportRadius,
       child: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
