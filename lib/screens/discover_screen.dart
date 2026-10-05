@@ -2001,20 +2001,34 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
                 border: const Border(
                   top: BorderSide(color: Color(0x4DFFFFFF), width: 1.2),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: SC.brandBlue.withValues(alpha: 0.5),
-                    blurRadius: 40,
-                    spreadRadius: -16,
-                    offset: const Offset(0, -18),
-                  ),
-                ],
               ),
               child: ClipRRect(
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(28)),
                 child: Stack(
                   children: [
+                    // Lueur bleue en haut de la page, DANS le cadre : une ombre
+                    // portee debordait du bord de la carte.
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      height: 70,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                SC.brandBlue.withValues(alpha: 0.35),
+                                SC.brandBlue.withValues(alpha: 0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
