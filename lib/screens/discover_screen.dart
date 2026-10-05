@@ -2036,6 +2036,27 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
                         ),
                       ),
                     ),
+                    // Et la meme lueur en BAS, toujours dans le cadre.
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 90,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [
+                                SC.brandBlue.withValues(alpha: 0.45),
+                                SC.brandBlue.withValues(alpha: 0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
