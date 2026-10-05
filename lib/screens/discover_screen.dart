@@ -2191,7 +2191,7 @@ class _PassportCover extends StatelessWidget {
         child: Stack(
           children: [
             Positioned(
-              right: -150,
+              left: -150,
               top: -50,
               width: 400,
               height: 400,
