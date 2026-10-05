@@ -2163,11 +2163,12 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
                   return Opacity(
                     opacity: fade.clamp(0.0, 1.0),
                     child: Transform(
-                      // Charniere EN HAUT : la couverture se releve comme un carnet.
-                      alignment: Alignment.topCenter,
+                      // Comme un livre : charniere a gauche (le dos), le bord droit
+                      // se leve VERS NOUS et part vers la gauche.
+                      alignment: Alignment.centerLeft,
                       transform: Matrix4.identity()
                         ..setEntry(3, 2, 0.0007)
-                        ..rotateX(115 * math.pi / 180 * t),
+                        ..rotateY(115 * math.pi / 180 * t),
                       child: _PassportCover(
                         passNo: passNo,
                         title: AppStrings.t('passport_title'),
