@@ -5,6 +5,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../services/ad_service.dart';
 import '../services/analytics.dart';
@@ -13,7 +14,6 @@ import '../services/app_strings.dart';
 import '../services/swayco_sounds.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
-import '../services/fact_emojis.dart';
 import '../services/friendship_api.dart';
 import '../services/job_sectors.dart';
 import '../services/languages.dart';
@@ -37,11 +37,11 @@ import '../widgets/discover_ad_card.dart';
 import '../widgets/discover_globe.dart';
 import '../widgets/fx2b_button.dart';
 import '../widgets/glass_nav_bar.dart';
-import '../widgets/info_bento.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/liquid_glass_button.dart';
 import '../widgets/lottie_icon_transition.dart';
 import '../widgets/match_overlay.dart';
+import '../widgets/popup_kit.dart' show popupDisplay;
 import '../widgets/sent_confirmation.dart';
 import '../services/special_message_quota.dart';
 import '../widgets/swayco_direct_message_sheet.dart';
@@ -55,7 +55,6 @@ import 'profile_screen.dart';
 /// Le fond du panneau déplié : opaque, un cran au-dessus du noir de la page —
 /// assez pour qu'on voie où il commence quand il recouvre la photo, assez peu
 /// pour rester du noir.
-Color get _kPanelBg => SC.light ? Colors.white : const Color(0xFF141517);
 
 /// Marge latérale de la carte (handoff 3c).
 const double _kCardInset = 14.0;
@@ -1061,6 +1060,7 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                                 bottom: _infoOpen ? 0 : -panelH,
                                 child: _ProfileInfoPanel(
                                   profile: me,
+                                  open: _infoOpen,
                                   // Mon propre drapeau ne s'affiche pas (apercu).
                                   hideFlag: true,
                                   onClose: () =>
@@ -1662,6 +1662,7 @@ class _TinderCardStackState extends State<_TinderCardStack> {
             bottom: widget.infoOpen ? 0 : -panelH,
             child: _ProfileInfoPanel(
               profile: widget.cards[i].profile,
+              open: widget.infoOpen,
               onClose: widget.onCloseInfo,
             ),
           ),
@@ -1721,18 +1722,23 @@ class _GhostCard extends StatelessWidget {
   }
 }
 
-/// Le panneau que la carte déplie : la bio d'abord, puis les infos que la
-/// personne a choisi de partager (âge, taille, métier, signe, ce qu'elle
-/// cherche), puis ses centres d'intérêt. Il reste DANS la carte — on ne change
-/// pas de page — et se rabat d'un glissement vers le bas.
+/// Le panneau que la carte déplie : un PASSEPORT. Il monte fermé (une couverture
+/// au dégradé de marque le recouvre), la couverture s'ouvre sur sa charnière
+/// gauche, puis les pages se remplissent bloc après bloc et le tampon du pays
+/// vient frapper. Il reste DANS la carte et se rabat d'un glissement vers le
+/// bas. À la fermeture : aucune mise en scène, tout disparaît.
 class _ProfileInfoPanel extends StatefulWidget {
   const _ProfileInfoPanel({
     required this.profile,
     required this.onClose,
+    required this.open,
     this.hideFlag = false,
   });
 
   final RemoteProfile profile;
+
+  /// Vrai quand le panneau est déplié : c'est ce qui déclenche le passeport.
+  final bool open;
 
   /// Aperçu de MA carte : pas de drapeau (on voit celui des autres, pas le sien).
   final bool hideFlag;
@@ -1742,7 +1748,16 @@ class _ProfileInfoPanel extends StatefulWidget {
   State<_ProfileInfoPanel> createState() => _ProfileInfoPanelState();
 }
 
-class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
+class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
+    with SingleTickerProviderStateMixin {
+  /// Toute la mise en scène sur UN contrôleur : couverture à 350 ms (950 ms de
+  /// rotation), blocs de 550 ms à 1,65 s, tampon à 1,5 s.
+  static const int _totalMs = 2000;
+  late final AnimationController _ctl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: _totalMs),
+  );
+
   /// Distance parcourue vers le bas depuis le début du geste. Fermer sur le
   /// seul élan demandait un coup sec : un glissement lent, celui qu'on fait
   /// quand on croit scroller, mourait à zéro de vélocité et le panneau
@@ -1753,6 +1768,37 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
   /// de la liste à sa position haute : sans lui, chaque image du geste
   /// rappellerait onClose.
   bool _dismissing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.open) _ctl.value = 1;
+  }
+
+  @override
+  void didUpdateWidget(_ProfileInfoPanel old) {
+    super.didUpdateWidget(old);
+    if (widget.open && !old.open) {
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _ctl.value = 1;
+      } else {
+        _ctl.forward(from: 0);
+      }
+    } else if (!widget.open && old.open) {
+      // Fermeture : pas de couverture, tout est deja ouvert pendant que le
+      // panneau redescend ; on remet a zero une fois hors ecran.
+      _ctl.value = 1;
+      Future<void>.delayed(const Duration(milliseconds: 320), () {
+        if (mounted && !widget.open) _ctl.value = 0;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
 
   /// Le débord vers le haut vaut fermeture. [ScrollUpdateNotification] porte
   /// des pixels négatifs quand la liste est tirée sous son point de départ —
@@ -1770,40 +1816,169 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
     return false;
   }
 
+  /// Animation d'un bloc : opacité 0→1 et translation 10→0 sur 450 ms, à partir
+  /// de [startMs].
+  Animation<double> _at(int startMs, [int durMs = 450]) => _ctl.drive(
+        CurveTween(
+          curve: Interval(
+            startMs / _totalMs,
+            (startMs + durMs) / _totalMs,
+            curve: Curves.easeOut,
+          ),
+        ),
+      );
+
+  Widget _reveal(int startMs, Widget child) {
+    final a = _at(startMs);
+    return FadeTransition(
+      opacity: a,
+      child: AnimatedBuilder(
+        animation: a,
+        builder: (_, c) =>
+            Transform.translate(offset: Offset(0, 10 * (1 - a.value)), child: c),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _row(IconData icon, String label, String value) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 31),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0x1AFFFFFF))),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 17, color: SC.accent),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xC7FFFFFF),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.profile;
     final cat = personaCategoryByLabel(p.personaCategory);
-    // Les tuiles du bento (lecture seule) : celles sans valeur disparaissent
-    // et la grille se recompose.
-    final ageTile = BentoTileData(
-      emoji: kFactEmojiAge,
-      label: AppStrings.t('info_age'),
-      value: p.age?.toString() ?? '',
-    );
-    final otherTiles = [
-      BentoTileData(
-        emoji: kFactEmojiJob,
-        label: AppStrings.t('info_job'),
-        value: displayJob(p.job),
+    final facts = <(IconData, String, String)>[
+      (
+        Icons.cake_rounded,
+        AppStrings.t('info_age'),
+        p.age == null
+            ? ''
+            : AppStrings.t('info_age_value', args: {'n': '${p.age}'}),
       ),
-      BentoTileData(
-        emoji: kFactEmojiZodiac,
-        label: AppStrings.t('info_zodiac'),
-        value: displayZodiac(p.zodiac),
+      (Icons.work_rounded, AppStrings.t('info_job'), displayJob(p.job)),
+      (
+        Icons.explore_rounded,
+        AppStrings.t('info_persona_category'),
+        cat == null ? '' : personaCategoryLabel(cat.label),
       ),
-      BentoTileData(
-        emoji: cat?.emoji ?? kFactEmojiPersonaCategory,
-        label: AppStrings.t('info_persona_category'),
-        value: cat == null ? '' : personaCategoryLabel(cat.label),
+      (
+        Icons.auto_awesome_rounded,
+        AppStrings.t('info_zodiac'),
+        displayZodiac(p.zodiac),
       ),
-      BentoTileData(
-        emoji: kFactEmojiLookingFor,
-        label: AppStrings.t('info_looking_for'),
-        value: displayLookingFor(p.lookingFor),
+      (
+        Icons.handshake_rounded,
+        AppStrings.t('info_looking_for'),
+        displayLookingFor(p.lookingFor),
       ),
+    ].where((f) => f.$3.trim().isNotEmpty).toList();
+
+    final country = p.country.trim();
+    final iso = countryIso2For(country);
+    final localizedCountry =
+        iso.isEmpty ? '' : AppStrings.t('country_$iso');
+    final stampText = (localizedCountry.isNotEmpty &&
+                localizedCountry != 'country_$iso'
+            ? localizedCountry
+            : country)
+        .toUpperCase();
+    final passNo = p.id.length >= 4
+        ? p.id.substring(p.id.length - 4).toUpperCase()
+        : '0001';
+
+    // Les blocs, dans l'ordre d'apparition (550 / 650 / 700 / 800 / … ms).
+    var step = 0;
+    const starts = [550, 650, 700, 800, 900, 1000, 1100, 1200];
+    int next() => starts[math.min(step++, starts.length - 1)];
+
+    final content = <Widget>[
+      _reveal(next(), _PanelHeader(profile: p, hideFlag: widget.hideFlag)),
+      const SizedBox(height: 14),
+      if (p.bio.trim().isNotEmpty) ...[
+        _reveal(
+          next(),
+          TranslatedProfileText(
+            text: p.bio.trim(),
+            profileId: p.id,
+            field: 'bio',
+            fromLang: p.language,
+            style: const TextStyle(
+              color: Color(0xCCFFFFFF),
+              fontSize: 13,
+              height: 1.45,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+      ] else
+        // Le rang du bio est consomme meme sans bio : les delais restent ceux
+        // de la maquette.
+        const SizedBox.shrink(),
+      for (final f in facts) _reveal(next(), _row(f.$1, f.$2, f.$3)),
+      if (p.interests.isNotEmpty) ...[
+        const SizedBox(height: 14),
+        _reveal(
+          next(),
+          SizedBox(
+            height: 40,
+            child: ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (r) => const LinearGradient(
+                colors: [Colors.white, Colors.white, Colors.transparent],
+                stops: [0, 0.78, 1],
+              ).createShader(r),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: p.interests.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => Center(
+                  child: InterestPill(
+                    label: interestPillText(p.interests[i]),
+                    prominent: true,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     ];
-    final hasFacts = ageTile.filled || otherTiles.any((t) => t.filled);
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       // Un glissement vers le bas suffit à le rabattre — pas de bouton. Un
@@ -1813,143 +1988,283 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
       onVerticalDragEnd: (d) {
         if ((d.primaryVelocity ?? 0) > 120 || _dragDy > 56) widget.onClose();
       },
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: DecoratedBox(
-          // Fond OPAQUE, plus de verre : le flou laissait passer la photo, et
-          // une photo n'est jamais assez uniforme pour porter du texte — selon
-          // le cliché, un mot sur deux tombait sur une zone claire. Le panneau
-          // est maintenant une page à lui, posée devant l'image.
-          decoration: BoxDecoration(
-            color: _kPanelBg,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24),
-              ),
-              border: Border(
-                top: BorderSide(color: SC.fgA(0.10)),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // La poignée : elle dit "tire-moi vers le bas".
-                Padding(
-                  padding: const EdgeInsets.only(top: 10, bottom: 8),
-                  child: Center(
-                    child: Container(
-                      width: 44,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: SC.fgA(0.22),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                  ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // ── La page intérieure ──────────────────────────────────────────
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF161B2E),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(28)),
+                border: const Border(
+                  top: BorderSide(color: Color(0x4DFFFFFF), width: 1.2),
                 ),
-                Expanded(
-                  // Le contenu défile. Et comme un défilement s'approprie tout
-                  // glissement vertical, c'est LUI qui porte la fermeture :
-                  // tiré vers le bas alors qu'on est déjà en haut de la liste,
-                  // le geste n'est plus du défilement, c'est un « referme-moi »
-                  // (70 px de débord suffisent). D'où la physique élastique,
-                  // AlwaysScrollable pour qu'un profil court se tire aussi.
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: _onPanelScroll,
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(
-                        parent: AlwaysScrollableScrollPhysics(),
-                      ),
-                      padding: const EdgeInsets.fromLTRB(20, 6, 20, 96),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                      // Le prénom EN TÊTE du panneau : déplié, il recouvre
-                      // celui posé sur la photo, et on ne sait plus de qui on
-                      // lit la fiche. L'âge le suit, et la paire de langues
-                      // ferme la ligne — c'est la promesse de l'app, elle vaut
-                      // d'être dite avant la bio.
-                      _PanelHeader(profile: p, hideFlag: widget.hideFlag),
-                      const SizedBox(height: 20),
-                      if (p.bio.trim().isNotEmpty) ...[
-                        _PanelSectionTitle(AppStrings.t('info_bio')),
-                        const SizedBox(height: 8),
-                        TranslatedProfileText(
-                          text: p.bio.trim(),
-                          profileId: p.id,
-                          field: 'bio',
-                          fromLang: p.language,
-                          style: TextStyle(
-                            color: SC.fgA(0.92),
-                            fontSize: 15.5,
-                            height: 1.45,
+                boxShadow: [
+                  BoxShadow(
+                    color: SC.brandBlue.withValues(alpha: 0.5),
+                    blurRadius: 40,
+                    spreadRadius: -16,
+                    offset: const Offset(0, -18),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(28)),
+                child: Stack(
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // La poignée : elle dit "tire-moi vers le bas".
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10, bottom: 8),
+                          child: Center(
+                            child: Container(
+                              width: 44,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: const Color(0x38FFFFFF),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 22),
-                      ],
-                      if (hasFacts) ...[
-                        _PanelSectionTitle(AppStrings.t('info_about')),
-                        const SizedBox(height: 10),
-                        // Panneau sombre : valeurs en jaune « fluo » même en mode clair.
-                        InfoBento(
-                          age: ageTile,
-                          others: otherTiles,
-                        ),
-                        const SizedBox(height: 22),
-                      ],                      if (p.interests.isNotEmpty) ...[
-                        _PanelSectionTitle(AppStrings.t('info_interests')),
-                        const SizedBox(height: 10),
-                        // Les mêmes puces que sur la carte (emoji + libellé),
-                        // plus les pastilles colorées « Relief 3D ».
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final tag in p.interests)
-                              InterestPill(
-                                label: interestPillText(tag),
-                                // Comme sur la page Profil.
-                                prominent: true,
+                        // Bandeau « SWAYCØ · PASSEPORT ».
+                        Container(
+                          height: 30,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          decoration:
+                              const BoxDecoration(gradient: SC.brandGradient),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  AppStrings.t('passport_band'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.ibmPlexMono(
+                                    fontSize: 11,
+                                    letterSpacing: 2,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
-                          ],
+                              const Icon(
+                                Icons.public_rounded,
+                                size: 17,
+                                color: SC.accent,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          // Le contenu défile. Et comme un défilement s'approprie
+                          // tout glissement vertical, c'est LUI qui porte la
+                          // fermeture : tiré vers le bas alors qu'on est déjà en
+                          // haut de la liste, le geste n'est plus du défilement,
+                          // c'est un « referme-moi » (70 px de débord suffisent).
+                          child: NotificationListener<ScrollNotification>(
+                            onNotification: _onPanelScroll,
+                            child: SingleChildScrollView(
+                              physics: const BouncingScrollPhysics(
+                                parent: AlwaysScrollableScrollPhysics(),
+                              ),
+                              padding:
+                                  const EdgeInsets.fromLTRB(20, 14, 20, 96),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: content,
+                              ),
+                            ),
+                          ),
                         ),
                       ],
-                      ],
+                    ),
+                    // Tant que la couverture est fermée, la page est assombrie.
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: FadeTransition(
+                          opacity: ReverseAnimation(_at(300, 800)),
+                          child: const ColoredBox(color: Color(0x73000000)),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
+          // ── Le tampon du pays (1,5 s) ───────────────────────────────────
+          if (stampText.isNotEmpty)
+            Positioned(
+              right: 16,
+              top: 52,
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _ctl,
+                  builder: (_, _) {
+                    final t = Curves.elasticOut.transform(
+                      _at(1500).value.clamp(0.0, 1.0),
+                    );
+                    final fade = _at(1500, 120).value;
+                    final scale = 2.2 + (1 - 2.2) * t;
+                    final angle = (-30 + 18 * t) * math.pi / 180;
+                    return Opacity(
+                      opacity: fade,
+                      child: Transform.rotate(
+                        angle: angle,
+                        child: Transform.scale(
+                          scale: scale,
+                          child: _CountryStamp(text: stampText),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          // ── La couverture ───────────────────────────────────────────────
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _ctl,
+                builder: (_, _) {
+                  final ms = _ctl.value * _totalMs;
+                  final open = ((ms - 350) / 950).clamp(0.0, 1.0);
+                  final t = const Cubic(0.65, 0.05, 0.25, 1).transform(open);
+                  // Face arrière masquée au-delà de la mi-course ; fondu entre
+                  // 600 et 1000 ms.
+                  if (t > 0.5 || ms >= 1000) return const SizedBox.shrink();
+                  final fade = ms <= 600 ? 1.0 : 1 - (ms - 600) / 400;
+                  return Opacity(
+                    opacity: fade.clamp(0.0, 1.0),
+                    child: Transform(
+                      alignment: Alignment.centerLeft,
+                      transform: Matrix4.identity()
+                        ..setEntry(3, 2, 0.0007)
+                        ..rotateY(-115 * math.pi / 180 * t),
+                      child: _PassportCover(
+                        passNo: passNo,
+                        title: AppStrings.t('passport_title'),
+                        sub: AppStrings.t('passport_sub'),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Couverture 11b : dégradé de marque, symbole de l'app en filigrane, pastille
+/// jaune avec un globe, et en bas à gauche le numéro, « Passeport » et sa ligne.
+class _PassportCover extends StatelessWidget {
+  const _PassportCover({
+    required this.passNo,
+    required this.title,
+    required this.sub,
+  });
+
+  final String passNo;
+  final String title;
+  final String sub;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [SC.brandBlueDeep, SC.brandBlue, SC.brandCyan],
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -150,
+              top: -50,
+              width: 400,
+              height: 400,
+              child: Opacity(
+                opacity: 0.16,
+                child: Image.asset('assets/glyph-white.png', fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              right: 20,
+              top: 20,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  color: SC.accent,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.public_rounded,
+                  size: 21,
+                  color: Color(0xFF04123A),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 24,
+              bottom: 28,
+              right: 24,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'N° $passNo · SWAYCØ',
+                    style: GoogleFonts.ibmPlexMono(
+                      fontSize: 10,
+                      letterSpacing: 3,
+                      color: Colors.white.withValues(alpha: 0.85),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: popupDisplay(
+                      fontSize: 32,
+                      letterSpacing: -1.3,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    sub,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _PanelSectionTitle extends StatelessWidget {
-  const _PanelSectionTitle(this.label);
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label.toUpperCase(),
-      style: TextStyle(
-        color: SC.fgA(0.45),
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.1,
-      ),
-    );
-  }
-}
-
-/// La première ligne du panneau : prénom + drapeau (l'âge est dans « À propos »).
+/// La première ligne de la page : prénom (Unbounded 800 19) + drapeau en image
+/// ronde, puis « Pays - Ville » dessous.
 class _PanelHeader extends StatelessWidget {
   const _PanelHeader({required this.profile, this.hideFlag = false});
 
@@ -1961,12 +2276,12 @@ class _PanelHeader extends StatelessWidget {
     final name = profile.displayName.trim().isEmpty
         ? AppStrings.t('profile_anonymous')
         : profile.displayName.trim();
-    final flag = hideFlag
-        ? ''
-        : (countryFlagFor(profile.country) ??
-            findLanguageByCode(profile.language)?.flag ??
-            '');
     final country = profile.country.trim();
+    final iso = hideFlag ? '' : countryIso2For(country);
+    final emoji = hideFlag
+        ? null
+        : (countryFlagFor(country) ??
+            findLanguageByCode(profile.language)?.flag);
     final city = profile.city.trim();
     final placeText = [
       if (country.isNotEmpty) country,
@@ -1982,47 +2297,95 @@ class _PanelHeader extends StatelessWidget {
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: SC.fg,
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.4,
-                  height: 1.1,
+                style: popupDisplay(
+                  fontSize: 19,
+                  letterSpacing: -0.76,
+                  color: Colors.white,
                 ),
               ),
             ),
+            if (iso.isNotEmpty || emoji != null) ...[
+              const SizedBox(width: 8),
+              iso.isNotEmpty
+                  ? ClipOval(
+                      child: Image.network(
+                        'https://flagcdn.com/w80/${iso.toLowerCase()}.png',
+                        width: 14,
+                        height: 14,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Text(
+                          emoji ?? '',
+                          style: const TextStyle(fontSize: 13, height: 1),
+                        ),
+                      ),
+                    )
+                  : Text(
+                      emoji ?? '',
+                      style: const TextStyle(fontSize: 13, height: 1),
+                    ),
+            ],
           ],
         ),
-        // Sous le prénom : le drapeau, puis « Pays - Ville ».
         if (placeText.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              if (flag.isNotEmpty) ...[
-                Text(flag, style: const TextStyle(fontSize: 26, height: 1)),
-                const SizedBox(width: 10),
-              ],
-              Flexible(
-                child: Text(
-                  placeText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: SC.fgA(0.85),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+          const SizedBox(height: 4),
+          Text(
+            placeText,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xBFFFFFFF),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ] else if (flag.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(flag, style: const TextStyle(fontSize: 26, height: 1)),
         ],
       ],
-    );  }
+    );
+  }
 }
+
+/// Tampon rond du pays : « ✦ » puis le nom du pays en majuscules, en jaune.
+class _CountryStamp extends StatelessWidget {
+  const _CountryStamp({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 54,
+      height: 54,
+      padding: const EdgeInsets.all(5),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: SC.accent, width: 2),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            '✦',
+            style: TextStyle(fontSize: 8, height: 1, color: SC.accent),
+          ),
+          Text(
+            text,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.ibmPlexMono(
+              fontSize: 7.5,
+              letterSpacing: 1.2,
+              height: 1.1,
+              color: SC.accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 class _StackCard extends StatelessWidget {
   const _StackCard({
