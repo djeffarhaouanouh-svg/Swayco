@@ -1851,19 +1851,25 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
   }
 
   Widget _row(IconData icon, String label, String value) {
+    final light = SC.light;
     return Container(
       constraints: const BoxConstraints(minHeight: 31),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0x1AFFFFFF))),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: light ? const Color(0x241F5EFF) : const Color(0x1AFFFFFF),
+          ),
+        ),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 17, color: SC.accent),
+          // Sur blanc : jamais de jaune, les icones passent en bleu.
+          Icon(icon, size: 17, color: light ? const Color(0xFF1F5EFF) : SC.accent),
           const SizedBox(width: 10),
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xC7FFFFFF),
+            style: TextStyle(
+              color: light ? const Color(0xB304123A) : const Color(0xC7FFFFFF),
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -1875,8 +1881,8 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: light ? const Color(0xFF04123A) : Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
               ),
@@ -1946,8 +1952,10 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
             profileId: p.id,
             field: 'bio',
             fromLang: p.language,
-            style: const TextStyle(
-              color: Color(0xCCFFFFFF),
+            style: TextStyle(
+              color: SC.light
+                  ? const Color(0xB804123A)
+                  : const Color(0xCCFFFFFF),
               fontSize: 13,
               height: 1.45,
             ),
@@ -1976,10 +1984,30 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
                 itemCount: p.interests.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (_, i) => Center(
-                  child: InterestPill(
-                    label: interestPillText(p.interests[i]),
-                    prominent: true,
-                  ),
+                  child: SC.light
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0x141F5EFF),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: const Color(0x401F5EFF)),
+                          ),
+                          child: Text(
+                            interestPillText(p.interests[i]),
+                            style: const TextStyle(
+                              color: Color(0xFF04123A),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        )
+                      : InterestPill(
+                          label: interestPillText(p.interests[i]),
+                          prominent: true,
+                        ),
                 ),
               ),
             ),
@@ -2004,10 +2032,15 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF161B2E),
+                color: SC.light ? Colors.white : const Color(0xFF161B2E),
                 borderRadius: _kPassportRadius,
-                border: const Border(
-                  top: BorderSide(color: Color(0x4DFFFFFF), width: 1.2),
+                border: Border(
+                  top: BorderSide(
+                    color: SC.light
+                        ? const Color(0x331F5EFF)
+                        : const Color(0x4DFFFFFF),
+                    width: 1.2,
+                  ),
                 ),
               ),
               child: ClipRRect(
@@ -2028,7 +2061,7 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                SC.brandBlue.withValues(alpha: 0.35),
+                                SC.brandBlue.withValues(alpha: SC.light ? 0.2 : 0.35),
                                 SC.brandBlue.withValues(alpha: 0),
                               ],
                             ),
@@ -2049,7 +2082,7 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
                               begin: Alignment.bottomCenter,
                               end: Alignment.topCenter,
                               colors: [
-                                SC.brandBlue.withValues(alpha: 0.45),
+                                SC.brandBlue.withValues(alpha: SC.light ? 0.25 : 0.45),
                                 SC.brandBlue.withValues(alpha: 0),
                               ],
                             ),
@@ -2068,7 +2101,9 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
                               width: 44,
                               height: 4,
                               decoration: BoxDecoration(
-                                color: const Color(0x38FFFFFF),
+                                color: SC.light
+                                    ? const Color(0x471F5EFF)
+                                    : const Color(0x38FFFFFF),
                                 borderRadius: BorderRadius.circular(999),
                               ),
                             ),
@@ -2235,7 +2270,7 @@ class _PassportCover extends StatelessWidget {
         child: Stack(
           children: [
             Positioned(
-              left: -150,
+              right: -150,
               top: -50,
               width: 400,
               height: 400,
@@ -2344,7 +2379,7 @@ class _PanelHeader extends StatelessWidget {
                 style: popupDisplay(
                   fontSize: 19,
                   letterSpacing: -0.76,
-                  color: Colors.white,
+                  color: SC.light ? const Color(0xFF04123A) : Colors.white,
                 ),
               ),
             ),
@@ -2376,8 +2411,10 @@ class _PanelHeader extends StatelessWidget {
             placeText,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xBFFFFFFF),
+            style: TextStyle(
+              color: SC.light
+                  ? const Color(0xB304123A)
+                  : const Color(0xBFFFFFFF),
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -2396,6 +2433,8 @@ class _CountryStamp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Sur blanc : bleu, jamais de jaune.
+    final c = SC.light ? const Color(0xFF1F5EFF) : SC.accent;
     return Container(
       width: 54,
       height: 54,
@@ -2403,14 +2442,14 @@ class _CountryStamp extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: SC.accent, width: 2),
+        border: Border.all(color: c, width: 2),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             '✦',
-            style: TextStyle(fontSize: 8, height: 1, color: SC.accent),
+            style: TextStyle(fontSize: 8, height: 1, color: c),
           ),
           Text(
             text,
@@ -2421,7 +2460,7 @@ class _CountryStamp extends StatelessWidget {
               fontSize: 7.5,
               letterSpacing: 1.2,
               height: 1.1,
-              color: SC.accent,
+              color: c,
             ),
           ),
         ],
