@@ -44,6 +44,7 @@ import '../widgets/match_overlay.dart';
 import '../widgets/popup_kit.dart' show popupDisplay;
 import '../widgets/sent_confirmation.dart';
 import '../services/special_message_quota.dart';
+import '../widgets/special_message_pro_sheet.dart';
 import '../widgets/swayco_direct_message_sheet.dart';
 import '../widgets/swayco_wordmark.dart';
 import '../widgets/swipe_coach_overlay.dart';
@@ -318,6 +319,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (!_hasActiveCard) return;
     final peer = _cards[_currentIndex].profile;
     if (!RevenueCat.proActive.value) {
+      // D'abord la feuille qui montre ce que donne un message special, puis le
+      // paywall seulement si on veut Pro.
+      Analytics.track(
+        'special_message_pitch_open',
+        props: {'source': 'discover_direct_message'},
+      );
+      final goPro = await showSpecialMessageProSheet(context, peer: peer);
+      if (!mounted || goPro != true) return;
       Analytics.track('paywall_open', props: {'source': 'discover_direct_message'});
       await showPaywallSheet(context);
       if (!mounted || !RevenueCat.proActive.value) return;
