@@ -266,8 +266,12 @@ class _GlobeVoyageScreenState extends State<GlobeVoyageScreen>
     // Position d'un point (x, y) de la viewBox -300 -140 620 240.
     Offset at(double x, double y) =>
         Offset((x + 300) * vk * k, (y + 140) * vk * k);
-    final swayc = at(-6, 19);
-    final dot = at(-218, -79);
+    // Dans le SVG, y est la LIGNE DE BASE du texte : la boite Flutter est
+    // centree, donc on remonte son centre d'environ 0,35 em.
+    final swaycSize = 50 * vk * k;
+    final dotSize = 34 * vk * k;
+    final swayc = at(-6, 19).translate(0, -0.35 * swaycSize);
+    final dot = at(-218, -79).translate(0, -0.35 * dotSize);
     final ink = const Color(0xFF04123A);
     final shadowColor =
         light ? const Color(0x661F5EFF) : const Color(0x8C02143C);
@@ -304,7 +308,7 @@ class _GlobeVoyageScreenState extends State<GlobeVoyageScreen>
                 style: TextStyle(
                   fontFamily: SC.brandFont,
                   fontWeight: FontWeight.w700,
-                  fontSize: 50 * vk * k,
+                  fontSize: swaycSize,
                   letterSpacing: 1.5 * vk * k,
                 ),
               ),
@@ -319,7 +323,7 @@ class _GlobeVoyageScreenState extends State<GlobeVoyageScreen>
               style: TextStyle(
                 fontFamily: SC.brandFont,
                 fontWeight: FontWeight.w700,
-                fontSize: 34 * vk * k,
+                fontSize: dotSize,
                 color: ink,
               ),
             ),
