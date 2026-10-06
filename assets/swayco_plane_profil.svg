@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-300 -140 620 240" width="620" height="240">
+
+<defs>
+  <linearGradient id="b" x1="0" y1="-40" x2="0" y2="38" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset=".65" stop-color="#E6EFFF"></stop><stop offset="1" stop-color="#B7CBF4"></stop></linearGradient>
+  <linearGradient id="g" x1="-290" y1="0" x2="290" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1F5EFF"></stop><stop offset=".55" stop-color="#2B7FFF"></stop><stop offset="1" stop-color="#18DDEA"></stop></linearGradient>
+  <linearGradient id="w" x1="0" y1="20" x2="-90" y2="84" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset="1" stop-color="#BFD2F6"></stop></linearGradient>
+</defs>
+<g stroke="#04123A" stroke-opacity=".2" stroke-width="1.2" stroke-linejoin="round">
+  <path d="M-262 -14 L-246 -50 L-214 -50 L-232 -26Z" fill="#DDE8FD"></path>
+  <path d="M-262 -14 L-240 -128 L-196 -128 L-166 -38Z" fill="url(#g)"></path>
+  <path d="M-10 22 L-112 88 L-68 90 L66 28Z" fill="url(#w)"></path>
+  <path d="M-290 -14 C-250 -34 -150 -40 -60 -40 L150 -40 C232 -40 282 -24 298 4 C282 26 232 36 150 38 L-60 38 C-150 38 -240 30 -290 8Z" fill="url(#b)"></path>
+  <ellipse cx="38" cy="58" rx="54" ry="18" fill="#EEF4FF"></ellipse>
+</g>
+<path d="M-282 8 C-222 24 -122 31 -40 31 L180 31 C240 29 276 16 292 8 L296 14 C276 30 232 37 172 38 L-60 38 C-150 38 -232 30 -288 13Z" fill="url(#g)"></path>
+<ellipse cx="90" cy="58" rx="8" ry="14" fill="#0B1F5C" stroke="#F4FF1F" stroke-width="2.5"></ellipse>
+<circle cx="-218" cy="-88" r="21" fill="#F4FF1F"></circle>
+<path d="M204 -30 L256 -21 L242 -11 L198 -13Z" fill="#0B1F5C"></path>
+  <rect x="-150" y="-31" width="13" height="12" rx="5" fill="#0B1F5C" opacity=".8"></rect>
+  <rect x="-120" y="-31" width="13" height="12" rx="5" fill="#0B1F5C" opacity=".8"></rect>
+  <rect x="-90" y="-31" width="13" height="12" rx="5" fill="#0B1F5C" opacity=".8"></rect>
+  <rect x="-60" y="-31" width="13" height="12" rx="5" fill="#0B1F5C" opacity=".8"></rect>
+  <rect x="-30" y="-31" width="13" height="12" rx="5" fill="#0B1F5C" opacity=".8"></rect>
+  <rect x="0" y="-31" width="13" height="12" rx="5" fill="#0B1F5C" opacity=".8"></rect>
+  <rect x="30" y="-31" width="13" height="12" rx="5" fill="#0B1F5C" opacity=".8"></rect>
+  <rect x="60" y="-31" width="13" height="12" rx="5" fill="#0B1F5C" opacity=".8"></rect>
+  <rect x="90" y="-31" width="13" height="12" rx="5" fill="#0B1F5C" opacity=".8"></rect>
+  <rect x="120" y="-31" width="13" height="12" rx="5" fill="#0B1F5C" opacity=".8"></rect>
+  <rect x="150" y="-31" width="13" height="12" rx="5" fill="#0B1F5C" opacity=".8"></rect>
+</svg>

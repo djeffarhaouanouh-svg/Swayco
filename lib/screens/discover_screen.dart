@@ -242,20 +242,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       ),
     );
     if (!mounted || keys == null || keys.isEmpty) return;
-    // "Lancer" on the globe → same full-screen ad as a country bubble.
-    _showFilterAd();
-    setState(() {
-      _countryKeys = keys;
-      _showFilterTransition = true;
-      _transitionAnimDone = false;
-      _transitionFeedDone = false;
-    });
+    setState(() => _countryKeys = keys);
     Analytics.track('screen_view',
         props: {'screen': 'discover', 'country_filter': keys.join(',')});
-    await _loadFeed(countries: _filterCountries);
+    // Le feed se charge PENDANT le voyage (globe -> escales -> avion), qui
+    // remplace l'ancien chargement Lottie ; un appui saute l'animation.
+    final load = _loadFeed(countries: _filterCountries);
+    await playGlobeVoyage(context, keys);
+    await load;
     if (!mounted) return;
-    _transitionFeedDone = true;
-    _maybeHideFilterTransition();
+    // "Lancer" on the globe → same full-screen ad as a country bubble, une
+    // fois l'animation terminee.
+    _showFilterAd();
   }
 
   /// Full-screen ad when a country filter is applied (a bubble switched ON,
