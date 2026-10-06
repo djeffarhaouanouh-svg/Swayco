@@ -26,7 +26,7 @@ const ColorFilter kBlackToTransparent = ColorFilter.matrix(<double>[
 /// Jaune de la DA 8c (le « ø » du mot swaycø).
 const Color kSplashYellow = Color(0xFFF4FF1F);
 
-/// Boot splash for Swayco — plays `assets/discover_filter_transition.json` (Splash Sync Call —
+/// Boot splash for Swayco — plays `assets/splash.json` (Splash Sync Call —
 /// cassure nette) centred on the blue brand gradient (8c).
 ///
 /// Plays through once (no loop) and holds the last frame. `main.dart` keeps
@@ -35,7 +35,7 @@ const Color kSplashYellow = Color(0xFFF4FF1F);
 class SplashScreenAnimation extends StatefulWidget {
   const SplashScreenAnimation({
     super.key,
-    this.asset = 'assets/discover_filter_transition.json',
+    this.asset = 'assets/splash.json',
     this.gradient = kSplashBlueGradient,
     this.onComplete,
   });

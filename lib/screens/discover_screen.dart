@@ -830,7 +830,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               child: Stack(
                 children: [
                   LottieIconTransition(
-                    asset: 'assets/splash.json',
+                    asset: 'assets/discover_filter_transition.json',
                     onComplete: () {
                       _transitionAnimDone = true;
                       _maybeHideFilterTransition();
