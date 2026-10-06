@@ -42,6 +42,7 @@ import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../swayco/translation_route.dart';
 import '../widgets/glass_panel.dart';
+import '../widgets/lottie_icon_transition.dart';
 import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
@@ -3240,50 +3241,32 @@ class _CallScreenState extends State<CallScreen> {
       // gratuit depuis, et elle occupait la meilleure place de l'écran pour
       // ne plus rien dire. Elle sert maintenant à ce qui améliore vraiment
       // l'appel qui commence : la façon de parler.
+      // L'animation de connexion (celle de la selection des pays de Discover,
+      // echangee avec l'ancien ecran « logo + spinner »), tenue >= 5 s, et
+      // sous elle la phrase sur la facon de parler.
       return Scaffold(
         backgroundColor: SC.dBg,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
-            child: Column(
-              children: [
-                // Logo, then the spinner + hint kept close just beneath it
-                // (centred together as a tight group, not spread apart).
-                const Spacer(flex: 5),
-                // Same provider CallSplashImage warmed at boot, so this
-                // paints on the splash's very first frame instead of a
-                // beat later. 278 rather than 210: the mark only fills
-                // 59% of its own canvas, so at 210 it would render a
-                // third smaller than the logo it replaces.
-                const Image(
-                  image: CallSplashImage.provider,
-                  width: 278,
-                  height: 278,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 22),
-                const SizedBox(
-                  height: 28,
-                  width: 28,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: SC.accent,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
+        body: Stack(
+          children: [
+            const LottieIconTransition(
+              asset: 'assets/discover_filter_transition.json',
+            ),
+            Align(
+              alignment: const Alignment(0, 0.72),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
                   AppStrings.t('call_connecting_tip'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: SC.dTextMuted,
+                  style: const TextStyle(
+                    color: Colors.white,
                     fontSize: 13,
                     height: 1.4,
                   ),
                 ),
-                const Spacer(flex: 6),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       );
     }

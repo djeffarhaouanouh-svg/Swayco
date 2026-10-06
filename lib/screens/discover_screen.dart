@@ -39,7 +39,6 @@ import '../widgets/fx2b_button.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/liquid_glass_button.dart';
-import '../widgets/lottie_icon_transition.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/popup_kit.dart' show popupDisplay;
 import '../widgets/sent_confirmation.dart';
@@ -827,27 +826,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           //    bas d'écran). ──────────────────────────────────────────────
           if (_showFilterTransition)
             Positioned.fill(
-              child: Stack(
-                children: [
-                  LottieIconTransition(
-                    asset: 'assets/discover_filter_transition.json',
-                    onComplete: () {
-                      _transitionAnimDone = true;
-                      _maybeHideFilterTransition();
-                    },
-                  ),
-                  Align(
-                    alignment: const Alignment(0, 0.6),
-                    child: Text(
-                      AppStrings.t('profile_loading'),
-                      style: TextStyle(
-                        color: SC.fg,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
+              // L'ancien ecran de connexion des appels (logo + spinner), echange
+              // avec l'animation Lottie qui accompagnait ce filtre.
+              child: _FilterLoadingOverlay(
+                onComplete: () {
+                  _transitionAnimDone = true;
+                  _maybeHideFilterTransition();
+                },
               ),
             ),
 
@@ -1139,6 +1124,62 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
 // ══════════════════════════════════════════════════════════════════════════════
 // Header — le logo swaycø, seul (handoff 3c : pas de loupe)
 // ══════════════════════════════════════════════════════════════════════════════
+
+/// Chargement du filtre pays : logo de l'app + spinner + une ligne, tenu un
+/// court instant (le feed charge dessous).
+class _FilterLoadingOverlay extends StatefulWidget {
+  const _FilterLoadingOverlay({required this.onComplete});
+
+  final VoidCallback onComplete;
+
+  @override
+  State<_FilterLoadingOverlay> createState() => _FilterLoadingOverlayState();
+}
+
+class _FilterLoadingOverlayState extends State<_FilterLoadingOverlay> {
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(const Duration(milliseconds: 1600), () {
+      if (mounted) widget.onComplete();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: SC.dBg,
+      child: Column(
+        children: [
+          const Spacer(flex: 5),
+          const Image(
+            image: AssetImage('assets/icon-saas.png'),
+            width: 278,
+            height: 278,
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(height: 22),
+          const SizedBox(
+            height: 28,
+            width: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.5, color: SC.accent),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            AppStrings.t('profile_loading'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: SC.dTextMuted,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          const Spacer(flex: 6),
+        ],
+      ),
+    );
+  }
+}
 
 class _DiscoverHeader extends StatelessWidget {
   const _DiscoverHeader();
