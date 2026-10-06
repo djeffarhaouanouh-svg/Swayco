@@ -290,7 +290,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
     // DiscoverScreen starts on its very first frame instead of a beat late.
     if (!_transitionPrecached) {
       _transitionPrecached = true;
-      AssetLottie('assets/discover_filter_transition.json').load();
+      AssetLottie('assets/splash.json').load();
     }
   }
 
