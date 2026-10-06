@@ -177,7 +177,12 @@ class _GlobeVoyageScreenState extends State<GlobeVoyageScreen>
                       ),
                     ),
                   ..._labels(t, size, k),
-                  _plane(t, size, k, light),
+                  GlobeVoyagePlane(
+                    tt: ((t - _planeStart) / _planeDur).clamp(0.0, 1.0),
+                    size: size,
+                    k: k,
+                    light: light,
+                  ),
                 ],
               ),
             );
@@ -252,11 +257,29 @@ class _GlobeVoyageScreenState extends State<GlobeVoyageScreen>
     }
     return out;
   }
+}
 
-  /// L'avion de profil qui traverse l'écran, avec son ombre et sa traînée.
-  Widget _plane(double t, Size size, double k, bool light) {
-    final tt = ((t - _planeStart) / _planeDur).clamp(0.0, 1.0);
-    if (t < _planeStart || tt >= 1) return const SizedBox.shrink();
+/// L'avion de profil qui traverse l'écran, avec son ombre et sa traînée.
+/// [tt] = progression du vol de 0 à 1 (hors de ]0, 1[ : rien n'est dessiné).
+class GlobeVoyagePlane extends StatelessWidget {
+  const GlobeVoyagePlane({
+    super.key,
+    required this.tt,
+    required this.size,
+    required this.k,
+    required this.light,
+  });
+
+  final double tt;
+  final Size size;
+
+  /// Échelle écran / maquette (largeur / 390).
+  final double k;
+  final bool light;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tt <= 0 || tt >= 1) return const SizedBox.shrink();
     final u = 0.6 * tt + 0.4 * Curves.easeInOutQuad.transform(tt);
     final cx = (-380 + (770 - -380) * u) * k;
     final cy = (450 - 40 * u) * k;
@@ -268,9 +291,11 @@ class _GlobeVoyageScreenState extends State<GlobeVoyageScreen>
         Offset((x + 300) * vk * k, (y + 140) * vk * k);
     // Dans le SVG, y est la LIGNE DE BASE du texte : la boite Flutter est
     // centree, donc on remonte son centre d'environ 0,35 em.
-    final swaycSize = 50 * vk * k;
-    final dotSize = 34 * vk * k;
-    final swayc = at(-6, 19).translate(0, -0.35 * swaycSize);
+    // Police de marque en gras ; tailles calees sur la capture de reference
+    // (le logo tient sous les hublots 4 a 7, entre fuselage et aile).
+    final swaycSize = 35 * vk * k;
+    final dotSize = 24 * vk * k;
+    final swayc = at(0, 19).translate(0, -0.35 * swaycSize);
     final dot = at(-218, -79).translate(0, -0.35 * dotSize);
     final ink = const Color(0xFF04123A);
     final shadowColor =
@@ -309,7 +334,7 @@ class _GlobeVoyageScreenState extends State<GlobeVoyageScreen>
                   fontFamily: SC.brandFont,
                   fontWeight: FontWeight.w700,
                   fontSize: swaycSize,
-                  letterSpacing: 1.5 * vk * k,
+                  letterSpacing: 1.0 * vk * k,
                 ),
               ),
               softWrap: false,
@@ -375,6 +400,7 @@ class _GlobeVoyageScreenState extends State<GlobeVoyageScreen>
         ],
       ),
     );
+
   }
 }
 
@@ -404,8 +430,6 @@ class _VoyagePainter extends CustomPainter {
   final double travel;
   final double planeStart;
   final double stopsEnd;
-
-  static const _land = Color(0xFF3768EA);
 
   /// Projection qui ne perd jamais un point : sur la face cachée, il retombe
   /// sur le bord du disque (le pays est « coupé » au limbe).
@@ -497,19 +521,22 @@ class _VoyagePainter extends CustomPainter {
     final rotLat = view.lat;
     final disc = Rect.fromCircle(center: center, radius: radius);
 
-    // Halo jaune autour du globe.
+    // Halo autour du globe : jaune en sombre, bleu de marque en clair.
+    final light = SC.light;
     canvas.drawCircle(
       center,
       radius + 5,
       Paint()
-        ..color = SC.accent.withValues(alpha: 0.3)
+        ..color = (light ? const Color(0xFF2B7FFF) : SC.accent)
+            .withValues(alpha: 0.3)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 45),
     );
     canvas.drawCircle(
       center,
       radius + 2,
       Paint()
-        ..color = SC.accent.withValues(alpha: 0.5)
+        ..color = (light ? const Color(0xFF1F5EFF) : SC.accent)
+            .withValues(alpha: light ? 0.35 : 0.5)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
     );
 
@@ -521,66 +548,24 @@ class _VoyagePainter extends CustomPainter {
       center,
       radius,
       Paint()
+        // Le globe de l'app, tel quel (pas un globe bleu a part).
         ..shader = const RadialGradient(
-          center: Alignment(-0.3, -0.35),
-          radius: 1.0,
-          colors: [Color(0xFF2A5BE0), Color(0xFF15399F), Color(0xFF0B1F5C)],
-          stops: [0, 0.55, 1],
+          center: Alignment(-0.24, -0.36),
+          radius: 0.95,
+          colors: [Color(0xFFBFE0EF), Color(0xFFA4D0E6), Color(0xFF8BBEDB)],
+          stops: [0.0, 0.62, 1.0],
         ).createShader(disc),
     );
 
-    // Parallèles et méridiens (blanc 8 %).
-    final grid = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8
-      ..color = Colors.white.withValues(alpha: 0.08);
-    final gridPath = Path();
-    void polyline(Iterable<Offset> pts, List<bool> vis) {
-      var pen = false;
-      var i = 0;
-      for (final p in pts) {
-        if (!vis[i]) {
-          pen = false;
-        } else if (!pen) {
-          gridPath.moveTo(p.dx, p.dy);
-          pen = true;
-        } else {
-          gridPath.lineTo(p.dx, p.dy);
-        }
-        i++;
-      }
-    }
-
-    for (var la = -60; la <= 60; la += 30) {
-      final pts = <Offset>[];
-      final vis = <bool>[];
-      for (var lo = -180; lo <= 180; lo += 6) {
-        vis.add(_visible(lo.toDouble(), la.toDouble(), rotLon, rotLat));
-        pts.add(_limb(lo.toDouble(), la.toDouble(), rotLon, rotLat, radius, center));
-      }
-      polyline(pts, vis);
-    }
-    for (var lo = -180; lo < 180; lo += 30) {
-      final pts = <Offset>[];
-      final vis = <bool>[];
-      for (var la = -90; la <= 90; la += 6) {
-        vis.add(_visible(lo.toDouble(), la.toDouble(), rotLon, rotLat));
-        pts.add(_limb(lo.toDouble(), la.toDouble(), rotLon, rotLat, radius, center));
-      }
-      polyline(pts, vis);
-    }
-    canvas.drawPath(gridPath, grid);
-
     // Terres (sans l'Antarctique) ; les pays du voyage passent en jaune.
-    final landFill = Paint()..color = _land;
     final landStroke = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.6
-      ..color = Colors.white.withValues(alpha: 0.22);
+      ..strokeWidth = 0.5
+      ..color = const Color(0xFFB9B3A3).withValues(alpha: 0.5);
     for (final land in world) {
       if (land.name == 'Antarctica') continue;
       final path = _landPathLimb(land, rotLon, rotLat, radius, center);
-      canvas.drawPath(path, landFill);
+      canvas.drawPath(path, Paint()..color = _terrain(land.avgLat));
       canvas.drawPath(path, landStroke);
       final i = keys.indexOf(land.name);
       if (i >= 0) {
@@ -589,31 +574,18 @@ class _VoyagePainter extends CustomPainter {
         if (a > 0) {
           canvas.drawPath(
             path,
-            Paint()..color = SC.accent.withValues(alpha: a),
+            Paint()..color = const Color(0xFF8EC06A).withValues(alpha: a),
           );
           canvas.drawPath(
             path,
             Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = 1.2
+              ..strokeWidth = 1.4
               ..color = Colors.white.withValues(alpha: a),
           );
         }
       }
     }
-
-    // Ombrage de la sphère : blanc 8 % -> transparent -> bleu nuit 60 %.
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..shader = const RadialGradient(
-          center: Alignment(-0.3, -0.35),
-          radius: 1.05,
-          colors: [Color(0x14FFFFFF), Color(0x00000000), Color(0x99040A1E)],
-          stops: [0, 0.55, 1],
-        ).createShader(disc),
-    );
 
     // Arcs en pointillés entre deux pays consécutifs.
     for (var i = 1; i < keys.length; i++) {
@@ -652,17 +624,21 @@ class _VoyagePainter extends CustomPainter {
           arc.lineTo(o.dx, o.dy);
         }
       }
+      // Sombre : pointilles jaunes ; clair : bleu #1F5EFF sur halo blanc (le
+      // jaune est illisible sur l'ocean clair).
       final glow = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 5
+        ..strokeWidth = light ? 6 : 5
         ..strokeCap = StrokeCap.round
-        ..color = SC.accent.withValues(alpha: 0.35)
+        ..color = light
+            ? Colors.white.withValues(alpha: 0.95)
+            : SC.accent.withValues(alpha: 0.35)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
       final dash = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.4
+        ..strokeWidth = light ? 2.8 : 2.4
         ..strokeCap = StrokeCap.round
-        ..color = SC.accent;
+        ..color = light ? const Color(0xFF1F5EFF) : SC.accent;
       final dashed = Path();
       for (final m in arc.computeMetrics()) {
         for (var d = 0.0; d < m.length; d += 8) {
@@ -674,6 +650,16 @@ class _VoyagePainter extends CustomPainter {
     }
 
     canvas.restore();
+
+    // Anneau du globe de l'app.
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..color = const Color(0xFF7FA8BD).withValues(alpha: 0.8),
+    );
 
     // Onde d'arrivée sur chaque pays, au centre du globe.
     for (var i = 0; i < keys.length; i++) {
