@@ -295,7 +295,13 @@ abstract final class ChatApi {
           ? AppStrings.tIn(lang, 'push_special_message')
           : (imageBody ? AppStrings.tIn(lang, 'push_photo') : body),
       type: 'message',
-      data: {'conversationId': conversationId, 'senderId': senderId},
+      data: {
+        'conversationId': conversationId,
+        'senderId': senderId,
+        // Le serveur met le drapeau dans le CORPS (phrase fixe), pas a cote du
+        // prenom, pour un message special.
+        if (special) 'special': 'true',
+      },
     );
   }
 

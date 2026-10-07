@@ -169,6 +169,62 @@ async function resolveActorImage(sb, payload) {
   );
 }
 
+// Pays (tel que stocke dans `profiles.country`, en francais) -> code ISO2.
+// Meme liste que `_kIso2` de lib/services/locations.dart.
+const COUNTRY_ISO2 = {
+  'France': 'fr', 'Belgique': 'be', 'Suisse': 'ch', 'Canada': 'ca',
+  'États-Unis': 'us', 'Royaume-Uni': 'gb', 'Espagne': 'es', 'Portugal': 'pt',
+  'Italie': 'it', 'Allemagne': 'de', 'Pays-Bas': 'nl', 'Mexique': 'mx',
+  'Argentine': 'ar', 'Colombie': 'co', 'Brésil': 'br', 'Maroc': 'ma',
+  'Algérie': 'dz', 'Tunisie': 'tn', 'Sénégal': 'sn', "Côte d'Ivoire": 'ci',
+  'Égypte': 'eg', 'Arabie Saoudite': 'sa', 'Émirats arabes unis': 'ae',
+  'Turquie': 'tr', 'Russie': 'ru', 'Chine': 'cn', 'Japon': 'jp',
+  'Corée du Sud': 'kr', 'Inde': 'in', 'Australie': 'au', 'Luxembourg': 'lu',
+  'Islande': 'is', 'Norvège': 'no', 'Suède': 'se', 'Danemark': 'dk',
+  'Finlande': 'fi', 'Irlande': 'ie', 'Pologne': 'pl', 'Ukraine': 'ua',
+  'Grèce': 'gr',
+};
+
+function flagEmoji(iso2) {
+  if (!/^[a-z]{2}$/i.test(iso2 || '')) return '';
+  return String.fromCodePoint(
+    ...iso2.toUpperCase().split('').map((c) => 127397 + c.charCodeAt(0)),
+  );
+}
+
+/** Drapeau (emoji) du pays de celui qui fait l'action, ou ''. */
+async function resolveActorFlag(sb, payload) {
+  const id = actorIdFromPayload(payload);
+  if (!id) return '';
+  try {
+    const { data } = await sb
+      .from('profiles')
+      .select('country')
+      .eq('id', id)
+      .maybeSingle();
+    return flagEmoji(COUNTRY_ISO2[String((data && data.country) || '').trim()]);
+  } catch (_) {
+    return '';
+  }
+}
+
+/**
+ * Le drapeau remplace les emojis decoratifs des notifications : « Léa t'a
+ * ajouté 🇧🇷 ». Sur un message le corps est le texte de la personne, donc le
+ * drapeau va a cote de son nom (titre) ; partout ailleurs, en fin de phrase.
+ * Les appels (CallKit / sonnerie) restent tels quels.
+ */
+function withActorFlag(payload, flag) {
+  if (!flag) return payload;
+  const t = payload.type;
+  if (t === 'incoming_call' || t === 'call_cancel') return payload;
+  const d = payload.data || {};
+  const isPlainMessage =
+    t === 'message' && d.kind !== 'reaction' && String(d.special || '') !== 'true';
+  if (isPlainMessage) return { ...payload, title: `${payload.title} ${flag}` };
+  return { ...payload, body: `${payload.body || ''} ${flag}`.trim() };
+}
+
 async function notifyUser(recipientUid, payload) {
   const out = { ok: 0, failed: 0, results: [] };
   const sb = supabase();
@@ -226,7 +282,9 @@ async function notifyUser(recipientUid, payload) {
   const wp = webPush();
   const fcm = firebaseMessaging();
   const imageUrl = await resolveActorImage(sb, payload);
-  const payloadOut = imageUrl ? { ...payload, image: imageUrl } : payload;
+  const flag = await resolveActorFlag(sb, payload);
+  const flagged = withActorFlag(payload, flag);
+  const payloadOut = imageUrl ? { ...flagged, image: imageUrl } : flagged;
 
   await Promise.all(
     targets.map(async (t) => {
@@ -299,7 +357,7 @@ async function notifyUser(recipientUid, payload) {
             // to the right screen (see NotificationRouter on the client).
             ...(payload.type ? { type: String(payload.type) } : {}),
             ...(dataOnlyAndroid
-              ? { title: String(payload.title || ''), body: String(payload.body || '') }
+              ? { title: String(payloadOut.title || ''), body: String(payloadOut.body || '') }
               : {}),
             ...(imageUrl ? { imageUrl } : {}),
           };
@@ -309,8 +367,8 @@ async function notifyUser(recipientUid, payload) {
               ? {}
               : {
                   notification: {
-                    title: payload.title,
-                    body: payload.body || '',
+                    title: payloadOut.title,
+                    body: payloadOut.body || '',
                     ...(imageUrl ? { image: imageUrl } : {}),
                   },
                 }),
