@@ -42,6 +42,8 @@ COPY backend/tiers.js ./tiers.js
 COPY backend/nationalities.js ./nationalities.js
 # Re-engagement emails — required by notify.js (require('./email')).
 COPY backend/email.js ./email.js
+# Notifications d'engagement planifiees — required by server.js (require('./engagement')).
+COPY backend/engagement.js ./engagement.js
 COPY --from=flutter-build /app/build/web ./web
 # Static legal site (Terms / Privacy / Help) — served by server.js at
 # /terms, /privacy, /help, /legal alongside the Flutter web bundle.

@@ -2876,3 +2876,8 @@ if (supabase()) {
   // eslint-disable-next-line no-console
   console.log(`[sched] reminder scheduler on (lead ${SCHEDULED_CALL_LEAD_MS}ms)`);
 }
+
+// Notifications d'engagement planifiees : demandes en attente 24 h, dire bonjour,
+// message non lu, fin de Boost, recap du dimanche (backend/engagement.js ;
+// journal = table notif_log, migration 0066).
+require('./engagement').start({ supabase, notifyUser });

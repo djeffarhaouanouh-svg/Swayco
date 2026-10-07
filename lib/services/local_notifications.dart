@@ -218,6 +218,50 @@ abstract final class LocalNotifications {
     }
   }
 
+  /// Stable id du rappel « il te reste 1 message special ».
+  static const int specialLeftId = 424244;
+
+  /// Programme, dans [after], le rappel « il te reste 1 message special » (le
+  /// dernier). Reprogrammer remplace le precedent (meme id).
+  static Future<void> scheduleSpecialLeftReminder({
+    required String title,
+    required String body,
+    Duration after = const Duration(hours: 3),
+  }) async {
+    if (kIsWeb) return;
+    await ensureReady();
+    final when = tz.TZDateTime.now(tz.UTC).add(after);
+    final android = AndroidNotificationDetails(
+      _messagesChannel.id,
+      _messagesChannel.name,
+      channelDescription: _messagesChannel.description,
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    try {
+      await _plugin.zonedSchedule(
+        specialLeftId,
+        title,
+        body,
+        when,
+        NotificationDetails(android: android, iOS: const DarwinNotificationDetails()),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: jsonEncode({'type': 'special_left'}),
+      );
+    } catch (_) {
+      // Un rappel de confort : jamais une erreur a montrer.
+    }
+  }
+
+  /// Annule le rappel « dernier message special » (plus aucun, ou deja fait).
+  static Future<void> cancelSpecialLeftReminder() async {
+    if (kIsWeb) return;
+    await ensureReady();
+    await _plugin.cancel(specialLeftId);
+  }
+
   /// Drop the pending onboarding reminder (called once onboarding completes,
   /// or when the user comes back to the app before it fires).
   static Future<void> cancelOnboardingReminder() async {

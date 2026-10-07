@@ -200,6 +200,20 @@ class _RootShellState extends State<RootShell> {
         // other unread chat too — a tap on Lenny's notification left the
         // bar blank while Claire still had unread lines.
         unawaited(_openThreadFromPush(intent.data));
+      case 'say_hello':
+      case 'unread_message':
+      case 'missed_call':
+        // Meme porte que « message » : l'onglet Messages ET le fil concerne
+        // (les donnees portent `senderId` = l'autre personne).
+        NavTab.select(NavTab.chat);
+        unawaited(_openThreadFromPush(intent.data));
+      case 'pending_requests':
+        NavTab.select(NavTab.demandes);
+      case 'boost_ending':
+        NavTab.select(NavTab.profile);
+      case 'weekly_recap':
+      case 'special_left':
+        NavTab.select(NavTab.discover);
       case 'online_broadcast':
         // "5 Japonaises en ligne" pull notification → open Discover so they
         // can browse / call whoever is online right now.

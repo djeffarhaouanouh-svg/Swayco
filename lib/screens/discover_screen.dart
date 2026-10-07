@@ -18,6 +18,7 @@ import '../services/friendship_api.dart';
 import '../services/job_sectors.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
+import '../services/local_notifications.dart';
 import '../services/looking_for.dart';
 import '../services/match_celebration.dart';
 import '../services/persona_categories.dart';
@@ -355,6 +356,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         special: true,
       );
       await SpecialMessageQuota.consume(_myId);
+      // Il n'en reste qu'un : un rappel dans quelques heures, pour bien le choisir.
+      if (await SpecialMessageQuota.remaining(_myId) == 1) {
+        unawaited(LocalNotifications.scheduleSpecialLeftReminder(
+          title: AppStrings.t('special_left_title'),
+          body: AppStrings.t('special_left_body'),
+        ));
+      }
       Analytics.track('message_sent',
           props: {'source': 'discover_direct', 'type': 'text'});
       if (!mounted) return;

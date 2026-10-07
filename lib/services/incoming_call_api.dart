@@ -161,6 +161,7 @@ abstract final class IncomingCallApi {
           'callerId': callerId,
           'roomName': roomName,
         },
+        imageUrl: caller?.bestAvatarUrl,
       );
     } catch (e) {
       debugPrint('ring notify failed: $e');
@@ -345,6 +346,36 @@ abstract final class IncomingCallApi {
       );
     } catch (e) {
       debugPrint('IncomingCallApi.notifyCancel failed: $e');
+    }
+  }
+
+  /// Appel manque : l'appelant a raccroche (ou la sonnerie a expire) avant que
+  /// [calleeId] decroche. Une notification « Appel manque » lui reste, avec la
+  /// photo de l'appelant ; le serveur y ajoute le drapeau tant qu'ils ne sont
+  /// pas amis. Best-effort — ne bloque jamais le raccrochage.
+  static Future<void> notifyMissed({
+    required String calleeId,
+    required String callerId,
+  }) async {
+    if (calleeId.isEmpty || callerId.isEmpty) return;
+    try {
+      final caller = await ProfileApi.fetchById(callerId);
+      final callerName = caller?.displayName.trim() ?? '';
+      final callee = await ProfileApi.fetchById(calleeId);
+      final lang = callee?.language ?? '';
+      await PushDispatcher.notify(
+        recipientUid: calleeId,
+        title: callerName.isEmpty
+            ? AppStrings.tIn(lang, 'push_missed_call')
+            : callerName,
+        body: AppStrings.tIn(lang, 'push_missed_call'),
+        type: 'missed_call',
+        // `senderId` : c'est lui que le tap utilise pour ouvrir le fil.
+        data: {'senderId': callerId, 'callerId': callerId},
+        imageUrl: caller?.bestAvatarUrl,
+      );
+    } catch (e) {
+      debugPrint('IncomingCallApi.notifyMissed failed: $e');
     }
   }
 

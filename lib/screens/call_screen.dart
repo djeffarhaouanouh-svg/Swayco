@@ -20,6 +20,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 import '../services/analytics.dart';
 import '../services/attribution.dart';
 import '../services/app_strings.dart';
+import '../services/auth_service.dart';
 import '../services/swayco_sounds.dart';
 import '../swayco/asr/apple_stt_channel.dart';
 import '../swayco/asr/asr_service.dart';
@@ -2584,6 +2585,13 @@ class _CallScreenState extends State<CallScreen> {
       if (callee.isNotEmpty) {
         unawaited(
           IncomingCallApi.notifyCancel(calleeId: callee, callId: outId),
+        );
+        // ... et il lui reste une notification « Appel manque » avec ta photo.
+        unawaited(
+          IncomingCallApi.notifyMissed(
+            calleeId: callee,
+            callerId: AuthService.currentUserId,
+          ),
         );
       }
     }
