@@ -2312,9 +2312,11 @@ class _PassportCover extends StatelessWidget {
                 ),
               ),
             ),
+            // Remonte au-dessus des boutons ✕ / message / ♥ (flottants par-dessus le
+            // panneau) : a 28 du bas, ils cachaient le titre.
             Positioned(
               left: 24,
-              bottom: 28,
+              bottom: 124,
               right: 24,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
