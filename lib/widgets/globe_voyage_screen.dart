@@ -8,12 +8,23 @@ part of 'discover_globe.dart';
 
 /// Joue l'animation puis se ferme toute seule. Ne montre rien (rend aussitôt)
 /// quand les animations sont réduites ou qu'il n'y a aucun pays.
-Future<void> playGlobeVoyage(BuildContext context, Set<String> keys) async {
+///
+/// [onFinishing] part au moment ou l'avion a fini de traverser (ou quand on
+/// saute l'animation), AVANT que l'ecran ne s'efface : c'est la que la pub
+/// plein ecran doit demarrer, pour qu'on ne voie pas la premiere carte avant.
+Future<void> playGlobeVoyage(
+  BuildContext context,
+  Set<String> keys, {
+  VoidCallback? onFinishing,
+}) async {
   final picked = [
     for (final k in keys)
       if (kGlobeCountries.containsKey(k)) k,
   ].take(4).toList();
-  if (picked.isEmpty || MediaQuery.disableAnimationsOf(context)) return;
+  if (picked.isEmpty || MediaQuery.disableAnimationsOf(context)) {
+    onFinishing?.call();
+    return;
+  }
   Analytics.track('globe_voyage_play', props: {'n': picked.length});
   await Navigator.of(context).push<void>(
     PageRouteBuilder<void>(
@@ -21,16 +32,24 @@ Future<void> playGlobeVoyage(BuildContext context, Set<String> keys) async {
       barrierColor: Colors.transparent,
       transitionDuration: Duration.zero,
       reverseTransitionDuration: Duration.zero,
-      pageBuilder: (_, _, _) => GlobeVoyageScreen(countries: picked),
+      pageBuilder: (_, _, _) =>
+          GlobeVoyageScreen(countries: picked, onFinishing: onFinishing),
     ),
   );
 }
 
 class GlobeVoyageScreen extends StatefulWidget {
-  const GlobeVoyageScreen({super.key, required this.countries});
+  const GlobeVoyageScreen({
+    super.key,
+    required this.countries,
+    this.onFinishing,
+  });
 
   /// Clés de [kGlobeCountries], 1 à 4.
   final List<String> countries;
+
+  /// Appelé une fois, à la fin du vol (ou au saut), avant le fondu de sortie.
+  final VoidCallback? onFinishing;
 
   @override
   State<GlobeVoyageScreen> createState() => _GlobeVoyageScreenState();
@@ -53,6 +72,13 @@ class _GlobeVoyageScreenState extends State<GlobeVoyageScreen>
     vsync: this,
     duration: Duration(milliseconds: (_total * 1000).round()),
   );
+  bool _finishingFired = false;
+
+  void _fireFinishing() {
+    if (_finishingFired) return;
+    _finishingFired = true;
+    widget.onFinishing?.call();
+  }
 
   List<_Land>? _world;
   bool _closed = false;
@@ -72,11 +98,17 @@ class _GlobeVoyageScreenState extends State<GlobeVoyageScreen>
     _ctl.addStatusListener((s) {
       if (s == AnimationStatus.completed) _close();
     });
+    // L'avion a fini de traverser : on lance la pub tout de suite, pendant
+    // que l'ecran s'efface encore.
+    _ctl.addListener(() {
+      if (_ctl.value * _total >= _total - 0.4) _fireFinishing();
+    });
   }
 
   void _close() {
     if (_closed || !mounted) return;
     _closed = true;
+    _fireFinishing();
     Navigator.of(context).maybePop();
   }
 

@@ -248,12 +248,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     // Le feed se charge PENDANT le voyage (globe -> escales -> avion), qui
     // remplace l'ancien chargement Lottie ; un appui saute l'animation.
     final load = _loadFeed(countries: _filterCountries);
-    await playGlobeVoyage(context, keys);
+    // La pub plein ecran part des que l'avion a fini (ou au saut), AVANT la
+    // fermeture de l'ecran : on ne voit plus la premiere carte puis la video.
+    await playGlobeVoyage(context, keys, onFinishing: _showFilterAd);
     await load;
-    if (!mounted) return;
-    // "Lancer" on the globe → same full-screen ad as a country bubble, une
-    // fois l'animation terminee.
-    _showFilterAd();
   }
 
   /// Full-screen ad when a country filter is applied (a bubble switched ON,
