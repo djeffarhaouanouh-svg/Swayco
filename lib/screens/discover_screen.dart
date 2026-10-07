@@ -2316,7 +2316,7 @@ class _PassportCover extends StatelessWidget {
             // panneau) : a 28 du bas, ils cachaient le titre.
             Positioned(
               left: 24,
-              bottom: 124,
+              bottom: 100,
               right: 24,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
