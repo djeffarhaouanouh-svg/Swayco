@@ -192,11 +192,32 @@ function flagEmoji(iso2) {
   );
 }
 
-/** Drapeau (emoji) du pays de celui qui fait l'action, ou ''. */
-async function resolveActorFlag(sb, payload) {
+/**
+ * Drapeau (emoji) du pays de celui qui fait l'action, ou ''.
+ *
+ * Seulement AVANT la rencontre : la presentation (demande, signe, message
+ * special, message d'un inconnu) porte le drapeau, pour dire d'ou vient la
+ * personne. Une fois qu'ils se sont likes (amitie acceptee) ou au moment du
+ * match, on n'en met plus : ils se connaissent.
+ */
+async function resolveActorFlag(sb, payload, recipientUid) {
   const id = actorIdFromPayload(payload);
   if (!id) return '';
+  if (payload.type === 'match') return '';
   try {
+    const isUuid = (s) => /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(s));
+    if (recipientUid && isUuid(id) && isUuid(recipientUid)) {
+      const { data: rows } = await sb
+        .from('friendships')
+        .select('id')
+        .eq('status', 'accepted')
+        .or(
+          `and(requester.eq.${id},addressee.eq.${recipientUid}),` +
+            `and(requester.eq.${recipientUid},addressee.eq.${id})`,
+        )
+        .limit(1);
+      if (rows && rows.length > 0) return '';
+    }
     const { data } = await sb
       .from('profiles')
       .select('country')
@@ -282,7 +303,7 @@ async function notifyUser(recipientUid, payload) {
   const wp = webPush();
   const fcm = firebaseMessaging();
   const imageUrl = await resolveActorImage(sb, payload);
-  const flag = await resolveActorFlag(sb, payload);
+  const flag = await resolveActorFlag(sb, payload, recipientUid);
   const flagged = withActorFlag(payload, flag);
   const payloadOut = imageUrl ? { ...flagged, image: imageUrl } : flagged;
 
