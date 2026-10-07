@@ -4,6 +4,7 @@ import '../screens/paywall_screen.dart';
 import '../services/app_strings.dart';
 import '../theme/swayco_theme.dart';
 import 'popup_kit.dart';
+import 'sparkles.dart';
 
 /// « Booster mon profil » en pastille jaune (barre du haut du profil) : même
 /// offre que [BoostButton], format compact.
@@ -35,7 +36,10 @@ class BoostPill extends StatelessWidget {
       onTap: active
           ? null
           : () => showBoostPaywall(context, onPurchased: onPurchased),
-      child: Container(
+      child: Sparkles(
+        color: active ? SC.brandCyan : Colors.white,
+        count: 5,
+        child: Container(
         height: 44,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
@@ -65,6 +69,7 @@ class BoostPill extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

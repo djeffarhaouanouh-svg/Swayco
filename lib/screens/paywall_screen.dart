@@ -18,6 +18,7 @@ import '../theme/swayco_theme.dart';
 import '../widgets/fade_scale_route.dart';
 import '../widgets/likes_lock.dart' show BlurredAvatar;
 import '../widgets/popup_kit.dart';
+import '../widgets/sparkles.dart';
 import '../widgets/profile_avatar.dart';
 
 /// The subscription paywall ("1c", direction 8c): a preview of MY card as a
@@ -1210,11 +1211,14 @@ class _LikesSheetState extends State<_LikesSheet> with _PaywallPurchase {
                   ),
                 ],
                 const SizedBox(height: 14),
-                _TwoLineCta(
-                  title: AppStrings.t('pw_pro_switch'),
-                  subtitle: proSubFull,
-                  busy: _busy,
-                  onPressed: _subscribe,
+                Sparkles(
+                  color: SC.onAccent,
+                  child: _TwoLineCta(
+                    title: AppStrings.t('pw_pro_switch'),
+                    subtitle: proSubFull,
+                    busy: _busy,
+                    onPressed: _subscribe,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 _VideoButton(

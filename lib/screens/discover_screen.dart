@@ -43,6 +43,7 @@ import '../widgets/lottie_icon_transition.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/popup_kit.dart' show popupDisplay;
 import '../widgets/sent_confirmation.dart';
+import '../widgets/sparkles.dart';
 import '../services/special_message_quota.dart';
 import '../widgets/special_message_pro_sheet.dart';
 import '../widgets/swayco_direct_message_sheet.dart';
@@ -1173,7 +1174,8 @@ class _DiscoverHeader extends StatelessWidget {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => showPaywallSheet(context),
-                child: Container(
+                child: Sparkles(
+                  child: Container(
                   height: 30,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
@@ -1210,6 +1212,7 @@ class _DiscoverHeader extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
                 ),
               ),
             ),

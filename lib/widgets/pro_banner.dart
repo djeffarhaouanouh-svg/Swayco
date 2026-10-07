@@ -4,6 +4,7 @@ import '../screens/paywall_screen.dart';
 import '../services/app_strings.dart';
 import '../theme/swayco_theme.dart';
 import 'popup_kit.dart';
+import 'sparkles.dart';
 
 /// Bandeau « Swayco Pro » de la page profil : carte au dégradé de marque,
 /// rond jaune + médaille, titre et accroche. Ouvre le paywall, le même lien
@@ -16,7 +17,10 @@ class ProBanner extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => showPaywallSheet(context),
-      child: Container(
+      child: Sparkles(
+        borderRadius: 20,
+        count: 9,
+        child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -80,6 +84,7 @@ class ProBanner extends StatelessWidget {
             const Icon(Icons.chevron_right, size: 22, color: Colors.white),
           ],
         ),
+      ),
       ),
     );
   }

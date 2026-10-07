@@ -6,6 +6,7 @@ import '../services/profile_api.dart';
 import '../services/special_message_quota.dart';
 import '../theme/swayco_theme.dart';
 import 'popup_kit.dart';
+import 'sparkles.dart';
 
 /// Feuille « Message spécial » pour un utilisateur NON Pro : montre le message
 /// tel que l'autre le recevra, puis propose Pro. Rend `true` au tap sur
@@ -249,10 +250,13 @@ class _SpecialMessageProSheetState extends State<_SpecialMessageProSheet>
                 ),
               ),
               const SizedBox(height: 14),
-              PopupButton(
-                label: AppStrings.t('pw_pro_switch'),
-                height: 56,
-                onPressed: () => Navigator.of(context).pop(true),
+              Sparkles(
+                color: SC.onAccent,
+                child: PopupButton(
+                  label: AppStrings.t('pw_pro_switch'),
+                  height: 56,
+                  onPressed: () => Navigator.of(context).pop(true),
+                ),
               ),
               Center(
                 child: TextButton(
