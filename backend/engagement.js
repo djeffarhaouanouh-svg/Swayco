@@ -427,7 +427,9 @@ async function weeklyRecap(ctx) {
     const lp = localParts(tzOf(p.country));
     if (!lp || lp.weekday !== 'Sun' || lp.hour < 18 || lp.hour >= 20) continue;
     const countries = new Set(
-      [...s.partners]
+      // Seulement les NOUVEAUX AMIS : un demandeur refuse n'est pas un pays
+      // decouvert.
+      [...s.friends]
         .map((id) => people.get(id)?.country)
         .filter((c) => c && String(c).trim()),
     );
