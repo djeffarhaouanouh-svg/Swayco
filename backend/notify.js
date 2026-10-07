@@ -126,6 +126,49 @@ async function withoutCallerDevices(sb, targets, payload) {
   );
 }
 
+function isHttpsImage(url) {
+  if (typeof url !== 'string') return '';
+  const u = url.trim();
+  if (!/^https:\/\//i.test(u) || u.length > 2000) return '';
+  return u;
+}
+
+function actorIdFromPayload(payload) {
+  const d = payload.data || {};
+  return String(
+    d.senderId || d.callerId || d.requesterId || d.peerId || d.inviterId || '',
+  );
+}
+
+/**
+ * Instagram / Snap style: the tray shows the ACTOR's face, not the app logo.
+ * `payload.image` wins when the client already has it. We look the rest up
+ * from profiles — except friend_request, where a missing image is deliberate
+ * (blurred likes must not leak a face).
+ */
+async function resolveActorImage(sb, payload) {
+  const explicit = isHttpsImage(payload.image);
+  if (explicit) return explicit;
+  if (payload.type === 'friend_request' || payload.type === 'call_cancel') {
+    return '';
+  }
+  const id = actorIdFromPayload(payload);
+  if (!id) return '';
+  const { data } = await sb
+    .from('profiles')
+    .select('avatar_url, discover_photo_url, photos')
+    .eq('id', id)
+    .maybeSingle();
+  if (!data) return '';
+  const photos = Array.isArray(data.photos) ? data.photos : [];
+  return (
+    isHttpsImage(data.avatar_url) ||
+    isHttpsImage(data.discover_photo_url) ||
+    isHttpsImage(photos[0]) ||
+    ''
+  );
+}
+
 async function notifyUser(recipientUid, payload) {
   const out = { ok: 0, failed: 0, results: [] };
   const sb = supabase();
@@ -182,6 +225,8 @@ async function notifyUser(recipientUid, payload) {
 
   const wp = webPush();
   const fcm = firebaseMessaging();
+  const imageUrl = await resolveActorImage(sb, payload);
+  const payloadOut = imageUrl ? { ...payload, image: imageUrl } : payload;
 
   await Promise.all(
     targets.map(async (t) => {
@@ -204,7 +249,7 @@ async function notifyUser(recipientUid, payload) {
           };
           await wp.sendNotification(
             subscription,
-            JSON.stringify(payload),
+            JSON.stringify(payloadOut),
             { TTL: 60 },
           );
           out.ok += 1;
@@ -238,6 +283,14 @@ async function notifyUser(recipientUid, payload) {
             (payload.type === 'incoming_call' ||
               payload.type === 'call_cancel') &&
             t.platform === 'android';
+          // Instagram / Snap style sur Android : quand on a la photo de
+          // l'acteur, la notification part en DONNEES SEULES et c'est l'app
+          // (isolat Dart, flutter_local_notifications) qui la dessine avec la
+          // photo en GRANDE ICONE ronde a la place du logo. Un bloc
+          // `notification` serait dessine par le systeme, avec le logo.
+          // Sans photo (ex. demande d'ami floue) : bloc `notification` normal.
+          const dataOnlyAndroid =
+            isCallAndroid || (t.platform === 'android' && !!imageUrl);
           const data = {
             ...Object.fromEntries(
               Object.entries(payload.data || {}).map(([k, v]) => [k, String(v)]),
@@ -245,20 +298,42 @@ async function notifyUser(recipientUid, payload) {
             // Carry the notification type so a tap can route the app
             // to the right screen (see NotificationRouter on the client).
             ...(payload.type ? { type: String(payload.type) } : {}),
-            ...(isCallAndroid
+            ...(dataOnlyAndroid
               ? { title: String(payload.title || ''), body: String(payload.body || '') }
               : {}),
+            ...(imageUrl ? { imageUrl } : {}),
           };
           const msg = {
             token: t.fcm_token,
-            ...(isCallAndroid
+            ...(dataOnlyAndroid
               ? {}
-              : { notification: { title: payload.title, body: payload.body || '' } }),
+              : {
+                  notification: {
+                    title: payload.title,
+                    body: payload.body || '',
+                    ...(imageUrl ? { image: imageUrl } : {}),
+                  },
+                }),
             data,
-            android: { priority: 'high' },
+            android: {
+              priority: 'high',
+              ...(!dataOnlyAndroid && imageUrl
+                ? { notification: { imageUrl } }
+                : {}),
+            },
             apns: {
-              payload: { aps: { sound: 'default' } },
+              payload: {
+                aps: {
+                  sound: 'default',
+                  ...(!isCallAndroid && imageUrl
+                    ? { 'mutable-content': 1 }
+                    : {}),
+                },
+              },
               headers: { 'apns-priority': '10' },
+              ...(!isCallAndroid && imageUrl
+                ? { fcmOptions: { imageUrl } }
+                : {}),
             },
           };
           await fcm.send(msg);
@@ -319,7 +394,7 @@ async function notifyUser(recipientUid, payload) {
   // Re-engagement email fallback — best-effort, fire-and-forget so it never
   // adds latency to (or fails) the push path. Self-gates on offline + throttle
   // + opt-out inside, and no-ops entirely when RESEND_API_KEY is unset.
-  maybeEmailNotification(sb, recipientUid, payload).catch(() => {});
+  maybeEmailNotification(sb, recipientUid, payloadOut).catch(() => {});
 
   // Per-target outcome in the Railway logs so a missing push can be
   // diagnosed at a glance: e.g. `sent: ios_voip`, `error: BadDeviceToken`,

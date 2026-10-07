@@ -1,6 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:http/http.dart' as http;
 import 'package:timezone/timezone.dart' as tz;
+
+import 'notification_router.dart';
 
 /// On-device notification presentation. FCM only carries the data — this
 /// is what actually rings / shows the banner once a push arrives.
@@ -59,6 +64,9 @@ abstract final class LocalNotifications {
     );
     await _plugin.initialize(
       const InitializationSettings(android: android, iOS: darwin),
+      // Toucher une notification dessinee par l'app (photo en grande icone) :
+      // meme routage que celles dessinees par le systeme.
+      onDidReceiveNotificationResponse: (r) => _route(r.payload),
     );
     final android_ = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
@@ -81,13 +89,54 @@ abstract final class LocalNotifications {
     _ready = true;
   }
 
+  /// Remet au routeur le `data` de FCM porte par une notification locale.
+  /// Les charges non JSON (« incoming_call »…) sont ignorees.
+  static void _route(String? payload) {
+    if (payload == null || !payload.startsWith('{')) return;
+    try {
+      final data = jsonDecode(payload);
+      if (data is Map) NotificationRouter.submit(Map<String, dynamic>.from(data));
+    } catch (_) {}
+  }
+
+  /// Demarrage a froid : l'app a ete lancee en touchant une de NOS
+  /// notifications (le systeme ne la connait pas comme message FCM).
+  static Future<void> consumeLaunchPayload() async {
+    if (kIsWeb) return;
+    try {
+      await ensureReady();
+      final d = await _plugin.getNotificationAppLaunchDetails();
+      if (d?.didNotificationLaunchApp ?? false) {
+        _route(d?.notificationResponse?.payload);
+      }
+    } catch (_) {}
+  }
+
+  /// Download the actor's photo for the Android large icon (circular avatar
+  /// next to the title, Instagram / Snap style). The status-bar glyph stays
+  /// [ic_notification] — Android requires a white silhouette there.
+  static Future<ByteArrayAndroidBitmap?> _androidAvatar(String? url) async {
+    final u = (url ?? '').trim();
+    if (u.isEmpty || !u.startsWith('https://')) return null;
+    try {
+      final res = await http.get(Uri.parse(u)).timeout(const Duration(seconds: 4));
+      if (res.statusCode != 200 || res.bodyBytes.isEmpty) return null;
+      if (res.bodyBytes.length > 1024 * 1024) return null;
+      return ByteArrayAndroidBitmap(res.bodyBytes);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Full-screen ringing incoming-call notification (WhatsApp-style).
   static Future<void> showIncomingCall({
     required String title,
     String? body,
+    String? imageUrl,
   }) async {
     if (kIsWeb) return;
     await ensureReady();
+    final avatar = await _androidAvatar(imageUrl);
     final android = AndroidNotificationDetails(
       _callsChannel.id,
       _callsChannel.name,
@@ -102,6 +151,7 @@ abstract final class LocalNotifications {
       autoCancel: false,
       visibility: NotificationVisibility.public,
       ticker: title,
+      largeIcon: avatar,
     );
     const darwin = DarwinNotificationDetails(
       presentAlert: true,
@@ -181,15 +231,19 @@ abstract final class LocalNotifications {
     required int id,
     required String title,
     String? body,
+    String? imageUrl,
+    Map<String, dynamic>? data,
   }) async {
     if (kIsWeb) return;
     await ensureReady();
+    final avatar = await _androidAvatar(imageUrl);
     final android = AndroidNotificationDetails(
       _messagesChannel.id,
       _messagesChannel.name,
       channelDescription: _messagesChannel.description,
       importance: Importance.high,
       priority: Priority.high,
+      largeIcon: avatar,
     );
     const darwin = DarwinNotificationDetails();
     await _plugin.show(
@@ -197,6 +251,7 @@ abstract final class LocalNotifications {
       title,
       body,
       NotificationDetails(android: android, iOS: darwin),
+      payload: data == null ? null : jsonEncode(data),
     );
   }
 }

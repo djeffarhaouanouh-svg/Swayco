@@ -77,7 +77,25 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await LocalNotifications.cancelIncomingCall();
     return;
   }
-  if (data['type'] != 'incoming_call') return;
+  if (data['type'] != 'incoming_call') {
+    // Message en DONNEES SEULES (Android, photo de l'acteur en grande icone,
+    // façon Instagram / Snap) : le systeme n'affiche rien, c'est a nous de le
+    // faire. Quand le push porte un bloc `notification`, l'OS s'en charge.
+    if (message.notification == null) {
+      final t = (data['title'] ?? '').toString().trim();
+      if (t.isNotEmpty) {
+        final b = (data['body'] ?? '').toString().trim();
+        await LocalNotifications.showMessage(
+          id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+          title: t,
+          body: b.isEmpty ? null : b,
+          imageUrl: (data['imageUrl'] ?? '').toString(),
+          data: Map<String, dynamic>.from(data),
+        );
+      }
+    }
+    return;
+  }
   final title = (data['title'] ?? data['callerName'] ?? '').toString().trim();
   final body = (data['body'] ?? '').toString().trim();
   await LocalNotifications.showIncomingCall(
@@ -90,6 +108,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // seconde formulation.
     title: title.isEmpty ? 'Incoming call' : title,
     body: body.isEmpty ? null : body,
+    imageUrl: (data['imageUrl'] ?? '').toString(),
   );
 }
 
@@ -121,6 +140,8 @@ void _handleForegroundMessage(RemoteMessage message) {
     id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
     title: title,
     body: body.isEmpty ? null : body,
+    imageUrl: (data['imageUrl'] ?? n?.android?.imageUrl ?? '').toString(),
+    data: Map<String, dynamic>.from(data),
   ));
 }
 

@@ -22,6 +22,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'local_notifications.dart';
 import 'notification_api.dart';
 import 'notification_router.dart';
 
@@ -140,6 +141,9 @@ abstract final class NotificationClient {
     // Cold launch: the app was started by tapping a notification.
     final initial = await FirebaseMessaging.instance.getInitialMessage();
     if (initial != null) NotificationRouter.submit(initial.data);
+    // ... ou en touchant une notification dessinee par l'app (Android, photo
+    // en grande icone) : le systeme ne la rattache pas a un message FCM.
+    await LocalNotifications.consumeLaunchPayload();
   }
 
   /// Picks up a notification-tap payload that AppDelegate.swift stashed in

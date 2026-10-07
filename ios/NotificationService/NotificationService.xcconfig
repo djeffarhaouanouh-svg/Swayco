@@ -1,0 +1,4 @@
+// Les numeros de version viennent de Flutter, comme pour l'app (l'extension
+// doit porter les memes que Runner). On n'inclut PAS Flutter/Release.xcconfig :
+// il tirerait les reglages des Pods dans l'extension.
+#include "../Flutter/Generated.xcconfig"
