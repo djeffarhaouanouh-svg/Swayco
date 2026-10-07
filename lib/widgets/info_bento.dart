@@ -386,10 +386,19 @@ class InfoGlassFrame extends StatelessWidget {
             borderRadius: r,
             border: Border.all(
               color: SC.light
-                  ? SC.glassBorder
+                  ? const Color(0x401F5EFF)
                   : Colors.white.withValues(alpha: 0.24),
-              width: 1.2,
+              width: SC.light ? 1.5 : 1.2,
             ),
+            boxShadow: SC.light
+                ? const [
+                    BoxShadow(
+                      color: Color(0x1A1F5EFF),
+                      blurRadius: 18,
+                      offset: Offset(0, 6),
+                    ),
+                  ]
+                : null,
           ),
           child: child,
         ),

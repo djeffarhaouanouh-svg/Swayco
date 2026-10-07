@@ -1169,7 +1169,7 @@ class _DiscoverHeader extends StatelessWidget {
             // Centre à 20 px du haut de la bande, comme avant le resserrement
             // (43 − 3 = 40 de zone utile).
             const Padding(
-              padding: EdgeInsets.fromLTRB(6, 0, 6, 3),
+              padding: EdgeInsets.fromLTRB(6, 0, 6, 11),
               child: SwaycoWordmark(adaptive: true),
             ),
             // En haut à droite : le bouton Pro, même lien que Réglages >
@@ -1178,7 +1178,7 @@ class _DiscoverHeader extends StatelessWidget {
               right: 0,
               // Centre un peu sous celui de la boite du logo : les minuscules de
               // « swaycø » pesent vers le bas, le bouton s'aligne sur leur milieu.
-              top: 9,
+              top: 1,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => showPaywallSheet(context),
