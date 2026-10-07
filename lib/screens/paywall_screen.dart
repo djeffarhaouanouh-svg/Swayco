@@ -583,22 +583,27 @@ class _PreviewCard extends StatelessWidget {
                 Positioned(
                   top: 12,
                   left: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: SC.accent,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      b,
-                      style: const TextStyle(
-                        color: SC.onAccent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
+                  // Etincelles sur la pastille « POPULAIRE » / « BOOSTE ».
+                  child: Sparkles(
+                    color: SC.onAccent,
+                    count: 5,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: SC.accent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        b,
+                        style: const TextStyle(
+                          color: SC.onAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
                   ),
