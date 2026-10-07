@@ -61,7 +61,8 @@ class _GlobeVoyageScreenState extends State<GlobeVoyageScreen>
   static const double _intro = 0.8;
   static const double _step = 1.0;
   static const double _travel = 0.55;
-  static const double _planeDur = 2.1;
+  // Traversee de l'avion : 2,1 s a l'origine, un peu plus vive (1,7 s).
+  static const double _planeDur = 1.7;
 
   late final int _n = widget.countries.length;
   late final double _stopsEnd = _intro + _n * _step + 0.2; // « Ls »
