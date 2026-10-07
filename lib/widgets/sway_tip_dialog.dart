@@ -187,7 +187,7 @@ class _RearLayer extends StatelessWidget {
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1D24),
+          color: SC.light ? const Color(0xFFE8EEFF) : const Color(0xFF1D1D24),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: PopupTokens.border),
         ),
@@ -206,12 +206,13 @@ class _FrontRequestCard extends StatelessWidget {
       height: 58,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF23232B),
+        // Clair : carte blanche (le coeur de la pop-up ne reste pas noir).
+        color: SC.light ? Colors.white : const Color(0xFF23232B),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: PopupTokens.ghostBorder),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0xE6000000),
+            color: SC.light ? const Color(0x661F5EFF) : const Color(0xE6000000),
             blurRadius: 34,
             spreadRadius: -16,
             offset: Offset(0, 16),
