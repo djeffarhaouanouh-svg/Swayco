@@ -11,8 +11,8 @@ class NotificationService: UNNotificationServiceExtension {
   /// Style « Communication » (la photo ronde de l'expediteur a la place de
   /// l'icone de l'app, comme iMessage / Snap). Il demande la capacite
   /// « Communication Notifications » sur l'App ID : a n'activer qu'une fois
-  /// ajoutee, sinon iOS l'ignore. Desactive : seule la vignette est jointe.
-  private static let useCommunicationStyle = false
+  /// ajoutee (entitlement dans Runner.entitlements) ; si iOS la refuse, on\n  /// retombe sur la vignette jointe.
+  private static let useCommunicationStyle = true
 
   private var contentHandler: ((UNNotificationContent) -> Void)?
   private var bestAttempt: UNMutableNotificationContent?

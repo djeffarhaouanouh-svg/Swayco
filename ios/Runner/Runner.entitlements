@@ -12,6 +12,10 @@
 	     run from Xcode would need this flipped back to development. -->
 	<key>aps-environment</key>
 	<string>production</string>
+	<!-- Notifications de type Communication : la photo de l'expediteur remplace
+	     le logo de l'app dans la banniere (comme iMessage / Snap). -->
+	<key>com.apple.developer.usernotifications.communication</key>
+	<true/>
 	<!-- Sign in with Apple. Required for the native Apple auth flow and for
 	     App Store review when any third-party login (Google) is offered. -->
 	<key>com.apple.developer.applesignin</key>
