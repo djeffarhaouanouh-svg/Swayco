@@ -2901,22 +2901,28 @@ class _TinderCardState extends State<_TinderCard> {
               top: 14,
               left: 14,
               child: IgnorePointer(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: SC.accent,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    AppStrings.t('paywall_popular').toUpperCase(),
-                    style: const TextStyle(
-                      color: SC.onAccent,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
+                // Etincelles sur « POPULAIRE » : la carte de Discover, et donc
+                // aussi l'apercu de l'oeil.
+                child: Sparkles(
+                  color: SC.onAccent,
+                  count: 5,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: SC.accent,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      AppStrings.t('paywall_popular').toUpperCase(),
+                      style: const TextStyle(
+                        color: SC.onAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                 ),
