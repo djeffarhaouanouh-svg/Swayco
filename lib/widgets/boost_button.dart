@@ -114,7 +114,10 @@ class BoostButton extends StatelessWidget {
         onTap: active
             ? null
             : () => showBoostPaywall(context, onPurchased: onPurchased),
-        child: Container(
+        child: _sparkle(
+          active,
+          20,
+          Container(
           height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
@@ -171,13 +174,17 @@ class BoostButton extends StatelessWidget {
             ],
           ),
         ),
+        ),
       );
     }
     final radius = BorderRadius.circular(16);
     // Même dégradé que le bouton message de Discover ; lueur bien plus
     // discrète, sa taille la rendrait envahissante. Boost déjà actif :
     // simple pastille bleutée, sans lueur.
-    return Container(
+    return _sparkle(
+      active,
+      16,
+      Container(
       decoration: active
           ? null
           : BoxDecoration(
@@ -215,6 +222,12 @@ class BoostButton extends StatelessWidget {
           style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800),
         ),
       ),
+      ),
     );
   }
+
+  /// Etincelles par-dessus le bouton tant que le Boost n'est pas actif.
+  static Widget _sparkle(bool active, double radius, Widget child) => active
+      ? child
+      : Sparkles(borderRadius: radius, count: 7, child: child);
 }
