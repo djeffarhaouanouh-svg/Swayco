@@ -42,6 +42,7 @@ import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../swayco/translation_route.dart';
+import '../widgets/call_loader.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
@@ -3248,52 +3249,7 @@ class _CallScreenState extends State<CallScreen> {
       // gratuit depuis, et elle occupait la meilleure place de l'écran pour
       // ne plus rien dire. Elle sert maintenant à ce qui améliore vraiment
       // l'appel qui commence : la façon de parler.
-      return Scaffold(
-        backgroundColor: SC.dBg,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
-            child: Column(
-              children: [
-                // Logo, then the spinner + hint kept close just beneath it
-                // (centred together as a tight group, not spread apart).
-                const Spacer(flex: 5),
-                // Same provider CallSplashImage warmed at boot, so this
-                // paints on the splash's very first frame instead of a
-                // beat later. 278 rather than 210: the mark only fills
-                // 59% of its own canvas, so at 210 it would render a
-                // third smaller than the logo it replaces.
-                const Image(
-                  image: CallSplashImage.provider,
-                  width: 278,
-                  height: 278,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 22),
-                const SizedBox(
-                  height: 28,
-                  width: 28,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: SC.accent,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  AppStrings.t('call_connecting_tip'),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: SC.dTextMuted,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-                const Spacer(flex: 6),
-              ],
-            ),
-          ),
-        ),
-      );
+      return const CallLoader(logo: CallSplashImage.provider);
     }
 
     final room = _room!;
