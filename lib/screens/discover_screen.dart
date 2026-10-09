@@ -1004,7 +1004,7 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                       )
                     : LayoutBuilder(
                         builder: (context, c) {
-                          final panelH = c.maxHeight * 0.76;
+                          final panelH = c.maxHeight * 0.88;
                           final card = _TinderCard(
                             profile: me,
                             photos: _photos,
@@ -1620,7 +1620,7 @@ class _TinderCardStackState extends State<_TinderCardStack> {
         // Le panneau prend les trois quarts de la carte : assez pour poser la
         // bio, les faits et les intérêts d'un coup. La bande de photo qui
         // reste au-dessus sert de poignée pour le rabattre.
-        final panelH = c.maxHeight * 0.76;
+        final panelH = c.maxHeight * 0.88;
         return Stack(
         children: [
           // Carte suivante — pleine taille dessous, elle grandit à mesure
