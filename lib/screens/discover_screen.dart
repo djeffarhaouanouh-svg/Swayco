@@ -15,11 +15,9 @@ import '../services/swayco_sounds.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
-import '../services/job_sectors.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/local_notifications.dart';
-import '../services/looking_for.dart';
 import '../services/match_celebration.dart';
 import '../services/persona_categories.dart';
 import '../services/nav_chrome.dart';
@@ -29,13 +27,15 @@ import '../services/rewarded_video.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
-import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/ad_info_sheet.dart';
 import '../widgets/boost_button.dart';
 import '../widgets/country_silhouette.dart';
 import '../widgets/discover_ad_card.dart';
 import '../widgets/discover_globe.dart';
+import '../services/fact_emojis.dart';
+import '../widgets/info_bento.dart' show bentoLabelStyle;
+import '../widgets/profile_info_card.dart';
 import '../widgets/swayco_action_buttons.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
@@ -1866,78 +1866,9 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
     );
   }
 
-  Widget _row(IconData icon, String label, String value) {
-    final light = SC.light;
-    return Container(
-      constraints: const BoxConstraints(minHeight: 31),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: light ? const Color(0x241F5EFF) : const Color(0x1AFFFFFF),
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Sur blanc : jamais de jaune, les icones passent en bleu.
-          Icon(icon, size: 17, color: light ? const Color(0xFF1F5EFF) : SC.accent),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: TextStyle(
-              color: light ? const Color(0xB304123A) : const Color(0xC7FFFFFF),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                color: light ? const Color(0xFF04123A) : Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final p = widget.profile;
-    final cat = personaCategoryByLabel(p.personaCategory);
-    final facts = <(IconData, String, String)>[
-      (
-        Icons.cake_rounded,
-        AppStrings.t('info_age'),
-        p.age == null
-            ? ''
-            : AppStrings.t('info_age_value', args: {'n': '${p.age}'}),
-      ),
-      (Icons.work_rounded, AppStrings.t('info_job'), displayJob(p.job)),
-      (
-        Icons.explore_rounded,
-        AppStrings.t('info_persona_category'),
-        cat == null ? '' : personaCategoryLabel(cat.label),
-      ),
-      (
-        Icons.auto_awesome_rounded,
-        AppStrings.t('info_zodiac'),
-        displayZodiac(p.zodiac),
-      ),
-      (
-        Icons.handshake_rounded,
-        AppStrings.t('info_looking_for'),
-        displayLookingFor(p.lookingFor),
-      ),
-    ].where((f) => f.$3.trim().isNotEmpty).toList();
 
     final country = p.country.trim();
     final iso = countryIso2For(country);
@@ -1982,56 +1913,39 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
         // Le rang du bio est consomme meme sans bio : les delais restent ceux
         // de la maquette.
         const SizedBox.shrink(),
-      for (final f in facts) _reveal(next(), _row(f.$1, f.$2, f.$3)),
-      if (p.interests.isNotEmpty) ...[
-        const SizedBox(height: 14),
-        _reveal(
-          next(),
-          SizedBox(
-            height: 40,
-            child: ShaderMask(
-              blendMode: BlendMode.dstIn,
-              shaderCallback: (r) => const LinearGradient(
-                colors: [Colors.white, Colors.white, Colors.transparent],
-                stops: [0, 0.78, 1],
-              ).createShader(r),
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: p.interests.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (_, i) => Center(
-                  child: SC.light
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 7,
+      _reveal(
+        next(),
+        ProfileInfoCard(
+          profile: p,
+          showHeader: false,
+          interestsBody: p.interests.isEmpty
+              ? null
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      '$kFactEmojiInterests ${AppStrings.t('profile_interests_section').toUpperCase()}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: bentoLabelStyle(),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final tag in p.interests)
+                          InterestPill(
+                            label: interestPillText(tag),
+                            prominent: true,
                           ),
-                          decoration: BoxDecoration(
-                            color: const Color(0x141F5EFF),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: const Color(0x401F5EFF)),
-                          ),
-                          child: Text(
-                            interestPillText(p.interests[i]),
-                            style: const TextStyle(
-                              color: Color(0xFF04123A),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        )
-                      : InterestPill(
-                          label: interestPillText(p.interests[i]),
-                          prominent: true,
-                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ),
         ),
-      ],
+      ),
     ];
-
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       // Un glissement vers le bas suffit à le rabattre — pas de bouton. Un

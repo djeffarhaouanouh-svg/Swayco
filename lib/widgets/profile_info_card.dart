@@ -98,6 +98,7 @@ class ProfileInfoCard extends StatelessWidget {
     this.onMother,
     this.onFather,
     this.interestsBody,
+    this.showHeader = true,
   });
 
   final RemoteProfile? profile;
@@ -113,6 +114,10 @@ class ProfileInfoCard extends StatelessWidget {
   /// Contenu complet de la tuile « centres d'intérêt » (libellé compris).
   /// Null = la tuile n'est pas affichée.
   final Widget? interestsBody;
+
+  /// Faux sur le passeport Discover : le nom, le drapeau et le tampon y sont
+  /// déjà portés par l'en-tête du passeport.
+  final bool showHeader;
 
   static const double _textBoost = 1.2;
 
@@ -197,8 +202,10 @@ class _Scaled extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _header(context, pal),
-                SizedBox(height: _u(10)),
+                if (card.showHeader) ...[
+                  _header(context, pal),
+                  SizedBox(height: _u(10)),
+                ],
                 SizedBox(height: _u(191), child: _ageJobSign(context, pal)),
                 SizedBox(height: _u(10)),
                 _defines(context, pal, persona),
