@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # --- Flutter Web (release) ---
 FROM ghcr.io/cirruslabs/flutter:stable AS flutter-build
 
