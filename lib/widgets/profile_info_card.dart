@@ -707,7 +707,6 @@ class _Tile extends StatelessWidget {
     required this.child,
     this.padding,
     this.onTap,
-    this.shrink = false,
     this.trailing,
   });
 
@@ -717,9 +716,6 @@ class _Tile extends StatelessWidget {
   final Widget child;
   final EdgeInsets? padding;
   final Future<void> Function(BuildContext)? onTap;
-
-  /// Hauteur = contenu (pas d'`Expanded`) : la case ne rogne plus son contenu.
-  final bool shrink;
 
   /// Posé par-dessus la case, à droite, centré sur toute sa hauteur.
   final Widget? trailing;
@@ -742,13 +738,12 @@ class _Tile extends StatelessWidget {
         border: Border.all(color: pal.tileBorder),
       ),
       child: Column(
-        mainAxisSize: shrink ? MainAxisSize.min : MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(label,
               maxLines: 1, overflow: TextOverflow.ellipsis, style: labelStyle),
           SizedBox(height: 4 * u),
-          if (shrink) child else Expanded(child: child),
+          Expanded(child: child),
         ],
       ),
     );
