@@ -99,6 +99,8 @@ class ProfileInfoCard extends StatelessWidget {
     this.onFather,
     this.interestsBody,
     this.showHeader = true,
+    this.framed = true,
+    this.signReveal,
   });
 
   final RemoteProfile? profile;
@@ -118,6 +120,13 @@ class ProfileInfoCard extends StatelessWidget {
   /// Faux sur le passeport Discover : le nom, le drapeau et le tampon y sont
   /// déjà portés par l'en-tête du passeport.
   final bool showHeader;
+
+  /// Faux sur le passeport : pas de cadre, d'ombre ni de halo propres, les cases
+  /// sont posées directement sur la page.
+  final bool framed;
+
+  /// Entrée de l'image du signe (rotation -140° -> 0°, échelle .4 -> 1).
+  final Animation<double>? signReveal;
 
   static const double _textBoost = 1.2;
 
@@ -170,6 +179,22 @@ class _Scaled extends StatelessWidget {
     final persona = personaCategoryByLabel(p?.personaCategory ?? '');
     final accent = kPersonaColors[persona?.label ?? ''] ?? _kDefaultAccent;
     final pal = _Pal(accent);
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (card.showHeader) ...[
+          _header(context, pal),
+          SizedBox(height: _u(10)),
+        ],
+        SizedBox(height: _u(191), child: _ageJobSign(context, pal)),
+        SizedBox(height: _u(10)),
+        _defines(context, pal, persona),
+        ..._origins(context, pal),
+        ..._interests(pal),
+      ],
+    );
+    if (!card.framed) return content;
     final radius = BorderRadius.circular(_u(34));
     return Container(
       decoration: BoxDecoration(
@@ -198,21 +223,7 @@ class _Scaled extends StatelessWidget {
           ),
           child: Padding(
             padding: EdgeInsets.fromLTRB(_u(28), _u(18), _u(28), _u(26)),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (card.showHeader) ...[
-                  _header(context, pal),
-                  SizedBox(height: _u(10)),
-                ],
-                SizedBox(height: _u(191), child: _ageJobSign(context, pal)),
-                SizedBox(height: _u(10)),
-                _defines(context, pal, persona),
-                ..._origins(context, pal),
-                ..._interests(pal),
-              ],
-            ),
+            child: content,
           ),
         ),
       ),
@@ -441,40 +452,35 @@ class _Scaled extends StatelessWidget {
                   k: k,
                   pal: pal,
                   label: AppStrings.t('info_zodiac').toUpperCase(),
-                  padding: EdgeInsets.fromLTRB(_u(18), _u(8), _u(12), _u(8)),
                   onTap: card.editable ? card.onZodiac : null,
-                  child: signName.isEmpty
-                      ? Align(
-                          alignment: Alignment.centerLeft,
-                          child: card.editable ? add() : dash(),
-                        )
-                      : Row(
-                          children: [
-                            Expanded(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  signName,
-                                  maxLines: 1,
-                                  style: TextStyle(
-                                    color: pal.text,
-                                    fontSize: _t(24),
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                  trailing: signName.isEmpty
+                      ? null
+                      : _SignArt(
+                          asset: 'assets/zodiac/${_kZodiacAssets[z]}.png',
+                          size: _u(68),
+                          reveal: card.signReveal,
+                        ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: signName.isEmpty
+                        ? (card.editable ? add() : dash())
+                        : Padding(
+                            padding: EdgeInsets.only(right: _u(92)),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                signName,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  color: pal.text,
+                                  fontSize: _t(24),
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
-                            ClipOval(
-                              child: Image.asset(
-                                'assets/zodiac/${_kZodiacAssets[z]}.png',
-                                width: _u(76),
-                                height: _u(76),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                  ),
                 ),
               ),
             ],
@@ -488,15 +494,16 @@ class _Scaled extends StatelessWidget {
   Widget _defines(BuildContext context, _Pal pal, PersonaCategory? persona) {
     final lum = pal.accent.computeLuminance();
     final fg = lum > 0.45 ? const Color(0xFF06121F) : Colors.white;
-    return SizedBox(
-      height: _u(86),
-      child: _Tile(
-        k: k,
-        pal: pal,
-        label: AppStrings.t('info_persona_category').toUpperCase(),
-        onTap: card.editable ? card.onPersona : null,
+    return _Tile(
+      k: k,
+      pal: pal,
+      shrink: true,
+      label: AppStrings.t('info_persona_category').toUpperCase(),
+      onTap: card.editable ? card.onPersona : null,
+      child: Padding(
+        padding: EdgeInsets.only(top: _u(8)),
         child: Align(
-          alignment: Alignment.bottomLeft,
+          alignment: Alignment.centerLeft,
           child: persona == null
               ? (card.editable
                   ? Text(
@@ -513,9 +520,21 @@ class _Scaled extends StatelessWidget {
               : Container(
                   padding: EdgeInsets.symmetric(
                       horizontal: _u(26), vertical: _u(6)),
+                  // La couleur du persona reste PLEINE : le reflet blanc est
+                  // en avant-plan, sinon le dégradé écrase la couleur (gris).
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(99),
                     color: pal.accent,
+                    boxShadow: [
+                      BoxShadow(
+                        color: pal.accent.withValues(alpha: .4),
+                        blurRadius: _u(20),
+                        offset: Offset(0, _u(6)),
+                      ),
+                    ],
+                  ),
+                  foregroundDecoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(99),
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -525,13 +544,6 @@ class _Scaled extends StatelessWidget {
                         Colors.transparent,
                       ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: pal.accent.withValues(alpha: .4),
-                        blurRadius: _u(20),
-                        offset: Offset(0, _u(6)),
-                      ),
-                    ],
                   ),
                   child: Text(
                     '${persona.emoji} ${personaCategoryLabel(persona.label)}',
@@ -673,6 +685,8 @@ class _Tile extends StatelessWidget {
     required this.child,
     this.padding,
     this.onTap,
+    this.shrink = false,
+    this.trailing,
   });
 
   final double k;
@@ -681,6 +695,12 @@ class _Tile extends StatelessWidget {
   final Widget child;
   final EdgeInsets? padding;
   final Future<void> Function(BuildContext)? onTap;
+
+  /// Hauteur = contenu (pas d'`Expanded`) : la case ne rogne plus son contenu.
+  final bool shrink;
+
+  /// Posé par-dessus la case, à droite, centré sur toute sa hauteur.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -692,7 +712,7 @@ class _Tile extends StatelessWidget {
       fontSize: 12 * u * 1.5,
       letterSpacing: 1.7 * u,
     );
-    final tile = Container(
+    Widget tile = Container(
       padding: pad,
       decoration: BoxDecoration(
         color: pal.tile,
@@ -700,20 +720,72 @@ class _Tile extends StatelessWidget {
         border: Border.all(color: pal.tileBorder),
       ),
       child: Column(
+        mainAxisSize: shrink ? MainAxisSize.min : MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(label,
               maxLines: 1, overflow: TextOverflow.ellipsis, style: labelStyle),
           SizedBox(height: 4 * u),
-          Expanded(child: child),
+          if (shrink) child else Expanded(child: child),
         ],
       ),
     );
+    if (trailing != null) {
+      tile = Stack(
+        fit: StackFit.passthrough,
+        children: [
+          tile,
+          Positioned(
+            right: 12 * u,
+            top: 0,
+            bottom: 0,
+            child: Center(child: trailing),
+          ),
+        ],
+      );
+    }
     if (onTap == null) return tile;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => onTap!(context),
       child: tile,
+    );
+  }
+}
+
+/// L'image du signe : ronde d'origine (fond transparent), jamais rognée.
+class _SignArt extends StatelessWidget {
+  const _SignArt({required this.asset, required this.size, this.reveal});
+
+  final String asset;
+  final double size;
+  final Animation<double>? reveal;
+
+  @override
+  Widget build(BuildContext context) {
+    final img = Image.asset(
+      asset,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+    );
+    final r = reveal;
+    if (r == null) return img;
+    return AnimatedBuilder(
+      animation: r,
+      builder: (_, c) {
+        final t = r.value.clamp(0.0, 1.0);
+        final e = Curves.easeOutBack.transform(t);
+        return Opacity(
+          opacity: t,
+          child: Transform.rotate(
+            angle: -140 * math.pi / 180 * (1 - e),
+            child: Transform.scale(scale: 0.4 + 0.6 * e, child: c),
+          ),
+        );
+      },
+      child: img,
     );
   }
 }

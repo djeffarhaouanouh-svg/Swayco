@@ -1894,16 +1894,10 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
   @override
   Widget build(BuildContext context) {
     final p = widget.profile;
-
-    final country = p.country.trim();
-    final iso = countryIso2For(country);
-    final localizedCountry =
-        iso.isEmpty ? '' : AppStrings.t('country_$iso');
-    final stampText = (localizedCountry.isNotEmpty &&
-                localizedCountry != 'country_$iso'
-            ? localizedCountry
-            : country)
-        .toUpperCase();
+    // Couleur du persona : halo du bas et bord haut du passeport.
+    final accent =
+        kPersonaColors[personaCategoryByLabel(p.personaCategory)?.label ?? ''] ??
+            SC.brandCyan;
     final passNo = p.id.length >= 4
         ? p.id.substring(p.id.length - 4).toUpperCase()
         : '0001';
@@ -1943,6 +1937,8 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
         ProfileInfoCard(
           profile: p,
           showHeader: false,
+          framed: false,
+          signReveal: _at(1000, 700),
           interestsBody: p.interests.isEmpty
               ? null
               : Column(
@@ -1991,9 +1987,7 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
                 borderRadius: _kPassportRadius,
                 border: Border(
                   top: BorderSide(
-                    color: SC.light
-                        ? const Color(0x331F5EFF)
-                        : const Color(0x4DFFFFFF),
+                    color: accent.withValues(alpha: 0.6),
                     width: 1.2,
                   ),
                 ),
@@ -2002,44 +1996,24 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
                 borderRadius: _kPassportRadius,
                 child: Stack(
                   children: [
-                    // Lueur bleue en haut de la page, DANS le cadre : une ombre
-                    // portee debordait du bord de la carte.
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      top: 0,
-                      height: 70,
-                      child: IgnorePointer(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                SC.brandBlue.withValues(alpha: SC.light ? 0.2 : 0.35),
-                                SC.brandBlue.withValues(alpha: 0),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Et la meme lueur en BAS, toujours dans le cadre.
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height: 90,
-                      child: IgnorePointer(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [
-                                SC.brandBlue.withValues(alpha: SC.light ? 0.25 : 0.45),
-                                SC.brandBlue.withValues(alpha: 0),
-                              ],
+                    // Halo de la couleur du persona, DANS le cadre : transparent en
+                    // haut, 70 % d'opacité sur le bord bas, sur 62 % de la hauteur.
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: FractionallySizedBox(
+                        widthFactor: 1,
+                        heightFactor: 0.62,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [
+                                  accent.withValues(alpha: 0.70),
+                                  accent.withValues(alpha: 0),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -2129,35 +2103,6 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
               ),
             ),
           ),
-          // ── Le tampon du pays (1,5 s) ───────────────────────────────────
-          if (stampText.isNotEmpty)
-            Positioned(
-              right: 16,
-              top: 52,
-              child: IgnorePointer(
-                child: AnimatedBuilder(
-                  animation: _ctl,
-                  builder: (_, _) {
-                    final t = Curves.elasticOut.transform(
-                      _at(1500).value.clamp(0.0, 1.0),
-                    );
-                    final fade = _at(1500, 120).value;
-                    final scale = 2.2 + (1 - 2.2) * t;
-                    final angle = (-30 + 18 * t) * math.pi / 180;
-                    return Opacity(
-                      opacity: fade,
-                      child: Transform.rotate(
-                        angle: angle,
-                        child: Transform.scale(
-                          scale: scale,
-                          child: _CountryStamp(text: stampText),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
           // ── La couverture ───────────────────────────────────────────────
           Positioned.fill(
             child: IgnorePointer(
@@ -2381,51 +2326,6 @@ class _PanelHeader extends StatelessWidget {
     );
   }
 }
-
-/// Tampon rond du pays : « ✦ » puis le nom du pays en majuscules, en jaune.
-class _CountryStamp extends StatelessWidget {
-  const _CountryStamp({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    // Sur blanc : bleu, jamais de jaune.
-    final c = SC.light ? const Color(0xFF1F5EFF) : SC.accent;
-    return Container(
-      width: 54,
-      height: 54,
-      padding: const EdgeInsets.all(5),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: c, width: 2),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '✦',
-            style: TextStyle(fontSize: 8, height: 1, color: c),
-          ),
-          Text(
-            text,
-            maxLines: 2,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.ibmPlexMono(
-              fontSize: 7.5,
-              letterSpacing: 1.2,
-              height: 1.1,
-              color: c,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 
 class _StackCard extends StatelessWidget {
   const _StackCard({
