@@ -555,7 +555,7 @@ class _Scaled extends StatelessWidget {
       );
     }
     final tile = Container(
-      padding: EdgeInsets.fromLTRB(_u(18), _u(10), _u(12), _u(10)),
+      padding: EdgeInsets.fromLTRB(_u(18), _u(10), _u(34), _u(10)),
       decoration: BoxDecoration(
         color: pal.tile,
         borderRadius: BorderRadius.circular(_u(22)),
