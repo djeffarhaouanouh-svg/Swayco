@@ -1,4 +1,4 @@
-import 'dart:math';
+﻿import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -41,6 +41,9 @@ class RemoteProfile {
     this.zodiac = '',
     this.lookingFor = '',
     this.personaCategory = '',
+    this.nationality = '',
+    this.originMother = '',
+    this.originFather = '',
   });
 
   final String id;
@@ -114,6 +117,13 @@ class RemoteProfile {
   /// Discover scoring. Empty for profiles onboarded before this field
   /// existed.
   final String personaCategory;
+
+  /// ISO-3166 alpha-2 (lowercase) codes: nationality, and the origins of the
+  /// mother and the father. Empty when not shared (`profiles.nationality`,
+  /// `origin_mother`, `origin_father` - migration 0067).
+  final String nationality;
+  final String originMother;
+  final String originFather;
 
   /// Self-declared grammatical gender. One of:
   ///   'm' — masculine
@@ -256,6 +266,9 @@ class RemoteProfile {
     zodiac: m['zodiac']?.toString() ?? '',
     lookingFor: m['looking_for']?.toString() ?? '',
     personaCategory: m['persona_category']?.toString() ?? '',
+    nationality: m['nationality']?.toString() ?? '',
+    originMother: m['origin_mother']?.toString() ?? '',
+    originFather: m['origin_father']?.toString() ?? '',
     gender: () {
       final g = m['gender']?.toString().trim() ?? '';
       return (g == 'm' || g == 'f' || g == 'x') ? g : '';
@@ -302,6 +315,9 @@ class RemoteProfile {
     String? zodiac,
     String? lookingFor,
     String? personaCategory,
+    String? nationality,
+    String? originMother,
+    String? originFather,
     String? gender,
     bool? hideOnlineStatus,
     bool? hideFromCountry,
@@ -330,6 +346,9 @@ class RemoteProfile {
     zodiac: zodiac ?? this.zodiac,
     lookingFor: lookingFor ?? this.lookingFor,
     personaCategory: personaCategory ?? this.personaCategory,
+    nationality: nationality ?? this.nationality,
+    originMother: originMother ?? this.originMother,
+    originFather: originFather ?? this.originFather,
     city: city ?? this.city,
     gender: gender ?? this.gender,
     hideOnlineStatus: hideOnlineStatus ?? this.hideOnlineStatus,
@@ -1052,6 +1071,9 @@ abstract final class ProfileApi {
     Object? zodiac = unset,
     Object? lookingFor = unset,
     Object? personaCategory = unset,
+    Object? nationality = unset,
+    Object? originMother = unset,
+    Object? originFather = unset,
   }) async {
     if (!isSupabaseReady || userId.isEmpty) return false;
     final patch = <String, dynamic>{};
@@ -1063,6 +1085,9 @@ abstract final class ProfileApi {
     if (!identical(personaCategory, unset)) {
       patch['persona_category'] = personaCategory;
     }
+    if (!identical(nationality, unset)) patch['nationality'] = nationality;
+    if (!identical(originMother, unset)) patch['origin_mother'] = originMother;
+    if (!identical(originFather, unset)) patch['origin_father'] = originFather;
     if (patch.isEmpty) return true;
     try {
       patch['updated_at'] = DateTime.now().toUtc().toIso8601String();

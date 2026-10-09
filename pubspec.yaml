@@ -259,6 +259,8 @@ flutter:
     # Natural Earth 110m country outlines (GeoJSON, coords rounded to 2dp) —
     # drives the Discover country-picker globe (lib/widgets/discover_globe.dart).
     - assets/geo/world-110m.geo.json
+    # Signes du zodiaque de la carte Mes infos.
+    - assets/zodiac/
 
   # The swaycø wordmark is set in Glacial Indifference (SIL Open Font
   # License — see assets/fonts/OFL.txt). Brand type only: the rest of the UI

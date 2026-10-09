@@ -22,7 +22,6 @@ import '../services/interests.dart';
 import '../services/job_sectors.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
-import '../services/looking_for.dart';
 import '../services/match_celebration.dart';
 import '../services/nav_tab.dart';
 import '../services/persona_categories.dart';
@@ -37,6 +36,7 @@ import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/fade_scale_route.dart';
 import '../widgets/info_bento.dart';
+import '../widgets/profile_info_card.dart';
 import '../widgets/settings_hero.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/location_picker_sheet.dart';
@@ -784,6 +784,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     Object? zodiac = _keep,
     Object? lookingFor = _keep,
     Object? personaCategory = _keep,
+    Object? nationality = _keep,
+    Object? originMother = _keep,
+    Object? originFather = _keep,
   }) async {
     if (_deviceId.isEmpty) return;
     await ProfileApi.updatePersonalInfo(
@@ -797,6 +800,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       personaCategory: identical(personaCategory, _keep)
           ? ProfileApi.unset
           : personaCategory,
+      nationality: identical(nationality, _keep) ? ProfileApi.unset : nationality,
+      originMother:
+          identical(originMother, _keep) ? ProfileApi.unset : originMother,
+      originFather:
+          identical(originFather, _keep) ? ProfileApi.unset : originFather,
     );
     SwaycoSounds.play(SwSound.profileSaved);
     if (mounted) await _reload(silent: true);
@@ -1362,6 +1370,9 @@ class _IdentitySection extends StatelessWidget {
     Object? zodiac,
     Object? lookingFor,
     Object? personaCategory,
+    Object? nationality,
+    Object? originMother,
+    Object? originFather,
   })? onSavePersonalInfo;
 
   /// Own profile: append a photo to the gallery.
@@ -1881,14 +1892,14 @@ class _IdentitySection extends StatelessWidget {
         if (!emptyBio || _hasFacts(personalInfo) || interests.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
-            child: InfoGlassFrame(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!emptyBio) ...[
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!emptyBio) ...[
+                  InfoGlassFrame(
                     // Traduite dans la langue de l'interface quand elle diffère
                     // de celle que le pair parle.
-                    TranslatedProfileText(
+                    child: TranslatedProfileText(
                       text: bio,
                       profileId: personalInfo?.id ?? handle,
                       field: 'bio',
@@ -1900,46 +1911,40 @@ class _IdentitySection extends StatelessWidget {
                         height: 1.4,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                  ],
-                  InfoBento(
-                    solidAge: true,
-                    age: _ageTile(personalInfo),
-                    others: _otherTiles(personalInfo),
                   ),
-                  if (interests.isNotEmpty) ...[
-                    if (!emptyBio || _hasFacts(personalInfo))
-                      const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: bentoTileDecoration(),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            '$kFactEmojiInterests ${AppStrings.t('profile_interests_section').toUpperCase()}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: bentoLabelStyle(),
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
+                  if (_hasFacts(personalInfo) || interests.isNotEmpty)
+                    const SizedBox(height: 12),
+                ],
+                if (_hasFacts(personalInfo) || interests.isNotEmpty)
+                  ProfileInfoCard(
+                    profile: personalInfo,
+                    interestsBody: interests.isEmpty
+                        ? null
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              for (final tag in interests)
-                                InterestPill(
-                                  label: interestPillText(tag),
-                                  prominent: true,
-                                ),
+                              Text(
+                                '$kFactEmojiInterests ${AppStrings.t('profile_interests_section').toUpperCase()}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: bentoLabelStyle(),
+                              ),
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  for (final tag in interests)
+                                    InterestPill(
+                                      label: interestPillText(tag),
+                                      prominent: true,
+                                    ),
+                                ],
+                              ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
       ],
@@ -1952,40 +1957,10 @@ class _IdentitySection extends StatelessWidget {
           p.job.trim().isNotEmpty ||
           p.zodiac.trim().isNotEmpty ||
           p.lookingFor.trim().isNotEmpty ||
-          p.personaCategory.trim().isNotEmpty);
-
-  /// Les tuiles en lecture seule (pair) : mêmes libellés que sur mon profil.
-  static BentoTileData _ageTile(RemoteProfile? p) => BentoTileData(
-        emoji: kFactEmojiAge,
-        label: AppStrings.t('info_age'),
-        value: p?.age?.toString() ?? '',
-      );
-
-  static List<BentoTileData> _otherTiles(RemoteProfile? p) {
-    final cat = personaCategoryByLabel(p?.personaCategory ?? '');
-    return [
-      BentoTileData(
-        emoji: kFactEmojiJob,
-        label: AppStrings.t('info_job'),
-        value: displayJob(p?.job ?? ''),
-      ),
-      BentoTileData(
-        emoji: kFactEmojiZodiac,
-        label: AppStrings.t('info_zodiac'),
-        value: displayZodiac(p?.zodiac ?? ''),
-      ),
-      BentoTileData(
-        emoji: cat?.emoji ?? kFactEmojiPersonaCategory,
-        label: AppStrings.t('info_persona_category'),
-        value: cat == null ? '' : personaCategoryLabel(cat.label),
-      ),
-      BentoTileData(
-        emoji: kFactEmojiLookingFor,
-        label: AppStrings.t('info_looking_for'),
-        value: displayLookingFor(p?.lookingFor ?? ''),
-      ),
-    ];
-  }
+          p.personaCategory.trim().isNotEmpty ||
+          p.nationality.trim().isNotEmpty ||
+          p.originMother.trim().isNotEmpty ||
+          p.originFather.trim().isNotEmpty);
 }
 /// Rond de 44 en verre (blanc 13 %, bord blanc 30 % de 1,2 px, flou 20) — les
 /// boutons posés sur la couverture.
@@ -2662,6 +2637,9 @@ class _PersonalInfoSection extends StatelessWidget {
     Object? zodiac,
     Object? lookingFor,
     Object? personaCategory,
+    Object? nationality,
+    Object? originMother,
+    Object? originFather,
   })? onSave;
 
   /// Rendu EN HAUT du panneau, au-dessus des lignes d'infos (la bio).
@@ -2678,7 +2656,6 @@ class _PersonalInfoSection extends StatelessWidget {
     // La catégorie choisie porte son propre emoji : c'est LUI qui tient la
     // colonne de gauche de la ligne. La coupe n'est que le pictogramme du
     // champ vide — une fois "Mélomane" choisi, la ligne s'annonce en 🎵.
-    final personaCat = personaCategoryByLabel(p?.personaCategory ?? '');
 
     Future<void> pickAge(BuildContext ctx) async {
       final picked = await showWheelPicker(
@@ -2758,78 +2735,56 @@ class _PersonalInfoSection extends StatelessWidget {
       await save(zodiac: kZodiacSigns[picked]);
     }
 
-    Future<void> pickLooking(BuildContext ctx) async {
-      final current = normalizeLookingFor(p?.lookingFor ?? '');
-      final picked = await showWheelPicker(
-        context: ctx,
-        title: AppStrings.t('info_looking_for'),
-        emoji: kFactEmojiLookingFor,
-        labels: [for (final k in kLookingForOptions) lookingForLabel(k)],
-        initialIndex: lookingForIndex(current),
-        allowClear: current.isNotEmpty,
+    Future<void> pickNationality(BuildContext ctx) async {
+      final iso = await pickCountryIso(
+        ctx,
+        title: AppStrings.t('info_nationality'),
+        current: p?.nationality ?? '',
       );
-      if (picked == null) return;
-      if (picked < 0) {
-        await save(lookingFor: '');
-        return;
-      }
-      await save(lookingFor: kLookingForOptions[picked]);
+      if (iso == null) return;
+      await save(nationality: iso);
     }
 
-    return InfoGlassFrame(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (top != null) ...[top!, const SizedBox(height: 10)],
-          InfoBento(
-            solidAge: true,
-            editable: true,
-            age: BentoTileData(
-              emoji: kFactEmojiAge,
-              label: AppStrings.t('info_age'),
-              value: p?.age?.toString() ?? '',
-              onTap: pickAge,
-            ),
-            others: [
-              BentoTileData(
-                emoji: kFactEmojiJob,
-                label: AppStrings.t('info_job'),
-                value: displayJob(p?.job ?? ''),
-                onTap: pickJob,
-              ),
-              BentoTileData(
-                emoji: kFactEmojiZodiac,
-                label: AppStrings.t('info_zodiac'),
-                value: displayZodiac(p?.zodiac ?? ''),
-                onTap: pickZodiac,
-              ),
-              BentoTileData(
-                emoji: personaCat?.emoji ?? kFactEmojiPersonaCategory,
-                label: AppStrings.t('info_persona_category'),
-                value: personaCat == null
-                    ? ''
-                    : personaCategoryLabel(personaCat.label),
-                onTap: pickPersona,
-              ),
-              BentoTileData(
-                emoji: kFactEmojiLookingFor,
-                label: AppStrings.t('info_looking_for'),
-                value: displayLookingFor(p?.lookingFor ?? ''),
-                onTap: pickLooking,
-              ),
-            ],
-          ),
-          if (bottom != null) ...[
-            const SizedBox(height: 10),
-            // La tuile « centres d'intérêt », pleine largeur.
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: bentoTileDecoration(),
-              child: bottom!,
-            ),
-          ],
+    Future<void> pickMother(BuildContext ctx) async {
+      final iso = await pickCountryIso(
+        ctx,
+        title: AppStrings.t('info_origin_mother'),
+        current: p?.originMother ?? '',
+      );
+      if (iso == null) return;
+      await save(originMother: iso);
+    }
+
+    Future<void> pickFather(BuildContext ctx) async {
+      final iso = await pickCountryIso(
+        ctx,
+        title: AppStrings.t('info_origin_father'),
+        current: p?.originFather ?? '',
+      );
+      if (iso == null) return;
+      await save(originFather: iso);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (top != null) ...[
+          InfoGlassFrame(child: top!),
+          const SizedBox(height: 12),
         ],
-      ),
+        ProfileInfoCard(
+          profile: p,
+          editable: true,
+          onNationality: pickNationality,
+          onAge: pickAge,
+          onJob: pickJob,
+          onZodiac: pickZodiac,
+          onPersona: pickPersona,
+          onMother: pickMother,
+          onFather: pickFather,
+          interestsBody: bottom,
+        ),
+      ],
     );
   }
 }
