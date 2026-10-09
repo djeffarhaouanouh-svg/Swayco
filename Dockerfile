@@ -23,7 +23,8 @@ RUN flutter config --no-analytics \
   && flutter build web --release --dart-define-from-file=dart_defines.env
 
 # --- Node: API + static web ---
-FROM node:22-alpine AS runtime
+# Miroir ECR : Docker Hub renvoie 429 sur les builders partages.
+FROM public.ecr.aws/docker/library/node:22-alpine AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
