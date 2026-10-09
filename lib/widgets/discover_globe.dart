@@ -241,23 +241,58 @@ Color _terrain(double lat) {
   return const Color(0xFFC9DFB6);
 }
 
+/// Qui je veux rencontrer : choisi sur la page 2 du globe, appliqué au deck
+/// Discover (`profile.gender` : m / f).
+enum GenderFilter { homme, femme, mixte }
+
+/// Ce que renvoie la pop-up Globe : les pays ET le genre.
+typedef GlobeResult = ({Set<String> countries, GenderFilter gender});
+
 // ── The sheet ───────────────────────────────────────────────────────────────
 
 /// Full-screen overlay: a dark card with the spinning globe and a cyan
 /// "🔍 Lancer" button. Pops the set of selected country keys — never null:
 /// an empty set (or a scrim/✕ dismiss) leaves the caller's filter untouched.
 class DiscoverGlobeSheet extends StatefulWidget {
-  const DiscoverGlobeSheet({super.key, this.initial = const {}});
+  const DiscoverGlobeSheet({
+    super.key,
+    this.initial = const {},
+    this.initialGender = GenderFilter.mixte,
+  });
 
   final Set<String> initial;
+  final GenderFilter initialGender;
 
   @override
   State<DiscoverGlobeSheet> createState() => _DiscoverGlobeSheetState();
 }
 
-class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
+class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
+    with SingleTickerProviderStateMixin {
   List<_Land>? _world;
   late Set<String> _selected = {...widget.initial};
+
+  /// 1 = les pays (globe), 2 = « Qui veux-tu y rencontrer ? ».
+  int _page = 1;
+  late GenderFilter _gender = widget.initialGender;
+
+  /// Toute la transition page 1 -> 2 sur UN contrôleur (1,2 s).
+  late final AnimationController _pageCtl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  );
+
+  /// Le globe descend, rétrécit et s'éteint sur les 950 premières ms.
+  late final Animation<double> _globeT = _pageCtl.drive(
+    CurveTween(
+      curve: const Interval(0, 0.79, curve: Cubic(0.65, 0, 0.25, 1)),
+    ),
+  );
+
+  /// La page 1 (croix, recherche, titre) s'efface sur 400 ms.
+  late final Animation<double> _p1T = _pageCtl.drive(
+    CurveTween(curve: const Interval(0, 400 / 1200, curve: Curves.easeOut)),
+  );
 
   final GlobalKey<_GlobeViewState> _globeKey = GlobalKey<_GlobeViewState>();
   final TextEditingController _search = TextEditingController();
@@ -276,6 +311,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
   void dispose() {
     _search.dispose();
     _searchFocus.dispose();
+    _pageCtl.dispose();
     super.dispose();
   }
 
@@ -288,6 +324,8 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
           ? (_selected.difference({key}))
           : ({..._selected, key});
     });
+    // Plus aucun pays choisi depuis la page 2 : retour à la page 1.
+    if (_selected.isEmpty && _page == 2) _setPage(1);
     // Fires the decode (JSON parse + the 88 embedded WebP frames) the moment
     // a country is picked, not when "Go" is tapped — by then the composition
     // is already sitting in lottie's sharedLottieCache, so the transition in
@@ -325,6 +363,207 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
     _searchFocus.unfocus();
   }
 
+  /// Passe d'une page à l'autre : le globe tourne de 40° pendant le trajet.
+  void _setPage(int p) {
+    if (_page == p) return;
+    setState(() => _page = p);
+    final instant = MediaQuery.disableAnimationsOf(context);
+    _globeKey.currentState?.spinBy(
+      p == 2 ? 40 : -40,
+      instant ? Duration.zero : const Duration(milliseconds: 1200),
+    );
+    if (p == 2) _searchFocus.unfocus();
+    if (instant) {
+      _pageCtl.value = p == 2 ? 1 : 0;
+    } else if (p == 2) {
+      _pageCtl.forward();
+    } else {
+      _pageCtl.reverse();
+    }
+  }
+
+  /// Le bouton principal : « Continuer » (page 1), puis « Lancer la découverte ».
+  void _onMain() {
+    if (_page == 1) {
+      HapticFeedback.selectionClick();
+      _setPage(2);
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    SwaycoSounds.play(SwSound.globeLaunch);
+    Navigator.of(context).pop<GlobeResult>(
+      (countries: _selected, gender: _gender),
+    );
+  }
+
+  String get _genderSummary =>
+      AppStrings.t('globe_gender_summary_${_gender.name}');
+
+  /// Le globe de la page 2 : 370 px plus bas, échelle 0,91, opacité 0,55.
+  Widget _globeAnim(double h, Widget child) {
+    return AnimatedBuilder(
+      animation: _globeT,
+      builder: (_, c) {
+        final t = _globeT.value;
+        return Opacity(
+          opacity: 1 - 0.45 * t,
+          child: Transform.translate(
+            offset: Offset(0, 370 * (h / 844) * t),
+            child: Transform.scale(scale: 1 - 0.09 * t, child: c),
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+
+  /// Un bloc de la page 1 : fondu sortant + 14 px vers le haut, puis inerte.
+  Widget _page1Fx(Widget child) {
+    return AnimatedBuilder(
+      animation: _p1T,
+      builder: (_, c) => IgnorePointer(
+        ignoring: _p1T.value > 0.5,
+        child: Opacity(
+          opacity: 1 - _p1T.value,
+          child: Transform.translate(
+            offset: Offset(0, -14 * _p1T.value),
+            child: c,
+          ),
+        ),
+      ),
+      child: child,
+    );
+  }
+
+  /// Un bloc de la page 2 : entre à [startMs] (450 ms), fondu + glissement.
+  Widget _reveal(int startMs, Widget child, {double dy = 14}) {
+    final fade = _pageCtl.drive(
+      CurveTween(
+        curve: Interval(startMs / 1200, (startMs + 450) / 1200,
+            curve: Curves.easeOut),
+      ),
+    );
+    final move = _pageCtl.drive(
+      CurveTween(curve: Interval(startMs / 1200, (startMs + 450) / 1200,
+          curve: Curves.easeOutBack)),
+    );
+    return AnimatedBuilder(
+      animation: _pageCtl,
+      builder: (_, c) => IgnorePointer(
+        ignoring: _page != 2,
+        child: Opacity(
+          opacity: fade.value.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, dy * (1 - move.value)),
+            child: c,
+          ),
+        ),
+      ),
+      child: child,
+    );
+  }
+
+  /// Barre du haut de la page 2 : retour, deux barres de progression, « 2/2 ».
+  Widget _page2Bar() {
+    final light = SC.light;
+    return Row(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _setPage(1),
+          child: _Glass(
+            radius: 99,
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Icon(
+                Icons.arrow_back_rounded,
+                color: light ? SC.textPrimary : Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: light
+                        ? const Color(0x591F5EFF)
+                        : SC.accent.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: light ? const Color(0xFF1F5EFF) : SC.accent,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        _Glass(
+          radius: 99,
+          child: SizedBox(
+            height: 44,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Center(
+                child: Text(
+                  '2/2',
+                  style: GoogleFonts.ibmPlexMono(
+                    fontSize: 12,
+                    color: light ? SC.textPrimary : Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Les trois choix, empilés (Mixte pré-sélectionné) — tout est libre.
+  Widget _genderCards() {
+    Widget card(GenderFilter g, IconData icon, String key) => _GenderCard(
+          icon: icon,
+          title: AppStrings.t('globe_gender_$key'),
+          sub: AppStrings.t('globe_gender_${key}_sub'),
+          selected: _gender == g,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() => _gender = g);
+          },
+        );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _reveal(510, card(GenderFilter.homme, Icons.male_rounded, 'man'),
+            dy: 24),
+        const SizedBox(height: 12),
+        _reveal(590, card(GenderFilter.femme, Icons.female_rounded, 'woman'),
+            dy: 24),
+        const SizedBox(height: 12),
+        _reveal(670,
+            card(GenderFilter.mixte, Icons.diversity_1_rounded, 'mixed'),
+            dy: 24),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
@@ -335,7 +574,12 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
     final barTop = mq.padding.top + 12;
     final matches = _matches;
 
-    return Material(
+    return PopScope(
+      canPop: _page == 1,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _page == 2) _setPage(1);
+      },
+      child: Material(
       type: MaterialType.transparency,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -352,6 +596,12 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
         child: Stack(
           children: [
             // ── Le globe, immense : il dépasse à gauche et en bas. ───────────
+            Positioned.fill(
+              child: _globeAnim(
+                h,
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
             Positioned(
               left: -0.38 * w,
               top: 0.18 * h,
@@ -400,6 +650,10 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                       ],
                     ),
             ),
+                  ],
+                ),
+              ),
+            ),
             if (_world == null)
               Center(
                 child: SizedBox(
@@ -412,14 +666,40 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                 ),
               ),
 
+            // Voile sombre : le globe passe au second plan sur la page 2.
+            if (!SC.light)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: FadeTransition(
+                    opacity: _pageCtl,
+                    child: const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0x33000000),
+                            Color(0x8C000000),
+                            Color(0x00000000),
+                          ],
+                          stops: [0, 0.5, 1],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
             // ── Titre : « Où veux-tu [voyager ?] ». ─────────────────────────
             Positioned(
               top: barTop + 44 + 18,
               left: 20,
-              child: IgnorePointer(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 260),
-                  child: _title(),
+              child: _page1Fx(
+                IgnorePointer(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 260),
+                    child: _title(),
+                  ),
                 ),
               ),
             ),
@@ -429,7 +709,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
               top: barTop,
               left: 14,
               right: 14,
-              child: Row(
+              child: _page1Fx(Row(
                 children: [
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -495,11 +775,11 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                     ),
                   ),
                 ],
-              ),
+              )),
             ),
 
             // ── Résultats de la recherche. ────────────────────────────────────
-            if (matches.isNotEmpty)
+            if (matches.isNotEmpty && _page == 1)
               Positioned(
                 top: barTop + 44 + 8,
                 left: 14 + 44 + 10,
@@ -551,6 +831,31 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                 ),
               ),
 
+            // ── Page 2 : « Qui veux-tu y rencontrer ? ». ─────────────────────
+            Positioned(
+              top: barTop,
+              left: 14,
+              right: 14,
+              child: _reveal(350, _page2Bar()),
+            ),
+            Positioned(
+              top: barTop + 56,
+              left: 20,
+              child: _reveal(
+                430,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: _title(key: 'globe_gender_title', spacing: -1.2),
+                ),
+              ),
+            ),
+            Positioned(
+              top: barTop + 190,
+              left: 14,
+              right: 14,
+              child: _genderCards(),
+            ),
+
             // ── Barre du bas : puces des pays choisis + valider. ─────────────
             Positioned(
               left: 14,
@@ -579,7 +884,9 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                               const SizedBox(width: 8),
                             ],
                             Text(
-                              AppStrings.t('globe_pinch'),
+                              _page == 1
+                                  ? AppStrings.t('globe_pinch')
+                                  : _genderSummary,
                               maxLines: 1,
                               style: GoogleFonts.dmSans(
                                 fontSize: 12.5,
@@ -591,13 +898,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: canLaunch
-                            ? () {
-                HapticFeedback.mediumImpact();
-                SwaycoSounds.play(SwSound.globeLaunch);
-                Navigator.of(context).pop(_selected);
-              }
-                            : null,
+                        onTap: canLaunch ? _onMain : null,
                         child: Container(
                           height: 54,
                           alignment: Alignment.center,
@@ -612,10 +913,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                           child: Text(
                             canLaunch
                                 ? AppStrings.t(
-                                    _selected.length == 1
-                                        ? 'globe_launch_1'
-                                        : 'globe_launch_n',
-                                    args: {'n': '${_selected.length}'},
+                                    _page == 1 ? 'globe_next' : 'globe_launch_go',
                                   )
                                 : AppStrings.t('globe_pick_one'),
                             maxLines: 1,
@@ -639,16 +937,17 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
           ],
         ),
       ),
+      ),
     );
   }
 
   /// « Où veux-tu [voyager ?] » : le `|` de la traduction marque le début du
   /// groupe posé sur la pastille jaune (il ne se coupe pas).
-  Widget _title() {
+  Widget _title({String key = 'globe_title_v2', double spacing = -0.6}) {
     final style = popupDisplay(
       fontSize: 30,
       height: 1.1,
-      letterSpacing: -0.6,
+      letterSpacing: spacing,
       color: SC.light ? const Color(0xFF04123A) : Colors.white,
     ).copyWith(
       // Clair : pas d'ombre sous le titre.
@@ -656,7 +955,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
           ? const []
           : const [Shadow(color: Color(0x66000000), blurRadius: 12)],
     );
-    final raw = AppStrings.t('globe_title_v2');
+    final raw = AppStrings.t(key);
     final cut = raw.indexOf('|');
     if (cut < 0) return Text(raw, style: style);
     return Text.rich(
@@ -681,6 +980,130 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Une carte de choix de la page 2 : icône, titre, sous-titre, coche.
+class _GenderCard extends StatelessWidget {
+  const _GenderCard({
+    required this.icon,
+    required this.title,
+    required this.sub,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String sub;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final light = SC.light;
+    final ink = light ? const Color(0xFF04123A) : Colors.white;
+    final border = selected
+        ? (light ? const Color(0xFF1F5EFF) : SC.accent)
+        : (light ? const Color(0x381F5EFF) : const Color(0x38FFFFFF));
+    final fill = selected
+        ? (light ? const Color(0x141F5EFF) : const Color(0x24F4FF1F))
+        : (light ? Colors.white : Colors.white.withValues(alpha: 0.10));
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            height: 88,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: fill,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: border, width: selected ? 2 : 1.2),
+            ),
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: selected ? SC.brandGradient : null,
+                    color: selected
+                        ? null
+                        : (light
+                            ? const Color(0x1A1F5EFF)
+                            : const Color(0x24FFFFFF)),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 30,
+                    color: selected || !light
+                        ? Colors.white
+                        : const Color(0xFF1F5EFF),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: popupDisplay(fontSize: 19, color: ink),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        sub,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: ink.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected ? SC.accent : Colors.transparent,
+                    border: selected
+                        ? null
+                        : Border.all(
+                            color: light
+                                ? const Color(0x661F5EFF)
+                                : Colors.white.withValues(alpha: 0.4),
+                            width: 2,
+                          ),
+                  ),
+                  child: selected
+                      ? const Icon(
+                          Icons.check_rounded,
+                          size: 19,
+                          color: SC.onAccent,
+                        )
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -887,6 +1310,8 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
 
   late final Ticker _spin;
   late final AnimationController _flyCtrl;
+  late final AnimationController _byCtrl;
+  double _byFrom = 0, _byDelta = 0;
   double _flyFromLon = 0, _flyFromLat = 0, _flyToLon = 0, _flyToLat = 0;
 
   double _scaleStart = 1;
@@ -899,6 +1324,7 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 700),
     )..addListener(_onFly);
+    _byCtrl = AnimationController(vsync: this)..addListener(_onBy);
     if (widget.selected.isNotEmpty) {
       // Land already on the first pre-selected country.
       final c = kGlobeCountries[widget.selected.first]!.center;
@@ -911,11 +1337,12 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
   void dispose() {
     _spin.dispose();
     _flyCtrl.dispose();
+    _byCtrl.dispose();
     super.dispose();
   }
 
   void _onSpin(Duration _) {
-    if (_dragging || _flying) return;
+    if (_dragging || _flying || _byCtrl.isAnimating) return;
     // Fling en cours : on glisse sur l'élan, amorti à ~0.93/frame.
     if (_velLon.abs() > 0.02 || _velLat.abs() > 0.02) {
       setState(() {
@@ -929,6 +1356,25 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
     _velLon = _velLat = 0;
     if (widget.selected.isNotEmpty) return; // plus de rotation auto une fois choisi
     setState(() => _rotLon += 0.14);
+  }
+
+  void _onBy() {
+    final t = Curves.easeInOutCubic.transform(_byCtrl.value);
+    setState(() => _rotLon = _byFrom + _byDelta * t);
+  }
+
+  /// Fait tourner le globe de [deg] degrés en [duration] (transition de page),
+  /// sans casser la rotation automatique ni le vol vers un pays.
+  void spinBy(double deg, Duration duration) {
+    _velLon = _velLat = 0;
+    if (duration == Duration.zero) {
+      setState(() => _rotLon += deg);
+      return;
+    }
+    _byFrom = _rotLon;
+    _byDelta = deg;
+    _byCtrl.duration = duration;
+    _byCtrl.forward(from: 0);
   }
 
   void _onFly() {

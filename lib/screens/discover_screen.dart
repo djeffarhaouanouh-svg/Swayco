@@ -122,6 +122,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   void _rebuildCards() {
     _cards.clear();
     for (final p in _profiles) {
+      if (_gender == GenderFilter.homme && p.gender != 'm') continue;
+      if (_gender == GenderFilter.femme && p.gender != 'f') continue;
       var photos = p.photos.where((u) => u.isNotEmpty).toList();
       if (photos.isEmpty && p.discoverPhotoUrl.isNotEmpty) {
         photos = [p.discoverPhotoUrl];
@@ -200,6 +202,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// feed is reloaded filtered to those countries' spoken languages and today's
   /// deck state is NOT persisted (the filtered view is ephemeral).
   Set<String> _countryKeys = {};
+
+  /// Qui je veux rencontrer (page 2 du globe) ; `mixte` = tout le monde.
+  GenderFilter _gender = GenderFilter.mixte;
   bool get _filtered => _countryKeys.isNotEmpty;
 
   // Ring+Arrow transition shown while the globe-filtered feed loads — hidden
@@ -225,13 +230,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// result reloads the feed filtered to those countries (the peer's actual
   /// `profiles.country`, not what they speak).
   Future<void> _openGlobe() async {
-    final keys = await showGeneralDialog<Set<String>>(
+    final res = await showGeneralDialog<GlobeResult>(
       context: context,
       barrierDismissible: true,
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
       barrierColor: Colors.transparent,
       transitionDuration: const Duration(milliseconds: 220),
-      pageBuilder: (_, _, _) => DiscoverGlobeSheet(initial: _countryKeys),
+      pageBuilder: (_, _, _) => DiscoverGlobeSheet(
+        initial: _countryKeys,
+        initialGender: _gender,
+      ),
       // Plein écran : apparaît SUR PLACE (fondu + très léger zoom), sans
       // monter du bas.
       transitionBuilder: (_, anim, _, child) => FadeTransition(
@@ -243,10 +251,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         ),
       ),
     );
-    if (!mounted || keys == null || keys.isEmpty) return;
-    setState(() => _countryKeys = keys);
-    Analytics.track('screen_view',
-        props: {'screen': 'discover', 'country_filter': keys.join(',')});
+    if (!mounted || res == null || res.countries.isEmpty) return;
+    final keys = res.countries;
+    setState(() {
+      _countryKeys = keys;
+      _gender = res.gender;
+    });
+    UserPrefs.saveDiscoverGender(res.gender.name);
+    Analytics.track('screen_view', props: {
+      'screen': 'discover',
+      'country_filter': keys.join(','),
+      'gender_filter': res.gender.name,
+    });
     // Le feed se charge PENDANT le voyage (globe -> escales -> avion), qui
     // remplace l'ancien chargement Lottie ; un appui saute l'animation.
     final load = _loadFeed(countries: _filterCountries);
@@ -440,6 +456,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   void initState() {
     super.initState();
     Analytics.track('screen_view', props: {'screen': 'discover'});
+    // Le genre choisi la derniere fois : applique au deck des qu'il est lu.
+    UserPrefs.loadDiscoverGender().then((v) {
+      final g = GenderFilter.values.asNameMap()[v] ?? GenderFilter.mixte;
+      if (!mounted || g == _gender) return;
+      setState(() {
+        _gender = g;
+        _rebuildCards();
+      });
+    });
     _bootstrap();
     _maybeShowSwipeCoach();
     _pollTimer = WebPoll.every(const Duration(seconds: 12), _refreshFriendships);

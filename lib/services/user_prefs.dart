@@ -46,6 +46,18 @@ abstract final class UserPrefs {
   /// feed comes back in a different order next launch. Empty = start at the top.
   static const String keyDiscoverCursor = 'discover_cursor_profile_id';
 
+  /// Qui je veux rencontrer sur Discover : `homme`, `femme` ou `mixte` (défaut).
+  static const String keyDiscoverGender = 'discover_gender';
+
+  static Future<String> loadDiscoverGender() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(keyDiscoverGender) ?? 'mixte';
+  }
+
+  static Future<void> saveDiscoverGender(String value) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(keyDiscoverGender, value);
+  }
   /// Calendar day (`yyyy-MM-dd`, local) the user finished the Discover deck.
   /// Cleared on a new day so the feed can start again tomorrow.
   static const String keyDiscoverDoneDay = 'discover_done_day';
