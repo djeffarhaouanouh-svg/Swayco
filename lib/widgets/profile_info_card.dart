@@ -503,7 +503,7 @@ class _Scaled extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.only(top: _u(8)),
         child: Align(
-          alignment: Alignment.centerLeft,
+          alignment: Alignment.centerRight,
           child: persona == null
               ? (card.editable
                   ? Text(
