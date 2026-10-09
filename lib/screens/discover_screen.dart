@@ -36,7 +36,7 @@ import '../widgets/boost_button.dart';
 import '../widgets/country_silhouette.dart';
 import '../widgets/discover_ad_card.dart';
 import '../widgets/discover_globe.dart';
-import '../widgets/fx2b_button.dart';
+import '../widgets/swayco_action_buttons.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/liquid_glass_button.dart';
@@ -3220,20 +3220,18 @@ class _SwipeActionBar extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Fx2bButton(
-          kind: Fx2bKind.cross,
-          size: _kFxSize,
-          onTap: onNope,
-          semanticLabel: 'Nope',
+        Semantics(
+          button: true,
+          label: 'Nope',
+          child: SwaycoCrossButton(size: _kFxSize, onTap: onNope),
         ),
         const SizedBox(width: 18),
         _DirectMessageButton(onTap: onMessage),
         const SizedBox(width: 18),
-        Fx2bButton(
-          kind: Fx2bKind.heart,
-          size: _kFxSize,
-          onTap: onLike,
-          semanticLabel: 'Like',
+        Semantics(
+          button: true,
+          label: 'Like',
+          child: SwaycoHeartButton(size: _kFxSize, onTap: onLike),
         ),
       ],
     );
