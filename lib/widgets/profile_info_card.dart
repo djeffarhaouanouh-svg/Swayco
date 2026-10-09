@@ -563,15 +563,15 @@ class _Scaled extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              AppStrings.t('info_persona_category').toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: labelStyle,
-            ),
+          Text(
+            AppStrings.t('info_persona_category').toUpperCase(),
+            maxLines: 1,
+            style: labelStyle,
           ),
-          Flexible(child: value),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Align(alignment: Alignment.centerRight, child: value),
+          ),
         ],
       ),
     );
