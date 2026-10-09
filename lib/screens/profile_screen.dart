@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -1784,6 +1785,15 @@ class _IdentitySection extends StatelessWidget {
             ),
           ),
         ),
+        // « Contact » : un mail à l'équipe, juste sous « Mes infos ».
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
+          child: _ProfileSectionHeader(AppStrings.t('contact_title')),
+        ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(18, 12, 18, 0),
+          child: _ContactCard(),
+        ),
       ],
     );
   }
@@ -2130,6 +2140,89 @@ class _PeerMediaStack extends StatelessWidget {
 
 /// Section header used across the redesigned profile (capture-1 style):
 /// a bold left-aligned title.
+/// Adresse de contact de l'équipe.
+const String kContactEmail = 'contact-swayco@gmail.com';
+
+/// Carte « Contact » : un appui ouvre le mail à l'équipe ; sans application de
+/// mail, l'adresse est copiée.
+class _ContactCard extends StatelessWidget {
+  const _ContactCard();
+
+  Future<void> _write(BuildContext context) async {
+    final uri = Uri(scheme: 'mailto', path: kContactEmail);
+    var ok = false;
+    try {
+      ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+    if (ok || !context.mounted) return;
+    await Clipboard.setData(const ClipboardData(text: kContactEmail));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppStrings.t('contact_copied'))),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _write(context),
+      child: InfoGlassFrame(
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                gradient: SC.brandGradient,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.mail_rounded,
+                size: 22,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    AppStrings.t('contact_sub'),
+                    style: TextStyle(
+                      color: SC.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    kContactEmail,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: SC.light ? SC.brandBlue : SC.accent,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 24,
+              color: SC.light ? SC.textMuted : Colors.white54,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ProfileSectionHeader extends StatelessWidget {
   const _ProfileSectionHeader(this.title, {this.trailing, this.suffix = ''});
   final String title;
