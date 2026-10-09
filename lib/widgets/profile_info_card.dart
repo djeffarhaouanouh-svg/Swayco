@@ -494,70 +494,92 @@ class _Scaled extends StatelessWidget {
   Widget _defines(BuildContext context, _Pal pal, PersonaCategory? persona) {
     final lum = pal.accent.computeLuminance();
     final fg = lum > 0.45 ? const Color(0xFF06121F) : Colors.white;
-    return _Tile(
-      k: k,
-      pal: pal,
-      shrink: true,
-      label: AppStrings.t('info_persona_category').toUpperCase(),
-      onTap: card.editable ? card.onPersona : null,
-      child: Padding(
-        padding: EdgeInsets.only(top: _u(8)),
-        child: Align(
-          alignment: Alignment.centerRight,
-          child: persona == null
-              ? (card.editable
-                  ? Text(
-                      '+ ${AppStrings.t('info_add')}',
-                      style: TextStyle(
-                        color: pal.accent,
-                        fontSize: _t(20),
-                        fontWeight: FontWeight.w800,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    )
-                  : Text('—',
-                      style: TextStyle(color: pal.label, fontSize: _t(20))))
-              : Container(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: _u(26), vertical: _u(6)),
-                  // La couleur du persona reste PLEINE : le reflet blanc est
-                  // en avant-plan, sinon le dégradé écrase la couleur (gris).
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(99),
-                    color: pal.accent,
-                    boxShadow: [
-                      BoxShadow(
-                        color: pal.accent.withValues(alpha: .4),
-                        blurRadius: _u(20),
-                        offset: Offset(0, _u(6)),
-                      ),
-                    ],
-                  ),
-                  foregroundDecoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(99),
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      stops: const [0, .55],
-                      colors: [
-                        Colors.white.withValues(alpha: .33),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                  child: Text(
-                    '${persona.emoji} ${personaCategoryLabel(persona.label)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: fg,
-                      fontSize: _t(20),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+    // Une seule ligne : le libellé à gauche, la pastille à droite.
+    final u = k;
+    final labelStyle = GoogleFonts.ibmPlexMono(
+      color: pal.label,
+      fontSize: 12 * u * 1.5,
+      letterSpacing: 1.7 * u,
+    );
+    Widget value;
+    if (persona == null) {
+      value = card.editable
+          ? Text(
+              '+ ${AppStrings.t('info_add')}',
+              style: TextStyle(
+                color: pal.accent,
+                fontSize: _t(20),
+                fontWeight: FontWeight.w800,
+                fontStyle: FontStyle.italic,
+              ),
+            )
+          : Text('—', style: TextStyle(color: pal.label, fontSize: _t(20)));
+    } else {
+      value = Container(
+        padding: EdgeInsets.symmetric(horizontal: _u(26), vertical: _u(6)),
+        // La couleur du persona reste PLEINE : le reflet blanc est en
+        // avant-plan, sinon le dégradé écrase la couleur (gris).
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(99),
+          color: pal.accent,
+          boxShadow: [
+            BoxShadow(
+              color: pal.accent.withValues(alpha: .4),
+              blurRadius: _u(20),
+              offset: Offset(0, _u(6)),
+            ),
+          ],
         ),
+        foregroundDecoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(99),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: const [0, .55],
+            colors: [
+              Colors.white.withValues(alpha: .33),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: Text(
+          '${persona.emoji} ${personaCategoryLabel(persona.label)}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: fg,
+            fontSize: _t(20),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+    final tile = Container(
+      padding: EdgeInsets.fromLTRB(_u(18), _u(10), _u(12), _u(10)),
+      decoration: BoxDecoration(
+        color: pal.tile,
+        borderRadius: BorderRadius.circular(_u(22)),
+        border: Border.all(color: pal.tileBorder),
       ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              AppStrings.t('info_persona_category').toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: labelStyle,
+            ),
+          ),
+          Flexible(child: value),
+        ],
+      ),
+    );
+    if (!card.editable || card.onPersona == null) return tile;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => card.onPersona!(context),
+      child: tile,
     );
   }
 
