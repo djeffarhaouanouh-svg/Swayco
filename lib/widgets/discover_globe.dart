@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -11,6 +13,7 @@ import 'package:lottie/lottie.dart';
 
 import '../services/analytics.dart';
 import '../services/country_waitlist.dart';
+import '../services/globe_faces.dart';
 import '../services/world_countries.dart';
 import '../services/app_strings.dart';
 import '../services/swayco_sounds.dart';
@@ -1421,6 +1424,17 @@ class _CountryChip extends StatelessWidget {
   }
 }
 
+/// Un visage posé sur un pays ouvert (longitude / latitude tirées au hasard dans
+/// ses frontières, toujours les mêmes pour un même compte).
+class _PlacedFace {
+  _PlacedFace(this.lon, this.lat, this.url);
+
+  final double lon;
+  final double lat;
+  final String url;
+  ui.Image? image;
+}
+
 // ── The interactive globe ───────────────────────────────────────────────────
 
 class _GlobeView extends StatefulWidget {
@@ -1473,9 +1487,16 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
 
   double _scaleStart = 1;
 
+  // ── Visages des comptes IA : visibles seulement quand on zoome ────────────
+  static const int _kFacesPerCountry = 8;
+  List<_PlacedFace> _faces = const [];
+  int _facesVersion = 0;
+  bool _imagesRequested = false;
+
   @override
   void initState() {
     super.initState();
+    GlobeFaces.load().then(_placeFaces);
     _spin = createTicker(_onSpin)..start();
     _flyCtrl = AnimationController(
       vsync: this,
@@ -1495,7 +1516,140 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
     _spin.dispose();
     _flyCtrl.dispose();
     _byCtrl.dispose();
+    for (final f in _faces) {
+      f.image?.dispose();
+    }
     super.dispose();
+  }
+
+  /// Pose les visages DANS leur pays : tirage au hasard (graine = le compte) dans
+  /// le plus grand polygone, en gardant un écart minimal entre deux visages.
+  void _placeFaces(List<GlobeFace> faces) {
+    if (!mounted || faces.isEmpty) return;
+    final keyByDb = {
+      for (final e in kGlobeCountries.entries) e.value.dbName: e.key,
+    };
+    final byKey = <String, List<GlobeFace>>{};
+    for (final f in faces) {
+      final key = keyByDb[f.country];
+      if (key == null) continue;
+      (byKey[key] ??= []).add(f);
+    }
+    final placed = <_PlacedFace>[];
+    for (final e in byKey.entries) {
+      _Land? land;
+      for (final l in widget.world) {
+        if (l.name == e.key) {
+          land = l;
+          break;
+        }
+      }
+      if (land == null || land.polygons.isEmpty) continue;
+      // Le plus grand polygone (par boîte englobante).
+      List<Offset>? ring;
+      var bestArea = -1.0;
+      for (final poly in land.polygons) {
+        if (poly.isEmpty) continue;
+        final r = poly.first;
+        var a0 = 999.0, a1 = -999.0, b0 = 999.0, b1 = -999.0;
+        for (final pt in r) {
+          if (pt.dx < a0) a0 = pt.dx;
+          if (pt.dx > a1) a1 = pt.dx;
+          if (pt.dy < b0) b0 = pt.dy;
+          if (pt.dy > b1) b1 = pt.dy;
+        }
+        final area = (a1 - a0) * (b1 - b0);
+        if (area > bestArea) {
+          bestArea = area;
+          ring = r;
+        }
+      }
+      if (ring == null || ring.length < 3) continue;
+      var minLon = 999.0, maxLon = -999.0, minLat = 999.0, maxLat = -999.0;
+      for (final pt in ring) {
+        if (pt.dx < minLon) minLon = pt.dx;
+        if (pt.dx > maxLon) maxLon = pt.dx;
+        if (pt.dy < minLat) minLat = pt.dy;
+        if (pt.dy > maxLat) maxLat = pt.dy;
+      }
+      final spacing = 0.2 * math.min(maxLon - minLon, maxLat - minLat);
+      final list = [...e.value]..sort((a, b) => a.id.compareTo(b.id));
+      final chosen = <Offset>[];
+      for (final f in list.take(_kFacesPerCountry)) {
+        final rnd = math.Random(f.id.hashCode);
+        Offset? best;
+        for (var i = 0; i < 40; i++) {
+          final c = Offset(
+            minLon + rnd.nextDouble() * (maxLon - minLon),
+            minLat + rnd.nextDouble() * (maxLat - minLat),
+          );
+          if (!_inRing(ring, c)) continue;
+          best ??= c;
+          if (chosen.every((o) => (o - c).distance >= spacing)) {
+            best = c;
+            break;
+          }
+        }
+        if (best == null) continue;
+        chosen.add(best);
+        placed.add(_PlacedFace(best.dx, best.dy, f.url));
+      }
+    }
+    setState(() {
+      _faces = placed;
+      _facesVersion++;
+    });
+    if (_scale >= 1.4) _loadFaceImages();
+  }
+
+  static bool _inRing(List<Offset> ring, Offset p) {
+    var inside = false;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      final a = ring[i], b = ring[j];
+      if ((a.dy > p.dy) != (b.dy > p.dy) &&
+          p.dx < (b.dx - a.dx) * (p.dy - a.dy) / (b.dy - a.dy) + a.dx) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  /// Télécharge les miniatures (96 px) la première fois qu'on zoome.
+  void _loadFaceImages() {
+    if (_imagesRequested || _faces.isEmpty) return;
+    _imagesRequested = true;
+    for (final f in _faces) {
+      _decode(f.url).then((img) {
+        if (img == null) return;
+        if (!mounted) {
+          img.dispose();
+          return;
+        }
+        setState(() {
+          f.image = img;
+          _facesVersion++;
+        });
+      });
+    }
+  }
+
+  Future<ui.Image?> _decode(String url) {
+    final c = Completer<ui.Image?>();
+    final stream = ResizeImage(NetworkImage(url), width: 96, height: 96)
+        .resolve(ImageConfiguration.empty);
+    late ImageStreamListener l;
+    l = ImageStreamListener(
+      (info, _) {
+        if (!c.isCompleted) c.complete(info.image.clone());
+        stream.removeListener(l);
+      },
+      onError: (_, _) {
+        if (!c.isCompleted) c.complete(null);
+        stream.removeListener(l);
+      },
+    );
+    stream.addListener(l);
+    return c.future.timeout(const Duration(seconds: 12), onTimeout: () => null);
   }
 
   void _onSpin(Duration _) {
@@ -1637,6 +1791,7 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
             setState(() {
               if (d.scale != 1.0) {
                 _scale = (_scaleStart * d.scale).clamp(1.0, 4.0);
+                if (_scale >= 1.4) _loadFaceImages();
               }
               // Sensibilité d'origine (0.25), très légèrement relevée.
               final k = 0.28 / _scale;
@@ -1660,6 +1815,8 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
               selected: widget.selected,
               lockedJoined: widget.lockedJoined,
               lockedCenters: widget.lockedCenters,
+              faces: _faces,
+              facesVersion: _facesVersion,
               rotLon: _rotLon,
               rotLat: _rotLat,
               scale: _scale,
@@ -1677,6 +1834,8 @@ class _GlobePainter extends CustomPainter {
     required this.selected,
     required this.lockedJoined,
     required this.lockedCenters,
+    required this.faces,
+    required this.facesVersion,
     required this.rotLon,
     required this.rotLat,
     required this.scale,
@@ -1686,6 +1845,8 @@ class _GlobePainter extends CustomPainter {
   final Set<String> selected;
   final Set<String> lockedJoined;
   final Map<String, Offset> lockedCenters;
+  final List<_PlacedFace> faces;
+  final int facesVersion;
   final double rotLon;
   final double rotLat;
   final double scale;
@@ -1753,6 +1914,9 @@ class _GlobePainter extends CustomPainter {
         );
       }
     }
+
+    // Visages des comptes IA : seulement quand on a zoomé, sur les pays ouverts.
+    _paintFaces(canvas, center, radius);
 
     canvas.restore();
 
@@ -1848,6 +2012,54 @@ class _GlobePainter extends CustomPainter {
 
   static const _ink = Color(0xFF04123A);
 
+  /// Photos rondes posées sur les pays ouverts : invisibles en vue d'ensemble,
+  /// elles apparaissent entre ×1,5 et ×2 et grossissent avec le zoom. Elles
+  /// rétrécissent près du bord du globe et passent derrière. Décoratives :
+  /// aucune n'est cliquable.
+  void _paintFaces(Canvas canvas, Offset center, double radius) {
+    if (scale < 1.5 || faces.isEmpty) return;
+    final fade = ((scale - 1.5) / 0.5).clamp(0.0, 1.0);
+    final r0 = rotLat * _deg;
+    for (final f in faces) {
+      final img = f.image;
+      if (img == null) continue;
+      final l = (f.lon + rotLon) * _deg;
+      final p = f.lat * _deg;
+      final z = math.sin(r0) * math.sin(p) + math.cos(r0) * math.cos(p) * math.cos(l);
+      if (z < 0.2) continue;
+      final at = _project(f.lon, f.lat, rotLon, rotLat, radius, center);
+      if (at == null) continue;
+      final fr = ((7 + (scale - 1.5) * 5).clamp(8.0, 17.0)) * (0.6 + 0.4 * z);
+      final rect = Rect.fromCircle(center: at, radius: fr);
+      canvas.drawCircle(
+        at.translate(0, 1.5),
+        fr + 1,
+        Paint()
+          ..color = Color.fromRGBO(0, 0, 0, 0.35 * fade)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+      );
+      canvas.save();
+      canvas.clipPath(Path()..addOval(rect));
+      canvas.drawImageRect(
+        img,
+        Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
+        rect,
+        Paint()
+          ..filterQuality = FilterQuality.medium
+          ..color = Color.fromRGBO(255, 255, 255, fade),
+      );
+      canvas.restore();
+      canvas.drawCircle(
+        at,
+        fr,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6
+          ..color = Color.fromRGBO(255, 255, 255, fade),
+      );
+    }
+  }
+
   /// Rond de 15 : cadenas blanc sur #04123A (pas rejoint) ou cloche #04123A
   /// sur jaune (rejoint).
   void _paintLockBadge(Canvas canvas, Offset at, bool joined) {
@@ -1913,6 +2125,7 @@ class _GlobePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_GlobePainter old) =>
+      old.facesVersion != facesVersion ||
       old.lockedJoined.length != lockedJoined.length ||
       !old.lockedJoined.containsAll(lockedJoined) ||
       old.lockedCenters.length != lockedCenters.length ||
