@@ -10,9 +10,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 
 import '../services/analytics.dart';
+import '../services/country_waitlist.dart';
 import '../services/app_strings.dart';
 import '../services/swayco_sounds.dart';
 import '../theme/swayco_theme.dart';
+import 'globe_locked_sheet.dart';
 import 'popup_kit.dart';
 
 part 'globe_voyage_screen.dart';
@@ -49,6 +51,19 @@ kGlobeCountries = {
   'Argentina': (flag: '🇦🇷', center: Offset(-63.6, -38.4), code: 'ar', dbName: 'Argentine'),
   'Colombia': (flag: '🇨🇴', center: Offset(-74.3, 4.6), code: 'co', dbName: 'Colombie'),
   'Philippines': (flag: '🇵🇭', center: Offset(122.0, 12.9), code: 'ph', dbName: 'Philippines'),
+};
+
+/// Pays pas encore ouverts : affichés en sable avec un cadenas, jamais
+/// sélectionnables ; un appui ouvre la feuille « Me prévenir ». La clé = le
+/// `name` du GeoJSON (comme [kGlobeCountries]) et ne doit jamais figurer dans
+/// les deux listes. À modifier au fil des ouvertures.
+const Map<String, ({Offset center, String code})> kLockedCountries = {
+  'Australia': (center: Offset(134.0, -25.7), code: 'au'),
+  'Kenya': (center: Offset(37.9, 0.2), code: 'ke'),
+  'India': (center: Offset(78.9, 22.5), code: 'in'),
+  'South Africa': (center: Offset(24.7, -29.0), code: 'za'),
+  'United States of America': (center: Offset(-98.5, 39.8), code: 'us'),
+  'South Korea': (center: Offset(127.8, 36.4), code: 'kr'),
 };
 
 /// The `profiles.country` value a globe country key maps to, or null if it
@@ -305,6 +320,11 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
     CurveTween(curve: const Interval(0, 400 / 1200, curve: Curves.easeOut)),
   );
 
+  /// Liste d'attente des pays verrouillés : combien attendent, et lesquels
+  /// j'attends (cloche au lieu du cadenas).
+  Map<String, int> _waitCounts = {};
+  Set<String> _joinedLocked = {};
+
   final GlobalKey<_GlobeViewState> _globeKey = GlobalKey<_GlobeViewState>();
   final TextEditingController _search = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
@@ -316,6 +336,48 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
       if (mounted) setState(() => _world = w);
     });
     _search.addListener(() => setState(() {}));
+    CountryWaitlist.counts().then((c) {
+      if (mounted) setState(() => _waitCounts = c);
+    });
+    CountryWaitlist.mine().then((m) {
+      if (mounted) setState(() => _joinedLocked = m);
+    });
+  }
+
+  /// Un pays verrouillé touché : la feuille « Me prévenir ». Le globe garde sa
+  /// position tant qu'elle est ouverte.
+  Future<void> _openLocked(String key) async {
+    final info = kLockedCountries[key];
+    if (info == null) return;
+    HapticFeedback.selectionClick();
+    _globeKey.currentState?.pauseSpin(true);
+    await showLockedCountrySheet(
+      context,
+      keyName: key,
+      code: info.code,
+      count: _waitCounts[key] ?? 0,
+      joined: _joinedLocked.contains(key),
+      onJoin: () async {
+        if (mounted) {
+          setState(() {
+            _joinedLocked = {..._joinedLocked, key};
+            _waitCounts = {..._waitCounts, key: (_waitCounts[key] ?? 0) + 1};
+          });
+        }
+        await CountryWaitlist.join(key);
+      },
+      onLeave: () async {
+        if (mounted) {
+          setState(() {
+            _joinedLocked = {..._joinedLocked}..remove(key);
+            final n = (_waitCounts[key] ?? 1) - 1;
+            _waitCounts = {..._waitCounts, key: n < 0 ? 0 : n};
+          });
+        }
+        await CountryWaitlist.leave(key);
+      },
+    );
+    _globeKey.currentState?.pauseSpin(false);
   }
 
   @override
@@ -656,6 +718,8 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
                             world: _world!,
                             selected: _selected,
                             onToggle: _toggle,
+                            lockedJoined: _joinedLocked,
+                            onLockedTap: _openLocked,
                           ),
                         ),
                       ],
@@ -710,6 +774,28 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 260),
                     child: _title(),
+                  ),
+                ),
+              ),
+            ),
+
+            // ── Légende : un cadenas = pas encore ouvert. ──────────────────
+            Positioned(
+              top: barTop + 44 + 18 + 76,
+              left: 20,
+              width: 260,
+              child: _page1Fx(
+                IgnorePointer(
+                  child: Text(
+                    AppStrings.t('globe_caption_locked'),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                      color: SC.light
+                          ? SC.textSecondary
+                          : Colors.white.withValues(alpha: 0.78),
+                    ),
                   ),
                 ),
               ),
@@ -1297,11 +1383,17 @@ class _GlobeView extends StatefulWidget {
     required this.world,
     required this.selected,
     required this.onToggle,
+    required this.lockedJoined,
+    required this.onLockedTap,
   });
 
   final List<_Land> world;
   final Set<String> selected;
   final ValueChanged<String> onToggle;
+
+  /// Pays verrouillés que j'attends (cloche) et l'appui sur l'un d'eux.
+  final Set<String> lockedJoined;
+  final ValueChanged<String> onLockedTap;
 
   @override
   State<_GlobeView> createState() => _GlobeViewState();
@@ -1313,6 +1405,10 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
   double _scale = 1;
 
   bool _dragging = false;
+
+  /// Vrai tant qu'une feuille est ouverte par-dessus : plus de rotation auto.
+  bool _paused = false;
+  void pauseSpin(bool v) => _paused = v;
   bool get _flying => _flyCtrl.isAnimating;
 
   // Inertie : vitesse résiduelle après un lâcher, en °/frame, amortie à
@@ -1353,7 +1449,7 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
   }
 
   void _onSpin(Duration _) {
-    if (_dragging || _flying || _byCtrl.isAnimating) return;
+    if (_dragging || _flying || _byCtrl.isAnimating || _paused) return;
     // Fling en cours : on glisse sur l'élan, amorti à ~0.93/frame.
     if (_velLon.abs() > 0.02 || _velLat.abs() > 0.02) {
       setState(() {
@@ -1428,12 +1524,34 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
     final r = radius * _scale;
     final p = d.localPosition;
 
+    // Les cadenas / cloches des pays verrouillés d'abord.
+    for (final key in kLockedCountries.keys) {
+      final c = kLockedCountries[key]!.center;
+      final b = _project(c.dx, c.dy, _rotLon, _rotLat, r, center);
+      if (b != null && (p - b).distance <= 20) {
+        widget.onLockedTap(key);
+        return;
+      }
+    }
+
     // The white label bubbles first — they're the easy target on small
     // countries.
     for (final key in kGlobeCountries.keys) {
       final b = _bubbleFor(key, _rotLon, _rotLat, r, center);
       if (b != null && (p - b.bubble).distance <= _kBubbleR + 4) {
         _select(key);
+        return;
+      }
+    }
+    // Les formes des pays verrouillés (la forme ouvre aussi la feuille).
+    for (final key in kLockedCountries.keys) {
+      final land = widget.world.firstWhere(
+        (l) => l.name == key,
+        orElse: () => _Land(key, const []),
+      );
+      if (land.polygons.isEmpty) continue;
+      if (_landPath(land, _rotLon, _rotLat, r, center).contains(p)) {
+        widget.onLockedTap(key);
         return;
       }
     }
@@ -1489,6 +1607,7 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
             painter: _GlobePainter(
               world: widget.world,
               selected: widget.selected,
+              lockedJoined: widget.lockedJoined,
               rotLon: _rotLon,
               rotLat: _rotLat,
               scale: _scale,
@@ -1504,6 +1623,7 @@ class _GlobePainter extends CustomPainter {
   _GlobePainter({
     required this.world,
     required this.selected,
+    required this.lockedJoined,
     required this.rotLon,
     required this.rotLat,
     required this.scale,
@@ -1511,6 +1631,7 @@ class _GlobePainter extends CustomPainter {
 
   final List<_Land> world;
   final Set<String> selected;
+  final Set<String> lockedJoined;
   final double rotLon;
   final double rotLat;
   final double scale;
@@ -1520,6 +1641,7 @@ class _GlobePainter extends CustomPainter {
   static const _pickableFill = Color(0xFFB6D59A);
   static const _border = Color(0xFFB9B3A3);
   static const _rim = Color(0xFF7FA8BD);
+  static const _lockedFill = Color(0xFFDDD1B0);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1553,9 +1675,12 @@ class _GlobePainter extends CustomPainter {
     for (final land in world) {
       final path = _landPath(land, rotLon, rotLat, radius, center);
       final isCountry = kGlobeCountries.containsKey(land.name);
+      final isLocked = kLockedCountries.containsKey(land.name);
       final isSelected = selected.contains(land.name);
       final Color fill;
-      if (isSelected) {
+      if (isLocked) {
+        fill = _lockedFill;
+      } else if (isSelected) {
         fill = _selectedFill;
       } else if (isCountry) {
         fill = _pickableFill;
@@ -1657,10 +1782,86 @@ class _GlobePainter extends CustomPainter {
           ..color = Colors.white,
       );
     }
+
+    // ── Cadenas / cloches des pays verrouillés, comme les bulles : hors du
+    //    clip, masqués quand le pays passe derrière le globe. ──
+    for (final key in kLockedCountries.keys) {
+      final c = kLockedCountries[key]!.center;
+      final at = _project(c.dx, c.dy, rotLon, rotLat, radius, center);
+      if (at == null) continue;
+      _paintLockBadge(canvas, at, lockedJoined.contains(key));
+    }
+  }
+
+  static const _ink = Color(0xFF04123A);
+
+  /// Rond de 15 : cadenas blanc sur #04123A (pas rejoint) ou cloche #04123A
+  /// sur jaune (rejoint).
+  void _paintLockBadge(Canvas canvas, Offset at, bool joined) {
+    canvas.drawCircle(
+      at.translate(0, 2),
+      15,
+      Paint()
+        ..color = const Color(0x40000000)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
+    canvas.drawCircle(at, 15, Paint()..color = joined ? SC.accent : _ink);
+    canvas.drawCircle(
+      at,
+      15,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = joined ? _ink : SC.accent,
+    );
+    canvas.save();
+    canvas.translate(at.dx, at.dy);
+    if (joined) {
+      final fill = Paint()..color = _ink;
+      final body = Path()
+        ..moveTo(-6.5, 4.5)
+        ..cubicTo(-4.5, 3.5, -4.5, -1, -4, -3)
+        ..cubicTo(-3.5, -5.5, -1.5, -6.2, 0, -6.2)
+        ..cubicTo(1.5, -6.2, 3.5, -5.5, 4, -3)
+        ..cubicTo(4.5, -1, 4.5, 3.5, 6.5, 4.5)
+        ..close();
+      canvas.drawPath(body, fill);
+      canvas.drawArc(
+        Rect.fromCircle(center: const Offset(0, 6.8), radius: 2),
+        0,
+        math.pi,
+        true,
+        fill,
+      );
+      canvas.drawCircle(const Offset(0, -7.4), 1.3, fill);
+    } else {
+      final white = Paint()..color = Colors.white;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: const Offset(0, 2), width: 11, height: 8.5),
+          const Radius.circular(2),
+        ),
+        white,
+      );
+      canvas.drawArc(
+        Rect.fromCircle(center: const Offset(0, -2.25), radius: 3.6),
+        math.pi,
+        math.pi,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..strokeCap = StrokeCap.round
+          ..color = Colors.white,
+      );
+    }
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(_GlobePainter old) =>
+      old.lockedJoined.length != lockedJoined.length ||
+      !old.lockedJoined.containsAll(lockedJoined) ||
       old.rotLon != rotLon ||
       old.rotLat != rotLat ||
       old.scale != scale ||
