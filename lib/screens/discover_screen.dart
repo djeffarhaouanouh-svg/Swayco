@@ -31,6 +31,8 @@ import '../theme/swayco_theme.dart';
 import '../widgets/ad_info_sheet.dart';
 import '../widgets/boost_button.dart';
 import '../widgets/country_silhouette.dart';
+import '../widgets/flag_border.dart';
+import '../widgets/flag_gradients.dart';
 import '../widgets/discover_ad_card.dart';
 import '../widgets/discover_globe.dart';
 import '../services/fact_emojis.dart';
@@ -1105,13 +1107,7 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                                   child: Stack(
                             children: [
                               // Exactly the feed card: r32, no flag border.
-                              Positioned.fill(
-                                child: ClipRRect(
-                                  borderRadius:
-                                      BorderRadius.circular(_kCardRadius),
-                                  child: card,
-                                ),
-                              ),
+                              Positioned.fill(child: _flagFrame(me, card)),
                               // Tirer la photo vers le haut déplie le panneau,
                               // exactement comme dans le feed.
                               if (!_infoOpen)
@@ -1830,12 +1826,12 @@ class _TinderCardStackState extends State<_TinderCardStack> {
   }
 
   Widget _buildCard(({RemoteProfile profile, List<String> photos}) card) {
-    // Carte photo arrondie (32) qui flotte sur le fond noir — plus de liseré
-    // drapeau : le drapeau est à côté du prénom, en image.
+    // Carte photo arrondie (32) qui flotte sur le fond noir, cerclée d'un liseré
+    // aux couleurs du PAYS de la personne (à défaut, de sa langue).
     return SizedBox.expand(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(_kCardRadius),
-        child: _TinderCard(
+      child: _flagFrame(
+        card.profile,
+        _TinderCard(
           key: ValueKey(card.profile.id),
           profile: card.profile,
           photos: card.photos,
@@ -1843,6 +1839,29 @@ class _TinderCardStackState extends State<_TinderCardStack> {
       ),
     );
   }
+}
+
+/// Le liseré du pays autour d'une carte. Lueur et ombre coupées : la pile est
+/// rognée au rectangle, elles se feraient couper au carré dans les coins.
+Widget _flagFrame(RemoteProfile profile, Widget child) {
+  final g = flagGradientFor(
+    country: profile.country,
+    language: profile.language,
+  );
+  if (g == null) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(_kCardRadius),
+      child: child,
+    );
+  }
+  return FlagBorder(
+    gradient: g,
+    radius: _kCardRadius,
+    borderWidth: 3,
+    glow: false,
+    dropShadow: false,
+    child: child,
+  );
 }
 
 /// Une carte fantôme : la tranche de la pile qui dépasse derrière la carte,
