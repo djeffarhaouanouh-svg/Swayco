@@ -204,18 +204,3 @@ List<Color> flagRingColors({required String country, required String language}) 
   return const [Color(0xFF22D3EE), Color(0xFFA78BFA)];
 }
 
-/// Contour aux couleurs du PAYS de la personne (`profiles.country`, libellé
-/// français), à défaut de sa langue. Null si on ne sait rien : la carte reste
-/// alors sans liseré.
-FlagGradient? flagGradientFor({required String country, required String language}) {
-  final c = flagRingColors(country: country, language: language);
-  // Le repli « maison » de flagRingColors (cyan / violet) = aucun pays connu.
-  if (c.first.toARGB32() == 0xFF22D3EE) return null;
-  final a = c.first;
-  final b = c.last;
-  return FlagGradient(
-    colors: [a, Color.lerp(a, b, 0.5)!, b],
-    stops: const [0.0, 0.5, 1.0],
-    glow: a.withValues(alpha: 0.22),
-  );
-}

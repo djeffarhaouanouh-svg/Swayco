@@ -19,10 +19,7 @@ class FlagBorder extends StatelessWidget {
   final Widget child;
 
   /// Le pays dont on veut le contour.
-  final FlagCountry? country;
-
-  /// Dégradé explicite (couleurs du pays de la personne) : remplace [country].
-  final FlagGradient? gradient;
+  final FlagCountry country;
 
   /// Épaisseur du liseré, en px logiques. (design 2a : 2.0)
   final double borderWidth;
@@ -45,8 +42,7 @@ class FlagBorder extends StatelessWidget {
   const FlagBorder({
     super.key,
     required this.child,
-    this.country,
-    this.gradient,
+    required this.country,
     this.borderWidth = 2.0,
     this.radius = 28.0,
     this.glowBlur = 30.0,
@@ -56,7 +52,7 @@ class FlagBorder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final g = gradient ?? kFlagGradients[country]!;
+    final g = kFlagGradients[country]!;
 
     return Container(
       padding: EdgeInsets.all(borderWidth),
