@@ -11,6 +11,7 @@ import 'package:lottie/lottie.dart';
 
 import '../services/analytics.dart';
 import '../services/country_waitlist.dart';
+import '../services/world_countries.dart';
 import '../services/app_strings.dart';
 import '../services/swayco_sounds.dart';
 import '../theme/swayco_theme.dart';
@@ -53,10 +54,10 @@ kGlobeCountries = {
   'Philippines': (flag: '🇵🇭', center: Offset(122.0, 12.9), code: 'ph', dbName: 'Philippines'),
 };
 
-/// Pays pas encore ouverts : affichés en sable avec un cadenas, jamais
-/// sélectionnables ; un appui ouvre la feuille « Me prévenir ». La clé = le
-/// `name` du GeoJSON (comme [kGlobeCountries]) et ne doit jamais figurer dans
-/// les deux listes. À modifier au fil des ouvertures.
+/// Centre exact (longitude, latitude) de quelques pays pas encore ouverts, pour
+/// y poser le cadenas. TOUT pays qui n'est pas dans [kGlobeCountries] est
+/// touchable (cadenas + feuille « Me prévenir ») ; les autres prennent le
+/// centre de leur plus grande surface. La clé = le `name` du GeoJSON.
 const Map<String, ({Offset center, String code})> kLockedCountries = {
   'Australia': (center: Offset(134.0, -25.7), code: 'au'),
   'Kenya': (center: Offset(37.9, 0.2), code: 'ke'),
@@ -325,6 +326,69 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
   Map<String, int> _waitCounts = {};
   Set<String> _joinedLocked = {};
 
+  /// Pays touchés pendant cette ouverture : leur cadenas apparaît.
+  final Set<String> _touched = {};
+  final Map<String, Offset> _centerCache = {};
+
+  /// Où poser le cadenas d'un pays : le centre fixé à la main, sinon le milieu
+  /// de sa plus grande surface (le fuseau 180° est géré).
+  Offset? _lockCenter(String key) {
+    final fixed = kLockedCountries[key]?.center;
+    if (fixed != null) return fixed;
+    final cached = _centerCache[key];
+    if (cached != null) return cached;
+    final world = _world;
+    if (world == null) return null;
+    _Land? land;
+    for (final l in world) {
+      if (l.name == key) {
+        land = l;
+        break;
+      }
+    }
+    if (land == null) return null;
+    var bestArea = -1.0;
+    Offset? best;
+    for (final poly in land.polygons) {
+      if (poly.isEmpty) continue;
+      var minLon = 999.0, maxLon = -999.0, minLat = 999.0, maxLat = -999.0;
+      for (final pt in poly.first) {
+        if (pt.dx < minLon) minLon = pt.dx;
+        if (pt.dx > maxLon) maxLon = pt.dx;
+        if (pt.dy < minLat) minLat = pt.dy;
+        if (pt.dy > maxLat) maxLat = pt.dy;
+      }
+      if (maxLon - minLon > 180) {
+        minLon = 999.0;
+        maxLon = -999.0;
+        for (final pt in poly.first) {
+          final lon = pt.dx < 0 ? pt.dx + 360 : pt.dx;
+          if (lon < minLon) minLon = lon;
+          if (lon > maxLon) maxLon = lon;
+        }
+      }
+      final area = (maxLon - minLon) * (maxLat - minLat);
+      if (area > bestArea) {
+        bestArea = area;
+        var lon = (minLon + maxLon) / 2;
+        if (lon > 180) lon -= 360;
+        best = Offset(lon, (minLat + maxLat) / 2);
+      }
+    }
+    if (best != null) _centerCache[key] = best;
+    return best;
+  }
+
+  /// Les cadenas / cloches à dessiner : pays touchés + pays que j'attends.
+  Map<String, Offset> get _lockCenters {
+    final out = <String, Offset>{};
+    for (final key in {..._touched, ..._joinedLocked}) {
+      final c = _lockCenter(key);
+      if (c != null) out[key] = c;
+    }
+    return out;
+  }
+
   final GlobalKey<_GlobeViewState> _globeKey = GlobalKey<_GlobeViewState>();
   final TextEditingController _search = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
@@ -347,14 +411,15 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
   /// Un pays verrouillé touché : la feuille « Me prévenir ». Le globe garde sa
   /// position tant qu'elle est ouverte.
   Future<void> _openLocked(String key) async {
-    final info = kLockedCountries[key];
-    if (info == null) return;
+    final code = kWorldCountries[key]?.iso ?? kLockedCountries[key]?.code;
+    if (code == null) return;
     HapticFeedback.selectionClick();
+    setState(() => _touched.add(key));
     _globeKey.currentState?.pauseSpin(true);
     await showLockedCountrySheet(
       context,
       keyName: key,
-      code: info.code,
+      code: code,
       count: _waitCounts[key] ?? 0,
       joined: _joinedLocked.contains(key),
       onJoin: () async {
@@ -719,6 +784,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
                             selected: _selected,
                             onToggle: _toggle,
                             lockedJoined: _joinedLocked,
+                            lockedCenters: _lockCenters,
                             onLockedTap: _openLocked,
                           ),
                         ),
@@ -1384,6 +1450,7 @@ class _GlobeView extends StatefulWidget {
     required this.selected,
     required this.onToggle,
     required this.lockedJoined,
+    required this.lockedCenters,
     required this.onLockedTap,
   });
 
@@ -1393,6 +1460,9 @@ class _GlobeView extends StatefulWidget {
 
   /// Pays verrouillés que j'attends (cloche) et l'appui sur l'un d'eux.
   final Set<String> lockedJoined;
+
+  /// Où est posé chaque cadenas / cloche (clé du pays -> lon, lat).
+  final Map<String, Offset> lockedCenters;
   final ValueChanged<String> onLockedTap;
 
   @override
@@ -1525,11 +1595,10 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
     final p = d.localPosition;
 
     // Les cadenas / cloches des pays verrouillés d'abord.
-    for (final key in kLockedCountries.keys) {
-      final c = kLockedCountries[key]!.center;
-      final b = _project(c.dx, c.dy, _rotLon, _rotLat, r, center);
+    for (final e in widget.lockedCenters.entries) {
+      final b = _project(e.value.dx, e.value.dy, _rotLon, _rotLat, r, center);
       if (b != null && (p - b).distance <= 20) {
-        widget.onLockedTap(key);
+        widget.onLockedTap(e.key);
         return;
       }
     }
@@ -1543,19 +1612,7 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
         return;
       }
     }
-    // Les formes des pays verrouillés (la forme ouvre aussi la feuille).
-    for (final key in kLockedCountries.keys) {
-      final land = widget.world.firstWhere(
-        (l) => l.name == key,
-        orElse: () => _Land(key, const []),
-      );
-      if (land.polygons.isEmpty) continue;
-      if (_landPath(land, _rotLon, _rotLat, r, center).contains(p)) {
-        widget.onLockedTap(key);
-        return;
-      }
-    }
-    // Then the country shapes themselves.
+    // Then the country shapes themselves (ouverts).
     for (final key in kGlobeCountries.keys) {
       final land = widget.world.firstWhere(
         (l) => l.name == key,
@@ -1564,6 +1621,20 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
       if (land.polygons.isEmpty) continue;
       if (_landPath(land, _rotLon, _rotLat, r, center).contains(p)) {
         _select(key);
+        return;
+      }
+    }
+    // Tout autre pays : pas encore ouvert -> cadenas + feuille « Me prévenir ».
+    for (final land in widget.world) {
+      if (land.polygons.isEmpty || kGlobeCountries.containsKey(land.name)) {
+        continue;
+      }
+      if (!kWorldCountries.containsKey(land.name) &&
+          !kLockedCountries.containsKey(land.name)) {
+        continue;
+      }
+      if (_landPath(land, _rotLon, _rotLat, r, center).contains(p)) {
+        widget.onLockedTap(land.name);
         return;
       }
     }
@@ -1608,6 +1679,7 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
               world: widget.world,
               selected: widget.selected,
               lockedJoined: widget.lockedJoined,
+              lockedCenters: widget.lockedCenters,
               rotLon: _rotLon,
               rotLat: _rotLat,
               scale: _scale,
@@ -1624,6 +1696,7 @@ class _GlobePainter extends CustomPainter {
     required this.world,
     required this.selected,
     required this.lockedJoined,
+    required this.lockedCenters,
     required this.rotLon,
     required this.rotLat,
     required this.scale,
@@ -1632,6 +1705,7 @@ class _GlobePainter extends CustomPainter {
   final List<_Land> world;
   final Set<String> selected;
   final Set<String> lockedJoined;
+  final Map<String, Offset> lockedCenters;
   final double rotLon;
   final double rotLat;
   final double scale;
@@ -1675,7 +1749,7 @@ class _GlobePainter extends CustomPainter {
     for (final land in world) {
       final path = _landPath(land, rotLon, rotLat, radius, center);
       final isCountry = kGlobeCountries.containsKey(land.name);
-      final isLocked = kLockedCountries.containsKey(land.name);
+      final isLocked = lockedCenters.containsKey(land.name);
       final isSelected = selected.contains(land.name);
       final Color fill;
       if (isLocked) {
@@ -1785,11 +1859,10 @@ class _GlobePainter extends CustomPainter {
 
     // ── Cadenas / cloches des pays verrouillés, comme les bulles : hors du
     //    clip, masqués quand le pays passe derrière le globe. ──
-    for (final key in kLockedCountries.keys) {
-      final c = kLockedCountries[key]!.center;
-      final at = _project(c.dx, c.dy, rotLon, rotLat, radius, center);
+    for (final e in lockedCenters.entries) {
+      final at = _project(e.value.dx, e.value.dy, rotLon, rotLat, radius, center);
       if (at == null) continue;
-      _paintLockBadge(canvas, at, lockedJoined.contains(key));
+      _paintLockBadge(canvas, at, lockedJoined.contains(e.key));
     }
   }
 
@@ -1862,6 +1935,8 @@ class _GlobePainter extends CustomPainter {
   bool shouldRepaint(_GlobePainter old) =>
       old.lockedJoined.length != lockedJoined.length ||
       !old.lockedJoined.containsAll(lockedJoined) ||
+      old.lockedCenters.length != lockedCenters.length ||
+      !old.lockedCenters.keys.every(lockedCenters.containsKey) ||
       old.rotLon != rotLon ||
       old.rotLat != rotLat ||
       old.scale != scale ||

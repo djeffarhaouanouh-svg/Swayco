@@ -3,24 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/app_strings.dart';
+import '../services/world_countries.dart';
 import '../theme/swayco_theme.dart';
 import 'popup_kit.dart';
-
-/// Nom d'un pays verrouillé dans la langue de l'app (`country_xx`), sinon le
-/// nom anglais du GeoJSON ([fallback]).
-String lockedCountryName(String code, String fallback) {
-  final t = AppStrings.t('country_$code');
-  return t.isEmpty || t == 'country_$code' ? fallback : t;
-}
-
-/// Le même avec son article quand la langue en demande un (« l'Inde ») : clé
-/// `country_art_xx`, sinon le nom nu.
-String lockedCountryArticle(String code, String fallback) {
-  final t = AppStrings.t('country_art_$code');
-  return t.isEmpty || t == 'country_art_$code'
-      ? lockedCountryName(code, fallback)
-      : t;
-}
 
 String _groupDigits(int n) {
   final lang = AppStrings.currentBcp47.value;
@@ -407,8 +392,8 @@ class _LockedSheetState extends State<_LockedSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final name = lockedCountryName(widget.code, widget.keyName);
-    final art = lockedCountryArticle(widget.code, widget.keyName);
+    final name = worldCountryName(widget.keyName);
+    final art = worldCountryArticle(widget.keyName);
     final bottom = MediaQuery.paddingOf(context).bottom;
     return PopupSurface(
       sheet: true,
