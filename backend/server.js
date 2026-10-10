@@ -21,6 +21,7 @@ const {
   handleEvent: handleStripeEvent,
 } = require('./stripe');
 const revenueCat = require('./revenuecat');
+const egress = require('./egress');
 
 dotenv.config();
 
@@ -149,6 +150,25 @@ function supabase() {
     auth: { persistSession: false },
   });
   return _supabase;
+}
+
+/** Resolves the caller's verified Supabase email from `Authorization: Bearer
+ *  <JWT>` — same pattern as stripe.js's authUserId, but the email (not the
+ *  id) is what /livekit/egress/* gates on. */
+async function egressCallerEmail(req) {
+  const auth = req.headers.authorization;
+  const m = typeof auth === 'string' ? /^Bearer\s+(.+)$/i.exec(auth.trim()) : null;
+  const token = m ? m[1] : '';
+  if (!token) return null;
+  const sb = supabase();
+  if (!sb) return null;
+  try {
+    const { data, error } = await sb.auth.getUser(token);
+    if (error || !data?.user) return null;
+    return data.user.email || null;
+  } catch (_) {
+    return null;
+  }
 }
 
 /** Short, URL-safe invite code (9 base62 chars). */
@@ -574,6 +594,8 @@ app.get('/api', (_req, res) => {
       translationSession: 'POST /translation/realtime/session',
       translationCalls: 'POST /translation/realtime/calls (SDP relay, Authorization: Bearer ephemeral)',
       translationVoice: 'POST /translation/voice (multipart audio → STT/translate/TTS)',
+      egressStart: 'POST /livekit/egress/start (dev-only, Authorization: Bearer <Supabase JWT>)',
+      egressStop: 'POST /livekit/egress/stop (dev-only, Authorization: Bearer <Supabase JWT>)',
     },
   });
 });
@@ -684,6 +706,59 @@ app.post('/invite/create', _limLite, async (req, res) => {
     }
   }
   return res.json({ roomName: room, exp, sig, ttlMs: INVITE_TTL_MS, code });
+});
+
+/**
+ * POST /livekit/egress/start
+ * Auth: Authorization: Bearer <Supabase JWT> — must resolve to the single
+ * account in EGRESS_ADMIN_EMAIL. Records both call participants' video +
+ * audio into one file, uploaded straight to Supabase Storage. Dev-only:
+ * used to capture footage for ads, never exposed to regular users.
+ * Body: { roomName }
+ * Returns: { egressId }
+ */
+app.post('/livekit/egress/start', _limLite, async (req, res) => {
+  const email = await egressCallerEmail(req);
+  if (!email) return res.status(401).json({ error: 'unauthenticated' });
+  if (!egress.isEgressAdmin(email)) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  const room = sanitizeRoomName((req.body || {}).roomName);
+  if (!room) return res.status(400).json({ error: 'invalid_room' });
+  try {
+    const { egressId } = await egress.startEgress(room);
+    return res.json({ egressId });
+  } catch (e) {
+    if (e.message === 'egress_unconfigured') {
+      return res.status(500).json({ error: 'egress_unconfigured' });
+    }
+    console.error('[egress] start failed:', e);
+    return res.status(500).json({ error: 'egress_start_failed' });
+  }
+});
+
+/**
+ * POST /livekit/egress/stop
+ * Auth: same as /livekit/egress/start.
+ * Body: { egressId }
+ */
+app.post('/livekit/egress/stop', _limLite, async (req, res) => {
+  const email = await egressCallerEmail(req);
+  if (!email) return res.status(401).json({ error: 'unauthenticated' });
+  if (!egress.isEgressAdmin(email)) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  const egressId = (req.body || {}).egressId;
+  if (typeof egressId !== 'string' || !egressId) {
+    return res.status(400).json({ error: 'invalid_egress_id' });
+  }
+  try {
+    await egress.stopEgress(egressId);
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('[egress] stop failed:', e);
+    return res.status(500).json({ error: 'egress_stop_failed' });
+  }
 });
 
 /**
@@ -1170,6 +1245,7 @@ app.post('/translation/suggest', _limText, async (req, res) => {
   }
 });
 
+
 /**
  * Translate one transcript through Grok (/v1/chat/completions, OpenAI-compatible).
  * Returns { translated } on success, or { error, status, detail? } on failure.
@@ -1245,7 +1321,6 @@ async function grokSynthesizeSpeech({ text, voice, lang }) {
     }
     const audio = Buffer.from(await r.arrayBuffer());
     if (audio.length === 0) return { error: 'grok_tts_empty', status: 502 };
-
     return { audio };
   } catch (e) {
     console.error('grok tts throw', e);
@@ -2211,12 +2286,12 @@ app.post('/api/stripe/portal', async (req, res) => {
 // Fan-out push notification dispatcher. Body: { recipientUid, title,
 // body, type, data }. See backend/notify.js for env-var requirements.
 app.post('/api/notify', _limLite, async (req, res) => {
-  const { recipientUid, title, body, type, data } = req.body || {};
+  const { recipientUid, title, body, type, data, image } = req.body || {};
   if (!recipientUid || !title) {
     return res.status(400).json({ error: 'missing_recipient_or_title' });
   }
   try {
-    const out = await notifyUser(recipientUid, { title, body, type, data });
+    const out = await notifyUser(recipientUid, { title, body, type, data, image });
     return res.json(out);
   } catch (e) {
     console.error('/api/notify error', e);
@@ -2788,14 +2863,17 @@ const SCHED_REMINDER_I18N = {
   ja: { title: '📞 通話リマインダー', body: (n) => `${n} との通話がまもなく始まります`, none: '予約した通話がまもなく始まります' },
   ko: { title: '📞 통화 알림', body: (n) => `${n} 님과의 통화가 곧 시작돼요`, none: '예약한 통화가 곧 시작돼요' },
 };
-function schedReminderPayload(lang, peerName, callId) {
+function schedReminderPayload(lang, peerName, callId, peerId) {
   const code = String(lang || '').toLowerCase().split(/[-_]/)[0];
   const m = SCHED_REMINDER_I18N[code] || SCHED_REMINDER_I18N.en;
   return {
     title: m.title,
     body: peerName ? m.body(peerName) : m.none,
     type: 'call_reminder',
-    data: { scheduledCallId: String(callId) },
+    data: {
+      scheduledCallId: String(callId),
+      ...(peerId ? { peerId: String(peerId) } : {}),
+    },
   };
 }
 
@@ -2850,11 +2928,11 @@ async function runScheduledCallReminders() {
     try {
       await notifyUser(
         r.caller,
-        schedReminderPayload(langOf(r.caller), nameOf(r.callee), r.id),
+        schedReminderPayload(langOf(r.caller), nameOf(r.callee), r.id, r.callee),
       );
       await notifyUser(
         r.callee,
-        schedReminderPayload(langOf(r.callee), nameOf(r.caller), r.id),
+        schedReminderPayload(langOf(r.callee), nameOf(r.caller), r.id, r.caller),
       );
       sent += 1;
     } catch (e) {
@@ -2881,3 +2959,8 @@ if (supabase()) {
 // message non lu, fin de Boost, recap du dimanche (backend/engagement.js ;
 // journal = table notif_log, migration 0066).
 require('./engagement').start({ supabase, notifyUser });
+
+// Comptes IA (profiles.is_ai) : file d'actions, repondeur (2 reponses/jour par
+// conversation) et mode autonome (backend/ai_agents.js ; table ai_actions,
+// migration 0068). Inerte tant que AI_AGENTS_ENABLED n'est pas « 1 ».
+require('./ai_agents').start({ supabase, notifyUser });

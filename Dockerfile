@@ -36,6 +36,8 @@ COPY backend/notify.js ./notify.js
 COPY backend/apns_voip.js ./apns_voip.js
 COPY backend/stripe.js ./stripe.js
 COPY backend/revenuecat.js ./revenuecat.js
+# LiveKit Egress (dev-only call recording) — required by server.js (require('./egress')).
+COPY backend/egress.js ./egress.js
 COPY backend/analytics.js ./analytics.js
 COPY backend/tiers.js ./tiers.js
 # Online "X en ligne" broadcast tables — required by server.js (require('./nationalities')).
@@ -44,6 +46,8 @@ COPY backend/nationalities.js ./nationalities.js
 COPY backend/email.js ./email.js
 # Notifications d'engagement planifiees — required by server.js (require('./engagement')).
 COPY backend/engagement.js ./engagement.js
+# Comptes IA (file d'actions, repondeur) — required by server.js (require('./ai_agents')).
+COPY backend/ai_agents.js ./ai_agents.js
 COPY --from=flutter-build /app/build/web ./web
 # Static legal site (Terms / Privacy / Help) — served by server.js at
 # /terms, /privacy, /help, /legal alongside the Flutter web bundle.
