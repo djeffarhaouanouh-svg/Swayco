@@ -226,7 +226,7 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
       ),
       textAlign: TextAlign.center,
       style: TextStyle(
-        color: color ?? Colors.white.withValues(alpha: 0.4),
+        color: color ?? PopupTokens.inkMuted,
         fontSize: 10,
         height: 1.35,
       ),
@@ -301,21 +301,23 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
         : '$price${AppStrings.t('paywall_period_month')} · '
             '${AppStrings.t('pw_cancel_anytime')}';
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+      value: SC.light ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: SC.dBg,
+        backgroundColor: SC.light ? Colors.white : SC.dBg,
         body: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF1A2040), Color(0xFF10121C), SC.dBg],
-              stops: [0, 0.45, 1],
+              colors: SC.light
+                  ? const [Colors.white, Colors.white, Colors.white]
+                  : [const Color(0xFF1A2040), const Color(0xFF10121C), SC.dBg],
+              stops: const [0, 0.45, 1],
             ),
           ),
           child: Stack(
             children: [
-              const Positioned(
+              Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
@@ -325,12 +327,39 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
                     gradient: RadialGradient(
                       center: Alignment.topCenter,
                       radius: 1.2,
-                      colors: [
-                        Color(0x8C2B7FFF),
-                        Color(0x1F18DDEA),
-                        Color(0x001F5EFF),
-                      ],
-                      stops: [0, 0.45, 0.75],
+                      colors: SC.light
+                          ? const [
+                              Color(0x332B7FFF),
+                              Color(0x1A18DDEA),
+                              Color(0x001F5EFF),
+                            ]
+                          : const [
+                              Color(0x8C2B7FFF),
+                              Color(0x1F18DDEA),
+                              Color(0x001F5EFF),
+                            ],
+                      stops: const [0, 0.45, 0.75],
+                    ),
+                  ),
+                ),
+              ),
+              // Halo du bas (clair ET sombre), sous le contenu.
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 260,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          SC.brandBlue.withValues(alpha: SC.light ? 0.28 : 0.45),
+                          SC.brandBlue.withValues(alpha: 0),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -380,8 +409,8 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
                         fontSize: 26,
                         tailBg: _pro
                             ? SC.accent
-                            : Colors.white.withValues(alpha: 0.14),
-                        tailFg: _pro ? SC.onAccent : SC.dTextPrimary,
+                            : PopupTokens.ghost,
+                        tailFg: _pro ? SC.onAccent : PopupTokens.ink,
                       ),
                       const SizedBox(height: 16),
                       // Les arguments : le badge Populaire d'abord.
@@ -459,7 +488,7 @@ class _FreeProSwitch extends StatelessWidget {
             style: TextStyle(
               color: active
                   ? SC.onAccent
-                  : SC.dTextPrimary.withValues(alpha: 0.6),
+                  : PopupTokens.inkSecondary,
               fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
@@ -471,9 +500,9 @@ class _FreeProSwitch extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
+        color: PopupTokens.ghost,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        border: Border.all(color: PopupTokens.ghostBorder),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -540,7 +569,9 @@ class _PreviewCard extends StatelessWidget {
           boxShadow: highlighted
               ? [
                   BoxShadow(
-                    color: SC.brandBlue.withValues(alpha: 0.8),
+                    color: SC.light
+                        ? const Color(0x801F5EFF)
+                        : SC.brandBlue.withValues(alpha: 0.8),
                     blurRadius: 50,
                     spreadRadius: -8,
                   ),
@@ -552,7 +583,11 @@ class _PreviewCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              const ColoredBox(color: Color(0xFF26262A)),
+              ColoredBox(
+                color: SC.light
+                    ? const Color(0xFFE8EDF7)
+                    : const Color(0xFF26262A),
+              ),
               if (photo.isNotEmpty)
                 Image.network(
                   photo,
@@ -668,9 +703,11 @@ class _PerkRow extends StatelessWidget {
       height: 58,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.07),
+        color: SC.light
+            ? const Color(0xFFF2F6FF)
+            : Colors.white.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        border: Border.all(color: PopupTokens.border),
       ),
       child: Row(
         children: [
@@ -698,7 +735,7 @@ class _PerkRow extends StatelessWidget {
                 label,
                 maxLines: 1,
                 style: TextStyle(
-                  color: SC.dTextPrimary,
+                  color: PopupTokens.ink,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
@@ -710,7 +747,9 @@ class _PerkRow extends StatelessWidget {
             value,
             maxLines: 1,
             style: TextStyle(
-              color: on ? SC.accent : SC.dTextPrimary.withValues(alpha: 0.55),
+              color: on
+                  ? (SC.light ? SC.brandBlue : SC.accent)
+                  : PopupTokens.inkSecondary,
               fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
@@ -737,7 +776,7 @@ class _TwoLineCta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    final cta = SizedBox(
       height: 64,
       width: double.infinity,
       child: FilledButton(
@@ -781,6 +820,22 @@ class _TwoLineCta extends StatelessWidget {
                 ],
               ),
       ),
+    );
+    if (!SC.light) return cta;
+    // En clair : ombre jaune sous la pilule.
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: SC.accent.withValues(alpha: 0.55),
+            blurRadius: 28,
+            spreadRadius: -8,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: cta,
     );
   }
 }
@@ -878,21 +933,23 @@ class _BoostPaywallState extends State<_BoostPaywall> {
         ? AppStrings.t('boost_pw_one_time')
         : '$price · ${AppStrings.t('boost_pw_one_time')}';
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+      value: SC.light ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: SC.dBg,
+        backgroundColor: SC.light ? Colors.white : SC.dBg,
         body: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF1A2040), Color(0xFF10121C), SC.dBg],
-              stops: [0, 0.45, 1],
+              colors: SC.light
+                  ? const [Colors.white, Colors.white, Colors.white]
+                  : [const Color(0xFF1A2040), const Color(0xFF10121C), SC.dBg],
+              stops: const [0, 0.45, 1],
             ),
           ),
           child: Stack(
             children: [
-              const Positioned(
+              Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
@@ -902,12 +959,39 @@ class _BoostPaywallState extends State<_BoostPaywall> {
                     gradient: RadialGradient(
                       center: Alignment.topCenter,
                       radius: 1.2,
-                      colors: [
-                        Color(0x8C2B7FFF),
-                        Color(0x1F18DDEA),
-                        Color(0x001F5EFF),
-                      ],
-                      stops: [0, 0.45, 0.75],
+                      colors: SC.light
+                          ? const [
+                              Color(0x332B7FFF),
+                              Color(0x1A18DDEA),
+                              Color(0x001F5EFF),
+                            ]
+                          : const [
+                              Color(0x8C2B7FFF),
+                              Color(0x1F18DDEA),
+                              Color(0x001F5EFF),
+                            ],
+                      stops: const [0, 0.45, 0.75],
+                    ),
+                  ),
+                ),
+              ),
+              // Halo du bas (clair ET sombre), sous le contenu.
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 260,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          SC.brandBlue.withValues(alpha: SC.light ? 0.28 : 0.45),
+                          SC.brandBlue.withValues(alpha: 0),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -951,7 +1035,7 @@ class _BoostPaywallState extends State<_BoostPaywall> {
                         style: SCText.subtitle.copyWith(
                           fontSize: 14.5,
                           height: 1.5,
-                          color: SC.dTextPrimary.withValues(alpha: 0.75),
+                          color: PopupTokens.textBody,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1506,7 +1590,7 @@ class _HighlightTitle extends StatelessWidget {
       fontSize: fontSize,
       letterSpacing: -fontSize * 0.03,
       height: 1.18,
-      color: SC.dTextPrimary,
+      color: PopupTokens.ink,
     );
     return Text.rich(
       TextSpan(
@@ -1541,17 +1625,19 @@ class _CloseButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.black.withValues(alpha: 0.35),
+      color: SC.light
+          ? const Color(0x141F5EFF)
+          : Colors.black.withValues(alpha: 0.35),
       shape: CircleBorder(
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+        side: BorderSide(color: PopupTokens.ghostBorder),
       ),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: const SizedBox(
+        child: SizedBox(
           width: 40,
           height: 40,
-          child: Icon(Icons.close_rounded, size: 20, color: Colors.white),
+          child: Icon(Icons.close_rounded, size: 20, color: PopupTokens.ink),
         ),
       ),
     );
@@ -1567,7 +1653,7 @@ class _FooterLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? SC.dTextPrimary.withValues(alpha: 0.55);
+    final c = color ?? PopupTokens.inkSecondary;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -1599,7 +1685,7 @@ class _FooterDot extends StatelessWidget {
       child: Text(
         '·',
         style: TextStyle(
-          color: color ?? SC.dTextPrimary.withValues(alpha: 0.55),
+          color: color ?? PopupTokens.inkSecondary,
           fontSize: 12,
         ),
       ),
@@ -1625,9 +1711,11 @@ class _PerkGrid extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 74),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: const Color(0xFF1B1F2D),
+            color: SC.light
+                ? const Color(0xFFF2F6FF)
+                : const Color(0xFF1B1F2D),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            border: Border.all(color: PopupTokens.border),
           ),
           child: Row(
             children: [
@@ -1667,8 +1755,8 @@ class _PerkGrid extends StatelessWidget {
                   item.$2,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: PopupTokens.ink,
                     fontSize: 15,
                     height: 1.15,
                     fontWeight: FontWeight.w700,
