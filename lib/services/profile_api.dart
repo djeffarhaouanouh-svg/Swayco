@@ -1347,11 +1347,8 @@ abstract final class ProfileApi {
       }
     }
 
-    if (positionInFetch < 10) {
-      s += 20;
-    } else if (positionInFetch < 25) {
-      s += 10;
-    }
+    // (L'ancien bonus de « position dans le lot » est retiré : le lot sortait de
+    // la base trié par date, donc il récompensait l'ordre d'inscription.)
 
     final theirCountry = p.country.trim().toLowerCase();
     if (myCountry.isNotEmpty &&
@@ -1378,7 +1375,9 @@ abstract final class ProfileApi {
     // most decks, without guaranteeing first place over strong matches.
     if (p.isBoosted) s += 120;
 
-    s += _feedRng.nextDouble() * 10;
+    // Du hasard assez fort pour mélanger des profils de même profil, au lieu de
+    // les laisser dans l'ordre où ils sont arrivés.
+    s += _feedRng.nextDouble() * 30;
     return s;
   }
 
