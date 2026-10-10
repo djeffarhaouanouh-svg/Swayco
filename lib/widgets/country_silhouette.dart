@@ -30,6 +30,11 @@ class CountrySilhouette extends StatefulWidget {
   /// Side of the square the outline is fitted into.
   final double size;
 
+  /// Pays dont le contour (110 m) ne fait pas une bonne bulle : une péninsule
+  /// trop irrégulière, le drapeau étiré dedans paraît tordu. Ils s'affichent en
+  /// drapeau ROND, sans déformation.
+  static const Set<String> discFlags = {'South Korea'};
+
   @override
   State<CountrySilhouette> createState() => _CountrySilhouetteState();
 }
@@ -48,6 +53,31 @@ class _CountrySilhouetteState extends State<CountrySilhouette> {
   @override
   Widget build(BuildContext context) {
     final s = widget.size;
+    if (CountrySilhouette.discFlags.contains(widget.geoName)) {
+      final d = s + 5;
+      return SizedBox(
+        width: s,
+        height: s,
+        child: OverflowBox(
+          maxWidth: d,
+          maxHeight: d,
+          child: ClipOval(
+            child: SizedBox(
+              width: d,
+              height: d,
+              child: FittedBox(
+                fit: BoxFit.cover,
+                clipBehavior: Clip.hardEdge,
+                child: CountryFlag.fromCountryCode(
+                  widget.iso2,
+                  theme: const ImageTheme(width: 40, height: 30),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final ring = _ring;
     if (ring == null || ring.length < 3) return SizedBox(width: s, height: s);
     final fitted = _fit(ring, s);
