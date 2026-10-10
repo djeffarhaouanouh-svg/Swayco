@@ -984,6 +984,10 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
 
   bool get _showBoost => !_loading && _me != null && !_infoOpen;
 
+  /// Cartes fantômes de la page œil : #151B30 en sombre, #E4ECFB en clair.
+  Color get _ghostColor =>
+      SC.light ? const Color(0xFFE4ECFB) : const Color(0xFF151B30);
+
   @override
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
@@ -997,13 +1001,42 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
           discoverCardAspect(context),
       MediaQuery.sizeOf(context).height -
           cardTop -
-          (safeBottom + 12 + (_showBoost ? 50 + _kBoostGap : 0)),
+          (safeBottom + 12 + (_showBoost ? 90 + _kBoostGap : 0)),
     );
 
     return Scaffold(
-      backgroundColor: SC.bg,
+      backgroundColor: SC.light ? Colors.white : const Color(0xFF0A0F1C),
       body: Stack(
         children: [
+          // Halo bleu en haut, derrière tout.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 330,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -1),
+                    radius: 1.1,
+                    colors: SC.light
+                        ? const [
+                            Color(0x331F5EFF),
+                            Color(0x1A18DDEA),
+                            Color(0x00FFFFFF),
+                          ]
+                        : const [
+                            Color(0x571F5EFF),
+                            Color(0x1A18DDEA),
+                            Color(0x000A0F1C),
+                          ],
+                    stops: const [0, 0.45, 0.75],
+                  ),
+                ),
+              ),
+            ),
+          ),
           Positioned(
             top: cardTop,
             left: _kCardInset,
@@ -1041,9 +1074,9 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                           return Stack(
                             clipBehavior: Clip.none,
                             children: [
-                              if (!_infoOpen) ...const [
-                                _GhostCard(angleDeg: -3),
-                                _GhostCard(angleDeg: 4),
+                              if (!_infoOpen) ...[
+                                _GhostCard(angleDeg: -3, color: _ghostColor),
+                                _GhostCard(angleDeg: 4, color: _ghostColor),
                               ],
                               Positioned.fill(
                                 child: ClipRect(
@@ -1121,12 +1154,37 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
             Positioned(
               left: 0,
               right: 0,
-              top: cardTop + cardH + _kBoostGap,
-              child: Center(
-                child: BoostButton(
-                  boostedUntil: me!.boostedUntil,
-                  onPurchased: _awaitBoostCredit,
-                ),
+              top: cardTop + cardH + _kBoostGap - 6,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  BoostButton(
+                    hero: true,
+                    boostedUntil: me!.boostedUntil,
+                    onPurchased: _awaitBoostCredit,
+                  ),
+                  const SizedBox(height: 14),
+                  // L'indice : sans lui, le passeport reste caché.
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.keyboard_double_arrow_up_rounded,
+                        size: 18,
+                        color: SC.fg.withValues(alpha: 0.65),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        AppStrings.t('preview_hint_pull'),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: SC.fg.withValues(alpha: 0.65),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           // Retour + bandeau "voici ta carte telle que les autres la voient".
@@ -1148,15 +1206,46 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    AppStrings.t('profile_preview_banner'),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: SC.fg.withValues(alpha: 0.70),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.visibility_rounded,
+                            size: 18,
+                            color: SC.light
+                                ? const Color(0xFF1F5EFF)
+                                : const Color(0xFF18DDEA),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              AppStrings.t('profile_preview'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: popupDisplay(
+                                fontSize: 15,
+                                letterSpacing: -0.45,
+                                color: SC.fg,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        AppStrings.t('profile_preview_banner'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: SC.fg.withValues(alpha: 0.70),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -1734,9 +1823,12 @@ class _TinderCardStackState extends State<_TinderCardStack> {
 /// petite et descendue de 10 : elle ne se voit que sous la carte et par ses
 /// coins.
 class _GhostCard extends StatelessWidget {
-  const _GhostCard({required this.angleDeg});
+  const _GhostCard({required this.angleDeg, this.color});
 
   final double angleDeg;
+
+  /// Page œil : sa propre teinte ; le feed garde `_kSurface`.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -1750,7 +1842,7 @@ class _GhostCard extends StatelessWidget {
             scale: 0.96,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: _kSurface,
+                color: color ?? _kSurface,
                 borderRadius: BorderRadius.circular(_kCardRadius),
                 border: Border.all(color: _kSurfaceBorder),
               ),

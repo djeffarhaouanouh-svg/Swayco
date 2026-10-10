@@ -86,6 +86,7 @@ class BoostButton extends StatelessWidget {
     required this.boostedUntil,
     required this.onPurchased,
     this.wide = false,
+    this.hero = false,
   });
 
   final DateTime? boostedUntil;
@@ -94,6 +95,10 @@ class BoostButton extends StatelessWidget {
   /// Profil 6b : barre pleine largeur de 56 (au dégradé de marque, rond jaune
   /// + fusée) au lieu du bouton qui épouse son contenu.
   final bool wide;
+
+  /// Page œil : pastille de 52 au dégradé de marque, fusée jaune, texte blanc
+  /// en entier (jamais tronqué).
+  final bool hero;
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +112,57 @@ class BoostButton extends StatelessWidget {
       label = AppStrings.t('boost_active_until', args: {'time': time});
     } else {
       label = AppStrings.t('boost_my_profile');
+    }
+    if (hero) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: active
+            ? null
+            : () => showBoostPaywall(context, onPurchased: onPurchased),
+        child: _sparkle(
+          active,
+          26,
+          Container(
+            height: 52,
+            padding: const EdgeInsets.fromLTRB(18, 0, 24, 0),
+            decoration: BoxDecoration(
+              gradient: active ? null : SC.brandGradient,
+              color: active ? SC.brandBlue.withValues(alpha: 0.18) : null,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: active
+                  ? null
+                  : const [
+                      BoxShadow(
+                        color: Color(0xB32B7FFF),
+                        blurRadius: 28,
+                        spreadRadius: -8,
+                        offset: Offset(0, 12),
+                      ),
+                    ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.rocket_launch_rounded,
+                  size: 22,
+                  color: active ? SC.brandCyan : SC.accent,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: popupDisplay(
+                    fontSize: 14,
+                    color: active ? SC.brandCyan : Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
     if (wide) {
       return GestureDetector(

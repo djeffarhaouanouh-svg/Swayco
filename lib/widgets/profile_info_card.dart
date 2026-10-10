@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/app_strings.dart';
+import '../services/fact_emojis.dart';
 import '../services/job_sectors.dart';
 import '../services/locations.dart';
 import '../services/persona_categories.dart';
@@ -589,13 +590,11 @@ class _Scaled extends StatelessWidget {
     final mother = (p?.originMother ?? '').trim().toLowerCase();
     final father = (p?.originFather ?? '').trim().toLowerCase();
     final tiles = <Widget>[
-      if (card.editable || mother.isNotEmpty)
-        _originTile(context, pal,
+      _originTile(context, pal,
             label: AppStrings.t('info_origin_mother'),
             iso: mother,
             onTap: card.onMother),
-      if (card.editable || father.isNotEmpty)
-        _originTile(context, pal,
+      _originTile(context, pal,
             label: AppStrings.t('info_origin_father'),
             iso: father,
             onTap: card.onFather),
@@ -656,11 +655,15 @@ class _Scaled extends StatelessWidget {
                 Text(
                   filled
                       ? countryNameForIso(iso)
-                      : '+ ${AppStrings.t('info_add')}',
+                      : (card.editable
+                          ? '+ ${AppStrings.t('info_add')}'
+                          : '—'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: filled ? pal.text : pal.accent,
+                    color: filled
+                        ? pal.text
+                        : (card.editable ? pal.accent : pal.label),
                     fontSize: _t(16),
                     fontWeight: FontWeight.w700,
                     fontStyle: filled ? FontStyle.normal : FontStyle.italic,
@@ -682,8 +685,25 @@ class _Scaled extends StatelessWidget {
 
   // ── Centres d'intérêt ─────────────────────────────────────────────────
   List<Widget> _interests(_Pal pal) {
-    final body = card.interestsBody;
-    if (body == null) return const [];
+    // Pas d'intérêts renseignés : la tuile reste, avec son tiret.
+    final body = card.interestsBody ??
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '$kFactEmojiInterests ${AppStrings.t('profile_interests_section').toUpperCase()}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.ibmPlexMono(
+                color: pal.label,
+                fontSize: 11 * 1.2,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text('—', style: TextStyle(color: pal.label, fontSize: _t(20))),
+          ],
+        );
     return [
       SizedBox(height: _u(10)),
       Container(
