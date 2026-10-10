@@ -1078,6 +1078,28 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                                 _GhostCard(angleDeg: -3, color: _ghostColor),
                                 _GhostCard(angleDeg: 4, color: _ghostColor),
                               ],
+                              // Ombre de la carte (hors du clip) : noire en sombre,
+                              // bleue en clair.
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      borderRadius:
+                                          BorderRadius.circular(_kCardRadius),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: SC.light
+                                              ? const Color(0x801F5EFF)
+                                              : const Color(0xB3000000),
+                                          blurRadius: 50,
+                                          spreadRadius: -20,
+                                          offset: const Offset(0, 24),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                               Positioned.fill(
                                 child: ClipRect(
                                   child: Stack(
@@ -2886,6 +2908,7 @@ class _TinderCardState extends State<_TinderCard> {
           // ── Dégradé noir en bas (style Tinder) — transparent sur le haut,
           //    fondu progressif jusqu'au noir sous le nom / la ville, pour que
           //    le texte reste lisible sur n'importe quelle photo. ────────────
+          if (!widget.preview)
           const Positioned.fill(
             child: IgnorePointer(
               child: DecoratedBox(
@@ -2900,8 +2923,34 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
+          // ── Aperçu (page œil) : dégradé bleu nuit, du transparent à 52 %
+          //    jusqu'à 88 % au pied de la photo. ─────────────────────────────
+          if (widget.preview)
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x0004123A), Color(0xE004123A)],
+                      stops: [0.52, 1],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (widget.preview)
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 20,
+              child: _PreviewFooter(profile: p),
+            ),
+
           // ── Bas de carte (handoff 3c) : « Elin, 23 » + drapeau · ville ·
           //    puces. Pas de pastille « en ligne », pas de « points communs ».
+          if (!widget.preview)
           Positioned(
             left: 20,
             right: 20,
@@ -2992,6 +3041,95 @@ class _TinderCardState extends State<_TinderCard> {
             ),
         ],
       );
+  }
+}
+
+/// Pied de photo de l'aperçu (page œil) : prénom en grand + âge, « Pays · Ville »,
+/// puis la pastille de la catégorie, en verre. Pas de drapeau : c'est MA carte.
+class _PreviewFooter extends StatelessWidget {
+  const _PreviewFooter({required this.profile});
+
+  final RemoteProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = profile;
+    final name = p.displayName.trim().isEmpty ? '—' : p.displayName.trim();
+    final place = [
+      if (p.country.trim().isNotEmpty) p.country.trim(),
+      if (p.city.trim().isNotEmpty) p.city.trim(),
+    ].join(' · ');
+    final cat = personaCategoryByLabel(p.personaCategory);
+    final pill = cat != null
+        ? '${cat.emoji} ${personaCategoryLabel(p.personaCategory)}'
+        : (p.interests.isNotEmpty ? interestPillText(p.interests.first) : '');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Flexible(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: popupDisplay(
+                  fontSize: 30,
+                  letterSpacing: -1.2,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            if (p.age != null) ...[
+              const SizedBox(width: 10),
+              Text(
+                '${p.age}',
+                style: popupDisplay(
+                  fontSize: 22,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+              ),
+            ],
+          ],
+        ),
+        if (place.isNotEmpty) ...[
+          const SizedBox(height: 7),
+          Text(
+            place,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
+          ),
+        ],
+        if (pill.isNotEmpty) ...[
+          const SizedBox(height: 7),
+          Container(
+            padding: const EdgeInsets.fromLTRB(11, 7, 14, 7),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+            ),
+            child: Text(
+              pill,
+              maxLines: 1,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }
 
