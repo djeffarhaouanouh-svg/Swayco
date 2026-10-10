@@ -44,6 +44,7 @@ const COUNTRY_TZ = {
   'Suède': 'Europe/Stockholm', 'Danemark': 'Europe/Copenhagen',
   'Finlande': 'Europe/Helsinki', 'Irlande': 'Europe/Dublin',
   'Pologne': 'Europe/Warsaw', 'Ukraine': 'Europe/Kyiv', 'Grèce': 'Europe/Athens',
+  'Philippines': 'Asia/Manila',
 };
 
 // ── Textes, localises dans la langue du DESTINATAIRE ─────────────────────────

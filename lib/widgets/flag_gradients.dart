@@ -192,6 +192,7 @@ List<Color> flagRingColors({required String country, required String language}) 
     'Pologne': [Color(0xFFDC143C), Color(0xFFDC143C)],
     'Ukraine': [Color(0xFF0057B7), Color(0xFFFFDD00)],
     'Grèce': [Color(0xFF0D5EAF), Color(0xFF0D5EAF)],
+    'Philippines': [Color(0xFF0038A8), Color(0xFFCE1126)],
   };
   final named = byCountry[country.trim()];
   if (named != null) return named;

@@ -47,6 +47,7 @@ const Map<String, ({String frM, String frF, String en, String ja})> kDemonyms = 
   'Pologne': (frM: 'Polonais', frF: 'Polonaise', en: 'Polish', ja: 'ポーランド人'),
   'Ukraine': (frM: 'Ukrainien', frF: 'Ukrainienne', en: 'Ukrainian', ja: 'ウクライナ人'),
   'Grèce': (frM: 'Grec', frF: 'Grecque', en: 'Greek', ja: 'ギリシャ人'),
+  'Philippines': (frM: 'Philippin', frF: 'Philippine', en: 'Filipino', ja: 'フィリピン人'),
 };
 
 /// "Une Brésilienne t'a ajouté 👀" in [lang] (fr / en / ja), for a sender

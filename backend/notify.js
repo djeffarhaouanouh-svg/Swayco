@@ -182,7 +182,7 @@ const COUNTRY_ISO2 = {
   'Corée du Sud': 'kr', 'Inde': 'in', 'Australie': 'au', 'Luxembourg': 'lu',
   'Islande': 'is', 'Norvège': 'no', 'Suède': 'se', 'Danemark': 'dk',
   'Finlande': 'fi', 'Irlande': 'ie', 'Pologne': 'pl', 'Ukraine': 'ua',
-  'Grèce': 'gr',
+  'Grèce': 'gr', 'Philippines': 'ph',
 };
 
 function flagEmoji(iso2) {

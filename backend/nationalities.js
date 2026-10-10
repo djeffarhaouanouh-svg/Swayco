@@ -57,6 +57,7 @@ const COUNTRY = {
   'Inde':                { frM: 'Indiens',        frF: 'Indiennes',      enAdj: 'Indian',        ja: 'インド人' },
   'Australie':           { frM: 'Australiens',    frF: 'Australiennes',  enAdj: 'Australian',    ja: 'オーストラリア人' },
   'Luxembourg':          { frM: 'Luxembourgeois', frF: 'Luxembourgeoises', enAdj: 'Luxembourgish', ja: 'ルクセンブルク人' },
+  'Philippines':         { frM: 'Philippins',     frF: 'Philippines',    enAdj: 'Filipino',      ja: 'フィリピン人' },
 };
 
 // Country flag emoji, appended to the end of every notification. Mirrors the
@@ -70,6 +71,7 @@ const FLAG = {
   'Égypte': '🇪🇬', 'Arabie Saoudite': '🇸🇦', 'Émirats arabes unis': '🇦🇪',
   'Turquie': '🇹🇷', 'Russie': '🇷🇺', 'Chine': '🇨🇳', 'Japon': '🇯🇵',
   'Corée du Sud': '🇰🇷', 'Inde': '🇮🇳', 'Australie': '🇦🇺', 'Luxembourg': '🇱🇺',
+  'Philippines': '🇵🇭',
 };
 
 // Short call-to-action used as the notification body, per app language.

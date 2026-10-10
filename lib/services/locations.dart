@@ -122,6 +122,9 @@ const List<Country> kCountries = [
   Country(name: 'Pologne', flag: '🇵🇱', cities: ['Varsovie', 'Cracovie', 'Gdańsk', 'Wrocław']),
   Country(name: 'Ukraine', flag: '🇺🇦', cities: ['Kyiv', 'Lviv', 'Odessa', 'Kharkiv']),
   Country(name: 'Grèce', flag: '🇬🇷', cities: ['Athènes', 'Thessalonique', 'Héraklion']),
+  Country(name: 'Philippines', flag: '🇵🇭', cities: [
+    'Manille', 'Quezon City', 'Cebu', 'Davao', 'Makati', 'Pasig', 'Taguig', 'Baguio',
+  ]),
 ];
 
 /// The flag emoji for a stored [country] name (verbatim match against
@@ -196,4 +199,5 @@ const Map<String, String> _kIso2 = {
   'Pologne': 'pl',
   'Ukraine': 'ua',
   'Grèce': 'gr',
+  'Philippines': 'ph',
 };

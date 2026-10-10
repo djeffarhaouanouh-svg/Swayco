@@ -48,6 +48,7 @@ kGlobeCountries = {
   'Mexico': (flag: '🇲🇽', center: Offset(-102.5, 23.6), code: 'mx', dbName: 'Mexique'),
   'Argentina': (flag: '🇦🇷', center: Offset(-63.6, -38.4), code: 'ar', dbName: 'Argentine'),
   'Colombia': (flag: '🇨🇴', center: Offset(-74.3, 4.6), code: 'co', dbName: 'Colombie'),
+  'Philippines': (flag: '🇵🇭', center: Offset(122.0, 12.9), code: 'ph', dbName: 'Philippines'),
 };
 
 /// The `profiles.country` value a globe country key maps to, or null if it
@@ -220,6 +221,7 @@ const Map<String, Offset> _kBubbleOffset = {
   'Mexico': Offset(-40, -26),
   'Colombia': Offset(-46, -12),
   'Argentina': Offset(-42, 12),
+  'Philippines': Offset(34, -18),
 };
 
 const double _kBubbleR = 18;
