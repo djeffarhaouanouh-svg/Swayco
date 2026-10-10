@@ -213,6 +213,7 @@ class _RootShellState extends State<RootShell> {
         NavTab.select(NavTab.profile);
       case 'weekly_recap':
       case 'special_left':
+      case 'country_open':
         NavTab.select(NavTab.discover);
       case 'online_broadcast':
         // "5 Japonaises en ligne" pull notification → open Discover so they

@@ -10,6 +10,8 @@
 //   unread_message    un message recu il y a 24 h n'a pas ete ouvert
 //   boost_ending      le Boost se termine dans ~1 h
 //   weekly_recap      le dimanche soir : amis, pays, demandes de la semaine
+//   country_open      un pays attendu vient d'ouvrir (table `country_open`,
+//                     migration 0070) : prevenir sa liste d'attente
 //
 // Garde-fous : jamais deux fois la meme chose (table `notif_log`, migration
 // 0066, on ECRIT avant d'envoyer pour qu'un echec ne boucle pas), au plus
@@ -106,6 +108,21 @@ const T = {
     zh: ['你的加速即将结束', '在列表顶部还剩约 1 小时。'],
     ja: ['ブーストがまもなく終了', 'リストの先頭に表示されるのはあと約1時間です。'],
     ko: ['부스트가 곧 끝나요', '목록 맨 위에 약 1시간 남았어요.'],
+  },
+  // {country} = le pays, dans la langue du destinataire (Intl.DisplayNames).
+  country_open: {
+    fr: ["{country} vient d'ouvrir !", "Tu l'attendais : viens rencontrer des gens là-bas."],
+    en: ['{country} just opened!', 'You asked for it — come meet people there.'],
+    es: ['¡{country} ya está abierto!', 'Lo pediste: ven a conocer gente allí.'],
+    de: ['{country} ist jetzt offen!', 'Du hast es dir gewünscht: Lerne dort Leute kennen.'],
+    it: ['{country} è aperto!', "Lo volevi: vieni a conoscere persone lì."],
+    pt: ['{country} já abriu!', 'Pediste: vem conhecer pessoas lá.'],
+    nl: ['{country} is open!', 'Je vroeg erom: maak daar nieuwe vrienden.'],
+    ar: ['تم افتتاح {country}!', 'لقد طلبته: تعال وتعرّف على أشخاص هناك.'],
+    ru: ['{country} открыта!', 'Ты просил(а): знакомься с людьми там.'],
+    zh: ['{country} 已开放！', '你期待已久：快去认识那里的人吧。'],
+    ja: ['{country}がオープンしました！', 'お待たせしました。現地の人と出会いましょう。'],
+    ko: ['{country}이(가) 열렸어요!', '기다리셨죠? 그곳 사람들을 만나 보세요.'],
   },
   // [titre, libelle amis, libelle pays, libelle demandes]
   weekly_recap: {
@@ -218,10 +235,15 @@ async function profilesById(sb, ids) {
 
 // ── Les taches ───────────────────────────────────────────────────────────────
 
-/** Envoie en respectant le plafond et les heures calmes. */
-async function deliver(ctx, userId, profile, kind, ref, payload) {
+/**
+ * Envoie en respectant le plafond et les heures calmes. `skipCap` : une
+ * ouverture de pays se fait attendre, elle ne compte pas dans le plafond du
+ * jour (les heures calmes, elles, restent respectees : on reessaie au tick
+ * suivant).
+ */
+async function deliver(ctx, userId, profile, kind, ref, payload, opts = {}) {
   if (!profile || !awake(profile.country)) return false;
-  if ((await sentLast24h(ctx.sb, userId)) >= DAILY_CAP) return false;
+  if (!opts.skipCap && (await sentLast24h(ctx.sb, userId)) >= DAILY_CAP) return false;
   if (!(await claim(ctx.sb, userId, kind, ref))) return false;
   try {
     await ctx.notifyUser(userId, payload);
@@ -387,6 +409,59 @@ async function boostEnding(ctx) {
   return sent;
 }
 
+/** Nom du pays dans la langue de la personne (ISO2 -> Intl.DisplayNames). */
+function regionName(iso, lang) {
+  const code = String(lang || 'en').toLowerCase().split(/[-_]/)[0];
+  try {
+    return new Intl.DisplayNames([code], { type: 'region' }).of(String(iso).toUpperCase())
+      || String(iso).toUpperCase();
+  } catch (_) {
+    return String(iso).toUpperCase();
+  }
+}
+
+/**
+ * Un pays vient d'ouvrir : on previent ceux de sa liste d'attente. Une ligne
+ * dans `country_open` (country_key, iso) suffit a declencher ; le journal
+ * `notif_log` (ref = la cle du pays) garantit un seul envoi par personne.
+ */
+async function countryOpen(ctx) {
+  const { sb } = ctx;
+  const { data: opened, error } = await sb
+    .from('country_open')
+    .select('country_key, iso')
+    .limit(50);
+  if (error || !opened || opened.length === 0) return 0; // table absente ou rien
+  let sent = 0;
+  for (const c of opened) {
+    const { data: waiting } = await sb
+      .from('country_waitlist')
+      .select('user_id')
+      .eq('country_key', c.country_key)
+      .limit(5000);
+    const ids = (waiting || []).map((w) => w.user_id);
+    if (ids.length === 0) continue;
+    const people = await profilesById(sb, ids);
+    for (const uid of ids) {
+      const p = people.get(uid);
+      if (!p) continue;
+      const [title, body] = pick('country_open', p.language);
+      const ok = await deliver(
+        ctx, uid, p, 'country_open', c.country_key,
+        {
+          title: fill(title, { country: regionName(c.iso, p.language) }),
+          body,
+          type: 'country_open',
+          data: { country_key: String(c.country_key), iso: String(c.iso) },
+        },
+        { skipCap: true },
+      );
+      if (ok) sent += 1;
+    }
+  }
+  return sent;
+}
+
 async function weeklyRecap(ctx) {
   const { sb } = ctx;
   const since = new Date(Date.now() - 7 * DAY).toISOString();
@@ -475,6 +550,7 @@ async function runOnce(ctx) {
       say_hello: sayHello,
       unread_message: unreadMessages,
       weekly_recap: weeklyRecap,
+      country_open: countryOpen,
     })) {
       try {
         out[name] = await fn(ctx);
