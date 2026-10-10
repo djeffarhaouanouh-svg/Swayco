@@ -611,12 +611,16 @@ class _Scaled extends StatelessWidget {
     final p = card.profile;
     final mother = (p?.originMother ?? '').trim().toLowerCase();
     final father = (p?.originFather ?? '').trim().toLowerCase();
+    // Origine non renseignée : la case disparaît chez les autres (sur mon
+    // profil elle reste, pour la remplir).
     final tiles = <Widget>[
-      _originTile(context, pal,
+      if (card.editable || mother.isNotEmpty)
+        _originTile(context, pal,
             label: AppStrings.t('info_origin_mother'),
             iso: mother,
             onTap: card.onMother),
-      _originTile(context, pal,
+      if (card.editable || father.isNotEmpty)
+        _originTile(context, pal,
             label: AppStrings.t('info_origin_father'),
             iso: father,
             onTap: card.onFather),
