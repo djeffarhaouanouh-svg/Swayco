@@ -847,28 +847,6 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
               ),
             ),
 
-            // ── Légende : un cadenas = pas encore ouvert. ──────────────────
-            Positioned(
-              top: barTop + 44 + 18 + 76,
-              left: 20,
-              width: 260,
-              child: _page1Fx(
-                IgnorePointer(
-                  child: Text(
-                    AppStrings.t('globe_caption_locked'),
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      height: 1.35,
-                      color: SC.light
-                          ? SC.textSecondary
-                          : Colors.white.withValues(alpha: 0.78),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
             // ── Barre du haut : fermer + recherche, en verre. ────────────────
             Positioned(
               top: barTop,
