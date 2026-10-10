@@ -1282,9 +1282,14 @@ class _DiscoverHeader extends StatelessWidget {
           children: [
             // Centre à 20 px du haut de la bande, comme avant le resserrement
             // (43 − 3 = 40 de zone utile).
-            const Padding(
-              padding: EdgeInsets.fromLTRB(6, 0, 6, 11),
-              child: SwaycoWordmark(adaptive: true),
+            // Le texte garde 40 px de haut (sinon le bas du « y » est rogne) ;
+            // la remontee de 8 px se fait par translation, sans toucher a la place.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 0, 6, 3),
+              child: Transform.translate(
+                offset: const Offset(0, -8),
+                child: const SwaycoWordmark(adaptive: true),
+              ),
             ),
             // En haut à droite : le bouton Pro, même lien que Réglages >
             // Mon abonnement (le paywall).
