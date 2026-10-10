@@ -22,6 +22,7 @@ const OPEN_KEYS = new Set([
   "Argentina",
   "Colombia",
   "Philippines",
+  "South Korea",
 ]);
 
 /** profiles.country (libellé français stocké) -> clé du globe (GeoJSON). */

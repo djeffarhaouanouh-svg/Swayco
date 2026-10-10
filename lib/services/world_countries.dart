@@ -135,7 +135,6 @@ const Map<String, ({String iso, String en, String fr, String frArt})>
   'Solomon Is.': (iso: 'sb', en: 'Solomon Islands', fr: 'Îles Salomon', frArt: 'les îles Salomon'),
   'Somalia': (iso: 'so', en: 'Somalia', fr: 'Somalie', frArt: 'la Somalie'),
   'South Africa': (iso: 'za', en: 'South Africa', fr: 'Afrique du Sud', frArt: "l'Afrique du Sud"),
-  'South Korea': (iso: 'kr', en: 'South Korea', fr: 'Corée du Sud', frArt: 'la Corée du Sud'),
   'Sri Lanka': (iso: 'lk', en: 'Sri Lanka', fr: 'Sri Lanka', frArt: 'le Sri Lanka'),
   'Sudan': (iso: 'sd', en: 'Sudan', fr: 'Soudan', frArt: 'le Soudan'),
   'Suriname': (iso: 'sr', en: 'Suriname', fr: 'Suriname', frArt: 'le Suriname'),

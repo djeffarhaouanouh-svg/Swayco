@@ -52,6 +52,7 @@ kGlobeCountries = {
   'Argentina': (flag: '🇦🇷', center: Offset(-63.6, -38.4), code: 'ar', dbName: 'Argentine'),
   'Colombia': (flag: '🇨🇴', center: Offset(-74.3, 4.6), code: 'co', dbName: 'Colombie'),
   'Philippines': (flag: '🇵🇭', center: Offset(122.0, 12.9), code: 'ph', dbName: 'Philippines'),
+  'South Korea': (flag: '🇰🇷', center: Offset(127.8, 36.4), code: 'kr', dbName: 'Corée du Sud'),
 };
 
 /// Centre exact (longitude, latitude) de quelques pays pas encore ouverts, pour
@@ -64,7 +65,6 @@ const Map<String, ({Offset center, String code})> kLockedCountries = {
   'India': (center: Offset(78.9, 22.5), code: 'in'),
   'South Africa': (center: Offset(24.7, -29.0), code: 'za'),
   'United States of America': (center: Offset(-98.5, 39.8), code: 'us'),
-  'South Korea': (center: Offset(127.8, 36.4), code: 'kr'),
 };
 
 /// The `profiles.country` value a globe country key maps to, or null if it
@@ -238,6 +238,8 @@ const Map<String, Offset> _kBubbleOffset = {
   'Colombia': Offset(-46, -12),
   'Argentina': Offset(-42, 12),
   'Philippines': Offset(34, -18),
+  // Coree du Sud : a gauche du Japon, sa bulle part vers le haut.
+  'South Korea': Offset(-38, -24),
 };
 
 const double _kBubbleR = 18;
