@@ -20,8 +20,10 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 import '../services/analytics.dart';
 import '../services/attribution.dart';
 import '../services/app_strings.dart';
-import '../services/auth_service.dart';
 import '../services/swayco_sounds.dart';
+import '../config/app_config.dart';
+import '../services/auth_service.dart';
+import '../services/egress_api.dart';
 import '../swayco/asr/apple_stt_channel.dart';
 import '../swayco/asr/asr_service.dart';
 import '../services/audio_controller.dart';
@@ -144,6 +146,18 @@ class _CallScreenState extends State<CallScreen> {
   Room? _room;
   String? _connectError;
   bool _connecting = true;
+
+  /// Dev-only ad-footage recording (LiveKit Egress). Non-null while a
+  /// recording is running. Never surfaced to a regular user: the REC button
+  /// itself only renders for [_isEgressAdmin], and the backend re-checks the
+  /// caller's Supabase email regardless.
+  String? _egressId;
+  bool _egressBusy = false;
+  bool get _isEgressAdmin {
+    final admin = resolvedEgressAdminEmail();
+    return admin.isNotEmpty &&
+        AuthService.currentEmail.toLowerCase() == admin.toLowerCase();
+  }
 
   /// Keep the connecting splash on screen for at least this long — LiveKit
   /// often connects in well under a second, so the splash used to flash by
@@ -2398,6 +2412,38 @@ class _CallScreenState extends State<CallScreen> {
     if (mounted) setState(() => _camOn = next);
   }
 
+  /// Dev-only: starts/stops the LiveKit Egress recording of this call
+  /// (both participants' video + audio, for ad footage). Gated by
+  /// [_isEgressAdmin] at the call site; the backend re-checks independently.
+  Future<void> _toggleEgress() async {
+    if (_egressBusy) return;
+    final room = _room;
+    if (room == null) return;
+    setState(() => _egressBusy = true);
+    try {
+      if (_egressId == null) {
+        final id = await EgressApi.start(room.name ?? widget.roomName);
+        if (mounted) setState(() => _egressId = id);
+        if (id == null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Egress: échec du démarrage')),
+          );
+        }
+      } else {
+        final id = _egressId!;
+        final ok = await EgressApi.stop(id);
+        if (mounted) setState(() => _egressId = null);
+        if (!ok && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Egress: échec de l\'arrêt')),
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _egressBusy = false);
+    }
+  }
+
   /// Re-open the OS share sheet with the guest-invite link. Only reachable
   /// from the waiting-room placeholder when [CallScreen.inviteShareText] is
   /// set (host side of a guest-invite call).
@@ -2551,6 +2597,14 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Future<void> _hangUp() async {
+    // Dev-only ad-footage recording left running: stop it so it doesn't
+    // keep billing/uploading after the call screen is gone. Best-effort,
+    // never blocks hang-up.
+    final egressId = _egressId;
+    if (egressId != null) {
+      _egressId = null;
+      unawaited(EgressApi.stop(egressId));
+    }
     // EN PREMIER : iOS doit savoir tout de suite que l'appel est fini.
     //
     // CallKit n'était démonté qu'au retour de `nav.push`, dans root_shell —
@@ -3221,7 +3275,7 @@ class _CallScreenState extends State<CallScreen> {
                 Text(
                   _connectError!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: SC.dTextMuted, height: 1.4),
+                  style: TextStyle(color: SC.dTextMuted, height: 1.4),
                 ),
                 const SizedBox(height: 24),
                 FilledButton(
@@ -3827,6 +3881,22 @@ class _CallScreenState extends State<CallScreen> {
                                           label: AppStrings.t('call_audio'),
                                           onTap: _openAudioSheet,
                                         ),
+                                        // Dev-only: capture ad footage via
+                                        // LiveKit Egress. Never shown to a
+                                        // regular user — [_isEgressAdmin]
+                                        // checks the signed-in account's
+                                        // email, and the backend checks it
+                                        // again independently.
+                                        if (_isEgressAdmin)
+                                          _RoundCallButton(
+                                            icon: Icons.fiber_manual_record,
+                                            label: _egressId == null
+                                                ? 'REC'
+                                                : 'STOP',
+                                            active: _egressId != null,
+                                            onTap:
+                                                _egressBusy ? () {} : _toggleEgress,
+                                          ),
                                       ],
                                     ),
                                   ),
@@ -5921,7 +5991,7 @@ class _FlagWheelState extends State<_FlagWheel> {
                 widget.title,
                 textAlign: TextAlign.center,
                 maxLines: 2,
-                style: const TextStyle(
+                style: TextStyle(
                   color: SC.dTextMuted,
                   fontSize: 12,
                   height: 1.25,
@@ -5975,7 +6045,7 @@ class _FlagWheelState extends State<_FlagWheel> {
           textAlign: TextAlign.center,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             color: SC.dTextPrimary,
             fontSize: 13,
             fontWeight: FontWeight.w600,
@@ -6074,7 +6144,7 @@ class _SheetLabel extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               color: SC.dTextPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w600,

@@ -80,3 +80,11 @@ String resolvedGoogleIosClientId() => _envOrDefine(
     'GOOGLE_IOS_CLIENT_ID',
     const String.fromEnvironment('GOOGLE_IOS_CLIENT_ID',
         defaultValue: _kDefaultGoogleIosClientId));
+
+/// Email that unlocks the dev-only call-recording (REC) button. Not a
+/// secret — the backend re-checks the signed-in Supabase account's email
+/// before ever starting an Egress job, so this only controls whether the
+/// button is drawn.
+String resolvedEgressAdminEmail() =>
+    _envOrDefine('EGRESS_ADMIN_EMAIL',
+        const String.fromEnvironment('EGRESS_ADMIN_EMAIL'));
