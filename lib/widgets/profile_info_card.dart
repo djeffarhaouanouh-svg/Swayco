@@ -102,6 +102,7 @@ class ProfileInfoCard extends StatelessWidget {
     this.showHeader = true,
     this.framed = true,
     this.signReveal,
+    this.fillHeight,
   });
 
   final RemoteProfile? profile;
@@ -129,6 +130,10 @@ class ProfileInfoCard extends StatelessWidget {
   /// Entrée de l'image du signe (rotation -140° -> 0°, échelle .4 -> 1).
   final Animation<double>? signReveal;
 
+  /// Hauteur à remplir (passeport sans bio) : la rangée âge / métier / signe
+  /// reçoit le surplus et les textes grossissent un peu. Null = hauteur naturelle.
+  final double? fillHeight;
+
   static const double _textBoost = 1.2;
 
   @override
@@ -136,10 +141,12 @@ class ProfileInfoCard extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, c) {
         final w = c.maxWidth.isFinite ? c.maxWidth : 360.0;
-        return _Scaled(
-          k: w / 632,
-          card: this,
-        );
+        final k = w / 632;
+        // Ce qui reste à remplir, rapporté à la hauteur naturelle (~437 unités).
+        final g = fillHeight == null
+            ? 1.0
+            : (fillHeight! / (437 * k)).clamp(1.0, 1.35);
+        return _Scaled(k: k, g: g, card: this);
       },
     );
   }
@@ -166,12 +173,15 @@ class _Pal {
 }
 
 class _Scaled extends StatelessWidget {
-  const _Scaled({required this.k, required this.card});
+  const _Scaled({required this.k, required this.g, required this.card});
 
   final double k;
+
+  /// Grossissement des textes quand la carte a de la place en plus.
+  final double g;
   final ProfileInfoCard card;
 
-  double _t(double v) => v * k * ProfileInfoCard._textBoost;
+  double _t(double v) => v * k * ProfileInfoCard._textBoost * g;
   double _u(double v) => v * k;
 
   @override
@@ -180,7 +190,8 @@ class _Scaled extends StatelessWidget {
     final persona = personaCategoryByLabel(p?.personaCategory ?? '');
     final accent = kPersonaColors[persona?.label ?? ''] ?? _kDefaultAccent;
     final pal = _Pal(accent);
-    final content = Column(
+    final fill = card.fillHeight;
+    final column = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -188,13 +199,24 @@ class _Scaled extends StatelessWidget {
           _header(context, pal),
           SizedBox(height: _u(10)),
         ],
-        SizedBox(height: _u(191), child: _ageJobSign(context, pal)),
+        if (fill == null)
+          SizedBox(height: _u(191), child: _ageJobSign(context, pal))
+        else
+          Expanded(child: _ageJobSign(context, pal)),
         SizedBox(height: _u(10)),
         _defines(context, pal, persona),
         ..._origins(context, pal),
         ..._interests(pal),
       ],
     );
+    // Hauteur à remplir : IntrinsicHeight + minHeight donnent le surplus au
+    // seul `Expanded` (la rangée du haut) sans jamais déborder.
+    final Widget content = fill == null
+        ? column
+        : ConstrainedBox(
+            constraints: BoxConstraints(minHeight: fill),
+            child: IntrinsicHeight(child: column),
+          );
     if (!card.framed) return content;
     final radius = BorderRadius.circular(_u(34));
     return Container(
@@ -399,7 +421,7 @@ class _Scaled extends StatelessWidget {
                           '$age',
                           style: TextStyle(
                             color: pal.age,
-                            fontSize: _u(92) * 1.1,
+                            fontSize: _u(92) * 1.1 * g,
                             height: .85,
                             fontWeight: FontWeight.w900,
                           ),
@@ -458,7 +480,7 @@ class _Scaled extends StatelessWidget {
                       ? null
                       : _SignArt(
                           asset: 'assets/zodiac/${_kZodiacAssets[z]}.png',
-                          size: _u(68),
+                          size: _u(68) * g,
                           reveal: card.signReveal,
                         ),
                   child: Align(
@@ -603,7 +625,7 @@ class _Scaled extends StatelessWidget {
     return [
       SizedBox(height: _u(10)),
       SizedBox(
-        height: _u(70),
+        height: _u(70) * g,
         child: Row(
           children: [
             for (var i = 0; i < tiles.length; i++) ...[

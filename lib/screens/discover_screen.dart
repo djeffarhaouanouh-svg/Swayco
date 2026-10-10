@@ -1984,7 +1984,11 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, c) => _panel(context, c.maxHeight),
+      );
+
+  Widget _panel(BuildContext context, double panelHeight) {
     final p = widget.profile;
     // Couleur du persona : halo du bas et bord haut du passeport.
     final accent =
@@ -2031,6 +2035,10 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
           showHeader: false,
           framed: false,
           signReveal: _at(1000, 700),
+          // Sans bio, la carte prend la place libre : poignée, bandeau, marges
+          // et en-tête (~226) retirés de la hauteur du panneau.
+          fillHeight:
+              p.bio.trim().isEmpty ? math.max(0.0, panelHeight - 226) : null,
           interestsBody: p.interests.isEmpty
               ? null
               : Column(
