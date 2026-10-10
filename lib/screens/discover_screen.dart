@@ -994,11 +994,11 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     final me = _me;
     final cardTop = safeTop + 64;
-    // Same inset, corners and ratio as the real Discover card — not taller
-    // than the feed shows it (room left for the Boost button).
+    // Maquette de la page œil : la carte prend TOUTE la hauteur libre (portrait,
+    // ~0,74 de large pour 1 de haut), le bouton Boost et l'indice juste dessous.
+    // Plafond : jamais plus étroite que 0,72 (écrans très hauts).
     final cardH = math.min(
-      (MediaQuery.sizeOf(context).width - 2 * _kCardInset) /
-          discoverCardAspect(context),
+      (MediaQuery.sizeOf(context).width - 2 * _kCardInset) / 0.72,
       MediaQuery.sizeOf(context).height -
           cardTop -
           (safeBottom + 12 + (_showBoost ? 90 + _kBoostGap : 0)),
