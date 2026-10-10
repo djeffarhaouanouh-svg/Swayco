@@ -1,9 +1,8 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -13,7 +12,7 @@ import 'package:lottie/lottie.dart';
 
 import '../services/analytics.dart';
 import '../services/country_waitlist.dart';
-import '../services/globe_faces.dart';
+import '../services/globe_places.dart';
 import '../services/world_countries.dart';
 import '../services/app_strings.dart';
 import '../services/swayco_sounds.dart';
@@ -22,6 +21,7 @@ import 'globe_locked_sheet.dart';
 import 'popup_kit.dart';
 
 part 'globe_voyage_screen.dart';
+part 'globe_zoom_layer.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Discover globe — a spinning orthographic Earth used to pick a country. The
@@ -111,6 +111,30 @@ class _Land {
   /// polygon → ring → point, each point an Offset(longitude, latitude).
   final List<List<List<Offset>>> polygons;
   late final double avgLat;
+
+  /// Centre de la boîte englobante et son étendue en degrés : sert à ne pas
+  /// dessiner (ni projeter) les pays entièrement sur l'hémisphère caché.
+  late final ({double lon, double lat, double span}) bounds = _computeBounds();
+
+  ({double lon, double lat, double span}) _computeBounds() {
+    var minLon = 999.0, maxLon = -999.0, minLat = 999.0, maxLat = -999.0;
+    for (final poly in polygons) {
+      if (poly.isEmpty) continue;
+      for (final pt in poly.first) {
+        if (pt.dx < minLon) minLon = pt.dx;
+        if (pt.dx > maxLon) maxLon = pt.dx;
+        if (pt.dy < minLat) minLat = pt.dy;
+        if (pt.dy > maxLat) maxLat = pt.dy;
+      }
+    }
+    if (minLon > maxLon) return (lon: 0, lat: 0, span: 360);
+    final w = maxLon - minLon;
+    // Un pays à cheval sur l'antiméridien : toujours « peut-être visible ».
+    if (w > 180) return (lon: 0, lat: 0, span: 360);
+    final lat = (minLat + maxLat) / 2;
+    final span = math.max(w * math.cos(lat * math.pi / 180), maxLat - minLat);
+    return (lon: (minLon + maxLon) / 2, lat: lat, span: span);
+  }
 }
 
 /// Loads and caches `assets/geo/world-110m.geo.json` (Natural Earth 110m,
@@ -124,9 +148,30 @@ class _WorldGeo {
     return _inFlight ??= _read();
   }
 
+  static List<_Land>? _cache50;
+  static Future<List<_Land>>? _inFlight50;
+
+  /// Le fond 50 m (≈ 1,5 Mo) : lu à la première montée en zoom, décodé hors du
+  /// fil d'interface.
+  static Future<List<_Land>> load50() {
+    if (_cache50 != null) return Future.value(_cache50);
+    return _inFlight50 ??= () async {
+      final raw = await rootBundle.loadString('assets/geo/world-50m.geo.json');
+      final fc = await compute(_decodeGeo, raw);
+      return _cache50 = _parse(fc);
+    }();
+  }
+
   static Future<List<_Land>> _read() async {
     final raw = await rootBundle.loadString('assets/geo/world-110m.geo.json');
     final fc = json.decode(raw) as Map<String, dynamic>;
+    final out = _parse(fc);
+    _cache = out;
+    _inFlight = null;
+    return out;
+  }
+
+  static List<_Land> _parse(Map<String, dynamic> fc) {
     final out = <_Land>[];
     for (final f in (fc['features'] as List)) {
       final m = f as Map<String, dynamic>;
@@ -144,8 +189,6 @@ class _WorldGeo {
       }
       if (polys.isNotEmpty) out.add(_Land(name, polys));
     }
-    _cache = out;
-    _inFlight = null;
     return out;
   }
 
@@ -160,6 +203,9 @@ class _WorldGeo {
           ],
       ];
 }
+
+Map<String, dynamic> _decodeGeo(String raw) =>
+    json.decode(raw) as Map<String, dynamic>;
 
 // ── Projection ──────────────────────────────────────────────────────────────
 
@@ -333,6 +379,9 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
 
   /// Pays touchés pendant cette ouverture : leur cadenas apparaît.
   final Set<String> _touched = {};
+
+  /// Le zoom du globe, republié : masque le titre, montre le chip du pays.
+  final ValueNotifier<double> _zoom = ValueNotifier<double>(1.0);
   final Map<String, Offset> _centerCache = {};
 
   /// Où poser le cadenas d'un pays : le centre fixé à la main, sinon le milieu
@@ -455,6 +504,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
     _search.dispose();
     _searchFocus.dispose();
     _pageCtl.dispose();
+    _zoom.dispose();
     super.dispose();
   }
 
@@ -791,6 +841,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
                             lockedJoined: _joinedLocked,
                             lockedCenters: _lockCenters,
                             onLockedTap: _openLocked,
+                            zoomOut: _zoom,
                           ),
                         ),
                       ],
@@ -836,15 +887,73 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
                 ),
               ),
 
+            // Dégradés haut et bas : la barre du haut et le panneau restent lisibles
+            // sur la carte zoomée (sombre seulement : en clair la carte reste nette).
+            if (!SC.light)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: _zoom,
+                    builder: (_, z, child) => AnimatedOpacity(
+                      opacity: z > 1.4 ? 1 : 0,
+                      duration: const Duration(milliseconds: 250),
+                      child: child,
+                    ),
+                    child: const Stack(
+                      children: [
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          top: 0,
+                          height: 240,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Color(0x8C04123A), Color(0x0004123A)],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          height: 260,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Color(0x0004123A), Color(0x8004123A)],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
             // ── Titre : « Où veux-tu [voyager ?] ». ─────────────────────────
             Positioned(
               top: barTop + 44 + 18,
               left: 20,
-              child: _page1Fx(
-                IgnorePointer(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 260),
-                    child: _title(),
+              child: ValueListenableBuilder<double>(
+                valueListenable: _zoom,
+                builder: (_, z, child) => AnimatedOpacity(
+                  opacity: z < 1.4 ? 1 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: child,
+                ),
+                child: _page1Fx(
+                  IgnorePointer(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 260),
+                      child: _title(),
+                    ),
                   ),
                 ),
               ),
@@ -922,6 +1031,144 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet>
                   ),
                 ],
               )),
+            ),
+
+            // ── + / − (verre, à droite). ───────────────────────────────────
+            Positioned(
+              right: 14,
+              top: 330,
+              child: _page1Fx(
+                _Glass(
+                  radius: 22,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _ZoomButton(
+                        icon: Icons.add_rounded,
+                        onTap: () => _globeKey.currentState?.zoomBy(1.6),
+                      ),
+                      Container(
+                        width: 44,
+                        height: 1,
+                        color: Colors.white.withValues(alpha: 0.22),
+                      ),
+                      _ZoomButton(
+                        icon: Icons.remove_rounded,
+                        onTap: () => _globeKey.currentState?.zoomBy(1 / 1.6),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // ── Chip du pays choisi + « Tout le globe » (zoomé). ─────────────
+            Positioned(
+              top: barTop + 52,
+              left: 14,
+              right: 14,
+              child: _page1Fx(
+                ValueListenableBuilder<double>(
+                  valueListenable: _zoom,
+                  builder: (_, z, _) {
+                    if (z <= 1.4 || _selected.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    final key = _selected.last;
+                    final info = kGlobeCountries[key];
+                    if (info == null) return const SizedBox.shrink();
+                    return Row(
+                      children: [
+                        Container(
+                          height: 40,
+                          padding: const EdgeInsets.fromLTRB(8, 0, 14, 0),
+                          decoration: BoxDecoration(
+                            color: SC.accent,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: ClipOval(
+                                  child: Image.network(
+                                    'https://flagcdn.com/w80/${info.code}.png',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) =>
+                                        const ColoredBox(color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _nameOf(key),
+                                maxLines: 1,
+                                style: popupDisplay(
+                                  fontSize: 15,
+                                  color: const Color(0xFF04123A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _globeKey.currentState?.zoomTo(
+                            1,
+                            duration: const Duration(milliseconds: 450),
+                            curve: Curves.easeInOutCubic,
+                          ),
+                          child: _Glass(
+                            radius: 99,
+                            child: SizedBox(
+                              height: 40,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 14),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.public_rounded,
+                                      size: 18,
+                                      color: SC.light
+                                          ? SC.textPrimary
+                                          : Colors.white,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      AppStrings.t('globe_zoom_all'),
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: SC.light
+                                            ? SC.textPrimary
+                                            : Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
             ),
 
             // ── Résultats de la recherche. ────────────────────────────────────
@@ -1255,6 +1502,31 @@ class _GenderCard extends StatelessWidget {
   }
 }
 
+/// Un bouton + / − de la colonne de zoom.
+class _ZoomButton extends StatelessWidget {
+  const _ZoomButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Icon(
+          icon,
+          size: 24,
+          color: SC.light ? SC.textPrimary : Colors.white,
+        ),
+      ),
+    );
+  }
+}
+
 /// Le verre de la barre de navigation : blanc 13 %, bord blanc 22 % de 1,2 px,
 /// flou 28. [tint] > 0.13 fonce le fond (liste de résultats, plus lisible).
 class _Glass extends StatelessWidget {
@@ -1424,17 +1696,6 @@ class _CountryChip extends StatelessWidget {
   }
 }
 
-/// Un visage posé sur un pays ouvert (longitude / latitude tirées au hasard dans
-/// ses frontières, toujours les mêmes pour un même compte).
-class _PlacedFace {
-  _PlacedFace(this.lon, this.lat, this.url);
-
-  final double lon;
-  final double lat;
-  final String url;
-  ui.Image? image;
-}
-
 // ── The interactive globe ───────────────────────────────────────────────────
 
 class _GlobeView extends StatefulWidget {
@@ -1446,6 +1707,7 @@ class _GlobeView extends StatefulWidget {
     required this.lockedJoined,
     required this.lockedCenters,
     required this.onLockedTap,
+    required this.zoomOut,
   });
 
   final List<_Land> world;
@@ -1458,6 +1720,9 @@ class _GlobeView extends StatefulWidget {
   /// Où est posé chaque cadenas / cloche (clé du pays -> lon, lat).
   final Map<String, Offset> lockedCenters;
   final ValueChanged<String> onLockedTap;
+
+  /// Le niveau de zoom courant, republié pour la pop-up (titre, boutons, chip).
+  final ValueNotifier<double> zoomOut;
 
   @override
   State<_GlobeView> createState() => _GlobeViewState();
@@ -1487,16 +1752,92 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
 
   double _scaleStart = 1;
 
-  // ── Visages des comptes IA : visibles seulement quand on zoome ────────────
-  static const int _kFacesPerCountry = 8;
-  List<_PlacedFace> _faces = const [];
-  int _facesVersion = 0;
-  bool _imagesRequested = false;
+  // ── Zoom : fond 50 m, bulles photo, boutons + / − ─────────────────────────
+  List<_Land>? _world50;
+  bool _loading50 = false;
+  late final AnimationController _zoomCtl = AnimationController(vsync: this)
+    ..addListener(_onZoomTick);
+  double _zoomFrom = 1, _zoomTo = 1;
+  Curve _zoomCurve = Curves.easeOutCubic;
+
+  /// Division d'un pays en villes (350 ms) et petit rebond d'une ville (220 ms).
+  late final AnimationController _splitCtl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 350),
+  )..addListener(() => setState(() {}));
+  late final AnimationController _bounceCtl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+  )..addListener(() => setState(() {}));
+  String? _splitKey;
+  String? _bounceKey;
+
+  /// Le fond le plus fin : le 50 m dès ×1,6 s'il est chargé.
+  bool get _hiRes => _scale >= 1.6 && _world50 != null;
+  List<_Land> get _activeWorld => _hiRes ? _world50! : widget.world;
+
+  void _setScale(double v) {
+    _scale = v;
+    widget.zoomOut.value = v;
+    if (v >= 1.4) _ensure50();
+  }
+
+  void _ensure50() {
+    if (_world50 != null || _loading50) return;
+    _loading50 = true;
+    _WorldGeo.load50().then((w) {
+      if (mounted) setState(() => _world50 = w);
+    });
+  }
+
+  void _onZoomTick() {
+    setState(() {
+      _setScale(
+        _zoomFrom + (_zoomTo - _zoomFrom) * _zoomCurve.transform(_zoomCtl.value),
+      );
+    });
+  }
+
+  /// Zoome (ou dézoome) en douceur, borné à 1–4.
+  void zoomTo(
+    double target, {
+    Duration duration = const Duration(milliseconds: 300),
+    Curve curve = Curves.easeOutCubic,
+  }) {
+    _velLon = _velLat = 0;
+    _zoomFrom = _scale;
+    _zoomTo = target.clamp(1.0, 4.0);
+    _zoomCurve = curve;
+    _zoomCtl.duration = duration;
+    _zoomCtl.forward(from: 0);
+  }
+
+  void zoomBy(double factor) => zoomTo(_scale * factor);
+
+  /// Une ville touchée : un léger rebond, rien de plus.
+  void _bounce(String name) {
+    HapticFeedback.selectionClick();
+    _bounceKey = name;
+    _bounceCtl.forward(from: 0);
+  }
+
+  /// Relance l'animation de division quand le pays divisé change.
+  void _scheduleSplit(String? key) {
+    if (key == _splitKey) return;
+    _splitKey = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && key != null) _splitCtl.forward(from: 0);
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    GlobeFaces.load().then(_placeFaces);
+    GlobePlaces.load({
+      for (final e in kGlobeCountries.entries) e.value.dbName: e.key,
+    }).then((_) {
+      if (mounted) setState(() {});
+    });
     _spin = createTicker(_onSpin)..start();
     _flyCtrl = AnimationController(
       vsync: this,
@@ -1516,144 +1857,15 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
     _spin.dispose();
     _flyCtrl.dispose();
     _byCtrl.dispose();
-    for (final f in _faces) {
-      f.image?.dispose();
-    }
+    _zoomCtl.dispose();
+    _splitCtl.dispose();
+    _bounceCtl.dispose();
     super.dispose();
-  }
-
-  /// Pose les visages DANS leur pays : tirage au hasard (graine = le compte) dans
-  /// le plus grand polygone, en gardant un écart minimal entre deux visages.
-  void _placeFaces(List<GlobeFace> faces) {
-    if (!mounted || faces.isEmpty) return;
-    final keyByDb = {
-      for (final e in kGlobeCountries.entries) e.value.dbName: e.key,
-    };
-    final byKey = <String, List<GlobeFace>>{};
-    for (final f in faces) {
-      final key = keyByDb[f.country];
-      if (key == null) continue;
-      (byKey[key] ??= []).add(f);
-    }
-    final placed = <_PlacedFace>[];
-    for (final e in byKey.entries) {
-      _Land? land;
-      for (final l in widget.world) {
-        if (l.name == e.key) {
-          land = l;
-          break;
-        }
-      }
-      if (land == null || land.polygons.isEmpty) continue;
-      // Le plus grand polygone (par boîte englobante).
-      List<Offset>? ring;
-      var bestArea = -1.0;
-      for (final poly in land.polygons) {
-        if (poly.isEmpty) continue;
-        final r = poly.first;
-        var a0 = 999.0, a1 = -999.0, b0 = 999.0, b1 = -999.0;
-        for (final pt in r) {
-          if (pt.dx < a0) a0 = pt.dx;
-          if (pt.dx > a1) a1 = pt.dx;
-          if (pt.dy < b0) b0 = pt.dy;
-          if (pt.dy > b1) b1 = pt.dy;
-        }
-        final area = (a1 - a0) * (b1 - b0);
-        if (area > bestArea) {
-          bestArea = area;
-          ring = r;
-        }
-      }
-      if (ring == null || ring.length < 3) continue;
-      var minLon = 999.0, maxLon = -999.0, minLat = 999.0, maxLat = -999.0;
-      for (final pt in ring) {
-        if (pt.dx < minLon) minLon = pt.dx;
-        if (pt.dx > maxLon) maxLon = pt.dx;
-        if (pt.dy < minLat) minLat = pt.dy;
-        if (pt.dy > maxLat) maxLat = pt.dy;
-      }
-      final spacing = 0.2 * math.min(maxLon - minLon, maxLat - minLat);
-      final list = [...e.value]..sort((a, b) => a.id.compareTo(b.id));
-      final chosen = <Offset>[];
-      for (final f in list.take(_kFacesPerCountry)) {
-        final rnd = math.Random(f.id.hashCode);
-        Offset? best;
-        for (var i = 0; i < 40; i++) {
-          final c = Offset(
-            minLon + rnd.nextDouble() * (maxLon - minLon),
-            minLat + rnd.nextDouble() * (maxLat - minLat),
-          );
-          if (!_inRing(ring, c)) continue;
-          best ??= c;
-          if (chosen.every((o) => (o - c).distance >= spacing)) {
-            best = c;
-            break;
-          }
-        }
-        if (best == null) continue;
-        chosen.add(best);
-        placed.add(_PlacedFace(best.dx, best.dy, f.url));
-      }
-    }
-    setState(() {
-      _faces = placed;
-      _facesVersion++;
-    });
-    if (_scale >= 1.4) _loadFaceImages();
-  }
-
-  static bool _inRing(List<Offset> ring, Offset p) {
-    var inside = false;
-    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-      final a = ring[i], b = ring[j];
-      if ((a.dy > p.dy) != (b.dy > p.dy) &&
-          p.dx < (b.dx - a.dx) * (p.dy - a.dy) / (b.dy - a.dy) + a.dx) {
-        inside = !inside;
-      }
-    }
-    return inside;
-  }
-
-  /// Télécharge les miniatures (96 px) la première fois qu'on zoome.
-  void _loadFaceImages() {
-    if (_imagesRequested || _faces.isEmpty) return;
-    _imagesRequested = true;
-    for (final f in _faces) {
-      _decode(f.url).then((img) {
-        if (img == null) return;
-        if (!mounted) {
-          img.dispose();
-          return;
-        }
-        setState(() {
-          f.image = img;
-          _facesVersion++;
-        });
-      });
-    }
-  }
-
-  Future<ui.Image?> _decode(String url) {
-    final c = Completer<ui.Image?>();
-    final stream = ResizeImage(NetworkImage(url), width: 96, height: 96)
-        .resolve(ImageConfiguration.empty);
-    late ImageStreamListener l;
-    l = ImageStreamListener(
-      (info, _) {
-        if (!c.isCompleted) c.complete(info.image.clone());
-        stream.removeListener(l);
-      },
-      onError: (_, _) {
-        if (!c.isCompleted) c.complete(null);
-        stream.removeListener(l);
-      },
-    );
-    stream.addListener(l);
-    return c.future.timeout(const Duration(seconds: 12), onTimeout: () => null);
   }
 
   void _onSpin(Duration _) {
     if (_dragging || _flying || _byCtrl.isAnimating || _paused) return;
+    if (_scale >= 1.2) return; // zoomé : le globe reste où on l'a mis
     // Fling en cours : on glisse sur l'élan, amorti à ~0.93/frame.
     if (_velLon.abs() > 0.02 || _velLat.abs() > 0.02) {
       setState(() {
@@ -1739,16 +1951,18 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
 
     // The white label bubbles first — they're the easy target on small
     // countries.
-    for (final key in kGlobeCountries.keys) {
-      final b = _bubbleFor(key, _rotLon, _rotLat, r, center);
-      if (b != null && (p - b.bubble).distance <= _kBubbleR + 4) {
-        _select(key);
-        return;
+    if (_scale < 1.4) {
+      for (final key in kGlobeCountries.keys) {
+        final b = _bubbleFor(key, _rotLon, _rotLat, r, center);
+        if (b != null && (p - b.bubble).distance <= _kBubbleR + 4) {
+          _select(key);
+          return;
+        }
       }
     }
     // Then the country shapes themselves (ouverts).
     for (final key in kGlobeCountries.keys) {
-      final land = widget.world.firstWhere(
+      final land = _activeWorld.firstWhere(
         (l) => l.name == key,
         orElse: () => _Land(key, const []),
       );
@@ -1759,7 +1973,7 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
       }
     }
     // Tout autre pays : pas encore ouvert -> cadenas + feuille « Me prévenir ».
-    for (final land in widget.world) {
+    for (final land in _activeWorld) {
       if (land.polygons.isEmpty || kGlobeCountries.containsKey(land.name)) {
         continue;
       }
@@ -1779,6 +1993,24 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
     return LayoutBuilder(
       builder: (context, c) {
         final size = Size(c.maxWidth, c.maxHeight);
+        return SizedBox(
+          width: size.width,
+          height: size.height,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(child: _paintedGlobe(size)),
+              ..._zoomBubbles(size),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _paintedGlobe(Size size) {
+    {
+      {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onScaleStart: (d) {
@@ -1786,12 +2018,12 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
             _scaleStart = _scale;
             _velLon = _velLat = 0;
             _flyCtrl.stop();
+            _zoomCtl.stop();
           },
           onScaleUpdate: (d) {
             setState(() {
               if (d.scale != 1.0) {
-                _scale = (_scaleStart * d.scale).clamp(1.0, 4.0);
-                if (_scale >= 1.4) _loadFaceImages();
+                _setScale((_scaleStart * d.scale).clamp(1.0, 4.0));
               }
               // Sensibilité d'origine (0.25), très légèrement relevée.
               final k = 0.28 / _scale;
@@ -1811,20 +2043,19 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
           child: CustomPaint(
             size: size,
             painter: _GlobePainter(
-              world: widget.world,
+              world: _activeWorld,
               selected: widget.selected,
               lockedJoined: widget.lockedJoined,
               lockedCenters: widget.lockedCenters,
-              faces: _faces,
-              facesVersion: _facesVersion,
               rotLon: _rotLon,
               rotLat: _rotLat,
               scale: _scale,
+              hiRes: _hiRes,
             ),
           ),
         );
-      },
-    );
+      }
+    }
   }
 }
 
@@ -1834,22 +2065,22 @@ class _GlobePainter extends CustomPainter {
     required this.selected,
     required this.lockedJoined,
     required this.lockedCenters,
-    required this.faces,
-    required this.facesVersion,
     required this.rotLon,
     required this.rotLat,
     required this.scale,
+    required this.hiRes,
   });
 
   final List<_Land> world;
   final Set<String> selected;
   final Set<String> lockedJoined;
   final Map<String, Offset> lockedCenters;
-  final List<_PlacedFace> faces;
-  final int facesVersion;
   final double rotLon;
   final double rotLat;
   final double scale;
+
+  /// Fond 50 m affiché : pays voisins en sable, contours qui épaississent.
+  final bool hiRes;
 
   static const _ocean = [Color(0xFFBFE0EF), Color(0xFFA4D0E6), Color(0xFF8BBEDB)];
   static const _selectedFill = Color(0xFF8EC06A);
@@ -1887,7 +2118,10 @@ class _GlobePainter extends CustomPainter {
       ..strokeWidth = 0.5
       ..color = _border.withValues(alpha: 0.5);
 
+    // Contours : 1,4 px à ×1,6, jusqu'à 3 px à ×4.
+    final bw = 1.4 + ((scale - 1.6).clamp(0.0, 2.4) / 2.4) * 1.6;
     for (final land in world) {
+      if (!_maybeVisible(land)) continue;
       final path = _landPath(land, rotLon, rotLat, radius, center);
       final isCountry = kGlobeCountries.containsKey(land.name);
       final isLocked = lockedCenters.containsKey(land.name);
@@ -1895,6 +2129,10 @@ class _GlobePainter extends CustomPainter {
       final Color fill;
       if (isLocked) {
         fill = _lockedFill;
+      } else if (hiRes) {
+        fill = isSelected
+            ? const Color(0xFFC6E48F)
+            : (isCountry ? const Color(0xFFB5D69A) : const Color(0xFFE9E4D3));
       } else if (isSelected) {
         fill = _selectedFill;
       } else if (isCountry) {
@@ -1903,8 +2141,35 @@ class _GlobePainter extends CustomPainter {
         fill = _terrain(land.avgLat);
       }
       canvas.drawPath(path, Paint()..color = fill);
-      canvas.drawPath(path, borderPaint);
-      if (isCountry && !isSelected) {
+      canvas.drawPath(
+        path,
+        hiRes
+            ? (Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = bw
+              ..strokeJoin = StrokeJoin.round
+              ..color = const Color(0x80786E5A))
+            : borderPaint,
+      );
+      if (hiRes && isSelected) {
+        // Pays choisi : halo jaune flou puis contour jaune épais.
+        canvas.drawPath(
+          path,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = bw * 1.6
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14)
+            ..color = SC.accent.withValues(alpha: 0.85),
+        );
+        canvas.drawPath(
+          path,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = bw * 1.6
+            ..strokeJoin = StrokeJoin.round
+            ..color = SC.accent,
+        );
+      } else if (isCountry && !isSelected) {
         canvas.drawPath(
           path,
           Paint()
@@ -1914,9 +2179,6 @@ class _GlobePainter extends CustomPainter {
         );
       }
     }
-
-    // Visages des comptes IA : seulement quand on a zoomé, sur les pays ouverts.
-    _paintFaces(canvas, center, radius);
 
     canvas.restore();
 
@@ -1933,6 +2195,7 @@ class _GlobePainter extends CustomPainter {
     // ── White label bubbles (FR / DE / CA / JP / BE / BR) — outside the
     //    clip so they can float over the rim, like the prototype's pins. ──
     for (final key in kGlobeCountries.keys) {
+      if (scale >= 1.4) break; // zoomé : les bulles photo prennent le relais
       final b = _bubbleFor(key, rotLon, rotLat, radius, center);
       if (b == null) continue;
       final picked = selected.contains(key);
@@ -2012,52 +2275,16 @@ class _GlobePainter extends CustomPainter {
 
   static const _ink = Color(0xFF04123A);
 
-  /// Photos rondes posées sur les pays ouverts : invisibles en vue d'ensemble,
-  /// elles apparaissent entre ×1,5 et ×2 et grossissent avec le zoom. Elles
-  /// rétrécissent près du bord du globe et passent derrière. Décoratives :
-  /// aucune n'est cliquable.
-  void _paintFaces(Canvas canvas, Offset center, double radius) {
-    if (scale < 1.5 || faces.isEmpty) return;
-    final fade = ((scale - 1.5) / 0.5).clamp(0.0, 1.0);
-    final r0 = rotLat * _deg;
-    for (final f in faces) {
-      final img = f.image;
-      if (img == null) continue;
-      final l = (f.lon + rotLon) * _deg;
-      final p = f.lat * _deg;
-      final z = math.sin(r0) * math.sin(p) + math.cos(r0) * math.cos(p) * math.cos(l);
-      if (z < 0.2) continue;
-      final at = _project(f.lon, f.lat, rotLon, rotLat, radius, center);
-      if (at == null) continue;
-      final fr = ((7 + (scale - 1.5) * 5).clamp(8.0, 17.0)) * (0.6 + 0.4 * z);
-      final rect = Rect.fromCircle(center: at, radius: fr);
-      canvas.drawCircle(
-        at.translate(0, 1.5),
-        fr + 1,
-        Paint()
-          ..color = Color.fromRGBO(0, 0, 0, 0.35 * fade)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
-      );
-      canvas.save();
-      canvas.clipPath(Path()..addOval(rect));
-      canvas.drawImageRect(
-        img,
-        Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
-        rect,
-        Paint()
-          ..filterQuality = FilterQuality.medium
-          ..color = Color.fromRGBO(255, 255, 255, fade),
-      );
-      canvas.restore();
-      canvas.drawCircle(
-        at,
-        fr,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.6
-          ..color = Color.fromRGBO(255, 255, 255, fade),
-      );
-    }
+  /// Faux seulement si le pays est entièrement de l'autre côté du globe.
+  bool _maybeVisible(_Land land) {
+    final b = land.bounds;
+    if (b.span >= 360) return true;
+    final lat1 = rotLat * _deg, lat2 = b.lat * _deg;
+    final dLon = (b.lon + rotLon) * _deg;
+    final cosd = math.sin(lat1) * math.sin(lat2) +
+        math.cos(lat1) * math.cos(lat2) * math.cos(dLon);
+    final ang = math.acos(cosd.clamp(-1.0, 1.0)) / _deg;
+    return ang <= 92 + b.span / 2;
   }
 
   /// Rond de 15 : cadenas blanc sur #04123A (pas rejoint) ou cloche #04123A
@@ -2125,7 +2352,7 @@ class _GlobePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_GlobePainter old) =>
-      old.facesVersion != facesVersion ||
+      old.hiRes != hiRes ||
       old.lockedJoined.length != lockedJoined.length ||
       !old.lockedJoined.containsAll(lockedJoined) ||
       old.lockedCenters.length != lockedCenters.length ||
