@@ -1922,16 +1922,36 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
     _flyCtrl.forward(from: 0);
   }
 
+  /// Niveau où les premières photos (les bulles de pays) apparaissent : un
+  /// pays choisi zoome jusque-là, sans jamais dézoomer.
+  static const double _kFirstPhotosZoom = 1.7;
+
+  void _zoomToFirstPhotos() {
+    if (_scale < _kFirstPhotosZoom) {
+      zoomTo(
+        _kFirstPhotosZoom,
+        duration: const Duration(milliseconds: 650),
+        curve: Curves.easeInOutCubic,
+      );
+    }
+  }
+
   /// Amène le globe sur un pays (résultat de la recherche).
   void flyToCountry(String key) {
     final c = kGlobeCountries[key]?.center;
-    if (c != null) _flyTo(c);
+    if (c != null) {
+      _flyTo(c);
+      _zoomToFirstPhotos();
+    }
   }
 
   void _select(String key) {
     final adding = !widget.selected.contains(key);
     widget.onToggle(key);
-    if (adding) _flyTo(kGlobeCountries[key]!.center);
+    if (adding) {
+      _flyTo(kGlobeCountries[key]!.center);
+      _zoomToFirstPhotos();
+    }
   }
 
   void _handleTapUp(TapUpDetails d, Size size) {
