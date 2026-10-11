@@ -35,6 +35,15 @@ class CountryStat {
 /// Les comptes sont lus une fois par session, dans les pays ouverts ; les
 /// photos viennent des comptes IA seulement (stable : le plus petit `id`).
 abstract final class GlobePlaces {
+  /// MODE DÉMO (tests uniquement) : `--dart-define=GLOBE_DEMO_COUNTS=300`
+  /// remplit le globe de chiffres factices (pays ET villes) tant qu'il n'y a pas
+  /// encore de vrais membres. 0 par défaut = chiffres réels, partout. À NE PAS
+  /// mettre dans un build public : ce sont de faux nombres.
+  static const int _demo = int.fromEnvironment('GLOBE_DEMO_COUNTS');
+
+  static int _spread(String s, int mod) =>
+      mod <= 0 ? 0 : s.codeUnits.fold<int>(7, (a, c) => (a * 31 + c) & 0xFFFF) % mod;
+
   static bool _loaded = false;
   static Future<void>? _loading;
 
@@ -99,14 +108,24 @@ abstract final class GlobePlaces {
       _countries.clear();
       _cities.clear();
       for (final key in keyByDbName.values) {
+        final realCount = countryCount[key] ?? 0;
         _countries[key] = CountryStat(
-          count: countryCount[key] ?? 0,
+          count: _demo > 0 ? realCount + _demo + _spread(key, _demo) : realCount,
           photoUrl: countryPhoto[key]?.$2,
         );
         final dbName = keyByDbName.entries.firstWhere((e) => e.value == key).key;
         final coords = _kCityCoords[dbName] ?? const {};
         final out = <CityBubble>[];
-        for (final e in (cityCount[key] ?? const <String, int>{}).entries) {
+        // Démo : toutes les villes connues du pays, avec des effectifs factices.
+        final counts = <String, int>{...(cityCount[key] ?? const <String, int>{})};
+        if (_demo > 0) {
+          for (final city in coords.keys) {
+            counts[city] = (counts[city] ?? 0) +
+                (_demo ~/ 10) +
+                _spread(city, (_demo ~/ 5) + 1);
+          }
+        }
+        for (final e in counts.entries) {
           final at = coords[e.key];
           if (at == null) continue;
           out.add(CityBubble(
