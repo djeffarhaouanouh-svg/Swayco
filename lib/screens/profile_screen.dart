@@ -2478,9 +2478,12 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   /// appui DANS le cadre ne ferme pas ; le fond, si.
   Widget _passportPage(double frameWide, double frameH) {
     final p = widget.passportProfile!;
-    // Plus étroit que les photos : les flèches latérales (44 px) ne doivent pas
-    // passer sur le contenu du passeport.
-    final frameW = frameWide - 68;
+    // Une carte PORTRAIT, comme une photo de la grille (3 : 4), et plus étroite
+    // que le cadre des photos : les flèches latérales (44 px) ne passent pas
+    // dessus. Jamais plus étroite que 0,6 (large / haut) sur un petit écran.
+    final maxW = frameWide - 68;
+    final frameW = frameH * 0.75 < maxW ? frameH * 0.75 : maxW;
+    final h = frameW / 0.6 < frameH ? frameW / 0.6 : frameH;
     return Center(
       child: Stack(
         clipBehavior: Clip.none,
@@ -2490,7 +2493,7 @@ class _PhotoViewerState extends State<_PhotoViewer> {
             onTap: () {},
             child: SizedBox(
               width: frameW,
-              height: frameH,
+              height: h,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: ProfileInfoPanel(
