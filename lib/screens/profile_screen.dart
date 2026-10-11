@@ -1883,6 +1883,28 @@ class _IdentitySection extends StatelessWidget {
               ],
             ),
           ),
+        // La bio, juste au-dessus des photos (le passeport est la 1re tuile de la
+        // grille, il n'y a plus de carte d'infos en bas).
+        if (!emptyBio)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 22, 18, 0),
+            child: InfoGlassFrame(
+              child: TranslatedProfileText(
+                // Traduite dans la langue de l'interface quand elle diffère de
+                // celle que le pair parle.
+                text: bio,
+                profileId: personalInfo?.id ?? handle,
+                field: 'bio',
+                fromLang: personalInfo?.language ?? '',
+                textAlign: TextAlign.start,
+                style: TextStyle(
+                  color: SC.textPrimary,
+                  fontSize: 15,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ),
         // « Ses photos (n) » + grille 2 colonnes.
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 26, 18, 0),
@@ -1902,37 +1924,6 @@ class _IdentitySection extends StatelessWidget {
                 : null,
           ),
         ),
-        // Bio + faits + centres d'intérêt : le même panneau « Mes infos », en
-        // lecture seule (une tuile sans valeur n'apparaît pas).
-        // Plus de carte d'infos en bas : le passeport est la 1re tuile de la
-        // grille de photos. Reste la bio, qui n'est pas sur la tuile.
-        if (!emptyBio)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
-            child: InfoGlassFrame(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!emptyBio) ...[
-                    // Traduite dans la langue de l'interface quand elle diffère
-                    // de celle que le pair parle.
-                    TranslatedProfileText(
-                      text: bio,
-                      profileId: personalInfo?.id ?? handle,
-                      field: 'bio',
-                      fromLang: personalInfo?.language ?? '',
-                      textAlign: TextAlign.start,
-                      style: TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 15,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
       ],
     );
   }
