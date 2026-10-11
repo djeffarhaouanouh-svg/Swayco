@@ -2484,7 +2484,8 @@ class _PhotoViewerState extends State<_PhotoViewer> {
     final screenH = MediaQuery.sizeOf(context).height;
     final maxH = frameH > screenH * 0.80 ? frameH : screenH * 0.80;
     final maxW = frameWide - 56;
-    final frameW = maxH * 0.8 < maxW ? maxH * 0.8 : maxW;
+    // 2 px de moins de chaque côté.
+    final frameW = (maxH * 0.8 < maxW ? maxH * 0.8 : maxW) - 4;
     final h = frameW / 0.58 < maxH ? frameW / 0.58 : maxH;
     return Center(
       child: Stack(
