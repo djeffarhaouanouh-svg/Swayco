@@ -44,6 +44,12 @@ const List<String> _kZodiacAssets = [
   'balance', 'scorpion', 'sagittaire', 'capricorne', 'verseau', 'poissons',
 ];
 
+/// L'image du signe (assets/zodiac/…) pour un signe stocké, ou null.
+String? zodiacAssetFor(String raw) {
+  final i = kZodiacSigns.indexOf(normalizeZodiac(raw));
+  return i < 0 ? null : 'assets/zodiac/${_kZodiacAssets[i]}.png';
+}
+
 /// Nom d'un pays dans la langue de l'interface (clé `country_<iso>` quand elle
 /// existe, sinon le libellé stocké).
 String countryNameForIso(String iso) {

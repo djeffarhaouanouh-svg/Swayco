@@ -57,7 +57,9 @@ import 'chat_thread_screen.dart';
 import 'photo_crop_screen.dart';
 // L'aperÃ§u "ma carte" vit dans le Discover : il rÃ©utilise le widget de carte
 // du feed pour que l'aperÃ§u soit le rendu rÃ©el, pas une copie qui dÃ©rive.
-import 'discover_screen.dart' show MyCardPreviewScreen, discoverCardAspect;
+import 'discover_screen.dart'
+    show MyCardPreviewScreen, ProfileInfoPanel, discoverCardAspect;
+import '../widgets/passport_tile.dart';
 import 'onboarding_screen.dart';
 import 'settings_screen.dart';
 
@@ -1891,7 +1893,14 @@ class _IdentitySection extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-          child: _PeerMediaStack(photos: photos),
+          child: _PeerMediaStack(
+            photos: photos,
+            // Le passeport est la 1re tuile de la grille (et la 1re page de la
+            // visionneuse) quand il y a de quoi y mettre.
+            profile: (_hasFacts(personalInfo) || interests.isNotEmpty)
+                ? personalInfo
+                : null,
+          ),
         ),
         // Bio + faits + centres d'intérêt : le même panneau « Mes infos », en
         // lecture seule (une tuile sans valeur n'apparaît pas).
@@ -2092,9 +2101,12 @@ class _DashedRRectPainter extends CustomPainter {
 
 /// Grille 2 colonnes de photos sur le profil d'un pair. Tap : viewer plein ecran.
 class _PeerMediaStack extends StatelessWidget {
-  const _PeerMediaStack({required this.photos});
+  const _PeerMediaStack({required this.photos, this.profile});
 
   final List<String> photos;
+
+  /// Non nul : le passeport ouvre la grille, avant les photos.
+  final RemoteProfile? profile;
 
   // Grille d'avant la DA : 2 colonnes, vignettes 3 / 4 (hauteur / largeur).
   static const double _aspect = 216 / 162;
@@ -2103,7 +2115,10 @@ class _PeerMediaStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (photos.isEmpty) return const _EmptyPhotosPlaceholder();
+    final passport = profile;
+    if (photos.isEmpty && passport == null) return const _EmptyPhotosPlaceholder();
+    // Le passeport est la page 0 de la visionneuse : les photos suivent.
+    final offset = passport != null ? 1 : 0;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -2114,6 +2129,21 @@ class _PeerMediaStack extends StatelessWidget {
           spacing: _spacing,
           runSpacing: _spacing,
           children: [
+            if (passport != null)
+              SizedBox(
+                width: tileWidth,
+                height: tileHeight,
+                child: PassportTile(
+                  profile: passport,
+                  onTap: () => showPhotoViewer(
+                    context,
+                    photos: photos,
+                    index: 0,
+                    viewerMode: true,
+                    passportProfile: passport,
+                  ),
+                ),
+              ),
             for (var i = 0; i < photos.length; i++)
               SizedBox(
                 width: tileWidth,
@@ -2124,8 +2154,9 @@ class _PeerMediaStack extends StatelessWidget {
                   onTap: () => showPhotoViewer(
                     context,
                     photos: photos,
-                    index: i,
+                    index: i + offset,
                     viewerMode: true,
+                    passportProfile: passport,
                   ),
                   // Chez un pair : aucun lisere. Le cadre cyan dit "ta photo
                   // de profil", ce qui n'a de sens que sur mon propre profil.
@@ -2359,8 +2390,10 @@ Future<void> showPhotoViewer(
   required List<String> photos,
   required int index,
   bool viewerMode = false,
+  RemoteProfile? passportProfile,
 }) {
-  if (photos.isEmpty) return Future<void>.value();
+  if (photos.isEmpty && passportProfile == null) return Future<void>.value();
+  final pageCount = photos.length + (passportProfile != null ? 1 : 0);
   return Navigator.of(context).push<void>(
     PageRouteBuilder<void>(
       opaque: false,
@@ -2368,8 +2401,9 @@ Future<void> showPhotoViewer(
       transitionDuration: const Duration(milliseconds: 240),
       pageBuilder: (ctx, anim, _) => _PhotoViewer(
         photos: photos,
-        initialIndex: index.clamp(0, photos.length - 1),
+        initialIndex: index.clamp(0, pageCount - 1),
         viewerMode: viewerMode,
+        passportProfile: passportProfile,
       ),
       // Fade + grow-in (scale from 90%) instead of a flat fade, so the photo
       // eases open instead of popping.
@@ -2393,10 +2427,14 @@ class _PhotoViewer extends StatefulWidget {
     required this.photos,
     required this.initialIndex,
     this.viewerMode = false,
+    this.passportProfile,
   });
   final List<String> photos;
   final int initialIndex;
   final bool viewerMode;
+
+  /// Non nul : la page 0 est le passeport, les photos suivent.
+  final RemoteProfile? passportProfile;
 
   @override
   State<_PhotoViewer> createState() => _PhotoViewerState();
@@ -2415,7 +2453,7 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   }
 
   void _go(int delta) {
-    final next = (_index + delta).clamp(0, widget.photos.length - 1);
+    final next = (_index + delta).clamp(0, _pageCount - 1);
     if (next != _index) {
       _pc.animateToPage(
         next,
@@ -2461,29 +2499,52 @@ class _PhotoViewerState extends State<_PhotoViewer> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final multi = widget.photos.length > 1;
-    // Le cadre : pleine largeur (14 de marge) au ratio de la carte Discover,
-    // borné en hauteur pour laisser respirer l'écran.
-    final aspect = discoverCardAspect(context);
-    var frameW = size.width - 28;
-    var frameH = frameW / aspect;
-    final maxH = size.height * 0.82;
-    if (frameH > maxH) {
-      frameH = maxH;
-      frameW = frameH * aspect;
-    }
-    return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.78),
-      body: Stack(
+  int get _passportOffset => widget.passportProfile != null ? 1 : 0;
+  int get _pageCount => widget.photos.length + _passportOffset;
+
+  /// La page passeport : la vraie carte passeport du Discover, ouverte d'emblée
+  /// et sans animation, dans le même cadre que les photos (pas de zoom). Un
+  /// appui DANS le cadre ne ferme pas ; le fond, si.
+  Widget _passportPage(double frameW, double frameH) {
+    final p = widget.passportProfile!;
+    return Center(
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          PageView.builder(
-            controller: _pc,
-            itemCount: widget.photos.length,
-            onPageChanged: (i) => setState(() => _index = i),
-            itemBuilder: (ctx, i) => GestureDetector(
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {},
+            child: SizedBox(
+              width: frameW,
+              height: frameH,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: ProfileInfoPanel(
+                  profile: p,
+                  open: true,
+                  hideFlag: false,
+                  // La place du ✕ du visionneur, à droite du bandeau.
+                  bandInsetRight: 58,
+                  onClose: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: _circleBtn(
+              Icons.close_rounded,
+              () => Navigator.of(context).pop(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _photoPage(int i, double frameW, double frameH) =>
+      GestureDetector(
               onTap: () => Navigator.of(context).pop(),
               behavior: HitTestBehavior.opaque,
               child: Center(
@@ -2529,7 +2590,33 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                   ],
                 ),
               ),
-            ),
+            );
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final multi = _pageCount > 1;
+    // Le cadre : pleine largeur (14 de marge) au ratio de la carte Discover,
+    // borné en hauteur pour laisser respirer l'écran.
+    final aspect = discoverCardAspect(context);
+    var frameW = size.width - 28;
+    var frameH = frameW / aspect;
+    final maxH = size.height * 0.82;
+    if (frameH > maxH) {
+      frameH = maxH;
+      frameW = frameH * aspect;
+    }
+    return Scaffold(
+      backgroundColor: Colors.black.withValues(alpha: 0.78),
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _pc,
+            itemCount: _pageCount,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemBuilder: (ctx, pi) => pi < _passportOffset
+                ? _passportPage(frameW, frameH)
+                : _photoPage(pi - _passportOffset, frameW, frameH),
           ),
           // Side arrows when there's more than one photo.
           if (multi) ...[
@@ -2552,7 +2639,7 @@ class _PhotoViewerState extends State<_PhotoViewer> {
               child: Center(
                 child: _circleBtn(
                   Icons.chevron_right_rounded,
-                  _index < widget.photos.length - 1 ? () => _go(1) : null,
+                  _index < _pageCount - 1 ? () => _go(1) : null,
                   size: 44,
                 ),
               ),

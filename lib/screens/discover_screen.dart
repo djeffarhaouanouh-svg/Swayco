@@ -919,7 +919,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 // ══════════════════════════════════════════════════════════════════════════════
 
 /// L'œil du profil ouvre ceci : MA carte, rendue avec exactement le même widget
-/// que le feed ([_TinderCard] + [_ProfileInfoPanel]), donc avec mes photos, mon
+/// que le feed ([_TinderCard] + [ProfileInfoPanel]), donc avec mes photos, mon
 /// nom, mon drapeau, ma ville et — panneau déplié — ma bio, mes infos et mes
 /// centres d'intérêt. Pas de swipe, pas de X / cœur : on ne se matche pas
 /// soi-même.
@@ -1152,7 +1152,7 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                                 right: 0,
                                 height: panelH,
                                 bottom: _infoOpen ? 0 : -panelH,
-                                child: _ProfileInfoPanel(
+                                child: ProfileInfoPanel(
                                   profile: me,
                                   open: _infoOpen,
                                   // Mon propre drapeau ne s'affiche pas (apercu).
@@ -1817,7 +1817,7 @@ class _TinderCardStackState extends State<_TinderCardStack> {
             right: 0,
             height: panelH,
             bottom: widget.infoOpen ? 0 : -panelH,
-            child: _ProfileInfoPanel(
+            child: ProfileInfoPanel(
               profile: widget.cards[i].profile,
               open: widget.infoOpen,
               onClose: widget.onCloseInfo,
@@ -1887,13 +1887,19 @@ class _GhostCard extends StatelessWidget {
 /// gauche, puis les pages se remplissent bloc après bloc et le tampon du pays
 /// vient frapper. Il reste DANS la carte et se rabat d'un glissement vers le
 /// bas. À la fermeture : aucune mise en scène, tout disparaît.
-class _ProfileInfoPanel extends StatefulWidget {
-  const _ProfileInfoPanel({
+class ProfileInfoPanel extends StatefulWidget {
+  const ProfileInfoPanel({
+    super.key,
     required this.profile,
     required this.onClose,
     required this.open,
     this.hideFlag = false,
+    this.bandInsetRight = 0,
   });
+
+  /// Place laissée libre à droite du bandeau « SWAYCØ · PASSEPORT » (la
+  /// visionneuse y pose son bouton ✕).
+  final double bandInsetRight;
 
   final RemoteProfile profile;
 
@@ -1905,7 +1911,7 @@ class _ProfileInfoPanel extends StatefulWidget {
   final VoidCallback onClose;
 
   @override
-  State<_ProfileInfoPanel> createState() => _ProfileInfoPanelState();
+  State<ProfileInfoPanel> createState() => _ProfileInfoPanelState();
 }
 
 /// Coins du passeport : 28 en haut, ceux de la carte en bas — le panneau
@@ -1917,7 +1923,7 @@ const BorderRadius _kPassportRadius = BorderRadius.only(
   bottomRight: Radius.circular(_kCardRadius),
 );
 
-class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
+class _ProfileInfoPanelState extends State<ProfileInfoPanel>
     with SingleTickerProviderStateMixin {
   /// Toute la mise en scène sur UN contrôleur : couverture à 350 ms (950 ms de
   /// rotation), blocs de 550 ms à 1,65 s, tampon à 1,5 s.
@@ -1945,7 +1951,7 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
   }
 
   @override
-  void didUpdateWidget(_ProfileInfoPanel old) {
+  void didUpdateWidget(ProfileInfoPanel old) {
     super.didUpdateWidget(old);
     if (widget.open && !old.open) {
       if (MediaQuery.disableAnimationsOf(context)) {
@@ -2168,7 +2174,8 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel>
                         // Bandeau « SWAYCØ · PASSEPORT ».
                         Container(
                           height: 30,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: EdgeInsets.fromLTRB(
+                              20, 0, 20 + widget.bandInsetRight, 0),
                           decoration:
                               const BoxDecoration(gradient: SC.brandGradient),
                           child: Row(
