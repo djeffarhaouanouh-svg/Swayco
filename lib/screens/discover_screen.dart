@@ -2999,14 +2999,14 @@ class _TinderCardState extends State<_TinderCard> {
                   Text.rich(
                     TextSpan(
                       children: [
-                        // Le drapeau passe sur la 2e ligne, AVANT le pays (pas sur
-                        // l'aperçu de ma carte : on ne voit pas le sien).
+                        // Le pays d'abord, puis son drapeau (pas sur l'aperçu de
+                        // ma carte : on ne voit pas le sien).
+                        if (country.isNotEmpty) TextSpan(text: country),
                         if (!widget.preview && flagEmoji.isNotEmpty)
                           TextSpan(
-                            text: '$flagEmoji  ',
+                            text: '  $flagEmoji',
                             style: const TextStyle(fontSize: 22),
                           ),
-                        if (country.isNotEmpty) TextSpan(text: country),
                       ],
                     ),
                     maxLines: 1,
