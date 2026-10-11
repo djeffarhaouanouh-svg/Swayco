@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/swayco_theme.dart';
 import '../services/interests.dart';
+import 'popup_kit.dart';
 
 /// « ⚽ Football » — le texte d'une puce d'intérêt : l'emoji de sa catégorie
 /// puis son libellé traduit.
@@ -213,6 +214,78 @@ class _InterestTagChipState extends State<InterestTagChip> {
       selected: widget.selected,
       button: _enabled,
       child: _enabled ? tappable : chip,
+    );
+  }
+}
+
+/// Puce du sélecteur d'intérêts (feuille « Mes choix ») : une ligne, jamais
+/// coupée. Choisie : sombre = jaune 16 % + bord jaune + coche ; clair = fond
+/// jaune plein, texte sombre. [dimmed] = limite atteinte (non choisie, inactive).
+class InterestPickChip extends StatelessWidget {
+  const InterestPickChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    this.dimmed = false,
+    this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final bool dimmed;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final light = SC.light;
+    final Color fill;
+    final Color border;
+    final double bw;
+    if (selected) {
+      fill = light ? SC.accent : const Color(0x29F4FF1F);
+      border = SC.accent;
+      bw = 1.5;
+    } else {
+      fill = PopupTokens.ghost;
+      border = PopupTokens.ghostBorder;
+      bw = 1.2;
+    }
+    final fg = selected && light ? const Color(0xFF04123A) : PopupTokens.ink;
+    final checkColor = light ? const Color(0xFF04123A) : SC.accent;
+    return Opacity(
+      opacity: dimmed ? 0.4 : 1,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: dimmed ? null : onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: border, width: bw),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                Icon(Icons.check_rounded, size: 15, color: checkColor),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13.5,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  color: fg,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

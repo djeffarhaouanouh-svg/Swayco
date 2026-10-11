@@ -87,12 +87,17 @@ class PopupSurface extends StatelessWidget {
     this.sheet = false,
     this.danger = false,
     this.washHeight = 120,
+    this.wash,
   });
 
   final Widget child;
   final bool sheet;
   final bool danger;
   final double washHeight;
+
+  /// Opacités du halo bleu / cyan du haut, quand la valeur par défaut est trop
+  /// faible (feuille « Intérêts »). Null = celles du thème.
+  final ({double blue, double cyan})? wash;
 
   @override
   Widget build(BuildContext context) {
@@ -134,10 +139,10 @@ class PopupSurface extends StatelessWidget {
                             PopupTokens.danger.withValues(alpha: 0),
                           ]
                         : [
-                            SC.brandBlue
-                                .withValues(alpha: SC.light ? 0.22 : 0.6),
-                            SC.brandCyan
-                                .withValues(alpha: SC.light ? 0.10 : 0.14),
+                            SC.brandBlue.withValues(
+                                alpha: wash?.blue ?? (SC.light ? 0.22 : 0.6)),
+                            SC.brandCyan.withValues(
+                                alpha: wash?.cyan ?? (SC.light ? 0.10 : 0.14)),
                             SC.brandBlueDeep.withValues(alpha: 0),
                           ],
                     stops: const [0, 0.42, 0.75],

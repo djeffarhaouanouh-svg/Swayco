@@ -3089,24 +3089,27 @@ class _InterestsSectionState extends State<_InterestsSection> {
     // toute la hauteur de l'Ã©cran, contenu collÃ© en haut et grand vide noir en
     // dessous. Un dialogue se pose au centre et fait exactement la taille du
     // panneau, qui est fixe (une page de catÃ©gorie + les points + le bouton).
-    await showDialog<void>(
+    await showModalBottomSheet<void>(
       context: context,
-      builder: (dialogCtx) => StatefulBuilder(
-        // Le dialogue a son propre cycle de rendu : sans ce setState local, les
-        // chips cochÃ©s ne changeraient d'Ã©tat qu'Ã  la fermeture.
-        builder: (dialogCtx, setSheetState) => Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _InlineInterestPicker(
-            sel: _sel,
-            onToggle: (tag) {
-              _toggle(tag);
-              setSheetState(() {});
-            },
-            onDone: () => Navigator.of(dialogCtx).pop(),
-            country: widget.country,
-          ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: PopupTokens.scrim,
+      builder: (sheetCtx) => StatefulBuilder(
+        // La feuille a son propre cycle de rendu : sans ce setState local, les
+        // puces cochées ne changeraient d'état qu'à la fermeture.
+        builder: (sheetCtx, setSheetState) => _InlineInterestPicker(
+          sel: _sel,
+          onToggle: (tag) {
+            _toggle(tag);
+            setSheetState(() {});
+          },
+          onClear: () {
+            setState(() => _sel = {});
+            widget.onSave?.call(const <String>[]);
+            setSheetState(() {});
+          },
+          onDone: () => Navigator.of(sheetCtx).pop(),
+          country: widget.country,
         ),
       ),
     );
@@ -3158,25 +3161,24 @@ class _InterestsSectionState extends State<_InterestsSection> {
   }
 }
 
-/// The inline body of the interest picker: a black rounded panel that is a
-/// CAROUSEL â one page per category. Swipe sideways (or tap a dot) to move
-/// between categories; each page shows that category's coloured header and its
-/// option chips. A live counter sits on top and an "Enregistrer" fold button
-/// at the bottom â but every chip tap is auto-saved by [_InterestsSection], so
-/// the button is just a tidy way to fold back. Rendered inside the profile.
+/// La feuille « Intérêts » (proposition C) : le bac « Mes choix » en haut, puis
+/// un carrousel de catégories (flèches rondes, points, balayage). Chaque appui
+/// est enregistré par [_InterestsSection] ; « Enregistrer » ne fait que refermer.
 class _InlineInterestPicker extends StatefulWidget {
   const _InlineInterestPicker({
     required this.sel,
     required this.onToggle,
+    required this.onClear,
     required this.onDone,
     this.country = '',
   });
 
   final Set<String> sel;
   final void Function(String tag) onToggle;
+  final VoidCallback onClear;
   final VoidCallback onDone;
 
-  /// The user's country â selects which interests taxonomy to display.
+  /// Le pays de la personne : choisit la liste d'intérêts.
   final String country;
 
   @override
@@ -3194,170 +3196,246 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
   }
 
   void _goTo(int i) => _pager.animateToPage(
-    i,
-    duration: const Duration(milliseconds: 280),
-    curve: Curves.easeOutCubic,
-  );
+        i,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
 
-  @override
-  Widget build(BuildContext context) {
-    final full = widget.sel.length >= profileInterestsMax;
-    final cats = interestCategoriesFor(widget.country);
-    final canPrev = _page > 0;
-    final canNext = _page < cats.length - 1;
-    return Container(
-      // Plus de marge haute : elle datait du temps oÃ¹ ce panneau se dÃ©pliait
-      // sous les chips. Dans une pop-up centrÃ©e, elle dÃ©centrait le contenu.
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
-      decoration: BoxDecoration(
-        color: PopupTokens.surface,
-        borderRadius: BorderRadius.circular(PopupTokens.radius),
-        border: Border.all(color: PopupTokens.border),
-      ),
-      child: Column(
-        // SANS Ã§a, la colonne prend toute la hauteur qu'on lui offre : dans un
-        // dialogue, elle s'Ã©tirait jusqu'en bas de l'Ã©cran et le panneau
-        // devenait un grand rectangle noir. Elle fait sa taille, dÃ©sormais.
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Croix de fermeture en haut Ã  droite â mÃªme teinte que paramÃ¨tres.
-          Align(
-            alignment: Alignment.centerRight,
-            child: Material(
-              color: SC.fill.withValues(alpha: 0.10),
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: widget.onDone,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: SC.stroke.withValues(alpha: 0.22),
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: 20,
-                    color: SC.textPrimary,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          // FlÃ¨ches gauche / droite autour du carrousel de catÃ©gories.
-          SizedBox(
-            height: 248,
-            child: Row(
-              children: [
-                _PickerNavArrow(
-                  icon: Icons.chevron_left_rounded,
-                  enabled: canPrev,
-                  onTap: canPrev ? () => _goTo(_page - 1) : null,
-                ),
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pager,
-                    onPageChanged: (i) => setState(() => _page = i),
-                    itemCount: cats.length,
-                    itemBuilder: (ctx, i) => _CategoryPage(
-                      cat: cats[i],
-                      sel: widget.sel,
-                      full: full,
-                      onToggle: widget.onToggle,
-                    ),
-                  ),
-                ),
-                _PickerNavArrow(
-                  icon: Icons.chevron_right_rounded,
-                  enabled: canNext,
-                  onTap: canNext ? () => _goTo(_page + 1) : null,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          // Page dots, coloured to the active category; tap to jump.
-          Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var i = 0; i < cats.length; i++) ...[
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => _goTo(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: i == _page ? 22 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: i == _page
-                            ? cats[i].color
-                            : SC.textMuted.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                  ),
-                  if (i != cats.length - 1) const SizedBox(width: 6),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          PopupButton(
-            label: AppStrings.t('save'),
-            height: 52,
-            onPressed: widget.onDone,
-          ),
-        ],
+  Widget _round(IconData icon, bool enabled, VoidCallback onTap) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: PopupTokens.ghost,
+          border: Border.all(color: PopupTokens.ghostBorder),
+        ),
+        child: Icon(
+          icon,
+          size: 22,
+          color: enabled
+              ? PopupTokens.ink
+              : PopupTokens.inkMuted.withValues(alpha: 0.4),
+        ),
       ),
     );
   }
-}
 
-/// Chevron de navigation du carrousel d'intÃ©rÃªts â mÃªme teinte que
-/// l'icÃ´ne paramÃ¨tres du profil ([SC.textPrimary]).
-class _PickerNavArrow extends StatelessWidget {
-  const _PickerNavArrow({
-    required this.icon,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback? onTap;
+  /// Un choix dans le bac : la pastille de l'app + une croix ; un appui la retire.
+  Widget _picked(String tag) {
+    final light = SC.light;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => widget.onToggle(tag),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: light ? const Color(0xFFF2F6FF) : Colors.white.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: light
+                ? const Color(0x381F5EFF)
+                : Colors.white.withValues(alpha: 0.20),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              interestPillText(tag),
+              maxLines: 1,
+              softWrap: false,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color: PopupTokens.ink,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.close_rounded,
+              size: 15,
+              color: PopupTokens.ink.withValues(alpha: 0.7),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 36,
-          height: 48,
-          child: Icon(
-            icon,
-            size: 28,
-            color: enabled
-                ? SC.textPrimary
-                : SC.textPrimary.withValues(alpha: 0.28),
-          ),
+    final cats = interestCategoriesFor(widget.country);
+    final page = _page.clamp(0, cats.length - 1);
+    final cat = cats[page];
+    final full = widget.sel.length >= profileInterestsMax;
+    final light = SC.light;
+    final canPrev = page > 0;
+    final canNext = page < cats.length - 1;
+    final bottom = MediaQuery.viewPaddingOf(context).bottom;
+    return PopupSurface(
+      sheet: true,
+      washHeight: light ? 230 : 140,
+      wash: light
+          ? (blue: 0.50, cyan: 0.20)
+          : (blue: 0.50, cyan: 0.10),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(18, 12, 18, 26 + bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Center(child: PopupHandle()),
+            // ── Mes choix ─────────────────────────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Text(
+                    AppStrings.t('interests_my_picks', args: {
+                      'n': '${widget.sel.length}',
+                      'max': '$profileInterestsMax',
+                    }),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.ibmPlexMono(
+                      fontSize: 11,
+                      letterSpacing: 1.5,
+                      color: PopupTokens.inkSecondary,
+                    ),
+                  ),
+                ),
+                if (widget.sel.isNotEmpty)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: widget.onClear,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: Text(
+                        AppStrings.t('interests_clear_all'),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: PopupTokens.inkSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _DashedBox(
+              color: light
+                  ? const Color(0x4D1F5EFF)
+                  : Colors.white.withValues(alpha: 0.22),
+              fill: PopupTokens.ghost,
+              radius: 18,
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 44),
+                padding: const EdgeInsets.all(10),
+                alignment: Alignment.centerLeft,
+                child: widget.sel.isEmpty
+                    ? Text(
+                        AppStrings.t('interests_empty_hint',
+                            args: {'max': '$profileInterestsMax'}),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: PopupTokens.inkMuted,
+                        ),
+                      )
+                    : Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final tag in widget.sel) _picked(tag),
+                        ],
+                      ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // ── Catégorie + flèches rondes ────────────────────────────────
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${cat.emoji} ${interestLabel(cat.label)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: popupDisplay(
+                      fontSize: 17,
+                      letterSpacing: -0.51,
+                      color: PopupTokens.ink,
+                    ),
+                  ),
+                ),
+                _round(Icons.chevron_left_rounded, canPrev,
+                    () => _goTo(page - 1)),
+                const SizedBox(width: 8),
+                _round(Icons.chevron_right_rounded, canNext,
+                    () => _goTo(page + 1)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 120,
+              child: PageView.builder(
+                controller: _pager,
+                onPageChanged: (i) => setState(() => _page = i),
+                itemCount: cats.length,
+                itemBuilder: (ctx, i) => _CategoryPage(
+                  cat: cats[i],
+                  sel: widget.sel,
+                  full: full,
+                  onToggle: widget.onToggle,
+                ),
+              ),
+            ),
+            // ── Points ────────────────────────────────────────────────────
+            const SizedBox(height: 14),
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < cats.length; i++) ...[
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _goTo(i),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: i == page ? 22 : 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: i == page
+                              ? (light ? const Color(0xFF1F5EFF) : SC.accent)
+                              : PopupTokens.inkMuted.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    if (i != cats.length - 1) const SizedBox(width: 6),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            PopupButton(
+              label: AppStrings.t('save'),
+              height: 54,
+              onPressed: widget.onDone,
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// One carousel page of [_InlineInterestPicker]: a single category â coloured
-/// emoji-led header + a "picked" count badge, then that category's option
-/// chips (wrapping, scrollable vertically if they overflow the page).
+/// Une page du carrousel : les puces d'UNE catégorie (défilement vertical si
+/// elles dépassent la hauteur de la zone).
 class _CategoryPage extends StatelessWidget {
   const _CategoryPage({
     required this.cat,
@@ -3373,72 +3451,19 @@ class _CategoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final picked = cat.options.where(sel.contains).length;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return SingleChildScrollView(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
         children: [
-          Row(
-            children: [
-              Text(cat.emoji, style: const TextStyle(fontSize: 18)),
-              const SizedBox(width: 8),
-              Text(
-                interestLabel(cat.label),
-                style: TextStyle(
-                  color: SC.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.2,
-                ),
-              ),
-              if (picked > 0) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: cat.color.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '$picked',
-                    style: TextStyle(
-                      color: cat.color,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  for (final opt in cat.options)
-                    InterestTagChip(
-                      label: opt,
-                      // Une seule couleur par catÃ©gorie (celle du header).
-                      color: cat.color,
-                      selected: sel.contains(opt),
-                      showCheck: sel.contains(opt),
-                      // When the cap is hit, leave only the already-picked
-                      // chips tappable (to deselect).
-                      onTap: (!sel.contains(opt) && full)
-                          ? null
-                          : () => onToggle(opt),
-                    ),
-                ],
-              ),
+          for (final opt in cat.options)
+            InterestPickChip(
+              label: interestPillText(opt),
+              selected: sel.contains(opt),
+              // Limite atteinte : seules les puces déjà choisies restent actives.
+              dimmed: !sel.contains(opt) && full,
+              onTap: () => onToggle(opt),
             ),
-          ),
         ],
       ),
     );
