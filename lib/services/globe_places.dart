@@ -66,11 +66,21 @@ abstract final class GlobePlaces {
       return;
     }
     try {
-      final rows = await Supabase.instance.client
-          .from('profiles')
-          .select('id, country, city, avatar_url, discover_photo_url, photos, is_ai')
-          .inFilter('country', keyByDbName.keys.toList())
-          .limit(20000);
+      // Par pages de 1 000 : l'API Supabase plafonne chaque réponse à 1 000
+      // lignes (quel que soit `limit`), donc un seul appel ne voyait que les
+      // premiers comptes et manquait des pays entiers dès qu'il y en a plus.
+      final rows = <dynamic>[];
+      final names = keyByDbName.keys.toList();
+      for (var from = 0; from < 100000; from += 1000) {
+        final page = await Supabase.instance.client
+            .from('profiles')
+            .select('id, country, city, avatar_url, discover_photo_url, photos, is_ai')
+            .inFilter('country', names)
+            .order('id')
+            .range(from, from + 999);
+        rows.addAll(page);
+        if (page.length < 1000) break;
+      }
 
       final countryCount = <String, int>{};
       final countryPhoto = <String, (String, String)>{}; // key -> (id, url)
