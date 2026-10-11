@@ -1904,7 +1904,9 @@ class _IdentitySection extends StatelessWidget {
         ),
         // Bio + faits + centres d'intérêt : le même panneau « Mes infos », en
         // lecture seule (une tuile sans valeur n'apparaît pas).
-        if (!emptyBio || _hasFacts(personalInfo) || interests.isNotEmpty)
+        // Plus de carte d'infos en bas : le passeport est la 1re tuile de la
+        // grille de photos. Reste la bio, qui n'est pas sur la tuile.
+        if (!emptyBio)
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
             child: InfoGlassFrame(
@@ -1926,38 +1928,7 @@ class _IdentitySection extends StatelessWidget {
                         height: 1.4,
                       ),
                     ),
-                    const SizedBox(height: 10),
                   ],
-                  ProfileInfoCard(
-                    profile: personalInfo,
-                    showHeader: false,
-                    framed: false,
-                    interestsBody: interests.isEmpty
-                        ? null
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                '$kFactEmojiInterests ${AppStrings.t('profile_interests_section').toUpperCase()}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: bentoLabelStyle(),
-                              ),
-                              const SizedBox(height: 10),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  for (final tag in interests)
-                                    InterestPill(
-                                      label: interestPillText(tag),
-                                      prominent: true,
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                  ),
                 ],
               ),
             ),
