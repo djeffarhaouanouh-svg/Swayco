@@ -2481,9 +2481,11 @@ class _PhotoViewerState extends State<_PhotoViewer> {
     // Une carte PORTRAIT, comme une photo de la grille (3 : 4), et plus étroite
     // que le cadre des photos : les flèches latérales (44 px) ne passent pas
     // dessus. Jamais plus étroite que 0,6 (large / haut) sur un petit écran.
-    final maxW = frameWide - 68;
-    final frameW = frameH * 0.75 < maxW ? frameH * 0.75 : maxW;
-    final h = frameW / 0.6 < frameH ? frameW / 0.6 : frameH;
+    final screenH = MediaQuery.sizeOf(context).height;
+    final maxH = frameH > screenH * 0.80 ? frameH : screenH * 0.80;
+    final maxW = frameWide - 56;
+    final frameW = maxH * 0.8 < maxW ? maxH * 0.8 : maxW;
+    final h = frameW / 0.58 < maxH ? frameW / 0.58 : maxH;
     return Center(
       child: Stack(
         clipBehavior: Clip.none,
