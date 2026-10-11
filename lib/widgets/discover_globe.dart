@@ -49,7 +49,6 @@ kGlobeCountries = {
   // Added with the Discover country row (FR · ES · BR · SE · MA).
   'Spain': (flag: '🇪🇸', center: Offset(-3.7, 40.2), code: 'es', dbName: 'Espagne'),
   'Sweden': (flag: '🇸🇪', center: Offset(16.0, 62.5), code: 'se', dbName: 'Suède'),
-  'Morocco': (flag: '🇲🇦', center: Offset(-6.3, 31.8), code: 'ma', dbName: 'Maroc'),
   // Latin America (the AI accounts' countries). Keys match the GeoJSON `name`.
   'Argentina': (flag: '🇦🇷', center: Offset(-63.6, -38.4), code: 'ar', dbName: 'Argentine'),
   'Colombia': (flag: '🇨🇴', center: Offset(-74.3, 4.6), code: 'co', dbName: 'Colombie'),
@@ -279,7 +278,6 @@ const Map<String, Offset> _kBubbleOffset = {
   // Same caveat for these three (Discover country row).
   'Spain': Offset(-44, 8),
   'Sweden': Offset(-8, -40),
-  'Morocco': Offset(-40, 22),
   // Same caveat: not tuned on a running globe. Brazil, Colombia and Argentina
   // are close together, so they fan out to different sides.
   'Colombia': Offset(-46, -12),

@@ -17,7 +17,6 @@ const OPEN_KEYS = new Set([
   "Brazil",
   "Spain",
   "Sweden",
-  "Morocco",
   "Argentina",
   "Colombia",
   "Philippines",

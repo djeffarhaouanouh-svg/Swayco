@@ -228,12 +228,6 @@ const Map<String, Map<String, Offset>> _kCityCoords = {
     'Fortaleza': Offset(-38.54, -3.73), 'Belo Horizonte': Offset(-43.94, -19.92),
     'Curitiba': Offset(-49.27, -25.43),
   },
-  'Maroc': {
-    'Casablanca': Offset(-7.59, 33.57), 'Rabat': Offset(-6.84, 34.02),
-    'Marrakech': Offset(-8.01, 31.63), 'Fès': Offset(-5.00, 34.03),
-    'Tanger': Offset(-5.80, 35.76), 'Agadir': Offset(-9.60, 30.43),
-    'Meknès': Offset(-5.55, 33.89),
-  },
   'Philippines': {
     'Manille': Offset(120.98, 14.60), 'Quezon City': Offset(121.04, 14.68),
     'Cebu': Offset(123.89, 10.32), 'Davao': Offset(125.46, 7.19),
