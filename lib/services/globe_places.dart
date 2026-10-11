@@ -212,11 +212,6 @@ const Map<String, Map<String, Offset>> _kCityCoords = {
     'Francfort': Offset(8.68, 50.11), 'Stuttgart': Offset(9.18, 48.78),
     'Düsseldorf': Offset(6.77, 51.23), 'Leipzig': Offset(12.37, 51.34),
   },
-  'Mexique': {
-    'Mexico': Offset(-99.13, 19.43), 'Guadalajara': Offset(-103.35, 20.67),
-    'Monterrey': Offset(-100.32, 25.67), 'Puebla': Offset(-98.20, 19.04),
-    'Tijuana': Offset(-117.04, 32.51), 'Cancún': Offset(-86.85, 21.16),
-  },
   'Argentine': {
     'Buenos Aires': Offset(-58.38, -34.60), 'Córdoba': Offset(-64.18, -31.42),
     'Rosario': Offset(-60.65, -32.95), 'Mendoza': Offset(-68.84, -32.89),

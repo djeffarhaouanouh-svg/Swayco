@@ -96,6 +96,7 @@ const Map<String, ({String iso, String en, String fr, String frArt})>
   'Malaysia': (iso: 'my', en: 'Malaysia', fr: 'Malaisie', frArt: 'la Malaisie'),
   'Mali': (iso: 'ml', en: 'Mali', fr: 'Mali', frArt: 'le Mali'),
   'Mauritania': (iso: 'mr', en: 'Mauritania', fr: 'Mauritanie', frArt: 'la Mauritanie'),
+  'Mexico': (iso: 'mx', en: 'Mexico', fr: 'Mexique', frArt: 'le Mexique'),
   'Moldova': (iso: 'md', en: 'Moldova', fr: 'Moldavie', frArt: 'la Moldavie'),
   'Mongolia': (iso: 'mn', en: 'Mongolia', fr: 'Mongolie', frArt: 'la Mongolie'),
   'Montenegro': (iso: 'me', en: 'Montenegro', fr: 'Monténégro', frArt: 'le Monténégro'),
