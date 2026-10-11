@@ -74,7 +74,7 @@ abstract final class GlobePlaces {
       for (var from = 0; from < 100000; from += 1000) {
         final page = await Supabase.instance.client
             .from('profiles')
-            .select('id, country, city, avatar_url, discover_photo_url, photos, is_ai')
+            .select('id, handle, country, city, avatar_url, discover_photo_url, photos, is_ai')
             .inFilter('country', names)
             .order('id')
             .range(from, from + 999);
@@ -98,7 +98,11 @@ abstract final class GlobePlaces {
           final cc = cityCount.putIfAbsent(key, () => {});
           cc[city] = (cc[city] ?? 0) + 1;
         }
-        if (m['is_ai'] != true || id.isEmpty) continue;
+        // Source de photo : les comptes IA, et les profils de test `seed_…`
+        // (créés avant les comptes IA). Jamais de vrais utilisateurs.
+        final handle = m['handle']?.toString() ?? '';
+        final isFake = m['is_ai'] == true || handle.startsWith('seed_');
+        if (!isFake || id.isEmpty) continue;
         var url = (m['avatar_url']?.toString() ?? '').trim();
         if (url.isEmpty) url = (m['discover_photo_url']?.toString() ?? '').trim();
         if (url.isEmpty) {
