@@ -2505,8 +2505,11 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   /// La page passeport : la vraie carte passeport du Discover, ouverte d'emblée
   /// et sans animation, dans le même cadre que les photos (pas de zoom). Un
   /// appui DANS le cadre ne ferme pas ; le fond, si.
-  Widget _passportPage(double frameW, double frameH) {
+  Widget _passportPage(double frameWide, double frameH) {
     final p = widget.passportProfile!;
+    // Plus étroit que les photos : les flèches latérales (44 px) ne doivent pas
+    // passer sur le contenu du passeport.
+    final frameW = frameWide - 68;
     return Center(
       child: Stack(
         clipBehavior: Clip.none,
