@@ -3464,7 +3464,7 @@ class _CardUndoButton extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.22),
+              color: Colors.white.withValues(alpha: 0.22),
               shape: BoxShape.circle,
               border: Border.all(color: SC.glassBorderStrong),
             ),
