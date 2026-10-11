@@ -58,8 +58,9 @@ class InterestPill extends StatelessWidget {
       decoration: BoxDecoration(
         // Sur photo : verre sombre. Sur le fond : en clair, puce blanche +
         // bord bleuté + ombre ; en sombre, blanc translucide comme avant.
+        // Sur photo : verre CLAIR (blanc 22 %), plus aéré que l'ancien noir 28 %.
         color: onPhoto
-            ? Colors.black.withValues(alpha: 0.28)
+            ? Colors.white.withValues(alpha: 0.22)
             : (SC.light && !forceDark
                 ? SC.fill
                 // Style Discover : gris foncé (≈ blanc 10 % sur #141517),
@@ -70,7 +71,9 @@ class InterestPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: onPhoto || !SC.light || forceDark
-              ? Colors.white.withValues(alpha: prominent ? 0.20 : 0.16)
+              ? Colors.white.withValues(
+                  alpha: onPhoto ? 0.32 : (prominent ? 0.20 : 0.16),
+                )
               : SC.stroke,
         ),
         boxShadow: onPhoto || forceDark ? null : SC.lift,
