@@ -51,12 +51,33 @@ abstract final class GlobePlaces {
 
   static List<CityBubble> cities(String key) => _cities[key] ?? const [];
 
+  /// Le total de comptes par pays (IA comprise), tel que la base le compte :
+  /// vue `country_counts` (migration 0072). Clés = `profiles.country`. Vide si
+  /// la vue est absente ou hors ligne : on retombe alors sur le décompte local.
+  static Future<Map<String, int>> _viewCounts() async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('country_counts')
+          .select('country, total');
+      final out = <String, int>{};
+      for (final r in rows) {
+        final m = r as Map;
+        final c = m['country']?.toString().trim() ?? '';
+        if (c.isNotEmpty) out[c] = ((m['total'] as num?) ?? 0).toInt();
+      }
+      return out;
+    } catch (_) {
+      return const <String, int>{};
+    }
+  }
+
   static Future<void> _fetch(Map<String, String> keyByDbName) async {
     if (!isSupabaseReady) {
       _loading = null;
       return;
     }
     try {
+      final viewCounts = await _viewCounts();
       // Par pages de 1 000 : l'API Supabase plafonne chaque réponse à 1 000
       // lignes (quel que soit `limit`), donc un seul appel ne voyait que les
       // premiers comptes et manquait des pays entiers dès qu'il y en a plus.
@@ -113,11 +134,12 @@ abstract final class GlobePlaces {
       _countries.clear();
       _cities.clear();
       for (final key in keyByDbName.values) {
+        final dbName = keyByDbName.entries.firstWhere((e) => e.value == key).key;
         _countries[key] = CountryStat(
-          count: countryCount[key] ?? 0,
+          // La base d'abord (vue country_counts) ; à défaut, le décompte local.
+          count: viewCounts[dbName] ?? countryCount[key] ?? 0,
           photoUrl: countryPhoto[key]?.$2,
         );
-        final dbName = keyByDbName.entries.firstWhere((e) => e.value == key).key;
         final coords = _kCityCoords[dbName] ?? const {};
         final out = <CityBubble>[];
         final counts = cityCount[key] ?? const <String, int>{};
