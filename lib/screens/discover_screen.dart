@@ -1319,7 +1319,7 @@ class _DiscoverHeader extends StatelessWidget {
               right: 0,
               // Centre un peu sous celui de la boite du logo : les minuscules de
               // « swaycø » pesent vers le bas, le bouton s'aligne sur leur milieu.
-              top: 7,
+              top: 4,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => showPaywallSheet(context),
