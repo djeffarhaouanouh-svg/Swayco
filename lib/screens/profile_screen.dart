@@ -1896,6 +1896,7 @@ class _IdentitySection extends StatelessWidget {
                 profileId: personalInfo?.id ?? handle,
                 field: 'bio',
                 fromLang: personalInfo?.language ?? '',
+                showNote: true,
                 textAlign: TextAlign.start,
                 style: TextStyle(
                   color: SC.textPrimary,

@@ -2047,6 +2047,7 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
             profileId: p.id,
             field: 'bio',
             fromLang: p.language,
+            showNote: true,
             style: TextStyle(
               color: SC.light
                   ? const Color(0xB804123A)

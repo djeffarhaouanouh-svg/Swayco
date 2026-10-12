@@ -1,3 +1,4 @@
+import '../services/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../services/profile_text_i18n.dart';
@@ -15,6 +16,7 @@ class TranslatedProfileText extends StatefulWidget {
     this.textAlign,
     this.maxLines,
     this.overflow,
+    this.showNote = false,
   });
 
   final String text;
@@ -25,6 +27,10 @@ class TranslatedProfileText extends StatefulWidget {
   final TextAlign? textAlign;
   final int? maxLines;
   final TextOverflow? overflow;
+
+  /// Une petite ligne « Traduit automatiquement » sous le texte, seulement
+  /// quand il a VRAIMENT été traduit (le texte affiché diffère de l'original).
+  final bool showNote;
 
   @override
   State<TranslatedProfileText> createState() => _TranslatedProfileTextState();
@@ -64,12 +70,30 @@ class _TranslatedProfileTextState extends State<TranslatedProfileText> {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
+    final text = Text(
       _shown,
       style: widget.style,
       textAlign: widget.textAlign,
       maxLines: widget.maxLines,
       overflow: widget.overflow,
+    );
+    if (!widget.showNote || _shown == widget.text) return text;
+    final base = widget.style?.color ?? Colors.white;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        text,
+        const SizedBox(height: 4),
+        Text(
+          AppStrings.t('bio_auto_translated'),
+          style: TextStyle(
+            fontSize: 11,
+            fontStyle: FontStyle.italic,
+            color: base.withValues(alpha: 0.55),
+          ),
+        ),
+      ],
     );
   }
 }
