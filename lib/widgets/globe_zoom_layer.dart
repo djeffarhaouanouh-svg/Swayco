@@ -113,8 +113,11 @@ class _ZoomBubble extends StatelessWidget {
             left: 0,
             right: 0,
             bottom: -7,
+            // UnconstrainedBox : la pastille prend la largeur de son texte, même
+            // quand la bulle est plus étroite (« 1,5 k » ne perd plus son « k »).
             child: Center(
-              child: Container(
+              child: UnconstrainedBox(
+                child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
                   color: selected ? SC.accent : const Color(0xD904123A),
@@ -123,12 +126,14 @@ class _ZoomBubble extends StatelessWidget {
                 child: Text(
                   _shortCount(count),
                   maxLines: 1,
+                  softWrap: false,
                   style: GoogleFonts.ibmPlexMono(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: selected ? const Color(0xFF04123A) : Colors.white,
                   ),
                 ),
+              ),
               ),
             ),
           ),
