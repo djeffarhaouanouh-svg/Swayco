@@ -772,7 +772,6 @@ abstract final class AppStrings {
     'follow_following': 'Abonné(e)',
     'profile_loading': 'Chargement...',
     'profile_anonymous': 'Sans nom',
-    'ai_badge': 'IA',
     'profile_email_private': 'Privé · visible uniquement par toi',
     'profile_signout': 'Se déconnecter',
     'profile_signout_confirm_title': 'Se déconnecter ?',
@@ -1585,7 +1584,6 @@ abstract final class AppStrings {
     'follow_following': 'Following',
     'profile_loading': 'Loading...',
     'profile_anonymous': 'No name',
-    'ai_badge': 'AI',
     'profile_email_private': 'Private · only visible to you',
     'profile_signout': 'Sign out',
     'profile_signout_confirm_title': 'Sign out?',
@@ -2354,7 +2352,6 @@ abstract final class AppStrings {
     'profile_message': 'Mensaje',
     'profile_loading': 'Cargando...',
     'profile_anonymous': 'Sin nombre',
-    'ai_badge': 'IA',
 
     'onb_welcome_title': 'Bienvenido',
     'onb_welcome_subtitle': '¿Cómo quieres que te llamemos?',
@@ -3054,7 +3051,6 @@ abstract final class AppStrings {
     'profile_message': 'Nachricht',
     'profile_loading': 'Lädt...',
     'profile_anonymous': 'Ohne Namen',
-    'ai_badge': 'KI',
 
     'onb_welcome_title': 'Willkommen',
     'onb_welcome_subtitle': 'Wie sollen wir dich nennen?',
@@ -3862,7 +3858,6 @@ abstract final class AppStrings {
     'profile_message': 'Messaggio',
     'profile_loading': 'Caricamento...',
     'profile_anonymous': 'Senza nome',
-    'ai_badge': 'IA',
 
     'onb_welcome_title': 'Benvenuto',
     'onb_welcome_subtitle': 'Come vuoi che ti chiamiamo?',
@@ -4665,7 +4660,6 @@ abstract final class AppStrings {
     'profile_message': 'Mensagem',
     'profile_loading': 'A carregar...',
     'profile_anonymous': 'Sem nome',
-    'ai_badge': 'IA',
 
     'onb_welcome_title': 'Bem-vindo',
     'onb_welcome_subtitle': 'Como queres que te chamemos?',
@@ -5471,7 +5465,6 @@ abstract final class AppStrings {
     'profile_message': 'Bericht',
     'profile_loading': 'Laden...',
     'profile_anonymous': 'Geen naam',
-    'ai_badge': 'AI',
 
     'onb_welcome_title': 'Welkom',
     'onb_welcome_subtitle': 'Hoe zullen we je noemen?',
@@ -6265,7 +6258,6 @@ abstract final class AppStrings {
     'profile_message': 'رسالة',
     'profile_loading': 'جارٍ التحميل...',
     'profile_anonymous': 'بدون اسم',
-    'ai_badge': 'AI',
 
     'onb_welcome_title': 'مرحباً',
     'onb_welcome_subtitle': 'كيف تريد أن نناديك؟',
@@ -7062,7 +7054,6 @@ abstract final class AppStrings {
     'profile_message': 'Сообщение',
     'profile_loading': 'Загрузка...',
     'profile_anonymous': 'Без имени',
-    'ai_badge': 'ИИ',
 
     'onb_welcome_title': 'Добро пожаловать',
     'onb_welcome_subtitle': 'Как тебя называть?',
@@ -7829,7 +7820,6 @@ abstract final class AppStrings {
     'profile_message': '消息',
     'profile_loading': '加载中...',
     'profile_anonymous': '无名',
-    'ai_badge': 'AI',
 
     'onb_welcome_title': '欢迎',
     'onb_welcome_subtitle': '希望我们怎么称呼你？',
@@ -8578,7 +8568,6 @@ abstract final class AppStrings {
     'profile_message': 'メッセージ',
     'profile_loading': '読み込み中...',
     'profile_anonymous': '名前なし',
-    'ai_badge': 'AI',
 
     'onb_welcome_title': 'ようこそ',
     'onb_welcome_subtitle': 'なんて呼べばいい？',
@@ -9330,7 +9319,6 @@ abstract final class AppStrings {
     'profile_message': '메시지',
     'profile_loading': '불러오는 중...',
     'profile_anonymous': '이름 없음',
-    'ai_badge': 'AI',
 
     'onb_welcome_title': '환영합니다',
     'onb_welcome_subtitle': '어떻게 불러드릴까요?',

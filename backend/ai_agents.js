@@ -13,10 +13,6 @@
 //                   nouveaux inscrits, avec AUTO_LIKES_PER_DAY ajouts par jour
 //                   et par compte, aux heures ou le compte est « reveille ».
 //
-// Honnetete : un compte IA ne se fait jamais passer pour une personne. Le
-// badge « IA » est dans l'app, ET le nom de l'expediteur des notifications
-// porte « (IA) » (un push ne peut pas afficher de pastille).
-//
 // Tout est DESACTIVE tant que AI_AGENTS_ENABLED n'est pas « 1 ». Le mode
 // autonome demande en plus AI_AUTONOMOUS=1. Si `ai_actions` n'existe pas
 // encore (migration 0068), tout est suspendu.
@@ -79,8 +75,8 @@ const LANG_NAME = {
 const langOf = (p) => String((p && p.language) || '').toLowerCase().split(/[-_]/)[0];
 const loc = (table, lang) => table[lang] || table.en;
 
-/** Nom affiche d'un compte IA dans une notification : toujours « (IA) ». */
-const aiLabel = (ai) => `${String(ai.display_name || '').trim() || 'Swayco'} (IA)`;
+/** Nom affiche d'un compte IA dans une notification (sans mention « IA »). */
+const aiLabel = (ai) => String(ai.display_name || '').trim() || 'Swayco';
 
 // ── Utilitaires ──────────────────────────────────────────────────────────────
 
