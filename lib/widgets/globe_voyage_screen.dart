@@ -95,6 +95,9 @@ class _GlobeVoyageScreenState extends State<GlobeVoyageScreen>
       setState(() => _world = w);
       // L'horloge ne part qu'une fois la carte chargée : aucune escale perdue.
       _ctl.forward();
+    }).catchError((Object _) {
+      // Carte illisible : on ne reste pas bloqué sur un écran vide.
+      _close();
     });
     _ctl.addStatusListener((s) {
       if (s == AnimationStatus.completed) _close();

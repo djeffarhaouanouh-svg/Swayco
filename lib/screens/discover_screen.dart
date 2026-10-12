@@ -122,8 +122,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   void _rebuildCards() {
     _cards.clear();
     for (final p in _profiles) {
-      if (_gender == GenderFilter.homme && p.gender != 'm') continue;
-      if (_gender == GenderFilter.femme && p.gender != 'f') continue;
+      // Le genre ne filtre que le deck des pays choisis ; sans pays, tout le
+      // monde (un choix mémorisé ne doit pas rester appliqué en silence).
+      if (_filtered && _gender == GenderFilter.homme && p.gender != 'm') continue;
+      if (_filtered && _gender == GenderFilter.femme && p.gender != 'f') continue;
       var photos = p.photos.where((u) => u.isNotEmpty).toList();
       if (photos.isEmpty && p.discoverPhotoUrl.isNotEmpty) {
         photos = [p.discoverPhotoUrl];
@@ -211,6 +213,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   // once BOTH the clip has played through AND the feed has actually landed,
   // so a slow network doesn't cut the animation short.
   bool _showFilterTransition = false;
+  // Numéro de la lecture en cours : la clé du clip change à chaque ajout de
+  // pays, sinon un 2e appui pendant la lecture ne la rejouait pas (et son
+  // `onComplete` ne revenait jamais).
+  int _transitionRun = 0;
   bool _transitionAnimDone = false;
   bool _transitionFeedDone = false;
 
@@ -285,7 +291,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   void _clearCountryFilter() {
     if (_countryKeys.isEmpty) return;
-    setState(() => _countryKeys = {});
+    // Plus aucun pays = plus aucun filtre : le choix homme/femme du globe
+    // repart aussi à « mixte » (sinon le deck restait coincé sur un seul
+    // genre, et le bouton du globe le gardait coché).
+    setState(() {
+      _countryKeys = {};
+      _gender = GenderFilter.mixte;
+      _showFilterTransition = false;
+    });
+    UserPrefs.saveDiscoverGender(GenderFilter.mixte.name);
     _loadFeed(countries: null);
   }
 
@@ -311,6 +325,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     // just reloads the deck quietly.
     if (!removing) {
       setState(() {
+        _transitionRun++;
         _showFilterTransition = true;
         _transitionAnimDone = false;
         _transitionFeedDone = false;
@@ -862,6 +877,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               child: Stack(
                 children: [
                   LottieIconTransition(
+                    key: ValueKey(_transitionRun),
                     asset: 'assets/discover_filter_transition.json',
                     onComplete: () {
                       _transitionAnimDone = true;
