@@ -331,6 +331,8 @@ abstract final class FriendshipApi {
         body: anonBody ?? AppStrings.tIn(lang, 'push_friend_request_body'),
         type: 'friend_request',
         data: {'requesterId': meId},
+        // Blurred likes must not leak a face the Likes tab hides.
+        imageUrl: blurred ? null : myProfile?.bestAvatarUrl,
       );
     } catch (e) {
       debugPrint('friendship notify failed: $e');
@@ -353,6 +355,7 @@ abstract final class FriendshipApi {
             : AppStrings.tIn(lang, 'push_match_body', args: {'name': myName}),
         type: 'match',
         data: {'peerId': meId},
+        imageUrl: myProfile?.bestAvatarUrl,
       );
     } catch (e) {
       debugPrint('match notify failed: $e');

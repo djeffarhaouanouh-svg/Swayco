@@ -43,8 +43,10 @@ abstract final class PushDispatcher {
     String? body,
     String? type,
     Map<String, dynamic>? data,
+    String? imageUrl,
   }) async {
     if (recipientUid.isEmpty || title.isEmpty) return;
+    final pic = (imageUrl ?? '').trim();
     try {
       await http
           .post(
@@ -56,6 +58,7 @@ abstract final class PushDispatcher {
               'body': ?body,
               'type': ?type,
               'data': ?data,
+              if (pic.isNotEmpty) 'image': pic,
             }),
           )
           .timeout(const Duration(seconds: 6));

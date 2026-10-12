@@ -161,6 +161,7 @@ abstract final class IncomingCallApi {
           'callerId': callerId,
           'roomName': roomName,
         },
+        imageUrl: caller?.bestAvatarUrl,
       );
     } catch (e) {
       debugPrint('ring notify failed: $e');
@@ -371,6 +372,7 @@ abstract final class IncomingCallApi {
         type: 'missed_call',
         // `senderId` : c'est lui que le tap utilise pour ouvrir le fil.
         data: {'senderId': callerId, 'callerId': callerId},
+        imageUrl: caller?.bestAvatarUrl,
       );
     } catch (e) {
       debugPrint('IncomingCallApi.notifyMissed failed: $e');
