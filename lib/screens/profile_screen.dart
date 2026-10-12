@@ -3270,7 +3270,13 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: PopupTokens.ghost,
-          border: Border.all(color: PopupTokens.ghostBorder),
+          // Bordure bleue de marque : plus franche en sombre, bleu 1F5EFF en clair.
+          border: Border.all(
+            color: SC.light
+                ? const Color(0x991F5EFF)
+                : SC.brandBlue.withValues(alpha: 0.85),
+            width: 1.4,
+          ),
         ),
         child: Icon(
           icon,
