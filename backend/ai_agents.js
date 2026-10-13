@@ -28,7 +28,7 @@ const AUTO_TICK_MS = 10 * 60 * 1000;
 const REPLIES_PER_DAY = 2; // par conversation, jour UTC
 const AUTO_LIKES_PER_DAY = 2; // par compte IA, jour UTC
 const WELCOME_LIKES_PER_NEW_USER = 2;
-// Doit couvrir le plus long délai de réponse (niveau 1 : 16 h).
+// Doit couvrir le plus long délai de réponse (niveau 1 : 12 h).
 const REPLY_WINDOW_MS = 18 * 60 * 60 * 1000;
 const PREFER_OPPOSITE_GENDER = process.env.AI_PREFER_OPPOSITE_GENDER !== '0';
 
@@ -226,7 +226,7 @@ const HOUR = 60 * MIN;
 const DELAY_BY_LEVEL = {
   3: [20 * MIN, 4 * HOUR], // ~2 h en moyenne, très variable d'un message à l'autre
   2: [1 * HOUR, 8 * HOUR],
-  1: [3 * HOUR, 16 * HOUR],
+  1: [2 * HOUR, 12 * HOUR],
 };
 
 function replyDelayForLevel(messageId, level) {
