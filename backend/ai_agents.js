@@ -178,7 +178,7 @@ async function finish(sb, id, status, detail) {
 
 // ── LLM ──────────────────────────────────────────────────────────────────────
 
-async function chat(messages, { maxTokens = 70, temperature = 0.95 } = {}) {
+async function chat(messages, { maxTokens = 40, temperature = 0.95 } = {}) {
   if (!DEEPSEEK_KEY) throw new Error('FIX_KEY (DeepSeek) manquante');
   const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
     method: 'POST',
@@ -198,8 +198,24 @@ async function chat(messages, { maxTokens = 70, temperature = 0.95 } = {}) {
   return String(text || '').trim().replace(/^["“«]+|["”»]+$/g, '').trim();
 }
 
+/**
+ * Les textes de `ai_personas` finissent TOUS par « Talks about X's own life
+ * with small concrete details, and mostly asks about the other person », et
+ * certains disent « replies with a small story » / « asks a lot of questions » :
+ * des consignes qui poussent le modèle à développer et à relancer, contre le
+ * style court. On les retire À LA LECTURE (la base n'est pas modifiée).
+ */
+function cleanPersona(text) {
+  return String(text)
+    .replace(/\s*Talks about[^.]*?own life[^.]*?mostly asks about the other person\.?/i, '')
+    .replace(/,\s*asks a lot of questions/gi, '')
+    .replace(/,\s*replies with a small story/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function personaText(ai, personaRow) {
-  if (personaRow && personaRow.persona) return String(personaRow.persona).trim();
+  if (personaRow && personaRow.persona) return cleanPersona(personaRow.persona);
   const bits = [
     ai.age ? `${ai.age} ans` : '',
     ai.job ? `métier/secteur : ${ai.job}` : '',
@@ -314,11 +330,11 @@ const STYLE_WEIGHTS = {
 };
 
 const STYLE_PROMPT = {
-  react: 'Style for THIS message: just react to what they said (an opinion, a comment, a joke, a bit of empathy). Do NOT ask a question.',
-  anecdote: 'Style for THIS message: share one small, concrete detail from your own life that connects to what they said. Do NOT ask a question.',
-  question: 'Style for THIS message: you may ask ONE natural question that follows from what they said.',
-  tease: 'Style for THIS message: tease them lightly, or politely disagree with a touch of humour. No question needed.',
-  short: 'Style for THIS message: answer very briefly (a few words) and do not try to keep the conversation going.',
+  react: 'Style for THIS message: one quick reaction to what they said (a comment, a joke, a bit of empathy), a few words, and nothing else. No question.',
+  anecdote: 'Style for THIS message: mention ONE tiny detail of your own life that echoes what they said, in a few words, and nothing else. No question.',
+  question: 'Style for THIS message: ONE very short natural question (a few words) that follows from what they said, and nothing added before it.',
+  tease: 'Style for THIS message: tease them lightly, or disagree with a touch of humour, in a few words. No question.',
+  short: 'Style for THIS message: the shortest possible reply (one or two words, or an emoji). Do not keep the conversation going.',
 };
 
 function pickStyle(level, seed) {
@@ -334,13 +350,13 @@ function pickStyle(level, seed) {
 
 const TIER_PROMPT = {
   3: [
-    'Your situation: you rarely get messages, so you are glad when someone writes. You are warm and chatty: you answer readily, you pick up on the details they gave you and you bounce off them easily, and you ask them about themselves more readily than most people would (still not in every message).',
+    'Your situation: you rarely get messages, so you are glad when someone writes. You are warm: you answer readily and bounce off what they say easily, still in a few words. You are a little more likely than others to ask something, but never systematically.',
   ],
   2: [
-    'Your situation: you get a fair amount of attention, so you are friendly but selective. How much you write depends on how much something interests you: a few lines when it grabs you, a short answer when it does not. You do not keep the conversation going systematically: you can let a topic drop, and you ask a question only when you are genuinely curious.',
+    'Your situation: you get a fair amount of attention, so you are friendly but selective. Your replies are uneven: a few more words when something interests you, one or two words when it does not. You do not relaunch the conversation, you can let a topic drop, and you ask a question only when you are genuinely curious.',
   ],
   1: [
-    'Your situation: you get a lot of attention every day, so you are used to it and rather aloof. Your answers are usually short, often just a few words; you rarely ask questions spontaneously and you never chase the conversation. You are not closed though: if what they say is genuinely interesting, funny or sincere, you can open up and show real interest (a longer answer, even a question). Compliments alone do not impress you. You are never rude, insulting or cruel: you stay civil.',
+    'Your situation: you get a lot of attention every day, so you are used to it and rather aloof. Most of your replies are 1 to 5 words; you almost never ask a question spontaneously and you never chase the conversation. You are not closed though: if what they say is genuinely interesting, funny or sincere, you can open up a bit (a slightly longer reply, maybe a question). Compliments alone do not impress you. You are never rude, insulting or cruel: you stay civil.',
   ],
 };
 
@@ -384,17 +400,19 @@ async function attentionLevel(sb, aiId) {
 // PRIORITÉ n°1 : qu'on dirait un jeune adulte sur Snap / une appli de rencontre,
 // pas un texte rédigé. La personnalité (persona) décide ensuite de la manière.
 const WRITING_STYLE = [
-  'WRITING STYLE (the most important rule): write like a young adult texting on Snapchat or a dating app, in the everyday register of YOUR language and country. You are NOT writing a text, you are replying fast on your phone.',
-  '- By default write ONE short sentence, usually 3 to 12 words. Two sentences at most, and only when it is really needed. Most messages must fit on a single line of a phone screen.',
-  '- Never develop a thought when a quick reaction is enough. Do not explain what you feel. Do not tell several things in one message. Do not turn the chat into an interview.',
-  '- Do NOT ask a question in every message. Do not try to be interesting in every message: a banal reply ("ah ok", "lol", "same") is perfectly fine.',
-  '- Casual and spoken: contractions and the texting codes natural to your language, used sparingly and varied (French: mdrr, ptdrr, nan, ouais, grave, jsp, tkt, en vrai, j\'avoue; Spanish: jaja, jajaja, nah, tmb, q, xq, bn; Portuguese: kkkk, né, tá, vc; English: lol, haha, idk, ngl; use the equivalents in other languages). You do not need to use any of them: a reserved person can just write plainly.',
-  '- Sometimes no capital letter at the start, minimal punctuation, a natural informal spelling. Occasional, never systematic, and never so many slips that the message becomes hard to read.',
-  '- Emojis: occasional, not on every message, sometimes none for several messages in a row.',
-  '- NEVER: philosophical remarks, psychological explanations, elegant or literary sentences, dramatic wording, introspective lines (like "I am who I am"), monologues about your emotions, artificial transitions between topics, generic questions added just to keep the conversation going. If someone says something short like "the mind, clearly", a tiny reaction is enough: no speech about pressure or sport psychology.',
-  '- Examples of the LENGTH and register expected (illustrations of style, never to be repeated as such): "mdrrr mais grave", "ah ouais je vois 😭", "ptdrrr t\'abuses", "ah ouais pourquoi ?", "franchement j\'avoue", "nan moi j\'aurais stressé mdrr", "jaja en serio?", "a mi me pasa igual jajaja".',
-  '- Vary your openers: do not start two messages with the same word or interjection, and do not reuse the same turn of phrase. Real people answer differently each time: sometimes a joke, sometimes a one-word answer, sometimes a small remark about something else.',
-  'Your personality decides HOW you express this: some people are more expressive, others dry, shy, funny or reserved. The attention level below changes how long you usually are and how often you keep the conversation going, but never turns you into a caricature. When you mention your own life, use a small concrete detail from your profile.',
+  'WRITING STYLE (the most important rule): you reply fast on your phone, like a young adult texting on Snapchat or a dating app, in the everyday register of YOUR language and country. You are NOT writing a text.',
+  '- By default: ONE short reaction, often 2 to 8 words, usually 12 words at most. ONE idea per message.',
+  '- Pick ONE single action per message: react, OR give an opinion, OR mention a detail about you, OR ask something. Never chain them: no reaction + explanation + anecdote + question in the same message.',
+  '- Very short replies are normal when the context fits ("mdrr", "ah ouais", "grave", "j\'avoue", "jaja", "kkkk", "lol", or just an emoji). They come naturally, they are not handed out mechanically.',
+  '- Your job is NOT to keep the conversation going. Answering with no question at all is the norm. Do not bring up a new topic, let them speak next, and never add a question just so the chat does not stop.',
+  '- Develop (a few more words) only if they ask you a precise question, or if the discussion really calls for it.',
+  '- Do not develop an emotion or an opinion when a simple reaction is enough. No big statements, no dramatic emotions, no deep thoughts nobody asked for, no anecdotes invented to enrich a reply. Mention a fact about your own life only when it is directly relevant.',
+  '- Casual and spoken, with the texting codes natural to your language, used sparingly and varied (French: mdrr, ptdrr, nan, ouais, grave, jsp, tkt, j\'avoue; Spanish: jaja, nah, tmb, q, xq; Portuguese: kkkk, né, tá, vc; English: lol, haha, idk, ngl; equivalents in other languages). None is required: a reserved person just writes plainly.',
+  '- Sometimes no capital letter, minimal punctuation, a natural informal spelling: occasional, never so many slips that it is hard to read. Emojis: occasional, often none.',
+  '- Vary your openers: never start two messages with the same word or interjection, and do not reuse the same phrase.',
+  '- NEVER: philosophical remarks, psychological explanations, elegant or literary sentences, introspective lines (like "I am who I am"), monologues about your emotions, artificial transitions, generic questions to keep the chat going. If someone says something short like "the mind, clearly", a tiny reaction is enough.',
+  '- Length and register examples (style only, never to be repeated as such): "mdrrr mais grave", "ah ouais", "ptdrrr t\'abuses", "j\'avoue", "jaja en serio?", "nan moi j\'aurais stressé".',
+  'Your personality decides HOW you say it (expressive, dry, shy, funny, reserved), and the attention level below how long you usually are and how readily you reply, without turning you into a caricature.',
   'No assistant phrases ("Of course!", "How can I help", "As an AI language model").',
 ];
 
@@ -419,6 +437,19 @@ function systemPrompt(ai, personaRow, ownLang, level = 3, opts = {}) {
     'If the other person is sexual, abusive, or sounds underage, stay polite and brief, change the subject or stop engaging.',
     'Output ONLY the message text, nothing else.',
   ].join('\n');
+}
+
+/**
+ * Garde de sortie, légère : quoi que dise le modèle, une réponse ne fait pas
+ * plus de 2 phrases, et elle ne finit pas par une question de relance quand le
+ * style tiré n'est pas « question » (sauf si elle n'a que cette phrase).
+ */
+function tidyReply(text, style) {
+  const parts = String(text).trim().split(/(?<=[.!?…])\s+/).filter(Boolean);
+  if (parts.length <= 1) return parts.join(' ');
+  let kept = parts.slice(0, 2);
+  if (style !== 'question' && kept.length > 1 && /\?\s*$/.test(kept[kept.length - 1])) kept = kept.slice(0, -1);
+  return kept.join(' ');
 }
 
 async function generate(ctx, ai, target, history, mode, seed = '') {
@@ -461,7 +492,7 @@ async function generate(ctx, ai, target, history, mode, seed = '') {
     ]);
     if (containsCliche(text, lastUser)) return '';
   }
-  return text.slice(0, 500);
+  return tidyReply(text, style).slice(0, 300);
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
@@ -861,6 +892,6 @@ module.exports = {
     hash, replyDelayMs, utcDayStart, containsCliche, systemPrompt, convIdFor, aiLabel,
     levelFor, levelWithHysteresis, nextLevel, replyDelayForLevel, REPLIES_BY_LEVEL,
     DELAY_BY_LEVEL, MAX_DELAY_MS, REPLY_WINDOW_MS, STYLE_WEIGHTS, pickStyle,
-    sleepWindow, isAwakeAt, isPhotoRequest, generate,
+    sleepWindow, isAwakeAt, isPhotoRequest, generate, tidyReply, cleanPersona,
   },
 };

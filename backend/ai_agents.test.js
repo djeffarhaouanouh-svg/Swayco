@@ -153,9 +153,9 @@ test('same messages, different levels → different style mix (measured)', () =>
 
 test('the prompt carries the chosen style and lets context win', () => {
   const p = t.systemPrompt(AI, null, 'es', 3, { style: 'react' });
-  assert.match(p, /Style for THIS message: just react/);
+  assert.match(p, /Style for THIS message: one quick reaction/);
   assert.match(p, /context always comes first/);
-  assert.match(p, /Do NOT ask a question in every message/);
+  assert.match(p, /Answering with no question at all is the norm/);
   // Plus de « pose-lui toujours une question ».
   assert.doesNotMatch(p, /or ask them something/);
 });
@@ -169,11 +169,11 @@ test('levels give concrete, different behaviours; same structure otherwise', () 
   assert.equal(p3.length, p1.length);
   assert.equal(p2.length, p1.length);
   assert.equal(p3.filter((l, i) => l !== p1[i]).length, 1);
-  assert.match(p3.join('\n'), /warm and chatty/);
-  assert.match(p3.join('\n'), /ask them about themselves more readily/);
-  assert.match(p2.join('\n'), /do not keep the conversation going systematically/i);
-  assert.match(p1.join('\n'), /usually short/);
-  assert.match(p1.join('\n'), /rarely ask questions spontaneously/);
+  assert.match(p3.join('\n'), /warm: you answer readily/);
+  assert.match(p3.join('\n'), /a little more likely than others to ask/);
+  assert.match(p2.join('\n'), /do not relaunch the conversation/i);
+  assert.match(p1.join('\n'), /1 to 5 words/);
+  assert.match(p1.join('\n'), /almost never ask a question spontaneously/);
   assert.match(p1.join('\n'), /can open up/);
 });
 
@@ -230,15 +230,42 @@ test('writing style: short, texting register, no chatbot or literary tone', () =
   for (const level of [1, 2, 3]) {
     const p = t.systemPrompt(AI, null, 'es', level);
     assert.match(p, /WRITING STYLE \(the most important rule\)/);
-    assert.match(p, /ONE short sentence, usually 3 to 12 words/);
-    assert.match(p, /Do NOT ask a question in every message/);
-    assert.match(p, /Do not try to be interesting in every message/);
+    assert.match(p, /ONE short reaction, often 2 to 8 words, usually 12 words at most/);
+    assert.match(p, /ONE idea per message/);
+    assert.match(p, /Never chain them/);
+    assert.match(p, /NOT to keep the conversation going/);
+    assert.match(p, /Answering with no question at all is the norm/);
+    assert.match(p, /never add a question just so the chat does not stop/);
     assert.match(p, /NEVER: philosophical remarks/);
     assert.match(p, /Vary your openers/);
     assert.match(p, /Snapchat or a dating app/);
+    assert.match(p, /no anecdotes invented to enrich a reply/);
     assert.doesNotMatch(p, /uf q fuerte/); // le modèle recopiait l'exemple
   }
   // Le style court est avant les consignes de niveau (il domine).
   const p = t.systemPrompt(AI, null, 'es', 1);
   assert.ok(p.indexOf('WRITING STYLE') < p.indexOf('Your situation'));
 });
+
+test('personas: instructions that push long, relaunching replies are removed on read', () => {
+  const raw = "Lucía, 22, lives in Mendoza, Argentine. Interests: Tennis. Lucía bakes when she is stressed. Texting style: calm and curious, replies with a small story. Here for: Pratiquer une langue. Talks about Lucía's own life with small concrete details, and mostly asks about the other person.";
+  const out = t.cleanPersona(raw);
+  assert.doesNotMatch(out, /mostly asks about the other person/);
+  assert.doesNotMatch(out, /Talks about/);
+  assert.doesNotMatch(out, /small story/);
+  assert.match(out, /Lucía bakes when she is stressed/); // les faits restent
+  assert.match(out, /calm and curious/);
+  assert.match(t.cleanPersona('Texting style: warm and teasing, asks a lot of questions.'), /warm and teasing\./);
+  // Le prompt final n'en contient plus.
+  const p = t.systemPrompt(AI, { persona: raw }, 'es', 3);
+  assert.doesNotMatch(p, /mostly asks about the other person/);
+});
+
+test('tidyReply: max 2 sentences, no relaunch question unless the style is question', () => {
+  assert.equal(t.tidyReply('jaja sí', 'react'), 'jaja sí');
+  assert.equal(t.tidyReply('jaja sí. ¿Y tú juegas?', 'react'), 'jaja sí.');
+  assert.equal(t.tidyReply('jaja sí. ¿Y tú juegas?', 'question'), 'jaja sí. ¿Y tú juegas?');
+  assert.equal(t.tidyReply('uno. dos. tres. cuatro.', 'react'), 'uno. dos.');
+  assert.equal(t.tidyReply('¿en serio?', 'react'), '¿en serio?'); // une seule phrase : intacte
+});
+
