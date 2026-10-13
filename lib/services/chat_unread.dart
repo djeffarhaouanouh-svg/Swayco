@@ -136,6 +136,12 @@ abstract final class ChatUnread {
   /// not fire a banner per unread message from before the app was open.
   static bool _primed = false;
 
+  /// Bumped each time a brand-new inbound message lands (live stream), so the
+  /// Messages list can reload its rows and show the unread bubble / preview at
+  /// once. Without it, native only refreshed the list on a tab switch or an
+  /// app resume (the 7 s poll is web-only).
+  static final ValueNotifier<int> newInbound = ValueNotifier<int>(0);
+
   static void _onRows(List<Map<String, dynamic>> rows) {
     final previousIds = {for (final r in _lastRows) r['id']?.toString() ?? ''};
     final skipBanners = !_primed;
@@ -143,11 +149,14 @@ abstract final class ChatUnread {
     _lastRows = rows;
     _recount();
     if (!skipBanners) {
+      var fresh = false;
       for (final r in rows) {
         final id = r['id']?.toString() ?? '';
         if (id.isEmpty || previousIds.contains(id)) continue;
+        fresh = true;
         _offerBanner(r);
       }
+      if (fresh) newInbound.value++;
     }
   }
 

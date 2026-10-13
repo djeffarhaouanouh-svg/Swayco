@@ -173,6 +173,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // moves, instead of relying on every possible entry point remembering
     // to trigger a reload on its way back.
     ChatUnread.revision.addListener(_onUnreadRevisionChanged);
+    // Un message arrive pendant que la liste est affichée : on la recharge tout
+    // de suite (pastille, aperçu, heure), sans attendre un changement d'onglet.
+    ChatUnread.newInbound.addListener(_onNewInbound);
     _reload();
     _watchFriendships();
     _checkNotifStatus();
@@ -211,6 +214,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     AppSettings.hideOnlineLocal.removeListener(_onHideOnlineChanged);
     NavTab.index.removeListener(_onNavTabChanged);
     ChatUnread.revision.removeListener(_onUnreadRevisionChanged);
+    ChatUnread.newInbound.removeListener(_onNewInbound);
     _pollTimer?.cancel();
     _presenceTimer?.cancel();
     _searchDebounce?.cancel();
@@ -309,6 +313,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void _onUnreadRevisionChanged() {
     if (!mounted) return;
     setState(() {});
+  }
+
+  void _onNewInbound() {
+    if (!mounted) return;
+    _reload(silent: true);
   }
 
   void _onNavTabChanged() {
