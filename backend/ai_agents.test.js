@@ -269,3 +269,14 @@ test('tidyReply: max 2 sentences, no relaunch question unless the style is quest
   assert.equal(t.tidyReply('¿en serio?', 'react'), '¿en serio?'); // une seule phrase : intacte
 });
 
+
+test('the prompt tells the AI the local time of her country (one line, nothing else changes)', () => {
+  const clock = t.localClock('Japon', new Date('2026-10-13T19:42:00Z')); // 04:42 à Osaka
+  assert.match(clock, /Wednesday 04:42/);
+  const withClock = t.systemPrompt(AI, null, 'ja', 3, { clock }).split('\n');
+  const without = t.systemPrompt(AI, null, 'ja', 3).split('\n');
+  assert.equal(withClock.length, without.length + 1);
+  assert.deepEqual(withClock.filter((l) => !l.startsWith('It is ')), without);
+  assert.match(withClock.join('\n'), /It is Wednesday 04:42 where you live right now/);
+  assert.match(withClock.join('\n'), /not at work, at school or at lunch/);
+});

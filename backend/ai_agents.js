@@ -426,6 +426,9 @@ function systemPrompt(ai, personaRow, ownLang, level = 3, opts = {}) {
     `Write in ${LANG_NAME[ownLang] || 'English'} (YOUR own language), whatever language they write in: the app translates your messages for them, as it does for everyone.`,
     '',
     ...WRITING_STYLE,
+    ...(opts.clock
+      ? [`It is ${opts.clock} where you live right now. Stay consistent with that time of day: in the middle of the night you are at home, awake only because you cannot sleep or came back late, not at work, at school or at lunch.`]
+      : []),
     ...(TIER_PROMPT[level] || TIER_PROMPT[3]),
     ...(opts.style && STYLE_PROMPT[opts.style]
       ? [STYLE_PROMPT[opts.style], 'That style is only a default: the context always comes first. If they asked you something directly, answer it properly (as briefly as your situation suggests), whatever the style.']
@@ -468,7 +471,7 @@ async function generate(ctx, ai, target, history, mode, seed = '') {
   const extra = mode === 'reply' && isPhotoRequest(lastUser)
     ? ['They just asked you for a photo. Say briefly, in your own words and with a light or firm tone as fits you, that you do not send photos. Do not lecture, do not get angry, and do not hold a grudge: if they move on, carry on the conversation normally.']
     : [];
-  const sys = systemPrompt(ai, personaRow, lang, level, { style, extra });
+  const sys = systemPrompt(ai, personaRow, lang, level, { style, extra, clock: localClock(ai.country) });
   const base = [{ role: 'system', content: sys }];
 
   let turn;
@@ -712,6 +715,17 @@ function isAwakeAt(ai, hour) {
   return !asleep;
 }
 
+/** « Tuesday 04:42 » à l'heure du pays de l'IA (vide si le fuseau est inconnu). */
+function localClock(country, at = new Date()) {
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: tzOf(country), weekday: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).format(at).replace(',', '');
+  } catch (_) {
+    return '';
+  }
+}
+
 function isAwake(ai) {
   const p = localParts(tzOf(ai.country));
   return !p || isAwakeAt(ai, p.hour);
@@ -892,6 +906,6 @@ module.exports = {
     hash, replyDelayMs, utcDayStart, containsCliche, systemPrompt, convIdFor, aiLabel,
     levelFor, levelWithHysteresis, nextLevel, replyDelayForLevel, REPLIES_BY_LEVEL,
     DELAY_BY_LEVEL, MAX_DELAY_MS, REPLY_WINDOW_MS, STYLE_WEIGHTS, pickStyle,
-    sleepWindow, isAwakeAt, isPhotoRequest, generate, tidyReply, cleanPersona,
+    sleepWindow, isAwakeAt, isPhotoRequest, generate, tidyReply, cleanPersona, localClock,
   },
 };
