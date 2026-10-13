@@ -32,8 +32,18 @@ test('the more attention, the slower and the fewer replies', () => {
     assert.ok(d1 >= t.DELAY_BY_LEVEL[1][0] && d1 < t.DELAY_BY_LEVEL[1][1]);
     assert.equal(t.replyDelayForLevel(id, 1), d1); // stable, no re-roll per tick
   }
-  // Longest delay stays inside the 20-minute reply window.
-  assert.ok(t.DELAY_BY_LEVEL[1][1] < 20 * 60 * 1000);
+  // Longest delay stays inside the reply window (18 h).
+  assert.ok(t.DELAY_BY_LEVEL[1][1] < 18 * 60 * 60 * 1000);
+});
+
+test('level 3 answers in hours, not seconds: ~2 h on average, and it varies', () => {
+  const HOUR = 3600 * 1000;
+  const ds = Array.from({ length: 2000 }, (_, i) => t.replyDelayForLevel(`m-${i}`, 3));
+  const avg = ds.reduce((a, b) => a + b, 0) / ds.length;
+  assert.ok(avg > 1.5 * HOUR && avg < 2.7 * HOUR, `avg ${(avg / HOUR).toFixed(2)} h`);
+  assert.ok(Math.min(...ds) >= 20 * 60 * 1000);
+  assert.ok(Math.max(...ds) <= 4 * HOUR);
+  assert.ok(new Set(ds.map((d) => Math.floor(d / (15 * 60 * 1000)))).size > 8); // spread out
 });
 
 test('same structure at every level, only the situation paragraph changes', () => {

@@ -28,7 +28,8 @@ const AUTO_TICK_MS = 10 * 60 * 1000;
 const REPLIES_PER_DAY = 2; // par conversation, jour UTC
 const AUTO_LIKES_PER_DAY = 2; // par compte IA, jour UTC
 const WELCOME_LIKES_PER_NEW_USER = 2;
-const REPLY_WINDOW_MS = 20 * 60 * 1000;
+// Doit couvrir le plus long délai de réponse (niveau 1 : 16 h).
+const REPLY_WINDOW_MS = 18 * 60 * 60 * 1000;
 const PREFER_OPPOSITE_GENDER = process.env.AI_PREFER_OPPOSITE_GENDER !== '0';
 
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
@@ -220,10 +221,12 @@ function levelFor(likesPerDay) {
 const REPLIES_BY_LEVEL = { 3: 3, 2: 2, 1: 1 };
 
 /** Délai de réponse [min, max] en ms, selon le niveau. */
+const MIN = 60 * 1000;
+const HOUR = 60 * MIN;
 const DELAY_BY_LEVEL = {
-  3: [5000, 30000],
-  2: [20000, 180000],
-  1: [60000, 600000],
+  3: [20 * MIN, 4 * HOUR], // ~2 h en moyenne, très variable d'un message à l'autre
+  2: [1 * HOUR, 8 * HOUR],
+  1: [3 * HOUR, 16 * HOUR],
 };
 
 function replyDelayForLevel(messageId, level) {
@@ -458,7 +461,7 @@ async function processReplies(ctx) {
     .lt('created_at', new Date(now - 5000).toISOString())
     .not('recipient', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(400);
+    .limit(1500);
   if (!recent || recent.length === 0) return 0;
 
   const aiSet = await aiIdsAmong(sb, recent.map((m) => m.recipient));
