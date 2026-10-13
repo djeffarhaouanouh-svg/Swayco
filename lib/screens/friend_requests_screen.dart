@@ -394,7 +394,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
             leaving: _leaving.contains(req.friendship.id),
             revealed: false,
             onOpenProfile: () => openOrUnlock(req.requester),
-            onAccept: () => _accept(req),
+            // Verrou : sur une carte floutée, « Add » ouvre l'écran Pro / vidéo
+            // au lieu d'accepter (accepter = match = voir qui c'est : le flou
+            // ne servait à rien). Une fois la personne révélée, « Add » marche.
+            onAccept: () => openOrUnlock(req.requester),
             onReject: () => _reject(req),
           ),
     ];
