@@ -478,9 +478,28 @@ async function processReplies(ctx) {
   const dayStart = utcDayStart();
   let sent = 0;
   for (const m of latest.values()) {
+    // Demande de photo : elle ne lui répondra plus jamais dans cette conversation.
+    if (isPhotoRequest(m.body)) {
+      await sb.from('ai_actions').insert({
+        ai_id: m.recipient, target_id: m.sender, kind: 'reply', source: 'reply',
+        ref: `snub:${m.conversation_id}`, status: 'skipped', detail: 'photo_request',
+        done_at: new Date().toISOString(),
+      }); // doublon (ref unique) = déjà snobé : sans conséquence
+      continue;
+    }
+
     const level = await attentionLevel(sb, m.recipient).catch(() => 3);
     if (now - Date.parse(m.created_at) < replyDelayForLevel(m.id, level)) continue;
     const dailyLimit = REPLIES_BY_LEVEL[level] ?? REPLIES_PER_DAY;
+
+    // Endormie : elle répondra à son réveil (le message reste dans la fenêtre).
+    const sleeper = await getProfile(sb, m.recipient);
+    if (!sleeper || !isAwake(sleeper)) continue;
+
+    // Snobé à vie ?
+    const { data: snub } = await sb.from('ai_actions').select('id')
+      .eq('ref', `snub:${m.conversation_id}`).limit(1);
+    if (snub && snub.length) continue;
 
     // Deja repondu apres ce message ?
     const { data: after } = await sb.from('messages').select('id')
@@ -522,7 +541,46 @@ async function processReplies(ctx) {
 // ── Mode autonome ────────────────────────────────────────────────────────────
 
 let autoRunning = false;
-const { awake } = require('./engagement')._test;
+const { localParts, tzOf } = require('./engagement')._test;
+
+/**
+ * Heures de sommeil PROPRES à chaque compte, à l'heure de son pays : elle se
+ * couche entre 22 h et 0 h et se réveille entre 6 h et 9 h (stable par compte).
+ * Endormie : aucune réponse, aucun like ; elle répond à son réveil.
+ */
+function sleepWindow(aiId) {
+  const h = hash(String(aiId));
+  return { bed: 22 + (h % 3), wake: 6 + (Math.floor(h / 3) % 4) };
+}
+
+function isAwakeAt(ai, hour) {
+  const { bed, wake } = sleepWindow(ai.id);
+  const b = bed % 24;
+  const asleep = b > wake ? (hour >= b || hour < wake) : (hour >= b && hour < wake);
+  return !asleep;
+}
+
+function isAwake(ai) {
+  const p = localParts(tzOf(ai.country));
+  return !p || isAwakeAt(ai, p.hour);
+}
+
+// ── Demandes de photo : silence définitif ────────────────────────────────────
+// Si quelqu'un lui demande une photo, elle ne lui répond plus jamais dans cette
+// conversation (elle le snobe). Détecté : un verbe de demande à côté d'un mot
+// « photo », dans les 12 langues de l'app.
+const PHOTO_NOUN = '(?:photos?|pics?|pictures?|selfies?|nudes?|fotos?|fotografi[ae]s?|immagin[ei]|bild(?:er)?|afbeelding(?:en)?|imagen(?:es)?)';
+const PHOTO_ASK_VERB = '(?:send|show|share|see|snap|envoie[rz]?|envoy(?:er|ez|e)|montre[rz]?|partage[rz]?|voir|manda[rs]?|m[aá]ndame|env[ií]a(?:me)?|muestra(?:me)?|ver|quiero|mostra|mostrami|inviami|manda(?:mi)?|mandi|vedere|schick(?:e|st)?|zeig(?:e|st)?|sehen|stuur|laat|zien|envia|mostre|me\\s+manda)';
+const PHOTO_ASK_RE = new RegExp(
+  `(?:\\bnudes?\\b|${PHOTO_ASK_VERB}\\b[^\\n]{0,40}\\b${PHOTO_NOUN}\\b|\\b${PHOTO_NOUN}\\b[^\\n]{0,40}\\b${PHOTO_ASK_VERB}\\b|\\b${PHOTO_NOUN}\\s+(?:of\\s+you|de\\s+toi|de\\s+ti|di\\s+te|von\\s+dir|van\\s+jou|tua|tuya|tuyas)\\b)`,
+  'i',
+);
+const PHOTO_ASK_NONLATIN = /(?:пришли|покажи|скинь|отправь|можно)[^\n]{0,30}(?:фото|селфи)|(?:фото|селфи)[^\n]{0,30}(?:пришли|покажи|скинь|отправь)|(?:发|给我|看看|看一下|发给我)[^\n]{0,10}(?:照片|相片|自拍)|(?:照片|相片|自拍)[^\n]{0,10}(?:发|给我|看看)|(?:写真|画像|自撮り)[^\n]{0,12}(?:見せ|送っ|ください|ちょうだい|欲しい)|(?:見せ|送っ)[^\n]{0,8}(?:写真|画像|自撮り)|사진[^\n]{0,12}(?:보내|보여|줘|주세요)|(?:보내|보여)[^\n]{0,8}사진|(?:ارسل|أرسل|ابعت|ابعثي|أرني|ارني|صور)[^\n]{0,15}(?:صورة|صورك|صور)|(?:صورة|صورك)[^\n]{0,15}(?:ارسل|أرسل|ابعت|ابعثي|أرني)/i;
+
+function isPhotoRequest(text) {
+  const s = String(text || '');
+  return PHOTO_ASK_RE.test(s) || PHOTO_ASK_NONLATIN.test(s);
+}
 
 async function sampleAi(sb, n) {
   const { count } = await sb.from('profiles').select('id', { count: 'exact', head: true }).eq('is_ai', true);
@@ -552,7 +610,7 @@ async function autoAcceptLikes(ctx) {
     // Entre 2 min et 1 h apres le like, stable pour cette ligne.
     if (Date.now() - Date.parse(r.created_at) < 120000 + (hash(r.id) % (58 * 60000))) continue;
     const ai = await getProfile(sb, r.addressee);
-    if (!ai || !ai.is_ai || !awake(ai.country)) continue;
+    if (!ai || !ai.is_ai || !isAwake(ai)) continue;
     if ((await autoLikesToday(sb, ai.id)) >= AUTO_LIKES_PER_DAY) continue;
     const claim = await sb.from('ai_actions').insert({
       ai_id: ai.id, target_id: r.requester, kind: 'like', source: 'auto',
@@ -588,7 +646,7 @@ async function autoWelcome(ctx) {
     const need = WELCOME_LIKES_PER_NEW_USER - have;
     if (need <= 0) continue;
 
-    let cands = (await sampleAi(sb, 40)).filter((c) => awake(c.country));
+    let cands = (await sampleAi(sb, 40)).filter((c) => isAwake(c));
     if (PREFER_OPPOSITE_GENDER && (user.gender === 'm' || user.gender === 'f')) {
       cands.sort((a, b) => (b.gender !== user.gender) - (a.gender !== user.gender));
     }
@@ -681,5 +739,6 @@ module.exports = {
   _test: {
     hash, replyDelayMs, utcDayStart, containsCliche, systemPrompt, convIdFor, aiLabel,
     levelFor, replyDelayForLevel, REPLIES_BY_LEVEL, DELAY_BY_LEVEL,
+    sleepWindow, isAwakeAt, isPhotoRequest,
   },
 };

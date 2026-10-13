@@ -580,5 +580,5 @@ function start({ supabase, notifyUser }) {
   console.log(`[engage] scheduler on (every ${TICK_MS / 60000} min, cap ${DAILY_CAP}/day)`);
 }
 
-module.exports = { start, runOnce, _test: { pick, fill, isoWeek, awake } };
+module.exports = { start, runOnce, _test: { pick, fill, isoWeek, awake, localParts, tzOf } };
 // build trigger 2026-10-09

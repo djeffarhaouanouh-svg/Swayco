@@ -80,3 +80,33 @@ test('the AI writes in its own language', () => {
   assert.match(t.systemPrompt(AI, null, 'es', 3), /Write in Spanish \(YOUR own language\)/);
   assert.match(t.systemPrompt(AI, null, 'ja', 3), /Write in Japanese/);
 });
+
+test('photo requests are detected in the app languages, ordinary talk is not', () => {
+  const yes = [
+    'send me a pic', 'can you send a photo of you?', 'show me a selfie', 'got any nudes',
+    'tu peux m\'envoyer une photo ?', 'envoie une photo de toi', 'quiero ver una foto tuya',
+    'mándame una foto', 'manda foto', 'mi mandi una foto?', 'schick mir ein Foto', 'zeig mir ein Bild von dir',
+    'stuur een foto', 'me manda uma foto', 'пришли фото', 'покажи селфи', '发张照片给我', '写真を送ってください',
+    '사진 보내줘', 'ارسل صورتك',
+  ];
+  const no = [
+    'I love taking photos of the sea', 'nice photography', 'hello how are you', 'I work as a photographer',
+    'what do you do in São Paulo?', 'j\'adore la photographie', 'me gusta la fotografía', 'hola, qué tal',
+  ];
+  for (const s of yes) assert.equal(t.isPhotoRequest(s), true, s);
+  for (const s of no) assert.equal(t.isPhotoRequest(s), false, s);
+});
+
+test('each AI sleeps at its own hours, and only at night', () => {
+  const wins = new Set();
+  for (let i = 0; i < 300; i++) {
+    const w = t.sleepWindow(`ai-${i}`);
+    wins.add(`${w.bed}-${w.wake}`);
+    assert.ok([22, 23, 24].includes(w.bed), `bed ${w.bed}`);
+    assert.ok(w.wake >= 6 && w.wake <= 9, `wake ${w.wake}`);
+    assert.equal(t.sleepWindow(`ai-${i}`).bed, w.bed); // stable
+    for (const h of [12, 14, 17]) assert.equal(t.isAwakeAt({ id: `ai-${i}` }, h), true);
+    for (const h of [1, 2, 3, 4, 5]) assert.equal(t.isAwakeAt({ id: `ai-${i}` }, h), false);
+  }
+  assert.ok(wins.size >= 6, `only ${wins.size} distinct windows`);
+});
