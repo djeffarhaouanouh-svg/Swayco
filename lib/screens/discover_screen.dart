@@ -2058,19 +2058,31 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
       if (p.bio.trim().isNotEmpty) ...[
         _reveal(
           next(),
-          TranslatedProfileText(
-            text: p.bio.trim(),
-            profileId: p.id,
-            field: 'bio',
-            fromLang: p.language,
-            showNote: true,
-            style: TextStyle(
-              color: SC.light
-                  ? const Color(0xB804123A)
-                  : const Color(0xCCFFFFFF),
-              fontSize: 13,
-              height: 1.45,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                AppStrings.t('profile_bio_section').toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: bentoLabelStyle(),
+              ),
+              const SizedBox(height: 6),
+              TranslatedProfileText(
+                text: p.bio.trim(),
+                profileId: p.id,
+                field: 'bio',
+                fromLang: p.language,
+                showNote: true,
+                style: TextStyle(
+                  color: SC.light
+                      ? const Color(0xB804123A)
+                      : const Color(0xCCFFFFFF),
+                  fontSize: 13,
+                  height: 1.45,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 14),

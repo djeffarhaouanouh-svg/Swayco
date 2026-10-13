@@ -1889,20 +1889,34 @@ class _IdentitySection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 22, 18, 0),
             child: InfoGlassFrame(
-              child: TranslatedProfileText(
-                // Traduite dans la langue de l'interface quand elle diffère de
-                // celle que le pair parle.
-                text: bio,
-                profileId: personalInfo?.id ?? handle,
-                field: 'bio',
-                fromLang: personalInfo?.language ?? '',
-                showNote: true,
-                textAlign: TextAlign.start,
-                style: TextStyle(
-                  color: SC.textPrimary,
-                  fontSize: 15,
-                  height: 1.4,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Un titre, comme les autres blocs : sans lui on ne voit pas
+                  // d'où sort ce texte.
+                  Text(
+                    AppStrings.t('profile_bio_section').toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: bentoLabelStyle(),
+                  ),
+                  const SizedBox(height: 8),
+                  TranslatedProfileText(
+                    // Traduite dans la langue de l'interface quand elle diffère
+                    // de celle que le pair parle.
+                    text: bio,
+                    profileId: personalInfo?.id ?? handle,
+                    field: 'bio',
+                    fromLang: personalInfo?.language ?? '',
+                    showNote: true,
+                    textAlign: TextAlign.start,
+                    style: TextStyle(
+                      color: SC.textPrimary,
+                      fontSize: 15,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
