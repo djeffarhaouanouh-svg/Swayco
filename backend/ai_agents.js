@@ -503,18 +503,29 @@ async function autoWelcome(ctx) {
       cands.sort((a, b) => (b.gender !== user.gender) - (a.gender !== user.gender));
     }
     let picked = 0;
+    // Jamais deux comptes au meme prenom pour une meme personne (deux
+    // « Johanna » allemandes qui l'ajoutent, ca sent le faux), et les likes
+    // d'un meme lot sont espaces d'au moins 15 min, pas simultanes.
+    const usedNames = new Set();
+    let lastRun = Date.now() + (10 + rnd(80)) * 60000;
     for (const ai of cands) {
       if (picked >= need) break;
+      const nameKey = String(ai.display_name || '').trim().toLowerCase();
+      if (nameKey && usedNames.has(nameKey)) continue;
       if ((await autoLikesToday(sb, ai.id)) >= AUTO_LIKES_PER_DAY) continue;
       const { data: fr } = await sb.from('friendships').select('id')
         .or(`and(requester.eq.${ai.id},addressee.eq.${user.id}),and(requester.eq.${user.id},addressee.eq.${ai.id})`)
         .limit(1);
       if (fr && fr.length) continue;
-      const runAt = new Date(Date.now() + (10 + rnd(80)) * 60000).toISOString();
+      const runAt = new Date(lastRun).toISOString();
       const ins = await sb.from('ai_actions').insert({
         ai_id: ai.id, target_id: user.id, kind: 'like', source: 'auto', run_at: runAt,
       });
-      if (!ins.error) { picked++; queued++; }
+      if (!ins.error) {
+        picked++; queued++;
+        if (nameKey) usedNames.add(nameKey);
+        lastRun += (15 + rnd(30)) * 60000;
+      }
     }
   }
   return queued;
