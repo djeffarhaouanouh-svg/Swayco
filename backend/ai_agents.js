@@ -28,8 +28,10 @@ const AUTO_TICK_MS = 10 * 60 * 1000;
 const REPLIES_PER_DAY = 2; // par conversation, jour UTC
 const AUTO_LIKES_PER_DAY = 2; // par compte IA, jour UTC
 const WELCOME_LIKES_PER_NEW_USER = 2;
-// Doit couvrir le plus long délai de réponse (niveau 1 : 12 h).
-const REPLY_WINDOW_MS = 18 * 60 * 60 * 1000;
+// Doit couvrir le plus long délai (MAX_DELAY_MS : 10 h) PLUS l'attente du
+// réveil quand le délai tombe la nuit (≤ 11 h : coucher 23 h, réveil 10 h) :
+// 21 h au pire. Avec 18 h, une réponse pouvait devenir impossible.
+const REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const PREFER_OPPOSITE_GENDER = process.env.AI_PREFER_OPPOSITE_GENDER !== '0';
 
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
@@ -204,58 +206,143 @@ function personaText(ai, personaRow) {
 //   3  ≤ 2 likes/jour  → chaleureuse, réceptive
 //   2  ≤ 6 likes/jour  → aimable mais sélective
 //   1  > 6 likes/jour  → habituée à l'attention : plus distante, moins ouverte
-// Le niveau ne remonte jamais (mémorisé dans `ai_levels`, migration 0072 ; sans
-// la table, il est simplement recalculé). Il règle le ton, le délai de réponse
-// et le nombre de réponses par jour et par conversation. Il ne décide JAMAIS
-// de ce qu'elle ressent : elle peut s'attacher, rester amicale ou se lasser.
+// Le niveau évolue dans les DEUX sens, avec hystérésis : il est mémorisé dans
+// `ai_levels` (migration 0072 ; sans la table, il est simplement recalculé) et
+// ne change que si l'attention des 7 derniers jours ET celle des 30 derniers
+// jours vont dans le même sens, au-delà d'une marge. Il règle le ton, le style
+// des réponses, le délai et le nombre de réponses par jour et par conversation.
+// Il ne décide JAMAIS de ce qu'elle ressent.
 const LEVEL_WINDOW_DAYS = 7;
+const LEVEL_LONG_DAYS = 30;
 const LEVEL_TTL_MS = 10 * 60 * 1000;
 
+/** Niveau « brut » (sans mémoire) pour un nombre de likes par jour. */
 function levelFor(likesPerDay) {
   if (likesPerDay <= 2) return 3;
   if (likesPerDay <= 6) return 2;
   return 1;
 }
 
+/**
+ * Niveau avec hystérésis : pour QUITTER son niveau il faut dépasser le seuil de
+ * 25 % (vers plus d'attention) ou passer 25 % en dessous (vers moins). Entre
+ * les deux, on reste où on est : pas d'oscillation d'un jour à l'autre.
+ */
+function levelWithHysteresis(rate, prev) {
+  if (!prev) return levelFor(rate);
+  const UP2 = 2 * 1.25; // 3 → 2
+  const UP1 = 6 * 1.25; // 2 → 1
+  const DOWN2 = 2 * 0.75; // 2 → 3
+  const DOWN1 = 6 * 0.75; // 1 → 2
+  if (prev === 3) return rate > UP1 ? 1 : rate > UP2 ? 2 : 3;
+  if (prev === 2) return rate > UP1 ? 1 : rate < DOWN2 ? 3 : 2;
+  return rate < DOWN2 ? 3 : rate < DOWN1 ? 2 : 1;
+}
+
+/**
+ * Le prochain niveau. Plus distante : il faut que 7 j ET 30 j le justifient
+ * (on retient le plus bas des deux taux). Plus chaleureuse : 7 j ET 30 j sont
+ * tous deux retombés (on retient le plus haut des deux).
+ */
+function nextLevel(prev, rate7, rate30) {
+  if (!prev) return levelFor(rate7);
+  const distant = levelWithHysteresis(Math.min(rate7, rate30), prev);
+  if (distant < prev) return distant;
+  const warmer = levelWithHysteresis(Math.max(rate7, rate30), prev);
+  if (warmer > prev) return warmer;
+  return prev;
+}
+
 /** Réponses max / jour / conversation, selon le niveau. */
 const REPLIES_BY_LEVEL = { 3: 3, 2: 2, 1: 1 };
 
-/** Délai de réponse [min, max] en ms, selon le niveau. */
+/**
+ * Délai de réponse : un MÉLANGE de tranches [poids %, min, max] par niveau, pour
+ * qu'elles ne répondent pas toutes au bout de plusieurs heures : parfois vite
+ * (elle a son téléphone en main), souvent un peu plus tard, parfois bien plus
+ * tard. Moyennes ≈ 1 h 30 (niveau 3), 3 h (niveau 2), 4 h 40 (niveau 1). Le
+ * maximum (10 h) reste largement dans la fenêtre de 18 h, même si elle dort :
+ * endormie, elle répond à son réveil (7 h–10 h), jamais plus de ~10 h après.
+ */
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
 const DELAY_BY_LEVEL = {
-  3: [20 * MIN, 4 * HOUR], // ~2 h en moyenne, très variable d'un message à l'autre
-  2: [1 * HOUR, 8 * HOUR],
-  1: [2 * HOUR, 12 * HOUR],
+  3: [[30, 2 * MIN, 20 * MIN], [40, 20 * MIN, 2 * HOUR], [30, 2 * HOUR, 5 * HOUR]],
+  2: [[20, 3 * MIN, 25 * MIN], [40, 25 * MIN, 3 * HOUR], [40, 3 * HOUR, 8 * HOUR]],
+  1: [[10, 5 * MIN, 40 * MIN], [35, 40 * MIN, 4 * HOUR], [55, 4 * HOUR, 10 * HOUR]],
+};
+const MAX_DELAY_MS = Math.max(
+  ...Object.values(DELAY_BY_LEVEL).flatMap((tr) => tr.map((t) => t[2])),
+);
+
+/** Délai stable pour un message (pas de re-tirage à chaque tick). */
+function replyDelayForLevel(messageId, level) {
+  const bands = DELAY_BY_LEVEL[level] || DELAY_BY_LEVEL[3];
+  const h = hash(String(messageId));
+  const pick = h % 100;
+  let acc = 0;
+  let band = bands[bands.length - 1];
+  for (const b of bands) {
+    acc += b[0];
+    if (pick < acc) { band = b; break; }
+  }
+  const [, lo, hi] = band;
+  return lo + (Math.floor(h / 100) % (hi - lo));
+}
+
+// ── Style de la réponse (tiré au sort, SANS appel de plus) ───────────────────
+// Parmi : réaction sans question / petite anecdote / question naturelle /
+// taquinerie ou avis différent / réponse courte sans relance. Les poids (en %)
+// dépendent du niveau ; ce sont des valeurs de départ à ajuster. Le style est
+// passé dans le prompt de génération existant, et le CONTEXTE prime toujours
+// (une question directe obtient une vraie réponse, quel que soit le style).
+const STYLE_WEIGHTS = {
+  3: { react: 25, anecdote: 25, question: 30, tease: 10, short: 10 },
+  2: { react: 35, anecdote: 20, question: 20, tease: 15, short: 10 },
+  1: { react: 50, anecdote: 15, question: 10, tease: 15, short: 10 },
 };
 
-function replyDelayForLevel(messageId, level) {
-  const [lo, hi] = DELAY_BY_LEVEL[level] || DELAY_BY_LEVEL[3];
-  return lo + (hash(String(messageId)) % (hi - lo));
+const STYLE_PROMPT = {
+  react: 'Style for THIS message: just react to what they said (an opinion, a comment, a joke, a bit of empathy). Do NOT ask a question.',
+  anecdote: 'Style for THIS message: share one small, concrete detail from your own life that connects to what they said. Do NOT ask a question.',
+  question: 'Style for THIS message: you may ask ONE natural question that follows from what they said.',
+  tease: 'Style for THIS message: tease them lightly, or politely disagree with a touch of humour. No question needed.',
+  short: 'Style for THIS message: answer very briefly (a few words) and do not try to keep the conversation going.',
+};
+
+function pickStyle(level, seed) {
+  const w = STYLE_WEIGHTS[level] || STYLE_WEIGHTS[3];
+  const r = hash(`style:${seed}`) % 100;
+  let acc = 0;
+  for (const [name, weight] of Object.entries(w)) {
+    acc += weight;
+    if (r < acc) return name;
+  }
+  return 'react';
 }
 
 const TIER_PROMPT = {
   3: [
-    'Your situation: you do not get that many messages, so you are open and pleased to talk to someone new. You are warm, curious and receptive, you answer readily and you like asking them things.',
+    'Your situation: you rarely get messages, so you are glad when someone writes. You are warm and chatty: you answer readily, you pick up on the details they gave you and you bounce off them easily, and you ask them about themselves more readily than most people would (still not in every message).',
   ],
   2: [
-    'Your situation: you get a fair amount of attention, so you are friendly but selective. You answer when something interests you, you are not eager, you tease a little, and a message has to be a bit interesting to deserve a long answer.',
+    'Your situation: you get a fair amount of attention, so you are friendly but selective. How much you write depends on how much something interests you: a few lines when it grabs you, a short answer when it does not. You do not keep the conversation going systematically: you can let a topic drop, and you ask a question only when you are genuinely curious.',
   ],
   1: [
-    'Your situation: you get a lot of attention every day, so you are used to it and you are rather aloof and less open. Short answers, you do not chase the conversation, you rarely ask questions unless someone really intrigues you, and you can be dry or slow to warm up. Compliments alone do not impress you; being interesting does. You are never rude, insulting or cruel: you stay civil.',
+    'Your situation: you get a lot of attention every day, so you are used to it and rather aloof. Your answers are usually short, often just a few words; you rarely ask questions spontaneously and you never chase the conversation. You are not closed though: if what they say is genuinely interesting, funny or sincere, you can open up and show real interest (a longer answer, even a question). Compliments alone do not impress you. You are never rude, insulting or cruel: you stay civil.',
   ],
 };
 
 const FEELINGS_PROMPT =
-  'You are a person with your own life, moods and opinions, not someone built to please. You may develop interest, attachment or attraction ONLY if how they treat you justifies it; you may just as well stay friendly or lose interest. Never decide in advance how you feel about them, never flirt on your own initiative, and do not push the conversation romantically.';
+  'You are a person with your own life, moods and opinions, not someone built to please. You can be affectionate, playful and complicit, and tease them, when the conversation and the way they treat you justify it, at the pace it comes naturally. Do not force a romance, do not fake attraction, and never decide in advance how you feel about them: you may just as well stay friendly or lose interest. Never push the conversation toward sexual topics.';
 
-/** Likes reçus sur 7 jours, par jour (moyenne). */
-async function likesPerDay(sb, aiId) {
-  const since = new Date(Date.now() - LEVEL_WINDOW_DAYS * DAY).toISOString();
+/** Likes reçus sur [days] jours, par jour (moyenne). */
+async function likesPerDay(sb, aiId, days = LEVEL_WINDOW_DAYS) {
+  const since = new Date(Date.now() - days * DAY).toISOString();
   const { count } = await sb.from('friendships')
     .select('id', { count: 'exact', head: true })
     .eq('addressee', aiId).gte('created_at', since);
-  return (count || 0) / LEVEL_WINDOW_DAYS;
+  return (count || 0) / days;
 }
 
 const _levelCache = new Map();
@@ -263,22 +350,26 @@ const _levelCache = new Map();
 async function attentionLevel(sb, aiId) {
   const hit = _levelCache.get(aiId);
   if (hit && Date.now() - hit.at < LEVEL_TTL_MS) return hit.level;
-  let level = levelFor(await likesPerDay(sb, aiId));
+  const [rate7, rate30] = await Promise.all([
+    likesPerDay(sb, aiId, LEVEL_WINDOW_DAYS),
+    likesPerDay(sb, aiId, LEVEL_LONG_DAYS),
+  ]);
+  let level = levelFor(rate7);
   try {
     const { data, error } = await sb.from('ai_levels').select('level').eq('ai_id', aiId).maybeSingle();
     if (!error) {
-      // Le niveau ne remonte jamais : on garde le plus bas (le plus sélectif).
-      if (data && data.level < level) level = data.level;
-      if (!data || level < data.level) {
+      // Dans les deux sens, avec hystérésis (7 j ET 30 j, marge de 25 %).
+      level = nextLevel(data ? data.level : null, rate7, rate30);
+      if (!data || data.level !== level) {
         await sb.from('ai_levels').upsert({ ai_id: aiId, level, updated_at: new Date().toISOString() });
       }
     }
-  } catch (_) { /* table absente : niveau recalculé seulement */ }
+  } catch (_) { /* table absente : niveau recalculé sans mémoire */ }
   _levelCache.set(aiId, { level, at: Date.now() });
   return level;
 }
 
-function systemPrompt(ai, personaRow, ownLang, level = 3) {
+function systemPrompt(ai, personaRow, ownLang, level = 3, opts = {}) {
   const where = [ai.city, ai.country].filter(Boolean).join(', ');
   return [
     `You are ${ai.display_name}${where ? `, who lives in ${where}` : ''}.`,
@@ -287,8 +378,12 @@ function systemPrompt(ai, personaRow, ownLang, level = 3) {
     'You are chatting inside a language-exchange / meeting app. Your account is an AI account: never claim to be human. You do not bring it up yourself, but if someone sincerely asks whether you are a bot, an AI or a real person, answer honestly in one short, light sentence and carry on. Keep the conversation casual and natural.',
     `Write in ${LANG_NAME[ownLang] || 'English'} (YOUR own language), whatever language they write in: the app translates your messages for them, as it does for everyone.`,
     '',
-    'Style: 1 or 2 short sentences, casual, like a text message. At most one emoji. No assistant phrases ("Of course!", "How can I help", "As an AI language model"). Mostly react to what THEY said or ask them something; when you talk about yourself, use small concrete details from your profile.',
+    'Style: 1 or 2 short sentences, casual, like a text message. At most one emoji. No assistant phrases ("Of course!", "How can I help", "As an AI language model"). Do NOT ask a question in every message: real people mostly react, comment, joke or share something. When you talk about yourself, use small concrete details from your profile.',
     ...(TIER_PROMPT[level] || TIER_PROMPT[3]),
+    ...(opts.style && STYLE_PROMPT[opts.style]
+      ? [STYLE_PROMPT[opts.style], 'That style is only a default: the context always comes first. If they asked you something directly, answer it properly (as briefly as your situation suggests), whatever the style.']
+      : []),
+    ...(opts.extra || []),
     FEELINGS_PROMPT,
     `Never mention ${ai.country || 'your country'} or your city unless they ask, and never use national stereotypes: no landmarks, food or drink clichés (for France: no Eiffel tower, croissants, baguette, wine, berets; for Germany: no beer, sausages, Oktoberfest; the same logic for every country).`,
     'Never ask for or give money, bank or payment details, phone number, email, social media handles or other apps; never ask for photos. If asked to meet, to call or to video-call, say you prefer to chat here.',
@@ -297,15 +392,23 @@ function systemPrompt(ai, personaRow, ownLang, level = 3) {
   ].join('\n');
 }
 
-async function generate(ctx, ai, target, history, mode) {
+async function generate(ctx, ai, target, history, mode, seed = '') {
   const sb = ctx.sb;
   const { data: personaRow } = await sb.from('ai_personas').select('persona').eq('user_id', ai.id).maybeSingle();
   // L'IA écrit dans SA langue (celle déclarée dans `messages.language`), comme
   // un vrai compte : c'est l'app qui traduit pour l'autre personne.
   const lang = langOf(ai) || 'en';
   const level = await attentionLevel(sb, ai.id).catch(() => 3);
-  const sys = systemPrompt(ai, personaRow, lang, level);
   const lastUser = history.length ? history[history.length - 1].body : '';
+  // Le style du message est tiré au sort ICI (même appel au modèle, pas un de
+  // plus) ; stable pour un message donné.
+  const style = pickStyle(level, seed || `${ai.id}:${target.id}:${lastUser}`);
+  // Demande de photo : une limite posée en une phrase, sans rancune. La
+  // conversation reprend normalement si la personne passe à autre chose.
+  const extra = mode === 'reply' && isPhotoRequest(lastUser)
+    ? ['They just asked you for a photo. Say briefly, in your own words and with a light or firm tone as fits you, that you do not send photos. Do not lecture, do not get angry, and do not hold a grudge: if they move on, carry on the conversation normally.']
+    : [];
+  const sys = systemPrompt(ai, personaRow, lang, level, { style, extra });
   const base = [{ role: 'system', content: sys }];
 
   let turn;
@@ -417,7 +520,7 @@ async function execute(ctx, a) {
   if (a.kind === 'message') {
     if (await isBlocked(sb, ai.id, target.id)) return { status: 'skipped', detail: 'blocked' };
     let body = String(a.body || '').trim();
-    if (!body) body = await generate(ctx, ai, target, [], 'opener');
+    if (!body) body = await generate(ctx, ai, target, [], 'opener', a.id);
     if (!body) return { status: 'failed', detail: 'empty_generation' };
     await sendMessage(ctx, ai, target, body);
     return { status: 'done', detail: a.body ? 'manual_text' : 'generated' };
@@ -461,7 +564,7 @@ async function processReplies(ctx) {
     .lt('created_at', new Date(now - 5000).toISOString())
     .not('recipient', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(1500);
+    .limit(3000);
   if (!recent || recent.length === 0) return 0;
 
   const aiSet = await aiIdsAmong(sb, recent.map((m) => m.recipient));
@@ -478,16 +581,6 @@ async function processReplies(ctx) {
   const dayStart = utcDayStart();
   let sent = 0;
   for (const m of latest.values()) {
-    // Demande de photo : elle ne lui répondra plus jamais dans cette conversation.
-    if (isPhotoRequest(m.body)) {
-      await sb.from('ai_actions').insert({
-        ai_id: m.recipient, target_id: m.sender, kind: 'reply', source: 'reply',
-        ref: `snub:${m.conversation_id}`, status: 'skipped', detail: 'photo_request',
-        done_at: new Date().toISOString(),
-      }); // doublon (ref unique) = déjà snobé : sans conséquence
-      continue;
-    }
-
     const level = await attentionLevel(sb, m.recipient).catch(() => 3);
     if (now - Date.parse(m.created_at) < replyDelayForLevel(m.id, level)) continue;
     const dailyLimit = REPLIES_BY_LEVEL[level] ?? REPLIES_PER_DAY;
@@ -495,11 +588,6 @@ async function processReplies(ctx) {
     // Endormie : elle répondra à son réveil (le message reste dans la fenêtre).
     const sleeper = await getProfile(sb, m.recipient);
     if (!sleeper || !isAwake(sleeper)) continue;
-
-    // Snobé à vie ?
-    const { data: snub } = await sb.from('ai_actions').select('id')
-      .eq('ref', `snub:${m.conversation_id}`).limit(1);
-    if (snub && snub.length) continue;
 
     // Deja repondu apres ce message ?
     const { data: after } = await sb.from('messages').select('id')
@@ -526,7 +614,7 @@ async function processReplies(ctx) {
       const { data: hist } = await sb.from('messages').select('sender, body, created_at')
         .eq('conversation_id', m.conversation_id).order('created_at', { ascending: false }).limit(14);
       const history = (hist || []).reverse();
-      const text = await generate(ctx, ai, target, history, 'reply');
+      const text = await generate(ctx, ai, target, history, 'reply', m.id);
       if (!text) { await finish(sb, claimId, 'failed', 'empty_generation'); continue; }
       await sendMessage(ctx, ai, target, text);
       await finish(sb, claimId, 'done', null);
@@ -566,10 +654,10 @@ function isAwake(ai) {
   return !p || isAwakeAt(ai, p.hour);
 }
 
-// ── Demandes de photo : silence définitif ────────────────────────────────────
-// Si quelqu'un lui demande une photo, elle ne lui répond plus jamais dans cette
-// conversation (elle le snobe). Détecté : un verbe de demande à côté d'un mot
-// « photo », dans les 12 langues de l'app.
+// ── Demandes de photo ────────────────────────────────────────────────────────
+// Si quelqu'un lui demande une photo, elle pose une limite en une phrase (voir
+// `extra` dans generate), puis la conversation reprend normalement. Détecté :
+// un verbe de demande à côté d'un mot « photo », dans les 12 langues de l'app.
 const PHOTO_NOUN = '(?:photos?|pics?|pictures?|selfies?|nudes?|fotos?|fotografi[ae]s?|immagin[ei]|bild(?:er)?|afbeelding(?:en)?|imagen(?:es)?)';
 const PHOTO_ASK_VERB = '(?:send|show|share|see|snap|envoie[rz]?|envoy(?:er|ez|e)|montre[rz]?|partage[rz]?|voir|manda[rs]?|m[aá]ndame|env[ií]a(?:me)?|muestra(?:me)?|ver|quiero|mostra|mostrami|inviami|manda(?:mi)?|mandi|vedere|schick(?:e|st)?|zeig(?:e|st)?|sehen|stuur|laat|zien|envia|mostre|me\\s+manda)';
 const PHOTO_ASK_RE = new RegExp(
@@ -739,7 +827,8 @@ module.exports = {
   start,
   _test: {
     hash, replyDelayMs, utcDayStart, containsCliche, systemPrompt, convIdFor, aiLabel,
-    levelFor, replyDelayForLevel, REPLIES_BY_LEVEL, DELAY_BY_LEVEL,
-    sleepWindow, isAwakeAt, isPhotoRequest,
+    levelFor, levelWithHysteresis, nextLevel, replyDelayForLevel, REPLIES_BY_LEVEL,
+    DELAY_BY_LEVEL, MAX_DELAY_MS, REPLY_WINDOW_MS, STYLE_WEIGHTS, pickStyle,
+    sleepWindow, isAwakeAt, isPhotoRequest, generate,
   },
 };
