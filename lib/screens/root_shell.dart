@@ -269,6 +269,7 @@ class _RootShellState extends State<RootShell> {
       }
       final fresh = ids.difference(_knownMatchIds);
       _knownMatchIds = ids;
+      if (fresh.isNotEmpty) MatchCelebration.matchesChanged.value++;
       for (final id in fresh) {
         MatchCelebration.offer(id);
       }

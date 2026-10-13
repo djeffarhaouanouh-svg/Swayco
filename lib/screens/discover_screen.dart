@@ -513,6 +513,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _bootstrap();
     _maybeShowSwipeCoach();
     _pollTimer = WebPoll.every(const Duration(seconds: 12), _refreshFriendships);
+    // Un nouveau match (annoncé par le shell, en temps réel) : on retire cette
+    // personne du paquet tout de suite, sans sondage sur mobile.
+    MatchCelebration.matchesChanged.addListener(_refreshFriendships);
     // Warm up the "Discover" interstitial (shown when a country bubble is
     // switched on) and the rewarded video (Likes unlock) in the background.
     // No-ops for Pro subscribers and never blocks/throws on failure.
@@ -531,6 +534,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   void dispose() {
     NavChrome.show();
     _pollTimer?.cancel();
+    MatchCelebration.matchesChanged.removeListener(_refreshFriendships);
     super.dispose();
   }
 

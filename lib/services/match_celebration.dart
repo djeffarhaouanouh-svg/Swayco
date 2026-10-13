@@ -12,6 +12,10 @@ abstract final class MatchCelebration {
   static final ValueNotifier<String?> pendingPeerId =
       ValueNotifier<String?>(null);
 
+  /// Bumped each time the shell sees a brand-new match, so other screens (the
+  /// Discover deck) can re-read my friendships once instead of polling.
+  static final ValueNotifier<int> matchesChanged = ValueNotifier<int>(0);
+
   static final Set<String> _alreadyShown = <String>{};
 
   /// Peers whose match was already celebrated (this session or an earlier one).
