@@ -649,6 +649,28 @@ async function processReplies(ctx) {
     if (!latest.has(m.conversation_id)) latest.set(m.conversation_id, m);
   }
 
+  // Insulte (n'importe quel message récent, pas seulement le dernier) : la
+  // conversation est réduite au silence, définitivement.
+  const insulted = new Map(); // conversation → premier message injurieux
+  for (const m of recent) {
+    if (!aiSet.has(m.recipient) || aiSet.has(m.sender) || !isInsult(m.body)) continue;
+    if (!insulted.has(m.conversation_id)) insulted.set(m.conversation_id, m);
+  }
+  if (insulted.size) {
+    // Une seule écriture par conversation : on retire celles déjà notées.
+    const refs = [...insulted.keys()].map((c) => `snub:${c}`);
+    const { data: known } = await sb.from('ai_actions').select('ref').in('ref', refs);
+    const done = new Set((known || []).map((r) => r.ref));
+    for (const [conv, m] of insulted) {
+      if (done.has(`snub:${conv}`)) continue;
+      await sb.from('ai_actions').insert({
+        ai_id: m.recipient, target_id: m.sender, kind: 'reply', source: 'reply',
+        ref: `snub:${conv}`, status: 'skipped', detail: 'abuse',
+        done_at: new Date().toISOString(),
+      }); // course entre deux ticks : le ref unique évite le doublon
+    }
+  }
+
   const dayStart = utcDayStart();
   let sent = 0;
   for (const m of latest.values()) {
@@ -662,6 +684,11 @@ async function processReplies(ctx) {
       const sleeper = await getProfile(sb, m.recipient);
       if (!sleeper || !isAwake(sleeper)) continue;
     }
+
+    // Réduit au silence après une insulte ?
+    const { data: snub } = await sb.from('ai_actions').select('id')
+      .eq('ref', `snub:${m.conversation_id}`).limit(1);
+    if (snub && snub.length) continue;
 
     // Deja repondu apres ce message ?
     const { data: after } = await sb.from('messages').select('id')
@@ -750,6 +777,30 @@ const PHOTO_ASK_RE = new RegExp(
   'i',
 );
 const PHOTO_ASK_NONLATIN = /(?:пришли|покажи|скинь|отправь|можно)[^\n]{0,30}(?:фото|селфи)|(?:фото|селфи)[^\n]{0,30}(?:пришли|покажи|скинь|отправь)|(?:发|给我|看看|看一下|发给我)[^\n]{0,10}(?:照片|相片|自拍)|(?:照片|相片|自拍)[^\n]{0,10}(?:发|给我|看看)|(?:写真|画像|自撮り)[^\n]{0,12}(?:見せ|送っ|ください|ちょうだい|欲しい)|(?:見せ|送っ)[^\n]{0,8}(?:写真|画像|自撮り)|사진[^\n]{0,12}(?:보내|보여|줘|주세요)|(?:보내|보여)[^\n]{0,8}사진|(?:ارسل|أرسل|ابعت|ابعثي|أرني|ارني|صور)[^\n]{0,15}(?:صورة|صورك|صور)|(?:صورة|صورك)[^\n]{0,15}(?:ارسل|أرسل|ابعت|ابعثي|أرني)/i;
+
+// ── Insultes : silence définitif dans la conversation ────────────────────────
+// Si quelqu'un l'insulte, elle ne lui répond plus jamais dans cette
+// conversation. Liste volontairement limitée aux insultes DIRECTES et sans
+// ambiguïté (« putain » ou « puta madre » seuls sont des interjections, pas
+// des insultes : exclus).
+const INSULT_LATIN = new RegExp(
+  '\\b(?:' + [
+    'salope', 'pute', 'connard(?:e)?', 'encul[ée]e?', 'fils de pute', 'ta gueule', 'nique ta m[èe]re', 'va te faire foutre', 'sale chienne',
+    'bitch', 'whore', 'slut', 'asshole', 'cunt', 'fuck you', 'shut the fuck up', 'dumb bitch',
+    'hijo de puta', 'hija de puta', 'una puta', 'hdp', 'hijueputa', 'malparida', 'gonorrea', 'cállate',
+    'vadia', 'filho da puta', 'piranha', 'vai se foder', 'cala a boca',
+    'puttana', 'troia', 'stronzo', 'vaffanculo', 'figlio di puttana',
+    'hure', 'fotze', 'arschloch', 'schlampe', 'halt die fresse',
+    'hoer', 'klootzak', 'kankerhoer', 'flikker',
+  ].join('|') + ')\\b',
+  'i',
+);
+const INSULT_NONLATIN = /сука|шлюха|блядь|пиздец тебе|иди на хуй|婊子|操你|傻逼|死ね|くたばれ|ビッチ|씨발|창녀|개새끼|병신|شرموطة|ابن الكلب|ابن العاهرة|يا كلب/i;
+
+function isInsult(text) {
+  const s = String(text || '');
+  return INSULT_LATIN.test(s) || INSULT_NONLATIN.test(s);
+}
 
 function isPhotoRequest(text) {
   const s = String(text || '');
@@ -914,6 +965,6 @@ module.exports = {
     hash, replyDelayMs, utcDayStart, containsCliche, systemPrompt, convIdFor, aiLabel,
     levelFor, levelWithHysteresis, nextLevel, replyDelayForLevel, REPLIES_BY_LEVEL,
     DELAY_BY_LEVEL, MAX_DELAY_MS, REPLY_WINDOW_MS, STYLE_WEIGHTS, pickStyle,
-    sleepWindow, isAwakeAt, isPhotoRequest, generate, tidyReply, cleanPersona, localClock,
+    sleepWindow, isAwakeAt, isPhotoRequest, isInsult, generate, tidyReply, cleanPersona, localClock,
   },
 };

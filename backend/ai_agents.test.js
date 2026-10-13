@@ -292,3 +292,17 @@ test('the AI knows the bio shown on her card (once, only when a persona exists)'
   // Sans bio : rien ne change.
   assert.doesNotMatch(t.systemPrompt(AI, { persona: 'x' }, 'es', 3), /profile bio/);
 });
+
+test('insults are detected (silence for good); interjections, jokes and normal talk are not', () => {
+  const yes = [
+    'T\'es qu\'une salope', 'espèce de connard', 'ferme ta gueule', 'ta gueule', 'you are a bitch', 'fuck you', 'shut the fuck up',
+    'eres una puta', 'hijo de puta', 'cállate', 'sua vadia', 'vai se foder', 'sei una puttana', 'vaffanculo', 'du bist ein arschloch',
+    'jij bent een klootzak', 'ты сука', '你这个婊子', 'くたばれ', '씨발', 'يا كلب',
+  ];
+  const no = [
+    'putain trop bien ce match', 'putain', 'la puta madre qué golazo', 'ça va ?', 'hola, qué tal', 'tu fais quoi ce soir ?',
+    'PD: te llamo mañana', 'I love my dog', 'bonne nuit', 'merci beaucoup', 'tu es belle', 'j\'adore ta photo',
+  ];
+  for (const s of yes) assert.equal(t.isInsult(s), true, s);
+  for (const s of no) assert.equal(t.isInsult(s), false, s);
+});
