@@ -252,11 +252,19 @@ class _RootShellState extends State<RootShell> {
       final peers = await FriendshipApi.fetchMatches(myId);
       final ids = {for (final p in peers) p.id};
       if (!_matchWatchPrimed) {
-        // First read is the baseline — don't replay every past match.
-        for (final id in ids) {
-          MatchCelebration.markShown(id);
-        }
+        // Matches celebrated in an earlier session are remembered on disk, so
+        // one made while the app was closed (an AI accepting my like) shows
+        // its celebration now. With nothing stored yet (first launch), the
+        // matches found are the baseline — don't replay every past match.
+        final hadHistory = await MatchCelebration.restore();
+        final unseen = hadHistory
+            ? ids.difference(MatchCelebration.shown)
+            : <String>{};
+        if (!hadHistory) await MatchCelebration.seed(ids);
         _knownMatchIds = ids;
+        for (final id in unseen) {
+          MatchCelebration.offer(id);
+        }
         return;
       }
       final fresh = ids.difference(_knownMatchIds);
