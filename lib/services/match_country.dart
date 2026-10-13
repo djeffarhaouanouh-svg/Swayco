@@ -26,6 +26,8 @@ class MatchCountry {
 /// Les pays dont la clé `country_xx_au` existe dans les 12 langues.
 const Set<String> kMatchCountryCodes = {
   'jp', 'br', 'kr', 'es', 'ma', 'ca', 'fr', 'de', 'be', 'se', 'sn',
+  'ch', 'us', 'gb', 'ie', 'au', 'mx', 'ar', 'co', 'pt', 'it', 'nl', 'ru', 'cn',
+  'dz', 'tn', 'eg', 'sa', 'ae', 'ci', 'ph', 'in',
 };
 
 /// Le pays de [p] (nom stocké dans `profiles.country`, ou code ISO), ou null
