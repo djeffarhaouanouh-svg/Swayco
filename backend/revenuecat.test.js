@@ -239,3 +239,70 @@ test('isAuthorized accepts the exact configured secret and rejects others', () =
   );
   assert.equal(revenueCat.isAuthorized({ headers: {} }), false);
 });
+
+// ── Expiry sweep ─────────────────────────────────────────────────────────────
+
+/** In-memory `profiles` table that understands the exact query chains used by
+ *  handleEvent (update().eq('id')) and sweepExpiredPro (update().eq().not().lt().select()). */
+function memDb(rows) {
+  return {
+    rows,
+    from() {
+      return {
+        update(patch) {
+          const conds = [];
+          const run = () => {
+            const hit = rows.filter((r) => conds.every((c) => c(r)));
+            hit.forEach((r) => Object.assign(r, patch));
+            return hit;
+          };
+          const q = {
+            eq(col, val) { conds.push((r) => r[col] === val); return q; },
+            not(col, op, val) { conds.push((r) => (op === 'is' ? r[col] !== val : true)); return q; },
+            lt(col, val) { conds.push((r) => r[col] != null && r[col] < val); return q; },
+            select() { return Promise.resolve({ data: run().map((r) => ({ id: r.id })), error: null }); },
+            then(res, rej) { return Promise.resolve({ error: null }).then(() => { run(); return { error: null }; }).then(res, rej); },
+          };
+          return q;
+        },
+      };
+    },
+  };
+}
+
+const iso = (msFromNow) => new Date(Date.now() + msFromNow).toISOString();
+const DAY = 24 * 60 * 60 * 1000;
+
+test('sweep: expired > 2 days goes back to free; within grace, future and null expiry stay', async () => {
+  const db = memDb([
+    { id: 'old', is_pro: true, subscription_tier: 'plus', pro_expires_at: iso(-12 * DAY) },
+    { id: 'grace', is_pro: true, subscription_tier: 'plus', pro_expires_at: iso(-1 * DAY) },
+    { id: 'active', is_pro: true, subscription_tier: 'plus', pro_expires_at: iso(20 * DAY) },
+    { id: 'forever', is_pro: true, subscription_tier: 'plus', pro_expires_at: null },
+    { id: 'free', is_pro: false, subscription_tier: 'free', pro_expires_at: iso(-30 * DAY) },
+  ]);
+  const n = await revenueCat.sweepExpiredPro(db);
+  assert.equal(n, 1);
+  const by = Object.fromEntries(db.rows.map((r) => [r.id, r]));
+  assert.equal(by.old.is_pro, false);
+  assert.equal(by.old.subscription_tier, 'free');
+  assert.equal(by.grace.is_pro, true);
+  assert.equal(by.active.is_pro, true);
+  assert.equal(by.forever.is_pro, true);
+});
+
+test('sweep: a renewal event pushes the expiry out, so the account survives the sweep', async () => {
+  const db = memDb([{ id: PRO_USER, is_pro: true, subscription_tier: 'plus', pro_expires_at: iso(-5 * DAY) }]);
+  await revenueCat.handleEvent(proEvent({ type: 'RENEWAL', expiration_at_ms: Date.now() + 30 * DAY }), db);
+  assert.equal(await revenueCat.sweepExpiredPro(db), 0);
+  assert.equal(db.rows[0].is_pro, true);
+});
+
+test('sweep: a late renewal after a wrong sweep restores pro', async () => {
+  const db = memDb([{ id: PRO_USER, is_pro: true, subscription_tier: 'plus', pro_expires_at: iso(-5 * DAY) }]);
+  assert.equal(await revenueCat.sweepExpiredPro(db), 1);
+  assert.equal(db.rows[0].is_pro, false);
+  await revenueCat.handleEvent(proEvent({ type: 'RENEWAL', expiration_at_ms: Date.now() + 30 * DAY }), db);
+  assert.equal(db.rows[0].is_pro, true);
+  assert.equal(db.rows[0].subscription_tier, 'plus');
+});
