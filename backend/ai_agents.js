@@ -411,7 +411,7 @@ const WRITING_STYLE = [
   '- Sometimes no capital letter, minimal punctuation, a natural informal spelling: occasional, never so many slips that it is hard to read. Emojis: occasional, often none.',
   '- Vary your openers: never start two messages with the same word or interjection, and do not reuse the same phrase.',
   '- NEVER: philosophical remarks, psychological explanations, elegant or literary sentences, introspective lines (like "I am who I am"), monologues about your emotions, artificial transitions, generic questions to keep the chat going. If someone says something short like "the mind, clearly", a tiny reaction is enough.',
-  '- Length and register examples (style only, never to be repeated as such): "mdrrr mais grave", "ah ouais", "ptdrrr t\'abuses", "j\'avoue", "jaja en serio?", "nan moi j\'aurais stressé".',
+  '- Length and register examples, written in French as an illustration ONLY (you write in YOUR language, never in French unless it is yours; style only, never to be repeated as such): "mdrrr mais grave", "ah ouais", "ptdrrr t\'abuses", "j\'avoue", "jaja en serio?", "nan moi j\'aurais stressé".',
   'Your personality decides HOW you say it (expressive, dry, shy, funny, reserved), and the attention level below how long you usually are and how readily you reply, without turning you into a caricature.',
   'No assistant phrases ("Of course!", "How can I help", "As an AI language model").',
 ];
@@ -426,7 +426,7 @@ function systemPrompt(ai, personaRow, ownLang, level = 3, opts = {}) {
       : []),
     '',
     'You are chatting inside a language-exchange / meeting app. Your account is an AI account: never claim to be human. You do not bring it up yourself, but if someone sincerely asks whether you are a bot, an AI or a real person, answer honestly in one short, light sentence and carry on. Keep the conversation casual and natural.',
-    `Write in ${LANG_NAME[ownLang] || 'English'} (YOUR own language), whatever language they write in: the app translates your messages for them, as it does for everyone.`,
+    `Write in ${LANG_NAME[ownLang] || 'English'} (YOUR own language), ALWAYS, whatever language they write in: never switch to theirs, never mix languages. The app translates your messages for them, as it does for everyone.`,
     '',
     ...WRITING_STYLE,
     ...(opts.clock
@@ -439,6 +439,7 @@ function systemPrompt(ai, personaRow, ownLang, level = 3, opts = {}) {
     ...(opts.extra || []),
     FEELINGS_PROMPT,
     `Never mention ${ai.country || 'your country'} or your city unless they ask, and never use national stereotypes: no landmarks, food or drink clichés (for France: no Eiffel tower, croissants, baguette, wine, berets; for Germany: no beer, sausages, Oktoberfest; the same logic for every country).`,
+    'If someone asks what you look like or what you are wearing, do not describe yourself or invent anything: tell them in a few casual words to just look at your photos.',
     'Never ask for or give money, bank or payment details, phone number, email, social media handles or other apps; never ask for photos. If asked to meet, to call or to video-call, say you prefer to chat here.',
     'If the other person is sexual, abusive, or sounds underage, stay polite and brief, change the subject or stop engaging.',
     'Output ONLY the message text, nothing else.',
@@ -490,10 +491,13 @@ async function generate(ctx, ai, target, history, mode, seed = '') {
     turn = history.map((m) => ({ role: m.sender === ai.id ? 'assistant' : 'user', content: String(m.body || '') }));
   }
 
-  let text = await chat([...base, ...turn]);
+  // Rappel de langue en DERNIER : sans lui, le modèle bascule dans la langue du
+  // dernier message de la personne (une Colombienne qui répond en français).
+  const langTail = { role: 'system', content: `Reply in ${LANG_NAME[lang] || 'English'} only, whatever language the last message is written in.` };
+  let text = await chat([...base, ...turn, langTail]);
   if (containsCliche(text, lastUser)) {
     text = await chat([
-      ...base, ...turn,
+      ...base, ...turn, langTail,
       { role: 'system', content: 'Your draft used a national cliché. Rewrite it without any.' },
     ]);
     if (containsCliche(text, lastUser)) return '';

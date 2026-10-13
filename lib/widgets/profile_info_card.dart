@@ -418,29 +418,35 @@ class _Scaled extends StatelessWidget {
               alignment: Alignment.bottomLeft,
               child: age == null
                   ? (card.editable ? add() : dash())
-                  : Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '$age',
-                          style: TextStyle(
-                            color: pal.age,
-                            fontSize: _u(92) * 1.1 * g,
-                            height: .85,
-                            fontWeight: FontWeight.w900,
+                  // Se réduit s'il le faut : « 24 ans » ne doit jamais
+                  // dépasser de la tuile (écran étroit, grosse police).
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.bottomLeft,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$age',
+                            style: TextStyle(
+                              color: pal.age,
+                              fontSize: _u(92) * 1.1 * g,
+                              height: .85,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
-                        ),
-                        SizedBox(width: _u(8)),
-                        Text(
-                          AppStrings.t('info_years'),
-                          style: TextStyle(
-                            color: pal.ageUnit,
-                            fontSize: _t(20),
+                          SizedBox(width: _u(8)),
+                          Text(
+                            AppStrings.t('info_years'),
+                            style: TextStyle(
+                              color: pal.ageUnit,
+                              fontSize: _t(20),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
             ),
           ),
