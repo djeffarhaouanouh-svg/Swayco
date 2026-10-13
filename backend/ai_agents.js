@@ -195,14 +195,14 @@ function personaText(ai, personaRow) {
   return bits.join(' ; ') || 'une personne ordinaire, curieuse des autres';
 }
 
-function systemPrompt(ai, personaRow, targetLang) {
+function systemPrompt(ai, personaRow, ownLang) {
   const where = [ai.city, ai.country].filter(Boolean).join(', ');
   return [
     `You are ${ai.display_name}${where ? `, who lives in ${where}` : ''}.`,
     `About you: ${personaText(ai, personaRow)}`,
     '',
     'You are chatting inside a language-exchange / meeting app. Your account is an AI account and the app labels it "AI" next to your name: never claim to be human. If someone asks whether you are a bot / an AI / real, answer honestly in one short light sentence.',
-    `Write in ${LANG_NAME[targetLang] || 'English'} (the other person's language), whatever language they write in.`,
+    `Write in ${LANG_NAME[ownLang] || 'English'} (YOUR own language), whatever language they write in: the app translates your messages for them, as it does for everyone.`,
     '',
     'Style: 1 or 2 short sentences, casual, like a text message. At most one emoji. No assistant phrases ("Of course!", "How can I help", "As an AI language model"). Mostly react to what THEY said or ask them something; when you talk about yourself, use small concrete details from your profile.',
     `Never mention ${ai.country || 'your country'} or your city unless they ask, and never use national stereotypes: no landmarks, food or drink clichés (for France: no Eiffel tower, croissants, baguette, wine, berets; for Germany: no beer, sausages, Oktoberfest; the same logic for every country).`,
@@ -215,7 +215,9 @@ function systemPrompt(ai, personaRow, targetLang) {
 async function generate(ctx, ai, target, history, mode) {
   const sb = ctx.sb;
   const { data: personaRow } = await sb.from('ai_personas').select('persona').eq('user_id', ai.id).maybeSingle();
-  const lang = langOf(target) || 'en';
+  // L'IA écrit dans SA langue (celle déclarée dans `messages.language`), comme
+  // un vrai compte : c'est l'app qui traduit pour l'autre personne.
+  const lang = langOf(ai) || 'en';
   const sys = systemPrompt(ai, personaRow, lang);
   const lastUser = history.length ? history[history.length - 1].body : '';
   const base = [{ role: 'system', content: sys }];
