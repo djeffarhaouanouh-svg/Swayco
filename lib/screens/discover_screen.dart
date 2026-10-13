@@ -119,9 +119,39 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   bool _feedLoading = true;
   final List<({RemoteProfile profile, List<String> photos})> _cards = [];
 
+  /// People I'm already matched with: they never belong in the deck, whether
+  /// it came from the live feed, today's cached deck, or was loaded before the
+  /// match happened.
+  Set<String> get _matchedPeerIds => {
+        for (final f in _myFriendships)
+          if (f.status == 'accepted' && f.peerOf(_myId).isNotEmpty)
+            f.peerOf(_myId),
+      };
+
+  /// A match landed while this deck was on screen (an AI accepting my like,
+  /// say): take that person out of the stack, keeping the current card in
+  /// place.
+  void _dropMatchedCards() {
+    final matched = _matchedPeerIds;
+    if (matched.isEmpty ||
+        !_cards.any((c) => matched.contains(c.profile.id))) {
+      return;
+    }
+    var idx = _currentIndex;
+    for (var i = _cards.length - 1; i >= 0; i--) {
+      if (!matched.contains(_cards[i].profile.id)) continue;
+      _cards.removeAt(i);
+      if (i < idx) idx--;
+    }
+    _currentIndex = idx.clamp(0, _cards.length);
+    if (_currentIndex >= _cards.length) _deckDone = _cards.isNotEmpty;
+  }
+
   void _rebuildCards() {
     _cards.clear();
+    final matched = _matchedPeerIds;
     for (final p in _profiles) {
+      if (matched.contains(p.id)) continue;
       // Le genre ne filtre que le deck des pays choisis ; sans pays, tout le
       // monde (un choix mémorisé ne doit pas rester appliqué en silence).
       if (_filtered && _gender == GenderFilter.homme && p.gender != 'm') continue;
@@ -508,7 +538,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (_myId.isEmpty || !isSupabaseReady) return;
     try {
       final mine = await FriendshipApi.fetchMine(_myId);
-      if (mounted) setState(() => _myFriendships = mine);
+      if (!mounted) return;
+      setState(() {
+        _myFriendships = mine;
+        _dropMatchedCards();
+      });
     } catch (_) {}
   }
 
