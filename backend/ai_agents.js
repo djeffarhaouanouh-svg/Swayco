@@ -30,7 +30,7 @@ const AUTO_LIKES_PER_DAY = 2; // par compte IA, jour UTC
 const WELCOME_LIKES_PER_NEW_USER = 2;
 // Contexte donné à l'IA pour répondre : les N derniers messages de CETTE
 // conversation (les siens et ceux de la personne), pas plus.
-const HISTORY_MESSAGES = 6;
+const HISTORY_MESSAGES = 14;
 // Doit couvrir le plus long délai (MAX_DELAY_MS : 10 h) PLUS l'attente du
 // réveil quand le délai tombe la nuit (≤ 11 h : coucher 23 h, réveil 10 h) :
 // 21 h au pire. Avec 18 h, une réponse pouvait devenir impossible.
