@@ -31,6 +31,14 @@ const WELCOME_LIKES_PER_NEW_USER = 2;
 // Contexte donné à l'IA pour répondre : les N derniers messages de CETTE
 // conversation (les siens et ceux de la personne), pas plus.
 const HISTORY_MESSAGES = 14;
+
+// MODE TEST : pour ces comptes (et eux seuls), les IA répondent tout de suite :
+// ni délai, ni sommeil, ni quota par jour. Sert à tester personnalité et
+// réponses ; à vider quand le test est fini. Le répondeur tourne toutes les
+// 15 s : « tout de suite » = quelques secondes.
+const TEST_INSTANT_TARGETS = new Set([
+  '2f80fb98-8e65-4078-adce-9b2a144654f6', // lou-2f80fb
+]);
 // Doit couvrir le plus long délai (MAX_DELAY_MS : 10 h) PLUS l'attente du
 // réveil quand le délai tombe la nuit (≤ 11 h : coucher 23 h, réveil 10 h) :
 // 21 h au pire. Avec 18 h, une réponse pouvait devenir impossible.
@@ -584,13 +592,16 @@ async function processReplies(ctx) {
   const dayStart = utcDayStart();
   let sent = 0;
   for (const m of latest.values()) {
+    const instant = TEST_INSTANT_TARGETS.has(m.sender);
     const level = await attentionLevel(sb, m.recipient).catch(() => 3);
-    if (now - Date.parse(m.created_at) < replyDelayForLevel(m.id, level)) continue;
-    const dailyLimit = REPLIES_BY_LEVEL[level] ?? REPLIES_PER_DAY;
+    if (!instant && now - Date.parse(m.created_at) < replyDelayForLevel(m.id, level)) continue;
+    const dailyLimit = instant ? Infinity : (REPLIES_BY_LEVEL[level] ?? REPLIES_PER_DAY);
 
     // Endormie : elle répondra à son réveil (le message reste dans la fenêtre).
-    const sleeper = await getProfile(sb, m.recipient);
-    if (!sleeper || !isAwake(sleeper)) continue;
+    if (!instant) {
+      const sleeper = await getProfile(sb, m.recipient);
+      if (!sleeper || !isAwake(sleeper)) continue;
+    }
 
     // Deja repondu apres ce message ?
     const { data: after } = await sb.from('messages').select('id')
