@@ -3117,27 +3117,30 @@ class _ComposerState extends State<_Composer>
         12 + MediaQuery.paddingOf(context).bottom * 0.4,
       ),
       child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          // Le rond GIF / envoi reste collé en bas quand le champ grandit.
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
               child: GlassPanel(
                 borderRadius: 27,
                 padding: const EdgeInsets.fromLTRB(14, 2, 4, 2),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  // En bas quand le champ grandit : la photo reste à l'aise.
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(
-                      // Hauteur FIXE : un long message défile dans le champ au
-                      // lieu de l'agrandir.
-                      child: SizedBox(
-                        height: 50,
+                      // Comme Instagram : le champ grandit avec le texte (de 50
+                      // jusqu'à 5 lignes), puis défile au-delà. Il ne coupe
+                      // plus un long message.
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 50),
                         child: TextField(
                           controller: widget.controller,
                           focusNode: _focus,
                           enabled: !widget.sending,
-                          expands: true,
-                          minLines: null,
-                          maxLines: null,
+                          keyboardType: TextInputType.multiline,
+                          minLines: 1,
+                          maxLines: 5,
                           textAlignVertical: TextAlignVertical.center,
                           textCapitalization: TextCapitalization.sentences,
                           cursorColor: SC.accentFg,
