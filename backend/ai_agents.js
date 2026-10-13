@@ -37,7 +37,8 @@ const HISTORY_MESSAGES = 14;
 // réponses ; à vider quand le test est fini. Le répondeur tourne toutes les
 // 15 s : « tout de suite » = quelques secondes.
 const TEST_INSTANT_TARGETS = new Set([
-  '2f80fb98-8e65-4078-adce-9b2a144654f6', // lou-2f80fb
+  // Mode test terminé : horaires, délais et quotas normaux pour tout le monde.
+  // Pour retester, ajouter l'id du compte ici (ex. lou-2f80fb : 2f80fb98-8e65-4078-adce-9b2a144654f6).
 ]);
 // Doit couvrir le plus long délai (MAX_DELAY_MS : 10 h) PLUS l'attente du
 // réveil quand le délai tombe la nuit (≤ 11 h : coucher 23 h, réveil 10 h) :
