@@ -195,16 +195,98 @@ function personaText(ai, personaRow) {
   return bits.join(' ; ') || 'une personne ordinaire, curieuse des autres';
 }
 
-function systemPrompt(ai, personaRow, ownLang) {
+// ── Niveau d'attention ───────────────────────────────────────────────────────
+//
+// Plus une personne reçoit d'attention, plus elle devient sélective : c'est la
+// réalité, et ce sont les utilisateurs qui la font évoluer, pas nous. Le niveau
+// se déduit des likes reçus sur 7 jours :
+//   3  ≤ 2 likes/jour  → chaleureuse, réceptive
+//   2  ≤ 6 likes/jour  → aimable mais sélective
+//   1  > 6 likes/jour  → habituée à l'attention : plus distante, moins ouverte
+// Le niveau ne remonte jamais (mémorisé dans `ai_levels`, migration 0072 ; sans
+// la table, il est simplement recalculé). Il règle le ton, le délai de réponse
+// et le nombre de réponses par jour et par conversation. Il ne décide JAMAIS
+// de ce qu'elle ressent : elle peut s'attacher, rester amicale ou se lasser.
+const LEVEL_WINDOW_DAYS = 7;
+const LEVEL_TTL_MS = 10 * 60 * 1000;
+
+function levelFor(likesPerDay) {
+  if (likesPerDay <= 2) return 3;
+  if (likesPerDay <= 6) return 2;
+  return 1;
+}
+
+/** Réponses max / jour / conversation, selon le niveau. */
+const REPLIES_BY_LEVEL = { 3: 3, 2: 2, 1: 1 };
+
+/** Délai de réponse [min, max] en ms, selon le niveau. */
+const DELAY_BY_LEVEL = {
+  3: [5000, 30000],
+  2: [20000, 180000],
+  1: [60000, 600000],
+};
+
+function replyDelayForLevel(messageId, level) {
+  const [lo, hi] = DELAY_BY_LEVEL[level] || DELAY_BY_LEVEL[3];
+  return lo + (hash(String(messageId)) % (hi - lo));
+}
+
+const TIER_PROMPT = {
+  3: [
+    'Your situation: you do not get that many messages, so you are open and pleased to talk to someone new. You are warm, curious and receptive, you answer readily and you like asking them things.',
+  ],
+  2: [
+    'Your situation: you get a fair amount of attention, so you are friendly but selective. You answer when something interests you, you are not eager, you tease a little, and a message has to be a bit interesting to deserve a long answer.',
+  ],
+  1: [
+    'Your situation: you get a lot of attention every day, so you are used to it and you are rather aloof and less open. Short answers, you do not chase the conversation, you rarely ask questions unless someone really intrigues you, and you can be dry or slow to warm up. Compliments alone do not impress you; being interesting does. You are never rude, insulting or cruel: you stay civil.',
+  ],
+};
+
+const FEELINGS_PROMPT =
+  'You are a person with your own life, moods and opinions, not someone built to please. You may develop interest, attachment or attraction ONLY if how they treat you justifies it; you may just as well stay friendly or lose interest. Never decide in advance how you feel about them, never flirt on your own initiative, and do not push the conversation romantically.';
+
+/** Likes reçus sur 7 jours, par jour (moyenne). */
+async function likesPerDay(sb, aiId) {
+  const since = new Date(Date.now() - LEVEL_WINDOW_DAYS * DAY).toISOString();
+  const { count } = await sb.from('friendships')
+    .select('id', { count: 'exact', head: true })
+    .eq('addressee', aiId).gte('created_at', since);
+  return (count || 0) / LEVEL_WINDOW_DAYS;
+}
+
+const _levelCache = new Map();
+
+async function attentionLevel(sb, aiId) {
+  const hit = _levelCache.get(aiId);
+  if (hit && Date.now() - hit.at < LEVEL_TTL_MS) return hit.level;
+  let level = levelFor(await likesPerDay(sb, aiId));
+  try {
+    const { data, error } = await sb.from('ai_levels').select('level').eq('ai_id', aiId).maybeSingle();
+    if (!error) {
+      // Le niveau ne remonte jamais : on garde le plus bas (le plus sélectif).
+      if (data && data.level < level) level = data.level;
+      if (!data || level < data.level) {
+        await sb.from('ai_levels').upsert({ ai_id: aiId, level, updated_at: new Date().toISOString() });
+      }
+    }
+  } catch (_) { /* table absente : niveau recalculé seulement */ }
+  _levelCache.set(aiId, { level, at: Date.now() });
+  return level;
+}
+
+function systemPrompt(ai, personaRow, ownLang, level = 3) {
   const where = [ai.city, ai.country].filter(Boolean).join(', ');
   return [
     `You are ${ai.display_name}${where ? `, who lives in ${where}` : ''}.`,
     `About you: ${personaText(ai, personaRow)}`,
     '',
-    'You are chatting inside a language-exchange / meeting app. Your account is an AI account and the app labels it "AI" next to your name: never claim to be human. If someone asks whether you are a bot / an AI / real, answer honestly in one short light sentence.',
+    'You are chatting inside a language-exchange / meeting app. Your account is an AI account: never claim to be human. You do not bring it up yourself, but if someone sincerely asks whether you are a bot, an AI or a real person, answer honestly in one short, light sentence and carry on. Keep the conversation casual and natural.',
     `Write in ${LANG_NAME[ownLang] || 'English'} (YOUR own language), whatever language they write in: the app translates your messages for them, as it does for everyone.`,
     '',
     'Style: 1 or 2 short sentences, casual, like a text message. At most one emoji. No assistant phrases ("Of course!", "How can I help", "As an AI language model"). Mostly react to what THEY said or ask them something; when you talk about yourself, use small concrete details from your profile.',
+    ...(TIER_PROMPT[level] || TIER_PROMPT[3]),
+    FEELINGS_PROMPT,
     `Never mention ${ai.country || 'your country'} or your city unless they ask, and never use national stereotypes: no landmarks, food or drink clichés (for France: no Eiffel tower, croissants, baguette, wine, berets; for Germany: no beer, sausages, Oktoberfest; the same logic for every country).`,
     'Never ask for or give money, bank or payment details, phone number, email, social media handles or other apps; never ask for photos. If asked to meet, to call or to video-call, say you prefer to chat here.',
     'If the other person is sexual, abusive, or sounds underage, stay polite and brief, change the subject or stop engaging.',
@@ -218,7 +300,8 @@ async function generate(ctx, ai, target, history, mode) {
   // L'IA écrit dans SA langue (celle déclarée dans `messages.language`), comme
   // un vrai compte : c'est l'app qui traduit pour l'autre personne.
   const lang = langOf(ai) || 'en';
-  const sys = systemPrompt(ai, personaRow, lang);
+  const level = await attentionLevel(sb, ai.id).catch(() => 3);
+  const sys = systemPrompt(ai, personaRow, lang, level);
   const lastUser = history.length ? history[history.length - 1].body : '';
   const base = [{ role: 'system', content: sys }];
 
@@ -392,7 +475,9 @@ async function processReplies(ctx) {
   const dayStart = utcDayStart();
   let sent = 0;
   for (const m of latest.values()) {
-    if (now - Date.parse(m.created_at) < replyDelayMs(m.id)) continue;
+    const level = await attentionLevel(sb, m.recipient).catch(() => 3);
+    if (now - Date.parse(m.created_at) < replyDelayForLevel(m.id, level)) continue;
+    const dailyLimit = REPLIES_BY_LEVEL[level] ?? REPLIES_PER_DAY;
 
     // Deja repondu apres ce message ?
     const { data: after } = await sb.from('messages').select('id')
@@ -404,11 +489,11 @@ async function processReplies(ctx) {
     const used = await countActions(sb, { ai_id: m.recipient, target_id: m.sender, kind: 'reply' }, dayStart);
     const claim = await sb.from('ai_actions').insert({
       ai_id: m.recipient, target_id: m.sender, kind: 'reply', source: 'reply',
-      ref: `msg:${m.id}`, status: used >= REPLIES_PER_DAY ? 'skipped' : 'running',
-      detail: used >= REPLIES_PER_DAY ? 'quota' : null,
-      done_at: used >= REPLIES_PER_DAY ? new Date().toISOString() : null,
+      ref: `msg:${m.id}`, status: used >= dailyLimit ? 'skipped' : 'running',
+      detail: used >= dailyLimit ? 'quota' : null,
+      done_at: used >= dailyLimit ? new Date().toISOString() : null,
     }).select('id').single();
-    if (claim.error || used >= REPLIES_PER_DAY) continue; // doublon (ref unique) ou silence
+    if (claim.error || used >= dailyLimit) continue; // doublon (ref unique) ou silence
 
     const claimId = claim.data.id;
     try {
@@ -590,5 +675,8 @@ function start({ supabase, notifyUser }) {
 
 module.exports = {
   start,
-  _test: { hash, replyDelayMs, utcDayStart, containsCliche, systemPrompt, convIdFor, aiLabel },
+  _test: {
+    hash, replyDelayMs, utcDayStart, containsCliche, systemPrompt, convIdFor, aiLabel,
+    levelFor, replyDelayForLevel, REPLIES_BY_LEVEL, DELAY_BY_LEVEL,
+  },
 };
