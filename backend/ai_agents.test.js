@@ -225,3 +225,20 @@ test('photo requests are detected in the app languages, ordinary talk is not', (
   for (const s of no) assert.equal(t.isPhotoRequest(s), false, s);
 });
 
+
+test('writing style: short, texting register, no chatbot or literary tone', () => {
+  for (const level of [1, 2, 3]) {
+    const p = t.systemPrompt(AI, null, 'es', level);
+    assert.match(p, /WRITING STYLE \(the most important rule\)/);
+    assert.match(p, /ONE short sentence, usually 3 to 12 words/);
+    assert.match(p, /Do NOT ask a question in every message/);
+    assert.match(p, /Do not try to be interesting in every message/);
+    assert.match(p, /NEVER: philosophical remarks/);
+    assert.match(p, /Vary your openers/);
+    assert.match(p, /Snapchat or a dating app/);
+    assert.doesNotMatch(p, /uf q fuerte/); // le modèle recopiait l'exemple
+  }
+  // Le style court est avant les consignes de niveau (il domine).
+  const p = t.systemPrompt(AI, null, 'es', 1);
+  assert.ok(p.indexOf('WRITING STYLE') < p.indexOf('Your situation'));
+});
