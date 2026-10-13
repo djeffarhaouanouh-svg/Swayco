@@ -3529,22 +3529,29 @@ class _EmptyThreadState extends State<_EmptyThread>
                   color: const Color(0xFF222222),
                   border: Border.all(color: SC.brandBlue, width: 3),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: widget.photoUrl.isNotEmpty
-                    ? Image.network(
-                        widget.photoUrl,
-                        fit: BoxFit.cover,
-                        alignment: const Alignment(0, -0.44),
-                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                      )
-                    : Center(
-                        child: ProfileAvatar(
-                          displayName: widget.peerName,
-                          avatarUrl: null,
-                          size: 126,
-                          fontSize: 48,
+                // La photo est découpée en CERCLE à l'intérieur de l'anneau
+                // (126 = 132 − 2×3). Découpée par le cercle extérieur, son
+                // carré recouvrait l'anneau en diagonale et le bleu ne restait
+                // visible que par morceaux.
+                child: ClipOval(
+                  child: widget.photoUrl.isNotEmpty
+                      ? Image.network(
+                          widget.photoUrl,
+                          width: 126,
+                          height: 126,
+                          fit: BoxFit.cover,
+                          alignment: const Alignment(0, -0.44),
+                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                        )
+                      : Center(
+                          child: ProfileAvatar(
+                            displayName: widget.peerName,
+                            avatarUrl: null,
+                            size: 126,
+                            fontSize: 48,
+                          ),
                         ),
-                      ),
+                ),
               ),
               if (theirs.isNotEmpty)
                 Positioned(
