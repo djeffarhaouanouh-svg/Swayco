@@ -28,6 +28,9 @@ const AUTO_TICK_MS = 10 * 60 * 1000;
 const REPLIES_PER_DAY = 2; // par conversation, jour UTC
 const AUTO_LIKES_PER_DAY = 2; // par compte IA, jour UTC
 const WELCOME_LIKES_PER_NEW_USER = 2;
+// Contexte donné à l'IA pour répondre : les N derniers messages de CETTE
+// conversation (les siens et ceux de la personne), pas plus.
+const HISTORY_MESSAGES = 6;
 // Doit couvrir le plus long délai (MAX_DELAY_MS : 10 h) PLUS l'attente du
 // réveil quand le délai tombe la nuit (≤ 11 h : coucher 23 h, réveil 10 h) :
 // 21 h au pire. Avec 18 h, une réponse pouvait devenir impossible.
@@ -612,7 +615,7 @@ async function processReplies(ctx) {
       if (!ai || ai.is_ai !== true || !target) { await finish(sb, claimId, 'failed', 'profile_missing'); continue; }
       if (await isBlocked(sb, ai.id, target.id)) { await finish(sb, claimId, 'skipped', 'blocked'); continue; }
       const { data: hist } = await sb.from('messages').select('sender, body, created_at')
-        .eq('conversation_id', m.conversation_id).order('created_at', { ascending: false }).limit(14);
+        .eq('conversation_id', m.conversation_id).order('created_at', { ascending: false }).limit(HISTORY_MESSAGES);
       const history = (hist || []).reverse();
       const text = await generate(ctx, ai, target, history, 'reply', m.id);
       if (!text) { await finish(sb, claimId, 'failed', 'empty_generation'); continue; }
