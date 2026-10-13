@@ -2964,3 +2964,6 @@ require('./engagement').start({ supabase, notifyUser });
 // conversation) et mode autonome (backend/ai_agents.js ; table ai_actions,
 // migration 0068). Inerte tant que AI_AGENTS_ENABLED n'est pas « 1 ».
 require('./ai_agents').start({ supabase, notifyUser });
+
+// Pro dont l'echeance est depassee (webhook perdu, achat test) : retour a free.
+revenueCat.startExpirySweep(supabase);

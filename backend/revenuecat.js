@@ -187,7 +187,41 @@ async function handleEvent(body, db = supabase()) {
   return 'ignored';
 }
 
+// Filet de securite : is_pro n'est remis a false que par un webhook
+// (EXPIRATION / Stripe). S'il se perd (achat test, evenement manque), le compte
+// resterait « Pro » a vie. On desactive donc ceux dont l'echeance est depassee
+// de plus de 2 jours (delai de grace pour un renouvellement en retard).
+const PRO_GRACE_MS = 2 * 24 * 60 * 60 * 1000;
+
+async function sweepExpiredPro(db) {
+  if (!db) return 0;
+  const cutoff = new Date(Date.now() - PRO_GRACE_MS).toISOString();
+  const { data, error } = await db.from('profiles')
+    .update({ is_pro: false, subscription_tier: 'free' })
+    .eq('is_pro', true).not('pro_expires_at', 'is', null).lt('pro_expires_at', cutoff)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data || []).length;
+}
+
+function startExpirySweep(getDb) {
+  const run = async () => {
+    try {
+      const n = await sweepExpiredPro(getDb());
+      // eslint-disable-next-line no-console
+      if (n) console.log(`[revenuecat] expiry sweep: ${n} account(s) back to free`);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[revenuecat] expiry sweep failed:', e?.message || e);
+    }
+  };
+  setTimeout(run, 60 * 1000).unref?.();
+  setInterval(run, 6 * 60 * 60 * 1000).unref?.();
+}
+
 module.exports = {
+  sweepExpiredPro,
+  startExpirySweep,
   isConfigured,
   isAuthorized,
   handleEvent,
