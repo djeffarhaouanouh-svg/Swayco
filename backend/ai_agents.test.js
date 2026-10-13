@@ -280,3 +280,15 @@ test('the prompt tells the AI the local time of her country (one line, nothing e
   assert.match(withClock.join('\n'), /It is Wednesday 04:42 where you live right now/);
   assert.match(withClock.join('\n'), /not at work, at school or at lunch/);
 });
+
+test('the AI knows the bio shown on her card (once, only when a persona exists)', () => {
+  const withBio = { ...AI, bio: 'Gym lunes y miércoles; el resto del tiempo, sofá.' };
+  const p = t.systemPrompt(withBio, { persona: 'Carolina, 25, lives in Cartagena.' }, 'es', 3);
+  assert.match(p, /Your profile bio, shown on your card: « Gym lunes y miércoles; el resto del tiempo, sofá\. »/);
+  assert.match(p, /never quote it word for word/);
+  // Pas de persona : le texte de secours contient déjà la bio, pas de doublon.
+  const noPersona = t.systemPrompt(withBio, null, 'es', 3);
+  assert.equal((noPersona.match(/Gym lunes/g) || []).length, 1);
+  // Sans bio : rien ne change.
+  assert.doesNotMatch(t.systemPrompt(AI, { persona: 'x' }, 'es', 3), /profile bio/);
+});

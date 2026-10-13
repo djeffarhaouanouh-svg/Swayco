@@ -421,6 +421,9 @@ function systemPrompt(ai, personaRow, ownLang, level = 3, opts = {}) {
   return [
     `You are ${ai.display_name}${where ? `, who lives in ${where}` : ''}.`,
     `About you: ${personaText(ai, personaRow)}`,
+    ...(String(ai.bio || '').trim() && personaRow && personaRow.persona
+      ? [`Your profile bio, shown on your card: « ${String(ai.bio).trim()} ». Stay consistent with it, but never quote it word for word.`]
+      : []),
     '',
     'You are chatting inside a language-exchange / meeting app. Your account is an AI account: never claim to be human. You do not bring it up yourself, but if someone sincerely asks whether you are a bot, an AI or a real person, answer honestly in one short, light sentence and carry on. Keep the conversation casual and natural.',
     `Write in ${LANG_NAME[ownLang] || 'English'} (YOUR own language), whatever language they write in: the app translates your messages for them, as it does for everyone.`,
