@@ -102,11 +102,15 @@ test('each AI sleeps at its own hours, and only at night', () => {
   for (let i = 0; i < 300; i++) {
     const w = t.sleepWindow(`ai-${i}`);
     wins.add(`${w.bed}-${w.wake}`);
-    assert.ok([22, 23, 24].includes(w.bed), `bed ${w.bed}`);
-    assert.ok(w.wake >= 6 && w.wake <= 9, `wake ${w.wake}`);
+    assert.ok([23, 24, 25, 26].includes(w.bed), `bed ${w.bed}`); // 23 h … 2 h
+    assert.ok(w.wake >= 7 && w.wake <= 10, `wake ${w.wake}`);
     assert.equal(t.sleepWindow(`ai-${i}`).bed, w.bed); // stable
-    for (const h of [12, 14, 17]) assert.equal(t.isAwakeAt({ id: `ai-${i}` }, h), true);
-    for (const h of [1, 2, 3, 4, 5]) assert.equal(t.isAwakeAt({ id: `ai-${i}` }, h), false);
+    // Jamais endormie en journée ni en soirée (20 h, 21 h, 22 h compris).
+    for (const h of [10, 12, 14, 17, 20, 21, 22]) {
+      assert.equal(t.isAwakeAt({ id: `ai-${i}` }, h), h >= w.wake, `h=${h} wake=${w.wake}`);
+    }
+    // Toujours endormie en pleine nuit.
+    for (const h of [3, 4, 5, 6]) assert.equal(t.isAwakeAt({ id: `ai-${i}` }, h), false);
   }
   assert.ok(wins.size >= 6, `only ${wins.size} distinct windows`);
 });

@@ -545,12 +545,13 @@ const { localParts, tzOf } = require('./engagement')._test;
 
 /**
  * Heures de sommeil PROPRES à chaque compte, à l'heure de son pays : elle se
- * couche entre 22 h et 0 h et se réveille entre 6 h et 9 h (stable par compte).
+ * couche entre 23 h et 2 h et se réveille entre 7 h et 10 h (stable par
+ * compte) : une jeune adulte, pas quelqu'un qui dort à 20 h.
  * Endormie : aucune réponse, aucun like ; elle répond à son réveil.
  */
 function sleepWindow(aiId) {
   const h = hash(String(aiId));
-  return { bed: 22 + (h % 3), wake: 6 + (Math.floor(h / 3) % 4) };
+  return { bed: 23 + (h % 4), wake: 7 + (Math.floor(h / 4) % 4) };
 }
 
 function isAwakeAt(ai, hour) {
