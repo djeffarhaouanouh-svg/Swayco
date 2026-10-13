@@ -306,3 +306,106 @@ test('sweep: a late renewal after a wrong sweep restores pro', async () => {
   assert.equal(db.rows[0].is_pro, true);
   assert.equal(db.rows[0].subscription_tier, 'plus');
 });
+
+// ── Full subscription lifecycle, every RevenueCat event type ─────────────────
+
+const ev = (type, extra = {}) => proEvent({ type, ...extra });
+const freshUser = () => memDb([{ id: PRO_USER, is_pro: false, subscription_tier: 'free', pro_expires_at: null }]);
+
+test('lifecycle: purchase → renewal → cancel → expiry → re-subscribe', async () => {
+  const db = freshUser();
+  const u = () => db.rows[0];
+
+  // 1. Someone pays.
+  assert.equal(await revenueCat.handleEvent(ev('INITIAL_PURCHASE', { expiration_at_ms: Date.now() + 30 * DAY }), db), 'pro_synced');
+  assert.equal(u().is_pro, true);
+  assert.equal(u().subscription_tier, 'plus');
+  const firstExpiry = u().pro_expires_at;
+
+  // 2. Next month it renews: expiry moves forward, still pro.
+  await revenueCat.handleEvent(ev('RENEWAL', { expiration_at_ms: Date.now() + 60 * DAY }), db);
+  assert.equal(u().is_pro, true);
+  assert.ok(u().pro_expires_at > firstExpiry);
+
+  // 3. They cancel auto-renew: no write, they keep Pro until the paid period ends.
+  assert.equal(await revenueCat.handleEvent(ev('CANCELLATION', { expiration_at_ms: Date.now() + 60 * DAY }), db), 'ignored');
+  assert.equal(u().is_pro, true);
+  assert.equal(await revenueCat.sweepExpiredPro(db), 0);
+  assert.equal(u().is_pro, true);
+
+  // 4. The period ends and RevenueCat says so.
+  assert.equal(await revenueCat.handleEvent(ev('EXPIRATION'), db), 'pro_synced');
+  assert.equal(u().is_pro, false);
+  assert.equal(u().subscription_tier, 'free');
+
+  // 5. They come back.
+  await revenueCat.handleEvent(ev('INITIAL_PURCHASE', { expiration_at_ms: Date.now() + 30 * DAY }), db);
+  assert.equal(u().is_pro, true);
+});
+
+test('lifecycle: EXPIRATION webhook lost → the sweep is the backstop, and a later purchase still works', async () => {
+  const db = memDb([{ id: PRO_USER, is_pro: true, subscription_tier: 'plus', pro_expires_at: iso(-3 * DAY) }]);
+  assert.equal(await revenueCat.sweepExpiredPro(db), 1);
+  assert.equal(db.rows[0].is_pro, false);
+  await revenueCat.handleEvent(ev('INITIAL_PURCHASE', { expiration_at_ms: Date.now() + 30 * DAY }), db);
+  assert.equal(db.rows[0].is_pro, true);
+});
+
+test('lifecycle: a renewal that lands during the 2-day grace is never swept', async () => {
+  const db = memDb([{ id: PRO_USER, is_pro: true, subscription_tier: 'plus', pro_expires_at: iso(-1 * DAY) }]);
+  assert.equal(await revenueCat.sweepExpiredPro(db), 0);
+  await revenueCat.handleEvent(ev('RENEWAL', { expiration_at_ms: Date.now() + 30 * DAY }), db);
+  assert.equal(await revenueCat.sweepExpiredPro(db), 0);
+  assert.equal(db.rows[0].is_pro, true);
+});
+
+test('events the webhook deliberately ignores leave the account untouched', async () => {
+  for (const type of ['CANCELLATION', 'UNCANCELLATION', 'BILLING_ISSUE', 'PRODUCT_CHANGE', 'TRANSFER', 'SUBSCRIPTION_PAUSED', 'TEST']) {
+    const db = memDb([{ id: PRO_USER, is_pro: true, subscription_tier: 'plus', pro_expires_at: iso(10 * DAY) }]);
+    const before = JSON.stringify(db.rows[0]);
+    assert.equal(await revenueCat.handleEvent(ev(type), db), 'ignored', type);
+    assert.equal(JSON.stringify(db.rows[0]), before, type);
+  }
+});
+
+test('purchase by alias / sandbox / non-pro entitlement / no user', async () => {
+  // Real user id only in aliases.
+  let db = freshUser();
+  await revenueCat.handleEvent(proEvent({ app_user_id: '$RCAnonymousID:abc', aliases: ['$RCAnonymousID:abc', PRO_USER], expiration_at_ms: Date.now() + 30 * DAY }), db);
+  assert.equal(db.rows[0].is_pro, true);
+
+  // Sandbox purchase (TestFlight / test card) behaves like production.
+  db = freshUser();
+  await revenueCat.handleEvent(proEvent({ environment: 'SANDBOX', expiration_at_ms: Date.now() + 5 * 60000 }), db);
+  assert.equal(db.rows[0].is_pro, true);
+
+  // Another entitlement is not Pro.
+  db = freshUser();
+  assert.equal(await revenueCat.handleEvent(proEvent({ entitlement_ids: ['other'] }), db), 'ignored_entitlement');
+  assert.equal(db.rows[0].is_pro, false);
+
+  // Anonymous only: nothing to write.
+  db = freshUser();
+  assert.equal(await revenueCat.handleEvent(proEvent({ app_user_id: '$RCAnonymousID:abc', aliases: [] }), db), 'unresolved');
+  assert.equal(db.rows[0].is_pro, false);
+});
+
+test('sandbox test purchase expires after minutes and the sweep clears it 2 days later', async () => {
+  const db = freshUser();
+  await revenueCat.handleEvent(proEvent({ environment: 'SANDBOX', expiration_at_ms: Date.now() - 3 * DAY }), db);
+  assert.equal(db.rows[0].is_pro, true); // as seen on lou-2f80fb: EXPIRATION never arrived
+  assert.equal(await revenueCat.sweepExpiredPro(db), 1);
+  assert.equal(db.rows[0].is_pro, false);
+});
+
+test('boost purchase credits via rpc and never touches pro', async () => {
+  const db = memDb([{ id: PRO_USER, is_pro: false, subscription_tier: 'free', pro_expires_at: null }]);
+  const rpcs = [];
+  db.rpc = (name, params) => { rpcs.push({ name, params }); return Promise.resolve({ data: 'until', error: null }); };
+  const status = await revenueCat.handleEvent(
+    proEvent({ type: 'NON_RENEWING_PURCHASE', product_id: 'boost_1', transaction_id: 'tx1' }), db);
+  assert.equal(status, 'boosted');
+  assert.equal(rpcs.length, 1);
+  assert.equal(rpcs[0].name, 'grant_boost');
+  assert.equal(db.rows[0].is_pro, false);
+});
