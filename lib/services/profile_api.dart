@@ -1555,25 +1555,55 @@ const double kDiscoverMinMenShare = 0.24;
 /// s'assurant qu'au moins [minMenShare] d'entre elles sont des hommes, quand il
 /// y en a assez dans le lot. Les meilleures cartes restent ; pour faire de la
 /// place aux hommes manquants, on retire les femmes les moins bien classées.
+///
+/// Les hommes ajoutés ainsi viennent du bas du classement : triés par score, ils
+/// finiraient TOUS au fond du paquet. Dans ce cas, on les MÉLANGE : le paquet est
+/// découpé en tranches égales, chaque homme prend une place au hasard dans la
+/// sienne (donc il y en a du début à la fin, sans rythme régulier), et les
+/// femmes remplissent le reste dans l'ordre de leur score. Si les hommes étaient
+/// déjà assez nombreux, le paquet n'est pas touché. [rng] sert aux tests.
 List<RemoteProfile> pickDiscoverDeck(
   List<(RemoteProfile, double)> sorted,
   int limit, {
   double minMenShare = kDiscoverMinMenShare,
+  Random? rng,
 }) {
   bool isMan((RemoteProfile, double) s) => s.$1.gender == 'm';
   final minMen = (limit * minMenShare).ceil();
   final deck = sorted.take(limit).toList();
   var men = deck.where(isMan).length;
-  if (men < minMen) {
-    final extra = sorted.skip(limit).where(isMan).take(minMen - men);
-    for (final man in extra) {
-      final drop = deck.lastIndexWhere((s) => !isMan(s));
-      if (drop < 0) break;
-      deck.removeAt(drop);
-      deck.add(man);
-      men++;
-    }
-    deck.sort((a, b) => b.$2.compareTo(a.$2));
+  if (men >= minMen) {
+    return List<RemoteProfile>.unmodifiable(deck.map((s) => s.$1));
   }
-  return List<RemoteProfile>.unmodifiable(deck.map((s) => s.$1));
+  final extra = sorted.skip(limit).where(isMan).take(minMen - men);
+  for (final man in extra) {
+    final drop = deck.lastIndexWhere((s) => !isMan(s));
+    if (drop < 0) break;
+    deck.removeAt(drop);
+    deck.add(man);
+    men++;
+  }
+  deck.sort((a, b) => b.$2.compareTo(a.$2));
+
+  final boys = deck.where(isMan).toList();
+  final girls = deck.where((s) => !isMan(s)).toList();
+  if (boys.isEmpty || girls.isEmpty) {
+    return List<RemoteProfile>.unmodifiable(deck.map((s) => s.$1));
+  }
+  final n = deck.length;
+  final r = rng ?? Random();
+  final slots = List<RemoteProfile?>.filled(n, null);
+  for (var i = 0; i < boys.length; i++) {
+    // Une place au hasard dans la tranche numéro i (n / nombre d'hommes de large).
+    var at = (((i + r.nextDouble()) * n) / boys.length).floor().clamp(0, n - 1);
+    while (slots[at] != null) {
+      at = (at + 1) % n;
+    }
+    slots[at] = boys[i].$1;
+  }
+  var w = 0;
+  for (var i = 0; i < n; i++) {
+    slots[i] ??= girls[w++].$1;
+  }
+  return List<RemoteProfile>.unmodifiable(slots.cast<RemoteProfile>());
 }
