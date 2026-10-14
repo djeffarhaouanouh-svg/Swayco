@@ -8,9 +8,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 abstract final class MatchCelebration {
   static const String _kShownKey = 'match_celebrated_ids';
 
-  /// Peer id awaiting an in-app celebration, or null.
+  /// Signal : une célébration attend (l'id du dernier match offert), ou null une
+  /// fois la file vidée. Les célébrations elles-mêmes sont dans [_queue] : avec
+  /// une seule place, un 2e match arrivé pendant l'animation du 1er l'écrasait
+  /// et n'était jamais montré.
   static final ValueNotifier<String?> pendingPeerId =
       ValueNotifier<String?>(null);
+
+  /// Matchs à célébrer, dans l'ordre d'arrivée.
+  static final List<String> _queue = <String>[];
 
   /// Bumped each time the shell sees a brand-new match, so other screens (the
   /// Discover deck) can re-read my friendships once instead of polling.
@@ -65,7 +71,19 @@ abstract final class MatchCelebration {
       return;
     }
     _persist();
+    _queue.add(id);
     pendingPeerId.value = id;
+  }
+
+  /// Le prochain match à célébrer (le plus ancien), ou null quand il n'y en a plus.
+  static String? takeNext() {
+    if (_queue.isEmpty) {
+      pendingPeerId.value = null;
+      return null;
+    }
+    final id = _queue.removeAt(0);
+    if (_queue.isEmpty) pendingPeerId.value = null;
+    return id;
   }
 
   /// Mark [peerId] as already celebrated without enqueueing — used by the

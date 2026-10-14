@@ -297,16 +297,33 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   }
 
   void _onMatchPending() {
-    final peerId = MatchCelebration.pendingPeerId.value;
-    if (peerId == null || peerId.isEmpty || _celebrating || !mounted) return;
-    MatchCelebration.consume();
-    unawaited(_celebrateWithPeer(peerId));
+    if (MatchCelebration.pendingPeerId.value == null || _celebrating || !mounted) return;
+    unawaited(_drainMatches());
+  }
+
+  /// Célèbre les matchs en attente, UN APRÈS L'AUTRE : un match offert pendant
+  /// l'animation du précédent reste dans la file et passe ensuite. Au plus 3
+  /// d'affilée (les suivants sont déjà notés comme montrés : pas d'avalanche).
+  Future<void> _drainMatches() async {
+    if (_celebrating) return;
+    _celebrating = true;
+    try {
+      var shown = 0;
+      while (mounted) {
+        final id = MatchCelebration.takeNext();
+        if (id == null) break;
+        if (shown >= 3) continue;
+        shown++;
+        await _celebrateWithPeer(id);
+      }
+    } finally {
+      _celebrating = false;
+    }
   }
 
   /// Push the same celebration the other side just saw.
   Future<void> _celebrateWithPeer(String peerId) async {
-    if (_celebrating || !mounted) return;
-    _celebrating = true;
+    if (!mounted) return;
     try {
       final myId = _myCalleeId.isNotEmpty
           ? _myCalleeId
@@ -348,8 +365,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       );
     } catch (e) {
       debugPrint('match celebration failed: $e');
-    } finally {
-      _celebrating = false;
     }
   }
 
