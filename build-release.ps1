@@ -18,9 +18,26 @@
 #     ce controle qui manquait - l'AAB suspendu etait vide de toute config
 #     et rien dans le build ne s'en etait plaint.
 
+param(
+  # Build avec les pubs de TEST de Google au lieu des vraies (pour un essai).
+  [switch]$TestAds
+)
+
 $ErrorActionPreference = "Stop"
 
 $Root = $PSScriptRoot
+
+# Les vraies pubs AdMob ne servent que sur un build fait EXPRES pour la
+# publication : sans ce define, lib/services/ad_service.dart reste sur les pubs
+# de test. Ce script construit l'AAB/IPA de publication : production par defaut,
+# `-TestAds` pour s'en passer.
+$AdArgs = @()
+if ($TestAds) {
+  Write-Host "Pubs de TEST (-TestAds) : ce build ne gagnera rien." -ForegroundColor Yellow
+} else {
+  $AdArgs = @("--dart-define=ADMOB_PRODUCTION=true")
+  Write-Host "Pubs AdMob en PRODUCTION (vraies pubs)." -ForegroundColor Green
+}
 $Defines = Join-Path $Root "dart_defines.env"
 
 if (-not (Test-Path $Defines)) {
@@ -50,7 +67,7 @@ Write-Host "==> flutter pub get" -ForegroundColor Cyan
 & $Flutter pub get
 
 Write-Host "==> Build Android App Bundle (Play Store)" -ForegroundColor Cyan
-& $Flutter build appbundle --release --dart-define-from-file=$Defines
+& $Flutter build appbundle --release --dart-define-from-file=$Defines @AdArgs
 
 if ($LASTEXITCODE -ne 0) {
   Write-Host "Build Android echoue." -ForegroundColor Red
@@ -84,7 +101,7 @@ Write-Host ""
 # iOS uniquement si on tourne sur macOS (Windows ne peut pas construire pour iOS).
 if ($IsMacOS) {
   Write-Host "==> Build iOS IPA (App Store)" -ForegroundColor Cyan
-  & $Flutter build ipa --release --dart-define-from-file=$Defines
+  & $Flutter build ipa --release --dart-define-from-file=$Defines @AdArgs
 
   if ($LASTEXITCODE -ne 0) {
     Write-Host "Build iOS echoue." -ForegroundColor Red
@@ -107,6 +124,6 @@ if ($IsMacOS) {
 } else {
   Write-Host "iOS skip (build IPA necessite macOS / Xcode)." -ForegroundColor Yellow
   Write-Host "Sur le Mac :" -ForegroundColor Yellow
-  Write-Host "  flutter build ipa --release --dart-define-from-file=dart_defines.env" -ForegroundColor Yellow
+  Write-Host "  flutter build ipa --release --dart-define-from-file=dart_defines.env --dart-define=ADMOB_PRODUCTION=true" -ForegroundColor Yellow
   Write-Host "  ./scripts/verify-release.sh build/ios/ipa/*.ipa" -ForegroundColor Yellow
 }

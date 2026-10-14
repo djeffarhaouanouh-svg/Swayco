@@ -13,10 +13,10 @@ import 'revenue_cat.dart';
 const String _kTestRewardedAndroid = 'ca-app-pub-3940256099942544/5224354917';
 const String _kTestRewardedIOS = 'ca-app-pub-3940256099942544/1712485313';
 
-/// Production rewarded units: NOT created in AdMob yet. Empty means
-/// "unavailable" in a production build — never fall back to test ads there.
-const String _kProdRewardedAndroid = '';
-const String _kProdRewardedIOS = '';
+/// Production rewarded units. Empty would mean "unavailable" in a production
+/// build — never fall back to test ads there.
+const String _kProdRewardedAndroid = 'ca-app-pub-1120860079267236/6561332979';
+const String _kProdRewardedIOS = 'ca-app-pub-1120860079267236/3014549219';
 
 /// Rewarded video ad — the "watch a video to reveal a like" unlock.
 ///

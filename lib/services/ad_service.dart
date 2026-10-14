@@ -31,10 +31,10 @@ const String _kProdInterstitialIOS = 'ca-app-pub-1120860079267236/1890818620';
 const String _kTestBannerAndroid = 'ca-app-pub-3940256099942544/6300978111';
 const String _kTestBannerIOS = 'ca-app-pub-3940256099942544/2934735716';
 
-/// Production banner units: NOT created in AdMob yet. Empty means "no card
+/// Production banner units (the in-deck "card" ad). Empty would mean "no card
 /// ad" in a production build — never fall back to test ads for real users.
-const String _kProdBannerAndroid = '';
-const String _kProdBannerIOS = '';
+const String _kProdBannerAndroid = 'ca-app-pub-1120860079267236/4645616076';
+const String _kProdBannerIOS = 'ca-app-pub-1120860079267236/1089514441';
 
 /// Minimum gap between two interstitials, so toggling several country
 /// bubbles in a row can't spam the user.

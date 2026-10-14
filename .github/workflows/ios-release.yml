@@ -19,6 +19,11 @@ on:
         required: false
         type: boolean
         default: true
+      admob_production:
+        description: "Serve REAL AdMob ads (tick ONLY for the build meant to go live). Unticked = Google test ads."
+        required: false
+        type: boolean
+        default: false
 
 env:
   APPLE_TEAM_ID: VXYW3LN267
@@ -120,9 +125,18 @@ jobs:
           fi
           echo "args=$ARGS" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve ad args
+        id: ads
+        run: |
+          if [ "${{ inputs.admob_production }}" = "true" ]; then
+            echo "args=--dart-define=ADMOB_PRODUCTION=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Flutter build (compile + assets, no codesign)
         run: |
-          flutter build ios --release --no-codesign ${{ steps.version.outputs.args }} \
+          flutter build ios --release --no-codesign ${{ steps.version.outputs.args }} ${{ steps.ads.outputs.args }} \
             --dart-define=SUPABASE_URL=$SUPABASE_URL \
             --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY \
             --dart-define=TOKEN_API_BASE=$TOKEN_API_BASE \
