@@ -27,7 +27,6 @@ const AUTO_TICK_MS = 10 * 60 * 1000;
 
 const REPLIES_PER_DAY = 2; // par conversation, jour UTC
 const AUTO_LIKES_PER_DAY = 2; // par compte IA, jour UTC
-const WELCOME_LIKES_PER_NEW_USER = 2;
 // Contexte donné à l'IA pour répondre : les N derniers messages de CETTE
 // conversation (les siens et ceux de la personne), pas plus.
 const HISTORY_MESSAGES = 14;
@@ -586,7 +585,11 @@ async function execute(ctx, a) {
   if (!target) return { status: 'failed', detail: 'target_missing' };
   if (target.is_ai) return { status: 'skipped', detail: 'target_is_ai' };
 
-  if (a.kind === 'like') return doLike(ctx, ai, target);
+  if (a.kind === 'like') {
+    // Like d'accueil programmé, photo supprimée entre-temps : on ne l'envoie pas.
+    if (a.source === 'auto' && !a.ref && !hasPhoto(target)) return { status: 'skipped', detail: 'photo_deleted' };
+    return doLike(ctx, ai, target);
+  }
 
   if (a.kind === 'message') {
     if (await isBlocked(sb, ai.id, target.id)) return { status: 'skipped', detail: 'blocked' };
@@ -807,15 +810,6 @@ function isPhotoRequest(text) {
   return PHOTO_ASK_RE.test(s) || PHOTO_ASK_NONLATIN.test(s);
 }
 
-async function sampleAi(sb, n) {
-  const { count } = await sb.from('profiles').select('id', { count: 'exact', head: true }).eq('is_ai', true);
-  if (!count) return [];
-  const off = rnd(Math.max(count - n, 1));
-  const { data } = await sb.from('profiles').select(PROFILE_COLS).eq('is_ai', true)
-    .order('id', { ascending: true }).range(off, off + n - 1);
-  return data || [];
-}
-
 const autoLikesToday = (sb, aiId) =>
   countActions(sb, { ai_id: aiId, kind: 'like', source: 'auto' }, utcDayStart());
 
@@ -855,55 +849,139 @@ async function autoAcceptLikes(ctx) {
   return done;
 }
 
-/** Les inscrits des dernières 24 h recoivent au plus WELCOME_LIKES_PER_NEW_USER likes d'IA. */
+// ── Accueil : une IA par jour pendant 7 jours après la photo ─────────────────
+//
+// Une personne qui poste sa photo reçoit UN like d'IA par jour pendant 7 jours
+// (au plus 7 en tout, pour qu'on ne puisse pas en tirer plus en supprimant puis
+// en reposant sa photo). Plus de photo → plus rien : les likes déjà programmés
+// sont annulés, et l'exécution revérifie la photo. Les IA alternent Amérique
+// latine / Asie (4/3 ou 3/4 sur les 7 jours, dans un ordre qui change d'une
+// personne à l'autre).
+const WELCOME_DAYS = 7;
+const LATAM = new Set(['Mexique', 'Argentine', 'Colombie', 'Brésil']);
+const ASIA = new Set(['Japon', 'Corée du Sud', 'Philippines', 'Inde', 'Chine']);
+
+const continentOf = (country) => (LATAM.has(country) ? 'latam' : ASIA.has(country) ? 'asia' : '');
+const hasPhoto = (p) => String((p && p.discover_photo_url) || '').trim() !== '';
+
+/** Quand la photo a été postée : l'horodatage (ms) dans le nom du fichier, sinon l'inscription. */
+function photoPostedAt(p) {
+  const urls = [p.discover_photo_url, ...(Array.isArray(p.photos) ? p.photos : [])].filter(Boolean);
+  const stamps = urls
+    .map((u) => /(\d{13})\.\w+(?:\?.*)?$/.exec(String(u)))
+    .filter(Boolean)
+    .map((m) => Number(m[1]));
+  if (stamps.length) return Math.max(...stamps);
+  return Date.parse(p.created_at) || 0;
+}
+
+/** Combien d'IA elle doit avoir reçues à cet instant : 1 le jour même, 2 le lendemain… 7 au plus. */
+function welcomeTarget(postedAtMs, nowMs = Date.now()) {
+  const day = Math.floor((nowMs - postedAtMs) / DAY);
+  if (day < 0 || day >= WELCOME_DAYS) return 0; // photo trop ancienne : pas de programme
+  return Math.min(WELCOME_DAYS, day + 1);
+}
+
+/** Le continent de la PROCHAINE IA : l'inverse de la dernière ; au hasard pour la première. */
+function nextContinent(previous, rand = Math.random) {
+  const last = previous[previous.length - 1];
+  if (last === 'latam') return 'asia';
+  if (last === 'asia') return 'latam';
+  return rand() < 0.5 ? 'latam' : 'asia';
+}
+
+async function sampleAiIn(sb, countries, oppositeOf, n) {
+  const filt = (q) => {
+    let r = q.eq('is_ai', true).in('country', countries);
+    if (oppositeOf === 'm' || oppositeOf === 'f') r = r.eq('gender', oppositeOf === 'm' ? 'f' : 'm');
+    return r;
+  };
+  const { count } = await filt(sb.from('profiles').select('id', { count: 'exact', head: true }));
+  if (!count) return [];
+  const off = rnd(Math.max(count - n, 1));
+  const { data } = await filt(sb.from('profiles').select(PROFILE_COLS))
+    .order('id', { ascending: true }).range(off, off + n - 1);
+  return data || [];
+}
+
+/** Photo supprimée : les likes d'accueil encore en attente pour cette personne sont annulés. */
+async function cancelWelcomeForPhotoless(sb) {
+  const { data: pending } = await sb.from('ai_actions').select('id, target_id')
+    .eq('status', 'pending').eq('kind', 'like').eq('source', 'auto').is('ref', null).limit(300);
+  if (!pending || pending.length === 0) return 0;
+  const ids = [...new Set(pending.map((a) => a.target_id))];
+  const { data: profs } = await sb.from('profiles').select('id, discover_photo_url').in('id', ids);
+  const withPhoto = new Set((profs || []).filter(hasPhoto).map((p) => p.id));
+  let n = 0;
+  for (const a of pending) {
+    if (withPhoto.has(a.target_id)) continue;
+    await sb.from('ai_actions')
+      .update({ status: 'skipped', detail: 'photo_deleted', done_at: new Date().toISOString() })
+      .eq('id', a.id).eq('status', 'pending');
+    n++;
+  }
+  return n;
+}
+
+/** Programme d'accueil : voir le bloc de commentaires ci-dessus. */
 async function autoWelcome(ctx) {
   const { sb } = ctx;
-  const { data: fresh } = await sb.from('profiles').select(PROFILE_COLS)
-    .eq('is_ai', false)
-    .gte('created_at', new Date(Date.now() - DAY).toISOString())
-    .not('discover_photo_url', 'is', null).neq('discover_photo_url', '')
-    .order('created_at', { ascending: false }).limit(100);
-  if (!fresh || fresh.length === 0) return 0;
-  let queued = 0;
-  for (const user of fresh) {
-    const have = await countActions(sb, { target_id: user.id, kind: 'like', source: 'auto' },
-      new Date(Date.now() - 2 * DAY).toISOString());
-    const need = WELCOME_LIKES_PER_NEW_USER - have;
-    if (need <= 0) continue;
+  await cancelWelcomeForPhotoless(sb);
 
-    let cands = (await sampleAi(sb, 40)).filter((c) => isAwake(c));
-    if (PREFER_OPPOSITE_GENDER && (user.gender === 'm' || user.gender === 'f')) {
-      cands.sort((a, b) => (b.gender !== user.gender) - (a.gender !== user.gender));
-    }
-    let picked = 0;
-    // Jamais deux comptes au meme prenom pour une meme personne (deux
-    // « Johanna » allemandes qui l'ajoutent, ca sent le faux), et les likes
-    // d'un meme lot sont espaces d'au moins 15 min, pas simultanes.
-    const usedNames = new Set();
-    let lastRun = Date.now() + (10 + rnd(80)) * 60000;
+  const now = Date.now();
+  const { data: users } = await sb.from('profiles').select(`${PROFILE_COLS}, photos, updated_at`)
+    .eq('is_ai', false)
+    .not('discover_photo_url', 'is', null).neq('discover_photo_url', '')
+    .gte('updated_at', new Date(now - (WELCOME_DAYS + 1) * DAY).toISOString())
+    .order('updated_at', { ascending: false }).limit(300);
+  if (!users || users.length === 0) return 0;
+
+  let queued = 0;
+  for (const user of users) {
+    const target = welcomeTarget(photoPostedAt(user), now);
+    if (target === 0) continue;
+
+    // Ses likes d'accueil jusqu'ici (programmés, en cours ou faits), du plus ancien au plus récent.
+    const { data: past } = await sb.from('ai_actions').select('ai_id, created_at')
+      .eq('target_id', user.id).eq('kind', 'like').eq('source', 'auto').is('ref', null)
+      .in('status', ['pending', 'running', 'done']).order('created_at', { ascending: true });
+    const done = past || [];
+    if (done.length >= target) continue; // en règle pour aujourd'hui
+    // Un seul par jour : pas deux en moins de 20 h, même en rattrapage.
+    if (done.length && now - Date.parse(done[done.length - 1].created_at) < 20 * 60 * 60 * 1000) continue;
+
+    // Continent et prénoms déjà vus.
+    const pastIds = done.map((a) => a.ai_id);
+    const { data: pastProfs } = pastIds.length
+      ? await sb.from('profiles').select('id, country, display_name').in('id', pastIds)
+      : { data: [] };
+    const byId = Object.fromEntries((pastProfs || []).map((p) => [p.id, p]));
+    const prevContinents = pastIds.map((id) => continentOf((byId[id] || {}).country));
+    const seenNames = new Set(pastIds.map((id) => String((byId[id] || {}).display_name || '').trim().toLowerCase()));
+    const continent = nextContinent(prevContinents);
+    const countries = [...(continent === 'latam' ? LATAM : ASIA)];
+
+    const cands = (await sampleAiIn(sb, countries, PREFER_OPPOSITE_GENDER ? user.gender : '', 60))
+      .filter((c) => isAwake(c))
+      .sort(() => Math.random() - 0.5);
     for (const ai of cands) {
-      if (picked >= need) break;
       const nameKey = String(ai.display_name || '').trim().toLowerCase();
-      if (nameKey && usedNames.has(nameKey)) continue;
+      if (nameKey && seenNames.has(nameKey)) continue;
       if ((await autoLikesToday(sb, ai.id)) >= AUTO_LIKES_PER_DAY) continue;
       const { data: fr } = await sb.from('friendships').select('id')
         .or(`and(requester.eq.${ai.id},addressee.eq.${user.id}),and(requester.eq.${user.id},addressee.eq.${ai.id})`)
         .limit(1);
       if (fr && fr.length) continue;
-      const runAt = new Date(lastRun).toISOString();
+      const runAt = new Date(now + (10 + rnd(80)) * 60000).toISOString();
       const ins = await sb.from('ai_actions').insert({
         ai_id: ai.id, target_id: user.id, kind: 'like', source: 'auto', run_at: runAt,
       });
-      if (!ins.error) {
-        picked++; queued++;
-        if (nameKey) usedNames.add(nameKey);
-        lastRun += (15 + rnd(30)) * 60000;
-      }
+      if (!ins.error) queued++;
+      break;
     }
   }
   return queued;
 }
-
 // ── Boucles ──────────────────────────────────────────────────────────────────
 
 async function tableAvailable(sb) {
@@ -965,6 +1043,7 @@ module.exports = {
     hash, replyDelayMs, utcDayStart, containsCliche, systemPrompt, convIdFor, aiLabel,
     levelFor, levelWithHysteresis, nextLevel, replyDelayForLevel, REPLIES_BY_LEVEL,
     DELAY_BY_LEVEL, MAX_DELAY_MS, REPLY_WINDOW_MS, STYLE_WEIGHTS, pickStyle,
+    welcomeTarget, nextContinent, continentOf, photoPostedAt, WELCOME_DAYS, LATAM, ASIA, autoWelcome,
     sleepWindow, isAwakeAt, isPhotoRequest, isInsult, generate, tidyReply, cleanPersona, localClock,
   },
 };

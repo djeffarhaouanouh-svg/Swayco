@@ -306,3 +306,50 @@ test('insults are detected (silence for good); interjections, jokes and normal t
   for (const s of yes) assert.equal(t.isInsult(s), true, s);
   for (const s of no) assert.equal(t.isInsult(s), false, s);
 });
+
+// ── Accueil : 1 IA par jour pendant 7 jours, Amérique latine / Asie ─────────
+
+test('welcome: one more AI each day for 7 days, none after, none before the photo', () => {
+  const D = 24 * 3600 * 1000;
+  const t0 = Date.parse('2026-10-14T10:00:00Z');
+  const want = (hoursAfter) => t.welcomeTarget(t0, t0 + hoursAfter * 3600 * 1000);
+  assert.equal(want(0), 1);
+  assert.equal(want(23), 1);
+  assert.equal(want(24), 2);
+  assert.equal(want(6 * 24 + 5), 7);
+  assert.equal(want(7 * 24 - 1), 7);
+  assert.equal(want(7 * 24), 0); // la fenêtre de 7 jours est finie
+  assert.equal(want(-3), 0); // photo « dans le futur »
+  assert.equal(t.welcomeTarget(t0 - 30 * D, t0), 0); // photo ancienne : pas de programme
+  assert.equal(t.WELCOME_DAYS, 7);
+});
+
+test('welcome: the photo date comes from the file name, else from sign-up', () => {
+  assert.equal(t.photoPostedAt({ discover_photo_url: 'https://x/avatars/discover/u/1785157421938.png' }), 1785157421938);
+  assert.equal(t.photoPostedAt({
+    discover_photo_url: 'https://x/discover/u/1785157421938.png',
+    photos: ['https://x/discover/u/1785157421938.png', 'https://x/discover/u/1785165012346.png?t=1'],
+  }), 1785165012346); // la plus récente
+  assert.equal(t.photoPostedAt({ discover_photo_url: 'https://x/p.png', created_at: '2026-10-01T00:00:00Z' }), Date.parse('2026-10-01T00:00:00Z'));
+});
+
+test('welcome: continents alternate Latin America / Asia, over 7 days it is 4/3 or 3/4', () => {
+  assert.deepEqual([...t.LATAM].sort(), ['Argentine', 'Brésil', 'Colombie', 'Mexique']);
+  assert.ok(t.ASIA.has('Japon') && t.ASIA.has('Corée du Sud') && t.ASIA.has('Philippines') && t.ASIA.has('Inde'));
+  assert.equal(t.continentOf('Colombie'), 'latam');
+  assert.equal(t.continentOf('Japon'), 'asia');
+  assert.equal(t.continentOf('France'), '');
+  assert.equal(t.nextContinent(['latam']), 'asia');
+  assert.equal(t.nextContinent(['asia']), 'latam');
+  assert.equal(t.nextContinent(['latam', 'asia']), 'latam');
+  for (const rnd of [() => 0.1, () => 0.9]) {
+    const seq = [];
+    for (let day = 0; day < 7; day++) seq.push(t.nextContinent(seq, rnd));
+    const latam = seq.filter((c) => c === 'latam').length;
+    assert.ok(latam === 3 || latam === 4, seq.join(','));
+    for (let i = 1; i < seq.length; i++) assert.notEqual(seq[i], seq[i - 1]); // jamais deux de suite
+  }
+  // Les deux ordres existent (au hasard pour la première).
+  assert.equal(t.nextContinent([], () => 0.1), 'latam');
+  assert.equal(t.nextContinent([], () => 0.9), 'asia');
+});
