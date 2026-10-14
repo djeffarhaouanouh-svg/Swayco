@@ -1,12 +1,12 @@
--- Discover : 150 swipes par jour pour un compte gratuit, illimité pour le Pro,
+-- Discover : 100 swipes par jour pour un compte gratuit, illimité pour le Pro,
 -- quel que soit le pays.
 --
--- Le paquet du jour = les cartes que la base renvoie. L'app demande un lot de 300
--- (le double du paquet de 150, pour pouvoir équilibrer hommes / continents) ; la
+-- Le paquet du jour = les cartes que la base renvoie. L'app demande un lot de 200
+-- (le double du paquet de 100, pour pouvoir équilibrer hommes / continents) ; la
 -- base plafonne ce lot elle-même, pour qu'une app modifiée ne puisse pas en
 -- demander davantage :
 --
---   * compte gratuit      : au plus 300 lignes (soit 150 cartes après équilibrage)
+--   * compte gratuit      : au plus 200 lignes (soit 100 cartes après équilibrage)
 --   * Pro / Plus / Ultra  : au plus 1 000 lignes (paquet de 400 cartes, illimité en pratique)
 --
 -- « Pro » = is_pro vrai OU subscription_tier différent de 'free' (le balayage
@@ -91,7 +91,7 @@ as $$
             md5(p.id::text || p_user_id::text || current_date::text)
    limit least(
      greatest(coalesce(p_limit, 50), 0),
-     case when (select unlimited from me) then 1000 else 300 end
+     case when (select unlimited from me) then 1000 else 200 end
    );
 $$;
 

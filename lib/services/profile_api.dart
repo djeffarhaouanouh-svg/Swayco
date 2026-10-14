@@ -1459,7 +1459,7 @@ abstract final class ProfileApi {
       // Les hommes ne sont que ~14 % des profils : le lot de 50 tiré au hasard
       // n'en contenait que 7 environ.
       final unfiltered = countryList.isEmpty && langs.isEmpty;
-      // Gratuit : [limit] swipes par jour (150). Pro : paquet beaucoup plus long,
+      // Gratuit : [limit] swipes par jour (100). Pro : paquet beaucoup plus long,
       // illimité en pratique. Le plafond est AUSSI posé côté base (migration 0074).
       RemoteProfile? meRow;
       try {
@@ -1564,13 +1564,13 @@ abstract final class ProfileApi {
 
 /// Swipes par jour pour un compte gratuit : c'est la taille du paquet du jour,
 /// quel que soit le pays. Le Pro n'a pas de limite (voir [kDiscoverProDeckSize]).
-const int kDiscoverDailySwipes = 150;
+const int kDiscoverDailySwipes = 100;
 
 /// Taille du paquet d'un compte Pro : « illimité » en pratique.
 const int kDiscoverProDeckSize = 400;
 
 /// Taille MINIMALE du lot demandé à la base pour un Discover SANS filtre ; on
-/// demande en fait le double du paquet voulu (150 cartes → 300). Mesuré sur 60
+/// demande en fait le double du paquet voulu (100 cartes → 200). Mesuré sur 60
 /// spectateurs : 100 profils contiennent 13 hommes en moyenne (au moins 12
 /// dans 75 % des cas) ; 160 en donnent 21 mais chargent 60 % de plus.
 const int kDiscoverFetchSize = 100;

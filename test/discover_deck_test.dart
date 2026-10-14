@@ -1,4 +1,4 @@
-﻿import 'dart:math';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:livekit_translate/services/continents.dart';
@@ -256,7 +256,7 @@ void main() {
   });
   test('la taille du lot et la part minimale sont celles mesurées', () {
     expect(kDiscoverFetchSize, 100);
-    expect(kDiscoverDailySwipes, 150);
+    expect(kDiscoverDailySwipes, 100);
     expect((50 * kDiscoverMinMenShare).ceil(), 12);
   });
 }
