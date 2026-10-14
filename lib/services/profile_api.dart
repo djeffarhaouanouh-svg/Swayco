@@ -1442,11 +1442,17 @@ abstract final class ProfileApi {
           .where((c) => c.isNotEmpty)
           .toSet()
           .toList();
+      // Sans filtre : on demande un lot PLUS GRAND, puis on garde [limit]
+      // cartes dont au moins [kDiscoverMinMenShare] d'hommes. Les hommes ne
+      // sont que ~14 % des profils : le lot de 50 tiré au hasard n'en contenait
+      // que 7 environ.
+      final unfiltered = countryList.isEmpty && langs.isEmpty;
+      final fetchLimit = unfiltered ? limit * 3 + 10 : limit;
       final result = await _c.rpc(
         'discover_feed',
         params: {
           'p_user_id': myId,
-          'p_limit': limit,
+          'p_limit': fetchLimit,
           if (langs.isNotEmpty) 'p_languages': langs,
           if (countryList.isNotEmpty) 'p_countries': countryList,
         },
@@ -1508,6 +1514,7 @@ abstract final class ProfileApi {
           ),
       ];
       scored.sort((a, b) => b.$2.compareTo(a.$2));
+      if (unfiltered) return pickDiscoverDeck(scored, limit);
       return List<RemoteProfile>.unmodifiable(scored.map((s) => s.$1));
     } catch (e) {
       debugPrint('ProfileApi.fetchDiscoverFeed failed: $e');
@@ -1532,4 +1539,35 @@ abstract final class ProfileApi {
     }
     await _c.from('profiles').delete().eq('id', userId);
   }
+}
+
+/// Part minimale d'hommes dans un paquet Discover SANS filtre (30 % : 15 cartes
+/// sur 50). Ils ne sont que ~14 % des profils, donc sans cela ils sont rares.
+const double kDiscoverMinMenShare = 0.3;
+
+/// Garde [limit] cartes parmi [sorted] (déjà triées par score décroissant) en
+/// s'assurant qu'au moins [minMenShare] d'entre elles sont des hommes, quand il
+/// y en a assez dans le lot. Les meilleures cartes restent ; pour faire de la
+/// place aux hommes manquants, on retire les femmes les moins bien classées.
+List<RemoteProfile> pickDiscoverDeck(
+  List<(RemoteProfile, double)> sorted,
+  int limit, {
+  double minMenShare = kDiscoverMinMenShare,
+}) {
+  bool isMan((RemoteProfile, double) s) => s.$1.gender == 'm';
+  final minMen = (limit * minMenShare).ceil();
+  final deck = sorted.take(limit).toList();
+  var men = deck.where(isMan).length;
+  if (men < minMen) {
+    final extra = sorted.skip(limit).where(isMan).take(minMen - men);
+    for (final man in extra) {
+      final drop = deck.lastIndexWhere((s) => !isMan(s));
+      if (drop < 0) break;
+      deck.removeAt(drop);
+      deck.add(man);
+      men++;
+    }
+    deck.sort((a, b) => b.$2.compareTo(a.$2));
+  }
+  return List<RemoteProfile>.unmodifiable(deck.map((s) => s.$1));
 }
