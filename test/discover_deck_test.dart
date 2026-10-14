@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:livekit_translate/services/continents.dart';
 import 'package:livekit_translate/services/profile_api.dart';
 
-RemoteProfile _p(String id, String gender, [String country = '']) => RemoteProfile(
+RemoteProfile _p(String id, String gender, [String country = '', bool isAi = true, bool boosted = false]) => RemoteProfile(
       id: id,
       handle: id,
       displayName: id,
@@ -13,6 +13,8 @@ RemoteProfile _p(String id, String gender, [String country = '']) => RemoteProfi
       avatarUrl: '',
       gender: gender,
       country: country,
+      isAi: isAi,
+      boostedUntil: boosted ? DateTime.now().add(const Duration(hours: 1)) : null,
     );
 
 /// [n] profils déjà triés par score décroissant : les hommes aux positions
@@ -193,11 +195,72 @@ void main() {
     expect(deck.length, 50);
     expect(_men(deck), 12); // seul le quota d'hommes joue
   });
+  // ── Les vrais comptes d'abord ──────────────────────────────────────────────
+  test('un vrai compte n\'est jamais retiré pour équilibrer, même mal classé', () {
+    // Lot dominé par l'Amérique latine ; 3 vrais comptes latins, tout en bas du top 50.
+    final lot = <(RemoteProfile, double)>[];
+    for (var i = 0; i < 100; i++) {
+      final humain = i == 45 || i == 47 || i == 49;
+      final pays = i < 70 ? 'Argentine' : (i.isEven ? 'Japon' : 'France');
+      lot.add((_p('p$i', 'f', pays, !humain), (100 - i).toDouble()));
+    }
+    for (var s = 0; s < 50; s++) {
+      final deck = pickDiscoverDeck(lot, 50, rng: Random(s));
+      for (final id in ['p45', 'p47', 'p49']) {
+        expect(deck.any((p) => p.id == id), isTrue, reason: 'graine $s : $id retiré');
+      }
+      expect(deck.length, 50);
+    }
+  });
+
+  test('le bonus de score d\'un vrai compte dépasse tous les autres critères réunis', () {
+    // intention 25 + intérêts 4x15 + catégorie 30 + connexion 30 + pays 35 + langue 30 + popularité ~36
+    expect(kDiscoverHumanBonus, greaterThan(25 + 60 + 30 + 30 + 35 + 30 + 40));
+  });
+
+  test('un vrai compte lit is_ai : faux par défaut, vrai quand la base le dit', () {
+    expect(RemoteProfile.fromMap({'id': 'u1', 'is_ai': true}).isAi, isTrue);
+    expect(RemoteProfile.fromMap({'id': 'u2', 'is_ai': false}).isAi, isFalse);
+    expect(RemoteProfile.fromMap({'id': 'u3'}).isAi, isFalse);
+  });
+  // ── Les boosts passent au-dessus de tout ───────────────────────────────────
+  test('le boost vaut plus que le bonus d\'un vrai compte et que tout le reste', () {
+    expect(kDiscoverBoostBonus, greaterThan(kDiscoverHumanBonus + 25 + 60 + 30 + 30 + 35 + 30 + 40));
+  });
+
+  test('un profil boosté est conservé et reste tout en haut du paquet', () {
+    // 100 cartes ; 2 boostées (IA) classées bas dans le top 50 d'origine et 1 juste dehors.
+    final lot = <(RemoteProfile, double)>[];
+    for (var i = 0; i < 100; i++) {
+      final boost = i == 40 || i == 48;
+      final pays = i < 70 ? 'Argentine' : (i.isEven ? 'Japon' : 'France');
+      lot.add((_p('p$i', 'f', pays, true, boost), (100 - i).toDouble()));
+    }
+    for (var s = 0; s < 80; s++) {
+      final deck = pickDiscoverDeck(lot, 50, rng: Random(s));
+      final tete = deck.take(2).map((p) => p.id).toSet();
+      expect(tete, {'p40', 'p48'}, reason: 'graine $s : les boostés ne sont pas en tête');
+      expect(deck.length, 50);
+    }
+  });
+
+  test('boosté et vrai compte : le boosté est devant', () {
+    final lot = [
+      (_p('humain', 'f', 'Argentine', false), 1000.0),
+      (_p('boost', 'f', 'Argentine', true, true), 10000.0),
+      for (var i = 0; i < 60; i++) (_p('x$i', 'f', 'Argentine'), (50 - i).toDouble()),
+    ]..sort((a, b) => b.$2.compareTo(a.$2));
+    final deck = pickDiscoverDeck(lot, 50, rng: Random(1));
+    expect(deck.first.id, 'boost');
+    expect(deck.any((p) => p.id == 'humain'), isTrue);
+  });
   test('la taille du lot et la part minimale sont celles mesurées', () {
     expect(kDiscoverFetchSize, 100);
     expect((50 * kDiscoverMinMenShare).ceil(), 12);
   });
 }
+
+
 
 
 

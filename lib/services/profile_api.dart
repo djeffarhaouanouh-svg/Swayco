@@ -36,6 +36,7 @@ class RemoteProfile {
     this.lastSeen,
     this.nameChangedAt,
     this.boostedUntil,
+    this.isAi = false,
     this.age,
     this.heightCm,
     this.job = '',
@@ -193,6 +194,10 @@ class RemoteProfile {
   /// backend's RevenueCat webhook; a DB trigger ignores client writes.
   final DateTime? boostedUntil;
 
+  /// Compte piloté par l'IA (profiles.is_ai). Jamais affiché : sert seulement au
+  /// classement de Discover, qui favorise les VRAIS comptes.
+  final bool isAi;
+
   bool get isBoosted {
     final until = boostedUntil;
     return until != null && until.isAfter(DateTime.now());
@@ -291,6 +296,7 @@ class RemoteProfile {
     lastSeen: _parseDate(m['last_seen']),
     nameChangedAt: _parseDate(m['display_name_changed_at']),
     boostedUntil: _parseDate(m['boosted_until']),
+    isAi: m['is_ai'] == true,
   );
 
   /// Returns a copy with the given fields overridden. Used by the few call
@@ -361,6 +367,7 @@ class RemoteProfile {
     lastSeen: lastSeen ?? this.lastSeen,
     nameChangedAt: nameChangedAt ?? this.nameChangedAt,
     boostedUntil: boostedUntil,
+    isAi: isAi,
   );
 }
 
@@ -1310,6 +1317,10 @@ abstract final class ProfileApi {
   ) {
     double s = 0;
 
+    // Un VRAI compte passe devant les comptes IA, quel que soit le reste du score
+    // (langue, pays, intérêts…) : quand il y en a, on les voit d'abord.
+    if (!p.isAi) s += kDiscoverHumanBonus;
+
     // Same persona category ("what defines you most", e.g. both "Sportif")
     // — one flat bonus, the strongest single "who you are" signal, on par
     // with the same-intent bonus below.
@@ -1372,9 +1383,9 @@ abstract final class ProfileApi {
 
     if (p.bio.trim().isNotEmpty) s += 8;
 
-    // Paid Boost (24 h): large enough to lift a profile near the top of
-    // most decks, without guaranteeing first place over strong matches.
-    if (p.isBoosted) s += 120;
+    // Boost payant (24 h) : passe AU-DESSUS de tout, y compris des vrais comptes
+    // (kDiscoverHumanBonus) : un boost garantit le haut du paquet.
+    if (p.isBoosted) s += kDiscoverBoostBonus;
 
     // Du hasard assez fort pour mélanger des profils de même profil, au lieu de
     // les laisser dans l'ordre où ils sont arrivés.
@@ -1557,6 +1568,14 @@ const double kDiscoverMinMenShare = 0.24;
 /// 40 % (20). Sans cela l'Amérique latine (48 % des profils) écrase l'Asie
 /// (18 %), qui tombait parfois à 3 cartes sur 50.
 const double kDiscoverMinContinentShare = 0.2;
+
+/// Bonus de score d'un vrai compte (non IA) dans Discover : bien plus que tous les
+/// autres critères réunis, donc il passe devant.
+const double kDiscoverHumanBonus = 1000;
+
+/// Bonus de score d'un profil boosté : au-dessus du bonus d'un vrai compte et de
+/// tous les autres critères réunis. Le boost passe donc devant tout le monde.
+const double kDiscoverBoostBonus = 10000;
 const double kDiscoverMaxContinentShare = 0.4;
 
 /// Compose le paquet de [limit] cartes à partir de [sorted] (triées par score
@@ -1603,6 +1622,8 @@ List<RemoteProfile> pickDiscoverDeck(
   // L'échange « [cand] entre, [out] sort » respecte-t-il tous les minimums et
   // maximums après coup ?
   bool pairOk((RemoteProfile, double) cand, (RemoteProfile, double) out) {
+    // Un vrai compte et un profil boosté ne sont JAMAIS retirés pour équilibrer.
+    if (!out.$1.isAi || out.$1.isBoosted) return false;
     if (isMan(out) && !isMan(cand) && men() - 1 < minMen) return false;
     final cc = cont(cand);
     final oc = cont(out);
@@ -1670,6 +1691,8 @@ List<RemoteProfile> pickDiscoverDeck(
   final n = deck.length;
   final r = rng ?? Random();
   var seq = _spreadAmong(natural, forced, n, r);
+  // Les profils boostés restent TOUT EN HAUT (le mélange ne les décale pas).
+  seq = [...seq.where((s) => s.$1.isBoosted), ...seq.where((s) => !s.$1.isBoosted)];
 
   // Quand des hommes ont été ajoutés, TOUS les hommes sont répartis dans le
   // paquet (sinon ils se regroupent) ; les autres gardent leur ordre.
