@@ -17,6 +17,10 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const APPLY = process.argv.includes('--apply');
+// --uniquify : en plus des prénoms composés, on rend DISTINCTS les prénoms partagés (le premier porteur le garde).
+// --countries=Argentine,Colombie,Brésil : ne traite que ces pays.
+const UNIQ = process.argv.includes('--uniquify');
+const ONLY = ((process.argv.find((a) => a.startsWith('--countries=')) || '').split('=')[1] || '').split(',').filter(Boolean);
 const env = Object.fromEntries(
   readFileSync(resolve(import.meta.dirname, '..', '.env.local'), 'utf8')
     .split('\n').map((l) => l.trim())
@@ -80,6 +84,10 @@ const MORE = {
   fr: w('Adeline, Agathe, Albane, Alexia, Alicia, Amélie, Anaëlle, Andréa, Angelina, Annabelle, Apolline, Audrey, Aurore, Bérénice, Camélia, Carole, Cathy, Céline, Chiara, Claire, Clarisse, Colombe, Constance, Corinne, Cynthia, Dorine, Éléonore, Élisa, Émeline, Emmanuelle, Eugénie, Gaëlle, Héloïse, Hortense, Jessica, Joséphine, Julia, Justine, Karine, Laura, Laure, Léonie, Lilou, Lise, Lisa, Louna, Lucile, Madeleine, Maélys, Maeva, Margot, Marie, Marianne, Maud, Mia, Mila, Nadia, Nathalie, Nina, Noa, Olivia, Perrine, Rose, Roxane, Sabrina, Servane, Sidonie, Sofia, Sophie, Stéphanie, Suzanne, Sylvie, Tiphaine, Valentine, Vanessa, Violette, Zélie'),
 };
 for (const [k, v] of Object.entries(MORE)) EXTRA[k] = [...new Set([...EXTRA[k], ...v])];
+// Prénoms portugais / brésiliens supplémentaires (réels).
+EXTRA.pt = [...new Set([...EXTRA.pt, ...w('Aisha, Alanis, Alexia, Amabile, Amora, Analice, Aparecida, Ayla, Bella, Benedita, Bernadete, Betina, Brisa, Cacau, Camile, Cândida, Carmem, Cassiane, Cleide, Creusa, Dalila, Dalva, Dirce, Dora, Edna, Eleonora, Elis, Eliza, Elza, Emanuela, Emília, Esther, Fátima, Fabrícia, Flora, Franciele, Gal, Gláucia, Gleice, Hadassa, Hellen, Hortência, Inês, Iracema, Irene, Isaura, Ivete, Jacira, Jandira, Joice, Jussara, Karla, Kátia, Késia, Lara, Leda, Leonor, Lia, Lígia, Liliane, Lourdes, Lucélia, Lucimara, Luzia, Maitê, Marilene, Marta, Mayara, Meire, Mirian, Neide, Nádia, Nathália, Odete, Olga, Palmira, Poliana, Raissa, Rosângela, Ruth, Sandy, Selma, Sheila, Silvana, Solange, Tereza, Thaynara, Valdirene, Valéria, Vânia, Vilma, Zilda, Zuleica, Abgail, Adriana, Agnes, Alba, Alma, Amara, Ana Júlia, Anabela, Anelise, Antonela, Arlete, Aurélia, Bárbara, Bernarda, Brígida, Cacilda, Camélia, Carlota, Carminha, Cátia, Celeste, Celina, Cibele, Cinara, Clívia, Dália, Dayse, Diva, Domingas, Dulce, Eda, Eglantina, Elida, Elisabete, Elô, Eunice, Evani, Filomena, Francine, Gessica, Glória, Graça, Guiomar, Hilda, Ilda, Ilka, Iolanda, Irís, Isa, Jamile, Jane, Janete, Jenifer, Joelma, Judite, Kamilly, Kelen, Kiara, Lana, Lenita, Lilia, Lucinda, Lurdes, Madalena, Mafalda, Marcia, Margarida, Marly, Matilde, Mirela, Mylena, Nara, Natasha, Nelma, Nilce, Noeli, Norma, Ofélia, Ondina, Pérola, Rosana, Rosália, Rute, Sabina, Sueli, Teresinha, Ubiratana, Vanda, Verônica, Zélia')])];
+// Prénoms espagnols / latino-américains supplémentaires (réels).
+EXTRA.es = [...new Set([...EXTRA.es, ...w('Abril, Adriana, Aída, Ainara, Alba, Alejandra, Alexa, Alexia, Alina, Allison, Amaia, Amalia, Amanda, Amelia, Anahí, Andrea, Ángela, Angie, Ariadna, Ariana, Astrid, Aylín, Bea, Beatriz, Berenice, Betina, Brianna, Camelia, Candela, Carina, Carlota, Cassandra, Catherine, Celia, Cintia, Claudia, Clarisa, Cloe, Cristal, Dafne, Daiana, Dariana, Débora, Elba, Eleonora, Elisa, Elsa, Emily, Estela, Estrella, Eva, Fabiana, Federica, Fernanda, Fiorella, Francesca, Gala, Gema, Georgina, Gimena, Giuliana, Gladys, Helena, Ileana, Irene, Iris, Ivanna, Jacqueline, Jennifer, Jenny, Joana, Jordana, Josefa, Judith, Julia, Kiara, Laia, Larissa, Lía, Lilian, Lina, Lisandra, Lucero, Lucrecia, Luisa, Luz, Maia, Mailén, Manuela, Marcia, Margarita, Marina, Marta, Matilde, Mirta, Mora, Nahir, Naiara, Nancy, Natasha, Nelly, Nicole, Nina, Oriana, Penélope, Pía, Rafaela, Regina, Ruth, Samantha, Sasha, Serena, Sheyla, Shirley, Sonia, Stefanía, Tania, Tiziana, Trinidad, Uma, Úrsula, Vera, Viviana, Wendy, Xiomara, Yaneth, Yara, Yazmín, Zaira, Marlene, Rosalía, Abigaíl, Alma, Anabella, Analía, Bettina, Brenda, Carmela, Dulce, Eloísa, Fabiola, Gloria, Inmaculada, Jovana, Kimberly, Lupe, Maite, Nerea, Pilar, Rita, Selene, Tamara, Vilma, Zenaida')])];
 const POOL_LANG = {
   Argentine: 'es', Colombie: 'es', Espagne: 'es', Mexique: 'es', 'Brésil': 'pt', Portugal: 'pt',
   France: 'fr', Belgique: 'fr', Suisse: 'de', Allemagne: 'de', 'Suède': 'sv', Philippines: 'en', Inde: 'en',
@@ -108,9 +116,22 @@ const report = [];
 for (const [key, accts] of [...groups].sort()) {
   const [country, gender] = key.split('|');
   const lang = POOL_LANG[country];
-  const compounds = accts.filter((a) => isCompound(a.display_name));
+  if (ONLY.length && !ONLY.includes(country)) continue;
+  // À renommer : les prénoms composés, et (avec --uniquify) les prénoms déjà portés par un autre compte du groupe.
+  const seenNames = new Set();
+  const dupLosers = UNIQ
+    ? accts.filter((a) => {
+        if (isCompound(a.display_name)) return false;
+        const k = a.display_name.toLowerCase();
+        if (seenNames.has(k)) return true;
+        seenNames.add(k);
+        return false;
+      })
+    : [];
+  const compounds = [...accts.filter((a) => isCompound(a.display_name)), ...dupLosers];
   if (!compounds.length || !lang) continue;
-  const singles = accts.filter((a) => !isCompound(a.display_name));
+  const renamable = new Set(compounds);
+  const singles = accts.filter((a) => !renamable.has(a));
   // villes où chaque prénom est déjà porté
   const cities = new Map();
   const usedGlobal = new Set();
@@ -170,7 +191,7 @@ if (APPLY) {
       done++;
       const text = personas.get(p.id);
       if (text && text.includes(p.from)) {
-        const r = await db.from('ai_personas').update({ persona: text.split(p.from).join(p.to) }).eq('user_id', p.id);
+        const r = await db.from('ai_personas').update({ persona: text.replace(new RegExp('(?<![\\p{L}])' + p.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}])', 'gu'), p.to) }).eq('user_id', p.id);
         if (!r.error) personaDone++;
       }
     }));
