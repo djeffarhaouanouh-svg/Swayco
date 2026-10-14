@@ -229,6 +229,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         NavTab.select(NavTab.profile);
       case 'weekly_recap':
       case 'special_left':
+      case 'swipes_back':
       case 'country_open':
         NavTab.select(NavTab.discover);
       case 'online_broadcast':

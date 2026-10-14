@@ -422,6 +422,10 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
                             AppStrings.t('pw_arg_badge'),
                           ),
                           (
+                            'assets/icons/pro/pro_swipes.svg',
+                            AppStrings.t('pw_arg_swipes'),
+                          ),
+                          (
                             'assets/icons/pro/pro_qui_ma_like.svg',
                             AppStrings.t('pw_arg_likes'),
                           ),

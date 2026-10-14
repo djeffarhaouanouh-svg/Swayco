@@ -255,6 +255,50 @@ abstract final class LocalNotifications {
     }
   }
 
+  /// Stable id du rappel « tes swipes du jour sont de retour ».
+  static const int swipesBackId = 424245;
+
+  /// Programme, dans [after], « tu peux revenir swiper » : le quota gratuit du jour
+  /// est épuisé. Reprogrammer remplace le précédent (même id).
+  static Future<void> scheduleSwipesBackReminder({
+    required String title,
+    required String body,
+    required Duration after,
+  }) async {
+    if (kIsWeb) return;
+    await ensureReady();
+    final when = tz.TZDateTime.now(tz.UTC).add(after);
+    final android = AndroidNotificationDetails(
+      _messagesChannel.id,
+      _messagesChannel.name,
+      channelDescription: _messagesChannel.description,
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    try {
+      await _plugin.zonedSchedule(
+        swipesBackId,
+        title,
+        body,
+        when,
+        NotificationDetails(android: android, iOS: const DarwinNotificationDetails()),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: jsonEncode({'type': 'swipes_back'}),
+      );
+    } catch (_) {
+      // Un rappel de confort : jamais une erreur à montrer.
+    }
+  }
+
+  /// Annule « tu peux revenir swiper » (il reste des swipes, ou compte Pro).
+  static Future<void> cancelSwipesBackReminder() async {
+    if (kIsWeb) return;
+    await ensureReady();
+    await _plugin.cancel(swipesBackId);
+  }
+
   /// Annule le rappel « dernier message special » (plus aucun, ou deja fait).
   static Future<void> cancelSpecialLeftReminder() async {
     if (kIsWeb) return;

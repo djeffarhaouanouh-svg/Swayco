@@ -572,6 +572,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       final cursor = results[2] as String;
       final doneToday = results[3] as bool;
 
+      // Nouveau paquet du jour : le rappel « tes swipes sont de retour » a fait son travail.
+      if (!doneToday) unawaited(LocalNotifications.cancelSwipesBackReminder());
       setState(() {
         _myFriendships = friendships;
         _profiles = feed;
@@ -714,6 +716,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       if (!_filtered) {
         UserPrefs.markDiscoverDoneToday();
         UserPrefs.saveDiscoverCursor('');
+        unawaited(_scheduleSwipesBack());
       }
       return;
     }
@@ -731,6 +734,24 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         _showAdCard = true;
       }
     });
+  }
+
+  /// Quota gratuit épuisé : une notification quand les swipes reviennent (demain
+  /// 9 h, heure locale). Le Pro n'a pas de limite, donc pas de rappel.
+  Future<void> _scheduleSwipesBack() async {
+    try {
+      final me = await ProfileApi.fetchById(_myId);
+      if (me != null && (me.isPro || me.isPlus)) return;
+      final now = DateTime.now();
+      final next = DateTime(now.year, now.month, now.day + 1, 9);
+      await LocalNotifications.scheduleSwipesBackReminder(
+        title: AppStrings.t('swipes_back_title'),
+        body: AppStrings.t('swipes_back_body'),
+        after: next.difference(now),
+      );
+    } catch (_) {
+      // Un rappel de confort.
+    }
   }
 
   void _onActionUndo() {
