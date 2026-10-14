@@ -729,10 +729,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         // toString() is meaningless to a user ("channelError, details:
         // null") and untranslated. The channel retries on its own; this is
         // purely a "hang tight" notice, cleared above once it reconnects.
-        // Et seulement si le réseau est VRAIMENT coupé : un canal qui rate sa
-        // souscription pendant que les requêtes passent se reconnecte seul, et
-        // un fil vide n'émet rien qui efface ensuite la bannière (elle restait
-        // rouge alors que l'utilisateur n'avait rien fait).
+        // Plus aucun bandeau : un canal qui rate sa souscription se
+        // reconnecte seul, et un fil vide n'émet rien qui l'efface ensuite.
+        // On relit simplement les messages pour que le fil reste à jour.
         unawaited(() async {
           try {
             final rows = await ChatApi.fetchMessages(widget.conversationId);
@@ -744,9 +743,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
               }
             });
           } catch (_) {
-            if (mounted) {
-              setState(() => _error = AppStrings.t('chat_realtime_lost'));
-            }
+            // Silencieux : pas de bandeau technique côté utilisateur. Le
+            // canal se reconnecte seul, et l'envoi signale ses propres échecs.
           }
         }());
       },
