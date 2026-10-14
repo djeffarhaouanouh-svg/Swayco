@@ -108,7 +108,7 @@ function replyDelayMs(messageId) {
   return 5000 + (hash(String(messageId)) % 25000);
 }
 
-function utcDayStart(now = new Date()) {
+function utcDayStart(now = new Date(Date.now())) {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
     .toISOString();
 }
@@ -425,7 +425,7 @@ function systemPrompt(ai, personaRow, ownLang, level = 3, opts = {}) {
       ? [`Your profile bio, shown on your card: « ${String(ai.bio).trim()} ». Stay consistent with it, but never quote it word for word.`]
       : []),
     '',
-    'If someone asks whether you are an AI or a bot, answer in one very short, casual sentence in your own language. No technical explanation, no long disclaimer. Keep the conversation natural.',
+    'Your account is an AI account: never claim to be human. If someone sincerely asks whether you are an AI, a bot or a real person, answer honestly in one very short, casual sentence in your own language (no technical explanation, no long disclaimer), then carry on. You do not bring it up yourself. Keep the conversation natural.',
     `Write in ${LANG_NAME[ownLang] || 'English'} (YOUR own language), ALWAYS, whatever language they write in: never switch to theirs, never mix languages. The app translates your messages for them, as it does for everyone.`,
     '',
     ...WRITING_STYLE,
@@ -816,24 +816,57 @@ function isPhotoRequest(text) {
 const autoLikesToday = (sb, aiId) =>
   countActions(sb, { ai_id: aiId, kind: 'like', source: 'auto' }, utcDayStart());
 
-/** Un humain a like un compte IA : il lui rend son like (= match), un peu plus tard. */
+// ── Acceptation automatique des likes reçus ─────────────────────────────────
+// Un humain like un compte IA : elle peut lui rendre son like (= match), un peu
+// plus tard. Deux garde-fous :
+//   * AU PLUS 1 acceptation par personne et par jour (jour UTC) : quelqu'un qui
+//     like 100 IA n'obtient pas 100 matchs ; les autres likes restent sans suite.
+//   * Selon le niveau de l'IA : plus elle reçoit d'attention, plus elle est
+//     sélective. Le tirage est fixé une fois pour toutes pour ce like (stable,
+//     jamais re-tiré à chaque vérification).
+const AUTO_ACCEPT_PER_USER_PER_DAY = 1;
+const ACCEPT_CHANCE = { 3: 90, 2: 50, 1: 15 }; // % de likes acceptés, par niveau
+
+/** Ce like précis sera-t-il accepté ? Stable pour une même ligne `friendships`. */
+function acceptRoll(friendshipId, level) {
+  const pct = ACCEPT_CHANCE[level] ?? ACCEPT_CHANCE[3];
+  return hash(`accept:${friendshipId}`) % 100 < pct;
+}
+
+/** Acceptations automatiques déjà faites aujourd'hui pour cette personne. */
+async function autoAcceptsToday(sb, userId) {
+  const { count } = await sb.from('ai_actions').select('id', { count: 'exact', head: true })
+    .eq('target_id', userId).eq('kind', 'like').eq('source', 'auto').like('ref', 'fr:%')
+    .in('status', ['pending', 'running', 'done'])
+    .gte('created_at', utcDayStart());
+  return count || 0;
+}
+
+/** Un humain a like un compte IA : elle lui rend son like (= match), sous conditions. */
 async function autoAcceptLikes(ctx) {
   const { sb } = ctx;
-  const { data: rows } = await sb.from('friendships')
+  const { data: fetched } = await sb.from('friendships')
     .select('id, requester, addressee, created_at')
     .eq('status', 'pending')
     .gte('created_at', new Date(Date.now() - DAY).toISOString())
     .order('created_at', { ascending: false }).limit(500);
-  if (!rows || rows.length === 0) return 0;
+  if (!fetched || fetched.length === 0) return 0;
+  // Le plus ancien d'abord : avec 1 acceptation par jour, c'est son premier like qui compte.
+  const rows = [...fetched].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
   const aiSet = await aiIdsAmong(sb, rows.flatMap((r) => [r.addressee, r.requester]));
   let done = 0;
   for (const r of rows) {
     if (!aiSet.has(r.addressee) || aiSet.has(r.requester)) continue;
     // Entre 2 min et 1 h apres le like, stable pour cette ligne.
     if (Date.now() - Date.parse(r.created_at) < 120000 + (hash(r.id) % (58 * 60000))) continue;
+    // Selon son niveau, elle accepte ce like ou l'ignore (tirage stable).
+    const level = await attentionLevel(sb, r.addressee).catch(() => 3);
+    if (!acceptRoll(r.id, level)) continue;
     const ai = await getProfile(sb, r.addressee);
     if (!ai || !ai.is_ai || !isAwake(ai)) continue;
     if ((await autoLikesToday(sb, ai.id)) >= AUTO_LIKES_PER_DAY) continue;
+    // 1 acceptation par personne et par jour.
+    if ((await autoAcceptsToday(sb, r.requester)) >= AUTO_ACCEPT_PER_USER_PER_DAY) continue;
     const claim = await sb.from('ai_actions').insert({
       ai_id: ai.id, target_id: r.requester, kind: 'like', source: 'auto',
       ref: `fr:${r.id}`, status: 'running',
@@ -851,7 +884,6 @@ async function autoAcceptLikes(ctx) {
   }
   return done;
 }
-
 // ── Accueil : 7 IA sur 7 jours après la photo ────────────────────────────────
 //
 // Une personne qui poste sa photo reçoit des likes d'IA : 2 le premier jour,
@@ -1071,6 +1103,7 @@ module.exports = {
     levelFor, levelWithHysteresis, nextLevel, replyDelayForLevel, REPLIES_BY_LEVEL,
     DELAY_BY_LEVEL, MAX_DELAY_MS, REPLY_WINDOW_MS, STYLE_WEIGHTS, pickStyle,
     welcomeTarget, welcomeSequence, continentOf, photoPostedAt, WELCOME_DAYS, WELCOME_LIKES_TOTAL, LATAM, ASIA, autoWelcome,
+    autoAcceptLikes, acceptRoll, ACCEPT_CHANCE, AUTO_ACCEPT_PER_USER_PER_DAY,
     sleepWindow, isAwakeAt, isPhotoRequest, isInsult, generate, tidyReply, cleanPersona, localClock,
   },
 };

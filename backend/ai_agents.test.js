@@ -376,3 +376,25 @@ test('the prompt asks for a tiny "and you?" after get-to-know-you questions', ()
   assert.match(p, /ALWAYS answer it in a few words AND end with a tiny "and you\?"/);
 });
 
+
+// ── Acceptation automatique : 1 par personne et par jour, selon le niveau ───
+
+test('auto-accept: the chance depends on the level and is fixed per like', () => {
+  assert.deepEqual(t.ACCEPT_CHANCE, { 3: 90, 2: 50, 1: 15 });
+  assert.equal(t.AUTO_ACCEPT_PER_USER_PER_DAY, 1);
+  const N = 30000;
+  const share = {};
+  for (const level of [3, 2, 1]) {
+    let ok = 0;
+    for (let i = 0; i < N; i++) if (t.acceptRoll(`row-${i}`, level)) ok++;
+    share[level] = ok / N;
+    assert.ok(Math.abs(share[level] - t.ACCEPT_CHANCE[level] / 100) < 0.02, `L${level}: ${share[level]}`);
+    // Stable : le même like donne toujours la même réponse (pas de nouveau tirage).
+    assert.equal(t.acceptRoll('row-7', level), t.acceptRoll('row-7', level));
+  }
+  assert.ok(share[3] > share[2] && share[2] > share[1]);
+  // Un like refusé à un niveau élevé l'est aussi à un niveau plus sélectif (même tirage, seuil plus bas).
+  for (let i = 0; i < 500; i++) {
+    if (t.acceptRoll(`row-${i}`, 1)) assert.equal(t.acceptRoll(`row-${i}`, 2) && t.acceptRoll(`row-${i}`, 3), true);
+  }
+});
