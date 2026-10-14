@@ -3053,9 +3053,9 @@ class _TinderCardState extends State<_TinderCard> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 28,
+                            fontSize: 22,
                             fontWeight: FontWeight.w900,
-                            letterSpacing: -0.4,
+                            letterSpacing: -0.3,
                             height: 1.1,
                             shadows: [
                               Shadow(color: Color(0x66000000), blurRadius: 10),
