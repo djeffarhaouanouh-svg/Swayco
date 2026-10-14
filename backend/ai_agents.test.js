@@ -307,21 +307,31 @@ test('insults are detected (silence for good); interjections, jokes and normal t
   for (const s of no) assert.equal(t.isInsult(s), false, s);
 });
 
-// ── Accueil : 1 IA par jour pendant 7 jours, Amérique latine / Asie ─────────
+// ── Accueil : 2 IA le premier jour, puis 1 par jour, 0 le 7e jour ───────────
 
-test('welcome: one more AI each day for 7 days, none after, none before the photo', () => {
+test('welcome: 2 the first day, then +1 a day, 7 in all, nothing on day 7, nothing outside', () => {
   const D = 24 * 3600 * 1000;
   const t0 = Date.parse('2026-10-14T10:00:00Z');
   const want = (hoursAfter) => t.welcomeTarget(t0, t0 + hoursAfter * 3600 * 1000);
-  assert.equal(want(0), 1);
-  assert.equal(want(23), 1);
-  assert.equal(want(24), 2);
-  assert.equal(want(6 * 24 + 5), 7);
+  assert.equal(want(0), 2); // le jour de la photo : 2
+  assert.equal(want(23), 2);
+  assert.equal(want(24), 3);
+  assert.equal(want(2 * 24), 4);
+  assert.equal(want(3 * 24), 5);
+  assert.equal(want(4 * 24), 6);
+  assert.equal(want(5 * 24), 7); // 6e jour : le 7e like
+  assert.equal(want(6 * 24), 7); // 7e jour : rien de plus
   assert.equal(want(7 * 24 - 1), 7);
-  assert.equal(want(7 * 24), 0); // la fenêtre de 7 jours est finie
-  assert.equal(want(-3), 0); // photo « dans le futur »
-  assert.equal(t.welcomeTarget(t0 - 30 * D, t0), 0); // photo ancienne : pas de programme
-  assert.equal(t.WELCOME_DAYS, 7);
+  assert.equal(want(7 * 24), 0); // fenêtre finie
+  assert.equal(want(-3), 0);
+  assert.equal(t.welcomeTarget(t0 - 30 * D, t0), 0);
+  // Nombre de nouveaux likes par jour : 2, 1, 1, 1, 1, 1, 0 = 7.
+  const perDay = [];
+  let prev = 0;
+  for (let d = 0; d < 7; d++) { const w = want(d * 24 + 1); perDay.push(w - prev); prev = w; }
+  assert.deepEqual(perDay, [2, 1, 1, 1, 1, 1, 0]);
+  assert.equal(perDay.reduce((a, b) => a + b, 0), t.WELCOME_LIKES_TOTAL);
+  assert.equal(t.WELCOME_LIKES_TOTAL, 7);
 });
 
 test('welcome: the photo date comes from the file name, else from sign-up', () => {
@@ -333,23 +343,25 @@ test('welcome: the photo date comes from the file name, else from sign-up', () =
   assert.equal(t.photoPostedAt({ discover_photo_url: 'https://x/p.png', created_at: '2026-10-01T00:00:00Z' }), Date.parse('2026-10-01T00:00:00Z'));
 });
 
-test('welcome: continents alternate Latin America / Asia, over 7 days it is 4/3 or 3/4', () => {
+test('welcome: 7 AIs split Latin America / Asia 4-3 or 3-4; the first two differ; stable per person', () => {
   assert.deepEqual([...t.LATAM].sort(), ['Argentine', 'Brésil', 'Colombie', 'Mexique']);
   assert.ok(t.ASIA.has('Japon') && t.ASIA.has('Corée du Sud') && t.ASIA.has('Philippines') && t.ASIA.has('Inde'));
   assert.equal(t.continentOf('Colombie'), 'latam');
   assert.equal(t.continentOf('Japon'), 'asia');
   assert.equal(t.continentOf('France'), '');
-  assert.equal(t.nextContinent(['latam']), 'asia');
-  assert.equal(t.nextContinent(['asia']), 'latam');
-  assert.equal(t.nextContinent(['latam', 'asia']), 'latam');
-  for (const rnd of [() => 0.1, () => 0.9]) {
-    const seq = [];
-    for (let day = 0; day < 7; day++) seq.push(t.nextContinent(seq, rnd));
-    const latam = seq.filter((c) => c === 'latam').length;
-    assert.ok(latam === 3 || latam === 4, seq.join(','));
-    for (let i = 1; i < seq.length; i++) assert.notEqual(seq[i], seq[i - 1]); // jamais deux de suite
+  let latamMajor = 0, asiaMajor = 0, firstLatam = 0;
+  for (let i = 0; i < 400; i++) {
+    const seq = t.welcomeSequence(`user-${i}`);
+    assert.equal(seq.length, 7);
+    const l = seq.filter((c) => c === 'latam').length;
+    assert.ok(l === 3 || l === 4, `user-${i}: ${seq.join(',')}`);
+    assert.equal(seq.length - l, 7 - l);
+    assert.notEqual(seq[0], seq[1]); // les deux du premier jour : un de chaque
+    assert.deepEqual(t.welcomeSequence(`user-${i}`), seq); // stable : même personne, même suite
+    if (l === 4) latamMajor++; else asiaMajor++;
+    if (seq[0] === 'latam') firstLatam++;
   }
-  // Les deux ordres existent (au hasard pour la première).
-  assert.equal(t.nextContinent([], () => 0.1), 'latam');
-  assert.equal(t.nextContinent([], () => 0.9), 'asia');
+  // Les deux répartitions et les deux ordres existent, à peu près à égalité.
+  assert.ok(latamMajor > 120 && asiaMajor > 120, `${latamMajor}/${asiaMajor}`);
+  assert.ok(firstLatam > 120 && firstLatam < 280, `${firstLatam}`);
 });

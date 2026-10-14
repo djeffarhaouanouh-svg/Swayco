@@ -36,8 +36,8 @@ const HISTORY_MESSAGES = 14;
 // réponses ; à vider quand le test est fini. Le répondeur tourne toutes les
 // 15 s : « tout de suite » = quelques secondes.
 const TEST_INSTANT_TARGETS = new Set([
-  // Mode test terminé : horaires, délais et quotas normaux pour tout le monde.
-  // Pour retester, ajouter l'id du compte ici (ex. lou-2f80fb : 2f80fb98-8e65-4078-adce-9b2a144654f6).
+  // Mode test actif pour ces comptes seulement. Pour le terminer : vider la liste.
+  '2f80fb98-8e65-4078-adce-9b2a144654f6', // lou-2f80fb
 ]);
 // Doit couvrir le plus long délai (MAX_DELAY_MS : 10 h) PLUS l'attente du
 // réveil quand le délai tombe la nuit (≤ 11 h : coucher 23 h, réveil 10 h) :
@@ -754,7 +754,7 @@ function isAwakeAt(ai, hour) {
 }
 
 /** « Tuesday 04:42 » à l'heure du pays de l'IA (vide si le fuseau est inconnu). */
-function localClock(country, at = new Date()) {
+function localClock(country, at = new Date(Date.now())) {
   try {
     return new Intl.DateTimeFormat('en-GB', {
       timeZone: tzOf(country), weekday: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
@@ -765,7 +765,7 @@ function localClock(country, at = new Date()) {
 }
 
 function isAwake(ai) {
-  const p = localParts(tzOf(ai.country));
+  const p = localParts(tzOf(ai.country), new Date(Date.now()));
   return !p || isAwakeAt(ai, p.hour);
 }
 
@@ -849,15 +849,16 @@ async function autoAcceptLikes(ctx) {
   return done;
 }
 
-// ── Accueil : une IA par jour pendant 7 jours après la photo ─────────────────
+// ── Accueil : 7 IA sur 7 jours après la photo ────────────────────────────────
 //
-// Une personne qui poste sa photo reçoit UN like d'IA par jour pendant 7 jours
-// (au plus 7 en tout, pour qu'on ne puisse pas en tirer plus en supprimant puis
-// en reposant sa photo). Plus de photo → plus rien : les likes déjà programmés
-// sont annulés, et l'exécution revérifie la photo. Les IA alternent Amérique
-// latine / Asie (4/3 ou 3/4 sur les 7 jours, dans un ordre qui change d'une
-// personne à l'autre).
-const WELCOME_DAYS = 7;
+// Une personne qui poste sa photo reçoit des likes d'IA : 2 le premier jour,
+// puis 1 par jour, et RIEN le 7e jour — 7 en tout (2+1+1+1+1+1+0), jamais plus,
+// même en supprimant puis en reposant sa photo. Plus de photo → plus rien : les
+// likes déjà programmés sont annulés, et l'exécution revérifie la photo. Les IA
+// se partagent entre Amérique latine et Asie (4/3 ou 3/4, dans un ordre propre à
+// chaque personne ; les deux du premier jour viennent de continents différents).
+const WELCOME_DAYS = 7; // la fenêtre ; le dernier jour n'apporte plus de like
+const WELCOME_LIKES_TOTAL = 7;
 const LATAM = new Set(['Mexique', 'Argentine', 'Colombie', 'Brésil']);
 const ASIA = new Set(['Japon', 'Corée du Sud', 'Philippines', 'Inde', 'Chine']);
 
@@ -875,21 +876,43 @@ function photoPostedAt(p) {
   return Date.parse(p.created_at) || 0;
 }
 
-/** Combien d'IA elle doit avoir reçues à cet instant : 1 le jour même, 2 le lendemain… 7 au plus. */
+/** Combien d'IA elle doit avoir reçues à cet instant : 2 le jour même, puis +1 par jour, 7 au plus (atteint le 6e jour ; le 7e : rien de plus). */
 function welcomeTarget(postedAtMs, nowMs = Date.now()) {
   const day = Math.floor((nowMs - postedAtMs) / DAY);
-  if (day < 0 || day >= WELCOME_DAYS) return 0; // photo trop ancienne : pas de programme
-  return Math.min(WELCOME_DAYS, day + 1);
+  if (day < 0 || day >= WELCOME_DAYS) return 0; // hors fenêtre : pas de programme
+  return Math.min(WELCOME_LIKES_TOTAL, day + 2);
 }
 
-/** Le continent de la PROCHAINE IA : l'inverse de la dernière ; au hasard pour la première. */
-function nextContinent(previous, rand = Math.random) {
-  const last = previous[previous.length - 1];
-  if (last === 'latam') return 'asia';
-  if (last === 'asia') return 'latam';
-  return rand() < 0.5 ? 'latam' : 'asia';
+/** Petit générateur pseudo-aléatoire stable (mulberry32) : même personne, même suite. */
+function seededRand(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
+/**
+ * Les 7 continents des 7 IA d'une personne, fixés une fois pour toutes par son
+ * identifiant : 4 d'un continent et 3 de l'autre (celui qui en a 4 dépend de la
+ * personne), les DEUX PREMIÈRES (le premier jour) de continents différents, le
+ * reste mélangé. Pas d'alternance stricte.
+ */
+function welcomeSequence(userId) {
+  const rand = seededRand(hash(`welcome:${userId}`));
+  const major = rand() < 0.5 ? 'latam' : 'asia';
+  const minor = major === 'latam' ? 'asia' : 'latam';
+  const rest = [major, major, major, minor, minor];
+  for (let i = rest.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [rest[i], rest[j]] = [rest[j], rest[i]];
+  }
+  const firstTwo = rand() < 0.5 ? [major, minor] : [minor, major];
+  return [...firstTwo, ...rest];
+}
 async function sampleAiIn(sb, countries, oppositeOf, n) {
   const filt = (q) => {
     let r = q.eq('is_ai', true).in('country', countries);
@@ -942,13 +965,13 @@ async function autoWelcome(ctx) {
     if (target === 0) continue;
 
     // Ses likes d'accueil jusqu'ici (programmés, en cours ou faits), du plus ancien au plus récent.
-    const { data: past } = await sb.from('ai_actions').select('ai_id, created_at')
+    const { data: past } = await sb.from('ai_actions').select('ai_id, created_at, run_at')
       .eq('target_id', user.id).eq('kind', 'like').eq('source', 'auto').is('ref', null)
       .in('status', ['pending', 'running', 'done']).order('created_at', { ascending: true });
     const done = past || [];
     if (done.length >= target) continue; // en règle pour aujourd'hui
-    // Un seul par jour : pas deux en moins de 20 h, même en rattrapage.
-    if (done.length && now - Date.parse(done[done.length - 1].created_at) < 20 * 60 * 60 * 1000) continue;
+    // Au-delà des deux du premier jour : un seul par jour, pas deux en moins de 20 h (même en rattrapage).
+    if (done.length >= 2 && now - Date.parse(done[done.length - 1].created_at) < 20 * 60 * 60 * 1000) continue;
 
     // Continent et prénoms déjà vus.
     const pastIds = done.map((a) => a.ai_id);
@@ -956,9 +979,8 @@ async function autoWelcome(ctx) {
       ? await sb.from('profiles').select('id, country, display_name').in('id', pastIds)
       : { data: [] };
     const byId = Object.fromEntries((pastProfs || []).map((p) => [p.id, p]));
-    const prevContinents = pastIds.map((id) => continentOf((byId[id] || {}).country));
     const seenNames = new Set(pastIds.map((id) => String((byId[id] || {}).display_name || '').trim().toLowerCase()));
-    const continent = nextContinent(prevContinents);
+    const continent = welcomeSequence(user.id)[done.length];
     const countries = [...(continent === 'latam' ? LATAM : ASIA)];
 
     const cands = (await sampleAiIn(sb, countries, PREFER_OPPOSITE_GENDER ? user.gender : '', 60))
@@ -972,7 +994,9 @@ async function autoWelcome(ctx) {
         .or(`and(requester.eq.${ai.id},addressee.eq.${user.id}),and(requester.eq.${user.id},addressee.eq.${ai.id})`)
         .limit(1);
       if (fr && fr.length) continue;
-      const runAt = new Date(now + (10 + rnd(80)) * 60000).toISOString();
+      // Jamais deux presque en même temps : au moins 15 min après la précédente.
+      const lastRun = done.length ? Date.parse(done[done.length - 1].run_at) || 0 : 0;
+      const runAt = new Date(Math.max(now, lastRun + 15 * 60000) + (10 + rnd(80)) * 60000).toISOString();
       const ins = await sb.from('ai_actions').insert({
         ai_id: ai.id, target_id: user.id, kind: 'like', source: 'auto', run_at: runAt,
       });
@@ -1043,7 +1067,7 @@ module.exports = {
     hash, replyDelayMs, utcDayStart, containsCliche, systemPrompt, convIdFor, aiLabel,
     levelFor, levelWithHysteresis, nextLevel, replyDelayForLevel, REPLIES_BY_LEVEL,
     DELAY_BY_LEVEL, MAX_DELAY_MS, REPLY_WINDOW_MS, STYLE_WEIGHTS, pickStyle,
-    welcomeTarget, nextContinent, continentOf, photoPostedAt, WELCOME_DAYS, LATAM, ASIA, autoWelcome,
+    welcomeTarget, welcomeSequence, continentOf, photoPostedAt, WELCOME_DAYS, WELCOME_LIKES_TOTAL, LATAM, ASIA, autoWelcome,
     sleepWindow, isAwakeAt, isPhotoRequest, isInsult, generate, tidyReply, cleanPersona, localClock,
   },
 };
