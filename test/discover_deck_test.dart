@@ -1,9 +1,10 @@
 ﻿import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:livekit_translate/services/continents.dart';
 import 'package:livekit_translate/services/profile_api.dart';
 
-RemoteProfile _p(String id, String gender) => RemoteProfile(
+RemoteProfile _p(String id, String gender, [String country = '']) => RemoteProfile(
       id: id,
       handle: id,
       displayName: id,
@@ -11,6 +12,7 @@ RemoteProfile _p(String id, String gender) => RemoteProfile(
       avatarColor: '',
       avatarUrl: '',
       gender: gender,
+      country: country,
     );
 
 /// [n] profils déjà triés par score décroissant : les hommes aux positions
@@ -73,10 +75,12 @@ void main() {
     expect(pickDiscoverDeck(lotPauvre, 50, rng: Random(1)).map((p) => p.id).toList(), a);
   });
 
-  test('les femmes gardent l\'ordre de leur score, les hommes aussi', () {
+  test('les cartes non forcées gardent l\'ordre de leur score', () {
     final deck = pickDiscoverDeck(lotPauvre, 50, rng: Random(7));
-    final femmes = deck.where((p) => p.gender != 'm').map(_rank).toList();
-    final hommes = deck.where((p) => p.gender == 'm').map(_rank).toList();
+    // Les cartes forcées viennent du bas du lot (rang >= 50) ; les autres restent triées.
+    // Les hommes sont répartis dans tout le paquet : on compare femmes entre elles, hommes entre eux.
+    final femmes = deck.where((p) => p.gender != 'm').map(_rank).where((r) => r < 50).toList();
+    final hommes = deck.where((p) => p.gender == 'm').map(_rank).where((r) => r < 50).toList();
     expect(femmes, [...femmes]..sort());
     expect(hommes, [...hommes]..sort());
   });
@@ -106,8 +110,94 @@ void main() {
     expect(_men(pickDiscoverDeck(lot, 50, minMenShare: 0)), 0);
   });
 
+  // ── Équilibre entre continents ─────────────────────────────────────────────
+  const latam = ['Argentine', 'Colombie', 'Brésil', 'Mexique'];
+  const asia = ['Japon', 'Corée du Sud', 'Philippines', 'Inde'];
+  const europe = ['France', 'Allemagne', 'Espagne', 'Suède'];
+
+  /// Un lot réaliste : 48 % Amérique latine, 18 % Asie, 34 % Europe, 14 % d'hommes,
+  /// score au hasard.
+  List<(RemoteProfile, double)> lotReel(Random r, {int n = 100}) {
+    final out = <(RemoteProfile, double)>[];
+    for (var i = 0; i < n; i++) {
+      final x = r.nextDouble();
+      final pays = x < 0.48 ? latam : (x < 0.66 ? asia : europe);
+      out.add((_p('p$i', r.nextDouble() < 0.14 ? 'm' : 'f', pays[r.nextInt(4)]), r.nextDouble()));
+    }
+    out.sort((a, b) => b.$2.compareTo(a.$2));
+    return out;
+  }
+
+  int nbPays(Iterable<RemoteProfile> d, List<String> pays) =>
+      d.where((p) => pays.contains(p.country)).length;
+
+  test('chaque continent a entre 20 % et 40 % du paquet quand le lot le permet, avec les hommes', () {
+    final r = Random(5);
+    var tenables = 0;
+    for (var i = 0; i < 400; i++) {
+      final lot = lotReel(r);
+      final deck = pickDiscoverDeck(lot, 50, rng: Random(i));
+      expect(deck.length, 50);
+      expect(deck.map((p) => p.id).toSet().length, 50); // aucun doublon
+      final profils = lot.map((s) => s.$1);
+      // Les bornes ne sont tenables que si le lot a au moins 10 cartes de
+      // chaque continent et assez de place sous le plafond de 20.
+      final dispo = [latam, asia, europe].map((p) => nbPays(profils, p)).toList();
+      final tenable = dispo.every((n) => n >= 10) && dispo.fold<int>(0, (a, n) => a + (n < 20 ? n : 20)) >= 50;
+      if (tenable) {
+        tenables++;
+        for (final pays in [latam, asia, europe]) {
+          final n = nbPays(deck, pays);
+          expect(n, inInclusiveRange(10, 20), reason: 'lot $i : $pays = $n');
+        }
+      } else {
+        // Continent rare : on prend toutes les cartes qu'il y a.
+        final pauvre = [latam, asia, europe].where((p) => nbPays(profils, p) < 10);
+        for (final pays in pauvre) {
+          expect(nbPays(deck, pays), nbPays(profils, pays), reason: 'lot $i : $pays');
+        }
+      }
+      // Les hommes : 12 si le lot en a assez (sinon tous ceux qu'il a).
+      final hommesDuLot = profils.where((p) => p.gender == 'm').length;
+      expect(_men(deck), hommesDuLot >= 12 ? greaterThanOrEqualTo(12) : hommesDuLot, reason: 'lot $i');
+    }
+    expect(tenables, greaterThan(380)); // presque tous les lots réalistes sont tenables
+  });
+  test('l\'Asie, rare dans le lot, passe de quelques cartes à au moins 10', () {
+    // 100 cartes dont seulement 4 d'Asie, toutes bien en dessous du top 50.
+    final lot = [
+      for (var i = 0; i < 100; i++)
+        (_p('p$i', 'f', (i >= 70 && i < 74) ? 'Japon' : (i.isEven ? 'Argentine' : 'France')), (100 - i).toDouble()),
+    ];
+    final deck = pickDiscoverDeck(lot, 50, rng: Random(1));
+    expect(nbPays(deck, asia), 4); // on prend celles qu'il y a
+    expect(deck.length, 50);
+  });
+
+  test('les cartes forcées sont mélangées dans tout le paquet, y compris au début', () {
+    var dansLes10Premieres = 0, essais = 300;
+    final r = Random(11);
+    for (var i = 0; i < essais; i++) {
+      final lot = lotReel(r);
+      final deck = pickDiscoverDeck(lot, 50, rng: Random(i));
+      // Les 10 premières cartes contiennent des cartes d'au moins 2 continents.
+      final tete = deck.take(10).map((p) => continentOfCountry(p.country)).toSet();
+      if (tete.length >= 2) dansLes10Premieres++;
+    }
+    expect(dansLes10Premieres / essais, greaterThan(0.95));
+  });
+
+  test('pays inconnus ou vides : aucun quota, comportement d\'avant', () {
+    final lot = _lot(100, {for (var i = 55; i < 100; i++) i}); // pays vides
+    final deck = pickDiscoverDeck(lot, 50, rng: Random(2));
+    expect(deck.length, 50);
+    expect(_men(deck), 12); // seul le quota d'hommes joue
+  });
   test('la taille du lot et la part minimale sont celles mesurées', () {
     expect(kDiscoverFetchSize, 100);
     expect((50 * kDiscoverMinMenShare).ceil(), 12);
   });
 }
+
+
+

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_service.dart';
+import 'continents.dart';
 import 'debug_overlay.dart';
 import 'looking_for.dart';
 import 'app_settings.dart';
@@ -1551,59 +1552,168 @@ const int kDiscoverFetchSize = 100;
 /// Quand le lot n'en contient pas assez, on prend tous ceux qu'il y a.
 const double kDiscoverMinMenShare = 0.24;
 
-/// Garde [limit] cartes parmi [sorted] (déjà triées par score décroissant) en
-/// s'assurant qu'au moins [minMenShare] d'entre elles sont des hommes, quand il
-/// y en a assez dans le lot. Les meilleures cartes restent ; pour faire de la
-/// place aux hommes manquants, on retire les femmes les moins bien classées.
+/// Part minimale / maximale d'un continent (Amérique latine, Asie, Europe) dans
+/// un paquet Discover SANS filtre : au moins 20 % (10 cartes sur 50) et au plus
+/// 40 % (20). Sans cela l'Amérique latine (48 % des profils) écrase l'Asie
+/// (18 %), qui tombait parfois à 3 cartes sur 50.
+const double kDiscoverMinContinentShare = 0.2;
+const double kDiscoverMaxContinentShare = 0.4;
+
+/// Compose le paquet de [limit] cartes à partir de [sorted] (triées par score
+/// décroissant). On part des [limit] mieux classées, puis on échange, au besoin,
+/// les moins bien classées contre les meilleures cartes restantes pour tenir :
+///   * au moins [minMenShare] d'hommes ;
+///   * pour chacun des trois continents (Amérique latine, Asie, Europe) entre
+///     [minContinentShare] et [maxContinentShare] des cartes.
+/// Un échange n'en défait jamais un autre : on ne retire pas une carte dont le
+/// départ ferait tomber un homme ou un continent sous son minimum. Si le lot ne
+/// contient pas assez de cartes d'un type, on prend celles qu'il y a.
 ///
-/// Les hommes ajoutés ainsi viennent du bas du classement : triés par score, ils
-/// finiraient TOUS au fond du paquet. Dans ce cas, on les MÉLANGE : le paquet est
-/// découpé en tranches égales, chaque homme prend une place au hasard dans la
-/// sienne (donc il y en a du début à la fin, sans rythme régulier), et les
-/// femmes remplissent le reste dans l'ordre de leur score. Si les hommes étaient
-/// déjà assez nombreux, le paquet n'est pas touché. [rng] sert aux tests.
+/// Les cartes ajoutées viennent du bas du classement : triées par score, elles
+/// finiraient TOUTES au fond du paquet. On les MÉLANGE donc dans tout le paquet
+/// (tranches égales, place au hasard dans chacune) ; les autres gardent l'ordre
+/// de leur score. [rng] sert aux tests.
 List<RemoteProfile> pickDiscoverDeck(
   List<(RemoteProfile, double)> sorted,
   int limit, {
   double minMenShare = kDiscoverMinMenShare,
+  double minContinentShare = kDiscoverMinContinentShare,
+  double maxContinentShare = kDiscoverMaxContinentShare,
   Random? rng,
 }) {
   bool isMan((RemoteProfile, double) s) => s.$1.gender == 'm';
+  DiscoverContinent cont((RemoteProfile, double) s) =>
+      continentOfCountry(s.$1.country);
+  const tracked = [
+    DiscoverContinent.latam,
+    DiscoverContinent.asia,
+    DiscoverContinent.europe,
+  ];
   final minMen = (limit * minMenShare).ceil();
+  final minC = (limit * minContinentShare).ceil();
+  final maxC = (limit * maxContinentShare).floor();
+
   final deck = sorted.take(limit).toList();
-  var men = deck.where(isMan).length;
-  if (men >= minMen) {
-    return List<RemoteProfile>.unmodifiable(deck.map((s) => s.$1));
+  final outside = sorted.skip(limit).toList();
+  final forcedIds = <String>{};
+
+  int count(DiscoverContinent c) => deck.where((s) => cont(s) == c).length;
+  int men() => deck.where(isMan).length;
+
+  // L'échange « [cand] entre, [out] sort » respecte-t-il tous les minimums et
+  // maximums après coup ?
+  bool pairOk((RemoteProfile, double) cand, (RemoteProfile, double) out) {
+    if (isMan(out) && !isMan(cand) && men() - 1 < minMen) return false;
+    final cc = cont(cand);
+    final oc = cont(out);
+    if (cc != oc) {
+      if (tracked.contains(cc) && count(cc) + 1 > maxC) return false;
+      if (tracked.contains(oc) && count(oc) - 1 < minC) return false;
+    }
+    return true;
   }
-  final extra = sorted.skip(limit).where(isMan).take(minMen - men);
-  for (final man in extra) {
-    final drop = deck.lastIndexWhere((s) => !isMan(s));
-    if (drop < 0) break;
-    deck.removeAt(drop);
-    deck.add(man);
-    men++;
+
+  // Fait entrer la meilleure carte restante qui satisfait [want] à la place de
+  // la carte la moins bien classée qui satisfait [victim], si l'échange est
+  // permis. Faux quand aucune paire ne convient.
+  bool swap(
+    bool Function((RemoteProfile, double)) want,
+    bool Function((RemoteProfile, double)) victim,
+  ) {
+    for (var ci = 0; ci < outside.length; ci++) {
+      final cand = outside[ci];
+      if (!want(cand)) continue;
+      var vi = -1;
+      for (var i = 0; i < deck.length; i++) {
+        final e = deck[i];
+        if (!victim(e) || !pairOk(cand, e)) continue;
+        // On retire de préférence une FEMME : remplacer un homme par un homme
+        // épuiserait les hommes disponibles sans en gagner un seul.
+        if (vi < 0 || _betterVictim(e, deck[vi], isMan)) vi = i;
+      }
+      if (vi < 0) continue;
+      outside.removeAt(ci);
+      deck[vi] = cand;
+      forcedIds.add(cand.$1.id);
+      return true;
+    }
+    return false;
+  }
+
+  var changed = true;
+  var guard = 0;
+  while (changed && guard++ < 500) {
+    changed = false;
+    // 1. Un continent sous son minimum : on y fait entrer une carte.
+    for (final c in tracked) {
+      if (count(c) < minC && swap((s) => cont(s) == c, (e) => cont(e) != c)) {
+        changed = true;
+      }
+    }
+    // 2. Un continent au-dessus de son maximum : une de ses cartes sort.
+    for (final c in tracked) {
+      if (count(c) > maxC && swap((s) => cont(s) != c, (e) => cont(e) == c)) {
+        changed = true;
+      }
+    }
+    // 3. Pas assez d'hommes : une femme laisse sa place à un homme.
+    if (men() < minMen && swap(isMan, (e) => !isMan(e))) changed = true;
   }
   deck.sort((a, b) => b.$2.compareTo(a.$2));
-
-  final boys = deck.where(isMan).toList();
-  final girls = deck.where((s) => !isMan(s)).toList();
-  if (boys.isEmpty || girls.isEmpty) {
+  if (forcedIds.isEmpty) {
     return List<RemoteProfile>.unmodifiable(deck.map((s) => s.$1));
   }
+
+  // Les cartes « forcées » sont réparties au hasard dans tout le paquet.
+  final natural = deck.where((s) => !forcedIds.contains(s.$1.id)).toList();
+  final forced = deck.where((s) => forcedIds.contains(s.$1.id)).toList();
   final n = deck.length;
   final r = rng ?? Random();
-  final slots = List<RemoteProfile?>.filled(n, null);
-  for (var i = 0; i < boys.length; i++) {
-    // Une place au hasard dans la tranche numéro i (n / nombre d'hommes de large).
-    var at = (((i + r.nextDouble()) * n) / boys.length).floor().clamp(0, n - 1);
+  var seq = _spreadAmong(natural, forced, n, r);
+
+  // Quand des hommes ont été ajoutés, TOUS les hommes sont répartis dans le
+  // paquet (sinon ils se regroupent) ; les autres gardent leur ordre.
+  final menForced = forced.any(isMan);
+  if (menForced) {
+    final boys = seq.where(isMan).toList();
+    final others = seq.where((s) => !isMan(s)).toList();
+    if (boys.isNotEmpty && others.isNotEmpty) {
+      seq = _spreadAmong(others, boys, n, r);
+    }
+  }
+  return List<RemoteProfile>.unmodifiable(seq.map((s) => s.$1));
+}
+
+/// Entre deux cartes à retirer : une femme avant un homme, puis la moins bien classée.
+bool _betterVictim(
+  (RemoteProfile, double) a,
+  (RemoteProfile, double) b,
+  bool Function((RemoteProfile, double)) isMan,
+) {
+  final am = isMan(a) ? 1 : 0;
+  final bm = isMan(b) ? 1 : 0;
+  return am < bm || (am == bm && a.$2 < b.$2);
+}
+
+/// [spread] est réparti au hasard dans [n] places (tranches égales, une place au
+/// hasard dans chacune) ; [fill] remplit le reste dans l'ordre.
+List<(RemoteProfile, double)> _spreadAmong(
+  List<(RemoteProfile, double)> fill,
+  List<(RemoteProfile, double)> spread,
+  int n,
+  Random r,
+) {
+  final slots = List<(RemoteProfile, double)?>.filled(n, null);
+  for (var i = 0; i < spread.length; i++) {
+    var at = (((i + r.nextDouble()) * n) / spread.length).floor().clamp(0, n - 1);
     while (slots[at] != null) {
       at = (at + 1) % n;
     }
-    slots[at] = boys[i].$1;
+    slots[at] = spread[i];
   }
   var w = 0;
   for (var i = 0; i < n; i++) {
-    slots[i] ??= girls[w++].$1;
+    slots[i] ??= fill[w++];
   }
-  return List<RemoteProfile>.unmodifiable(slots.cast<RemoteProfile>());
+  return slots.cast<(RemoteProfile, double)>();
 }
