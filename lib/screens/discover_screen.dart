@@ -2421,8 +2421,8 @@ class _PassportCover extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: popupDisplay(
-                      fontSize: 32,
-                      letterSpacing: -1.3,
+                      fontSize: 24,
+                      letterSpacing: -1.0,
                       color: Colors.white,
                     ),
                   ),
