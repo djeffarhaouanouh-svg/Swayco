@@ -21,12 +21,12 @@ List<(RemoteProfile, double)> _lot(int n, Set<int> menAt) => [
 int _men(List<RemoteProfile> d) => d.where((p) => p.gender == 'm').length;
 
 void main() {
-  test('un lot sans assez d\'hommes : on monte à 30 % (15 sur 50)', () {
-    // 160 candidats, 7 hommes parmi les 50 premiers et 15 de plus plus bas.
+  test('un lot sans assez d\'hommes : on monte à 24 % (12 sur 50)', () {
+    // 100 candidats, 7 hommes parmi les 50 premiers et 15 de plus plus bas.
     final men = {3, 9, 14, 22, 30, 41, 47, for (var i = 60; i < 75; i++) i};
-    final deck = pickDiscoverDeck(_lot(160, men), 50);
+    final deck = pickDiscoverDeck(_lot(100, men), 50);
     expect(deck.length, 50);
-    expect(_men(deck), 15);
+    expect(_men(deck), 12);
     // Les meilleures cartes restent : p0, p1, p2 sont toujours là, dans l'ordre.
     expect(deck.take(3).map((p) => p.id), ['p0', 'p1', 'p2']);
     // Les hommes déjà bien classés sont conservés.
@@ -39,7 +39,7 @@ void main() {
   });
 
   test('assez d\'hommes déjà : rien ne change', () {
-    final men = {for (var i = 0; i < 50; i += 3) i}; // 17 hommes dans les 50 premiers
+    final men = {for (var i = 0; i < 50; i += 3) i}; // 17 hommes dans les 50 premiers (> 12)
     final lot = _lot(160, men);
     final deck = pickDiscoverDeck(lot, 50);
     expect(deck.map((p) => p.id), lot.take(50).map((s) => s.$1.id));
@@ -62,4 +62,10 @@ void main() {
     expect(_men(pickDiscoverDeck(lot, 50, minMenShare: 0.5)), 25);
     expect(_men(pickDiscoverDeck(lot, 50, minMenShare: 0)), 0);
   });
+
+  test('la taille du lot et la part minimale sont celles mesurées', () {
+    expect(kDiscoverFetchSize, 100);
+    expect((50 * kDiscoverMinMenShare).ceil(), 12);
+  });
 }
+

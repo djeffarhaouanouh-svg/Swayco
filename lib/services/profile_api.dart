@@ -1442,12 +1442,12 @@ abstract final class ProfileApi {
           .where((c) => c.isNotEmpty)
           .toSet()
           .toList();
-      // Sans filtre : on demande un lot PLUS GRAND, puis on garde [limit]
-      // cartes dont au moins [kDiscoverMinMenShare] d'hommes. Les hommes ne
-      // sont que ~14 % des profils : le lot de 50 tiré au hasard n'en contenait
-      // que 7 environ.
+      // Sans filtre : on demande un lot PLUS GRAND ([kDiscoverFetchSize]), puis
+      // on garde [limit] cartes dont au moins [kDiscoverMinMenShare] d'hommes.
+      // Les hommes ne sont que ~14 % des profils : le lot de 50 tiré au hasard
+      // n'en contenait que 7 environ.
       final unfiltered = countryList.isEmpty && langs.isEmpty;
-      final fetchLimit = unfiltered ? limit * 3 + 10 : limit;
+      final fetchLimit = unfiltered ? max(limit, kDiscoverFetchSize) : limit;
       final result = await _c.rpc(
         'discover_feed',
         params: {
@@ -1541,9 +1541,15 @@ abstract final class ProfileApi {
   }
 }
 
-/// Part minimale d'hommes dans un paquet Discover SANS filtre (30 % : 15 cartes
+/// Taille du lot demandé à la base pour un Discover SANS filtre. Mesuré sur 60
+/// spectateurs : 100 profils contiennent 13 hommes en moyenne (au moins 12
+/// dans 75 % des cas) ; 160 en donnent 21 mais chargent 60 % de plus.
+const int kDiscoverFetchSize = 100;
+
+/// Part minimale d'hommes dans un paquet Discover SANS filtre (24 % : 12 cartes
 /// sur 50). Ils ne sont que ~14 % des profils, donc sans cela ils sont rares.
-const double kDiscoverMinMenShare = 0.3;
+/// Quand le lot n'en contient pas assez, on prend tous ceux qu'il y a.
+const double kDiscoverMinMenShare = 0.24;
 
 /// Garde [limit] cartes parmi [sorted] (déjà triées par score décroissant) en
 /// s'assurant qu'au moins [minMenShare] d'entre elles sont des hommes, quand il
