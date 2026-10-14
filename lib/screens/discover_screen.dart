@@ -866,6 +866,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 : _cards.isEmpty
                     ? _Empty(
                         onReset: _filtered ? _clearCountryFilter : _reset,
+                        onChooseCountries: _openGlobe,
                         body: _filtered
                             ? AppStrings.t('globe_filter_empty')
                             : null,
@@ -3634,66 +3635,280 @@ class _DiscoverDone extends StatelessWidget {
   }
 }
 
-class _Empty extends StatelessWidget {
-  const _Empty({required this.onReset, this.body});
+class _Empty extends StatefulWidget {
+  const _Empty({
+    required this.onReset,
+    required this.onChooseCountries,
+    this.body,
+  });
   final VoidCallback onReset;
+  final VoidCallback onChooseCountries;
 
   /// Override for the sub-line — used by the country filter's empty state.
   final String? body;
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 70,
-              height: 70,
+  State<_Empty> createState() => _EmptyState();
+}
+
+class _EmptyState extends State<_Empty> with SingleTickerProviderStateMixin {
+  late final AnimationController _waves = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3200),
+  )..repeat();
+
+  // Trois pays pris au hasard parmi ceux du globe, tirés une fois.
+  late final List<String> _flags = (kGlobeCountries.values
+          .map((c) => c.code)
+          .toList()
+        ..shuffle())
+      .take(3)
+      .toList();
+
+  @override
+  void dispose() {
+    _waves.dispose();
+    super.dispose();
+  }
+
+  Widget _wave(double delay) {
+    return AnimatedBuilder(
+      animation: _waves,
+      builder: (_, _) {
+        // 2,4 s d'onde, décalées de 0,8 s : phase sur un cycle de 3,2 s.
+        final t = ((_waves.value * 3.2 - delay) / 2.4);
+        if (t < 0 || t > 1) return const SizedBox.shrink();
+        final e = Curves.easeOut.transform(t);
+        return Opacity(
+          opacity: 0.7 * (1 - e),
+          child: Transform.scale(
+            scale: 0.6 + 0.9 * e,
+            child: Container(
+              width: 160,
+              height: 160,
               decoration: BoxDecoration(
-                color: SC.fill.withValues(alpha: 0.06), boxShadow: SC.lift,
                 shape: BoxShape.circle,
-                border: Border.all(color: SC.stroke.withValues(alpha: 0.14)),
-              ),
-              child: Icon(
-                Icons.favorite_border,
-                color: SC.fgA(0.54),
-                size: 32,
+                border: Border.all(color: SC.brandCyan, width: 1.5),
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              AppStrings.t('discover_empty_title'),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: SC.fgA(0.7),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              body ?? AppStrings.t('discover_empty_body'),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: SC.fg.withValues(alpha: 0.45),
-                fontSize: 13.5,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton.icon(
-              onPressed: onReset,
-              icon: Icon(Icons.refresh, color: SC.accentFg),
-              label: Text(
-                AppStrings.t('restart'),
-                style: TextStyle(color: SC.accentFg),
-              ),
-            ),
-          ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _flag(String code) {
+    return Container(
+      width: 44,
+      height: 30,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x66000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Image.network(
+          'https://flagcdn.com/w160/$code.png',
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => ColoredBox(color: SC.fgA(0.2)),
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final custom = widget.body != null;
+    return LayoutBuilder(
+      builder: (context, box) => Stack(
+        alignment: Alignment.center,
+        children: [
+          // Halo derrière le bloc, centré vers le haut.
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.45),
+                    radius: 0.55,
+                    colors: [
+                      SC.brandBlue.withValues(alpha: 0.5),
+                      SC.brandCyan.withValues(alpha: 0.14),
+                      Colors.transparent,
+                    ],
+                    stops: const [0, 0.5, 1],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: box.maxHeight),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 220,
+                    height: 220,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        _wave(0),
+                        _wave(0.8),
+                        _wave(1.6),
+                        Container(
+                          width: 160,
+                          height: 160,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: const Alignment(-0.5, -1),
+                              end: const Alignment(0.5, 1),
+                              colors: SC.brandGradient.colors,
+                              stops: SC.brandGradient.stops,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: SC.brandBlue.withValues(alpha: 0.5),
+                                blurRadius: 40,
+                                offset: const Offset(0, 14),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.public_rounded,
+                            size: 70,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Positioned(left: 4, top: 22, child: _flag(_flags[0])),
+                        Positioned(right: 0, top: 86, child: _flag(_flags[1])),
+                        Positioned(left: 14, bottom: 14, child: _flag(_flags[2])),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: Text(
+                      AppStrings.t('discover_end_title'),
+                      textAlign: TextAlign.center,
+                      style: popupDisplay(
+                        fontSize: 26,
+                        letterSpacing: -1.04,
+                        height: 1.1,
+                        color: SC.fg,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 30),
+                    child: Text(
+                      custom
+                          ? widget.body!
+                          : AppStrings.t('discover_end_body'),
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14.5,
+                        height: 1.45,
+                        color: SC.fgA(0.75),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: widget.onChooseCountries,
+                      child: Container(
+                        height: 54,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: SC.accent,
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: SC.accent.withValues(alpha: 0.5),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.explore_rounded,
+                              size: 20,
+                              color: SC.onAccent,
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                AppStrings.t('discover_end_countries'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: popupDisplay(
+                                  fontSize: 14,
+                                  color: SC.onAccent,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: widget.onReset,
+                      child: Container(
+                        height: 50,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: SC.fgA(0.10),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: SC.fgA(0.25), width: 1.2),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.refresh_rounded, size: 19, color: SC.fg),
+                            const SizedBox(width: 8),
+                            Text(
+                              AppStrings.t('discover_end_retry'),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: SC.fg,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

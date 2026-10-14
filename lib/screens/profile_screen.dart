@@ -1717,10 +1717,17 @@ class _IdentitySection extends StatelessWidget {
             ],
           ),
         ),
+        // Abonn? Pro : le bandeau dispara?t (l'abonnement se g?re dans
+        // R?glages) et sa marge avec lui, le Boost touche ? Mes photos ?.
         if (aboveGallery != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: aboveGallery!,
+          ValueListenableBuilder<bool>(
+            valueListenable: RevenueCat.proActive,
+            builder: (_, pro, _) => pro
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: aboveGallery!,
+                  ),
           ),
         // « Mes photos (n) » + « +40 pts ».
         Padding(

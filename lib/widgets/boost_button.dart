@@ -225,7 +225,13 @@ class BoostButton extends StatelessWidget {
                   ),
                 ),
               ),
-              if (!active)
+              if (active)
+                const Icon(
+                  Icons.check_circle_rounded,
+                  size: 22,
+                  color: SC.brandCyan,
+                )
+              else
                 Icon(Icons.chevron_right, size: 22, color: SC.fg),
             ],
           ),
