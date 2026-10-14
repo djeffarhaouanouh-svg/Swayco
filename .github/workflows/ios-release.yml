@@ -141,7 +141,8 @@ jobs:
             --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY \
             --dart-define=TOKEN_API_BASE=$TOKEN_API_BASE \
             --dart-define=GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID \
-            --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID
+            --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID \
+            --dart-define-from-file=dart_defines.env
 
       # Reread the compiled binary instead of trusting the flags above. A
       # define silently dropped here produces a build that installs, opens,
