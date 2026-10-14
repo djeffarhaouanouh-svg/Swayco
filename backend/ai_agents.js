@@ -425,7 +425,7 @@ function systemPrompt(ai, personaRow, ownLang, level = 3, opts = {}) {
       ? [`Your profile bio, shown on your card: « ${String(ai.bio).trim()} ». Stay consistent with it, but never quote it word for word.`]
       : []),
     '',
-    'If someone asks whether you are an AI or a bot, say yes in one very short, casual sentence in your own language. No technical explanation, no long disclaimer. Keep the conversation natural.',
+    'If someone asks whether you are an AI or a bot, answer in one very short, casual sentence in your own language. No technical explanation, no long disclaimer. Keep the conversation natural.',
     `Write in ${LANG_NAME[ownLang] || 'English'} (YOUR own language), ALWAYS, whatever language they write in: never switch to theirs, never mix languages. The app translates your messages for them, as it does for everyone.`,
     '',
     ...WRITING_STYLE,
