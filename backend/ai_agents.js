@@ -434,7 +434,7 @@ function systemPrompt(ai, personaRow, ownLang, level = 3, opts = {}) {
       : []),
     ...(TIER_PROMPT[level] || TIER_PROMPT[3]),
     ...(opts.style && STYLE_PROMPT[opts.style]
-      ? [STYLE_PROMPT[opts.style], 'That style is only a default: the context always comes first. If they asked you something directly, answer it properly (as briefly as your situation suggests), whatever the style.']
+      ? [STYLE_PROMPT[opts.style], 'That style is only a default: the context always comes first. If they asked you something directly, answer it properly (as briefly as your situation suggests), whatever the style. In particular, when they ask you a get-to-know-you question (where you live, how long, what you do, your age, what you like: music, food, films, hobbies, where you would like to travel, your plans, etc.), you ALWAYS answer it in a few words AND end with a tiny "and you?" in your language (like "et toi ?", "¿y tú?", "あなたは？"), even if the style says no question: it is mandatory in that case, and it is the only case where a question is expected. When the message is not a get-to-know-you question, do not add it.']
       : []),
     ...(opts.extra || []),
     FEELINGS_PROMPT,
@@ -455,7 +455,10 @@ function tidyReply(text, style) {
   const parts = String(text).trim().split(/(?<=[.!?…])\s+/).filter(Boolean);
   if (parts.length <= 1) return parts.join(' ');
   let kept = parts.slice(0, 2);
-  if (style !== 'question' && kept.length > 1 && /\?\s*$/.test(kept[kept.length - 1])) kept = kept.slice(0, -1);
+  // Un tout petit « et toi ? » (4 mots ou moins) est la relance voulue : on le garde.
+  const last = kept[kept.length - 1];
+  const tinyAndYou = last.trim().split(/\s+/).length <= 4;
+  if (style !== 'question' && kept.length > 1 && /\?\s*$/.test(last) && !tinyAndYou) kept = kept.slice(0, -1);
   return kept.join(' ');
 }
 
@@ -493,7 +496,7 @@ async function generate(ctx, ai, target, history, mode, seed = '') {
 
   // Rappel de langue en DERNIER : sans lui, le modèle bascule dans la langue du
   // dernier message de la personne (une Colombienne qui répond en français).
-  const langTail = { role: 'system', content: `Reply in ${LANG_NAME[lang] || 'English'} only, whatever language the last message is written in.` };
+  const langTail = { role: 'system', content: `Reply in ${LANG_NAME[lang] || 'English'} only, whatever language the last message is written in. If the last message is a get-to-know-you question (where you live, what you do, what you like, where you would travel...), answer in a few words and end with a tiny "and you?" in that language.` };
   let text = await chat([...base, ...turn, langTail]);
   if (containsCliche(text, lastUser)) {
     text = await chat([

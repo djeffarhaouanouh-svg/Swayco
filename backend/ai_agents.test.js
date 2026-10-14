@@ -263,7 +263,9 @@ test('personas: instructions that push long, relaunching replies are removed on 
 
 test('tidyReply: max 2 sentences, no relaunch question unless the style is question', () => {
   assert.equal(t.tidyReply('jaja sí', 'react'), 'jaja sí');
-  assert.equal(t.tidyReply('jaja sí. ¿Y tú juegas?', 'react'), 'jaja sí.');
+  assert.equal(t.tidyReply('jaja sí. ¿Y qué tal te fue hoy en el trabajo?', 'react'), 'jaja sí.'); // longue question de relance : retirée
+  assert.equal(t.tidyReply('Vivo en Cartagena. ¿Y tú?', 'react'), 'Vivo en Cartagena. ¿Y tú?'); // petit « et toi ? » : gardé
+  assert.equal(t.tidyReply('Je vis à Osaka. Et toi ?', 'react'), 'Je vis à Osaka. Et toi ?');
   assert.equal(t.tidyReply('jaja sí. ¿Y tú juegas?', 'question'), 'jaja sí. ¿Y tú juegas?');
   assert.equal(t.tidyReply('uno. dos. tres. cuatro.', 'react'), 'uno. dos.');
   assert.equal(t.tidyReply('¿en serio?', 'react'), '¿en serio?'); // une seule phrase : intacte
@@ -365,3 +367,12 @@ test('welcome: 7 AIs split Latin America / Asia 4-3 or 3-4; the first two differ
   assert.ok(latamMajor > 120 && asiaMajor > 120, `${latamMajor}/${asiaMajor}`);
   assert.ok(firstLatam > 120 && firstLatam < 280, `${firstLatam}`);
 });
+
+
+test('the prompt asks for a tiny "and you?" after get-to-know-you questions', () => {
+  const p = t.systemPrompt(AI, null, 'ja', 3, { style: 'react' });
+  assert.match(p, /get-to-know-you question/);
+  assert.match(p, /tiny "and you\?" in your language/);
+  assert.match(p, /ALWAYS answer it in a few words AND end with a tiny "and you\?"/);
+});
+
