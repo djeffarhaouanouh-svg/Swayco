@@ -111,6 +111,12 @@ if (RESTORE) {
 
 let rows = await loadAll();
 console.log(`comptes IA avec bio : ${rows.length}`);
+if (process.argv.includes('--retry') && existsSync(BACKUP)) {
+  // Seulement ceux qui ont encore leur ANCIENNE bio (échecs d'une passe précédente).
+  const old = JSON.parse(readFileSync(BACKUP, 'utf8'));
+  rows = rows.filter((r) => old[r.id] === r.bio);
+  console.log(`à refaire : ${rows.length}`);
+}
 if (SAMPLE) rows = rows.sort(() => Math.random() - 0.5).slice(0, SAMPLE);
 
 if (APPLY && !existsSync(BACKUP)) {
