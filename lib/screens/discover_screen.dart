@@ -53,6 +53,8 @@ import '../widgets/swipe_coach_overlay.dart';
 import '../widgets/translated_profile_text.dart';
 import 'chat_thread_screen.dart';
 import 'paywall_screen.dart';
+import '../services/daily_swipes.dart';
+import '../widgets/daily_limit_view.dart';
 import 'profile_screen.dart';
 
 /// Le fond du panneau déplié : opaque, un cran au-dessus du noir de la page —
@@ -215,6 +217,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// True once every card has been swiped today — show the end-of-deck screen
   /// instead of looping back to the first profile.
   bool _deckDone = false;
+
+  /// Compte gratuit : les 100 profils du jour sont passés -> écran de fin.
+  bool _limitReached = false;
+  final List<SeenProfile> _recentSeen = [];
+
+  Future<void> _refreshLimit() async {
+    final reached = await DailySwipes.reached();
+    if (mounted && reached != _limitReached) {
+      setState(() => _limitReached = reached);
+    }
+  }
+
   final _stackKey = GlobalKey<_TinderCardStackState>();
   List<Friendship> _myFriendships = const [];
 
@@ -511,6 +525,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       });
     });
     _bootstrap();
+    unawaited(_refreshLimit());
+    // Devenir Pro (depuis le paywall) rouvre Discover sans recharger l'app.
+    RevenueCat.proActive.addListener(_refreshLimit);
     _maybeShowSwipeCoach();
     _pollTimer = WebPoll.every(const Duration(seconds: 12), _refreshFriendships);
     // Un nouveau match (annoncé par le shell, en temps réel) : on retire cette
@@ -535,6 +552,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     NavChrome.show();
     _pollTimer?.cancel();
     MatchCelebration.matchesChanged.removeListener(_refreshFriendships);
+    RevenueCat.proActive.removeListener(_refreshLimit);
     super.dispose();
   }
 
@@ -706,6 +724,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.pass);
     }
+    // Un profil de plus passé aujourd'hui (gratuit : 100 par jour).
+    _recentSeen.insert(0, (
+      photoUrl: profile.discoverPhotoUrl.isNotEmpty
+          ? profile.discoverPhotoUrl
+          : (profile.photos.isNotEmpty ? profile.photos.first : null),
+      country: profile.country,
+    ));
+    if (_recentSeen.length > 3) _recentSeen.removeLast();
+    unawaited(DailySwipes.increment().then((_) => _refreshLimit()));
     if (!mounted || _cards.isEmpty) return;
     final next = _currentIndex + 1;
     if (next >= _cards.length) {
@@ -884,6 +911,21 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       strokeWidth: 2,
                     ),
                   )
+                : _limitReached
+                    ? DailyLimitView(
+                        seen: _recentSeen.isNotEmpty
+                            ? List.of(_recentSeen)
+                            : [
+                                for (final c in _cards.take(3))
+                                  (
+                                    photoUrl: c.photos.isNotEmpty
+                                        ? c.photos.first
+                                        : null,
+                                    country: c.profile.country,
+                                  ),
+                              ],
+                        onReset: () => setState(() => _limitReached = false),
+                      )
                 : _cards.isEmpty
                     ? _Empty(
                         onReset: _filtered ? _clearCountryFilter : _reset,
