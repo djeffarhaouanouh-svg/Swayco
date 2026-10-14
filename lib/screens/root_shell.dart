@@ -53,7 +53,7 @@ class RootShell extends StatefulWidget {
   State<RootShell> createState() => _RootShellState();
 }
 
-class _RootShellState extends State<RootShell> {
+class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   // Tab order: Chat (0), Discover (1), Profile (2). Discover is the
   // default landing tab. The selected index lives in the shared
   // [NavTab] notifier so screens pushed on top of the shell can drive it.
@@ -93,6 +93,20 @@ class _RootShellState extends State<RootShell> {
   Set<String> _knownMatchIds = {};
   bool _matchWatchPrimed = false;
   bool _celebrating = false;
+  String _matchMyId = '';
+
+  /// Un match peut se faire pendant que l'app est en arrière-plan (une IA qui
+  /// accepte mon like une heure plus tard) : le temps réel est alors coupé et
+  /// l'événement perdu, donc ni l'animation ni le retrait de la carte dans
+  /// Discover ne se déclenchaient. Au retour dans l'app, on relit mes matchs.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        _matchWatchPrimed &&
+        _matchMyId.isNotEmpty) {
+      unawaited(_refreshKnownMatches(_matchMyId));
+    }
+  }
 
   /// Drives the horizontal swipe between tabs (Snapchat-style). Kept in sync
   /// with [NavTab.index]: nav-bar taps / routing animate it, swipes update
@@ -112,6 +126,8 @@ class _RootShellState extends State<RootShell> {
   @override
   void initState() {
     super.initState();
+    // Au retour dans l'app, on relit mes matchs (voir didChangeAppLifecycleState).
+    WidgetsBinding.instance.addObserver(this);
     _subscribeIncomingCalls();
     // Route taps on push notifications (live-call invite, message, …).
     NotificationRouter.pending.addListener(_onNotificationIntent);
@@ -232,6 +248,7 @@ class _RootShellState extends State<RootShell> {
   /// device didn't celebrate itself becomes a pending celebration.
   Future<void> _startMatchWatch(String myId) async {
     if (!isSupabaseReady || myId.isEmpty) return;
+    _matchMyId = myId;
     MatchCelebration.pendingPeerId.addListener(_onMatchPending);
     await _refreshKnownMatches(myId);
     _matchWatchPrimed = true;
@@ -262,6 +279,7 @@ class _RootShellState extends State<RootShell> {
             : <String>{};
         if (!hadHistory) await MatchCelebration.seed(ids);
         _knownMatchIds = ids;
+        if (unseen.isNotEmpty) MatchCelebration.matchesChanged.value++;
         for (final id in unseen) {
           MatchCelebration.offer(id);
         }
@@ -670,6 +688,7 @@ class _RootShellState extends State<RootShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final ch in _callKitCancelSubs.values) {
       unawaited(Supabase.instance.client.removeChannel(ch));
     }
