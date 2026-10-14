@@ -669,7 +669,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     if (!isSupabaseReady) {
       setState(
         () => _error =
-            'Supabase non configuré — les messages ne sont pas disponibles.',
+            AppStrings.t('chat_unavailable'),
       );
       return;
     }
@@ -906,7 +906,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     if (body.isEmpty || _sending) return;
     if (_myId.isEmpty) return;
     if (!isSupabaseReady) {
-      setState(() => _error = 'Supabase non configuré.');
+      setState(() => _error = AppStrings.t('chat_send_failed'));
       return;
     }
     setState(() => _sending = true);
@@ -930,7 +930,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     } catch (e) {
       HapticFeedback.vibrate();
       SwaycoSounds.play(SwSound.error);
-      setState(() => _error = 'Envoi échoué: $e');
+      setState(() => _error = AppStrings.t('chat_send_failed'));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -940,7 +940,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   Future<void> _sendImage() async {
     if (_myId.isEmpty || _sending) return;
     if (!isSupabaseReady) {
-      setState(() => _error = 'Supabase non configuré.');
+      setState(() => _error = AppStrings.t('chat_send_failed'));
       return;
     }
     final XFile? file;
@@ -956,7 +956,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       if (file == null) return;
       bytes = await file.readAsBytes();
     } catch (e) {
-      if (mounted) setState(() => _error = "Accès à la galerie refusé ou indisponible: $e");
+      if (mounted) setState(() => _error = AppStrings.t('chat_gallery_denied'));
       return;
     }
     if (!mounted) return;
@@ -981,7 +981,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     } catch (e) {
       HapticFeedback.vibrate();
       SwaycoSounds.play(SwSound.error);
-      if (mounted) setState(() => _error = 'Envoi image échoué: $e');
+      if (mounted) setState(() => _error = AppStrings.t('chat_send_failed'));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -1009,7 +1009,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   Future<void> _sendGif() async {
     if (_myId.isEmpty || _sending) return;
     if (!isSupabaseReady) {
-      setState(() => _error = 'Supabase non configuré.');
+      setState(() => _error = AppStrings.t('chat_send_failed'));
       return;
     }
     final gif = await showGifPicker(context);
@@ -1033,7 +1033,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     } catch (e) {
       HapticFeedback.vibrate();
       SwaycoSounds.play(SwSound.error);
-      if (mounted) setState(() => _error = 'Envoi GIF échoué: $e');
+      if (mounted) setState(() => _error = AppStrings.t('chat_send_failed'));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
