@@ -36,8 +36,7 @@ const HISTORY_MESSAGES = 14;
 // réponses ; à vider quand le test est fini. Le répondeur tourne toutes les
 // 15 s : « tout de suite » = quelques secondes.
 const TEST_INSTANT_TARGETS = new Set([
-  // Mode test actif pour ces comptes seulement. Pour le terminer : vider la liste.
-  '2f80fb98-8e65-4078-adce-9b2a144654f6', // lou-2f80fb
+  // Mode test terminé : liste vide. Pour tester un compte, ajouter son id ici.
 ]);
 // Doit couvrir le plus long délai (MAX_DELAY_MS : 10 h) PLUS l'attente du
 // réveil quand le délai tombe la nuit (≤ 11 h : coucher 23 h, réveil 10 h) :
