@@ -1979,15 +1979,13 @@ class _GlassCircle extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: SC.fill.withValues(alpha: 0.13), boxShadow: SC.lift,
+            // Clair : rond plein comme les R?glages (? 13 % il disparaissait
+            // sur le d?grad? marine du haut). Sombre / Noir : verre + l'anneau
+            // de la bulle Filtrer.
+            color: light ? SC.fill : SC.fill.withValues(alpha: 0.13),
+            boxShadow: SC.lift,
             shape: BoxShape.circle,
-            // Clair : bord d'avant. Sombre / Noir : l'anneau de la bulle Filtrer.
-            border: light
-                ? Border.all(
-                    color: SC.stroke.withValues(alpha: 0.3),
-                    width: 1.2,
-                  )
-                : null,
+            border: light ? Border.all(color: SC.stroke, width: 1.2) : null,
           ),
           child: Icon(icon, size: 22, color: SC.fg),
         ),
