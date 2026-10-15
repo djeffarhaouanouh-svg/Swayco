@@ -1738,14 +1738,14 @@ class _ThreadHeader extends StatelessWidget {
             // verre, plus de rebond, plus rien à toucher — il ne reste que les
             // deux icônes en creux. Un bouton grisé se presse quand même ;
             // une icône nue, non. Ce qu'on peut encore faire est en bas.
-            // Ordre de la maquette 1b : téléphone, puis caméra au bord.
+            // Caméra d'abord, puis téléphone au bord.
             if (blockedByPeer)
               const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _DeadCallIcon(icon: Icons.phone_rounded),
-                  SizedBox(width: 8),
                   _DeadCallIcon(icon: Icons.videocam_rounded),
+                  SizedBox(width: 8),
+                  _DeadCallIcon(icon: Icons.phone_rounded),
                 ],
               )
             else
@@ -1753,21 +1753,21 @@ class _ThreadHeader extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   LiquidGlassButton(
-                    icon: Icons.phone_rounded,
-                    sfSymbol: 'phone.fill',
-                    size: 44,
-                    iconSize: 19,
-                    semanticLabel: 'Call',
-                    onTap: onCall,
-                  ),
-                  const SizedBox(width: 8),
-                  LiquidGlassButton(
                     icon: Icons.videocam_rounded,
                     sfSymbol: 'video.fill',
                     size: 44,
                     iconSize: 19,
                     semanticLabel: 'Video call',
                     onTap: onVideoCall,
+                  ),
+                  const SizedBox(width: 8),
+                  LiquidGlassButton(
+                    icon: Icons.phone_rounded,
+                    sfSymbol: 'phone.fill',
+                    size: 44,
+                    iconSize: 19,
+                    semanticLabel: 'Call',
+                    onTap: onCall,
                   ),
                 ],
               ),
