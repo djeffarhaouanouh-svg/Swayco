@@ -2,6 +2,8 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'tap_pad.dart';
+
 /// Tappable wrapper with a REAL spring (physics) press bounce — the authentic
 /// iOS "compress, then overshoot, then settle" feel, driven by a
 /// [SpringSimulation] rather than a fixed curve. This is the same physics-based
@@ -91,16 +93,19 @@ class _SpringPressState extends State<SpringPress>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: widget.behavior,
-      onTapDown: _enabled ? _down : null,
-      onTapUp: _enabled ? _up : null,
-      onTapCancel: _enabled ? _springBack : null,
-      onTap: widget.onTap,
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (_, child) => Transform.scale(scale: _c.value, child: child),
-        child: widget.child,
+    return TapPad(
+      minSize: _enabled ? kMinTapTarget : 0,
+      child: GestureDetector(
+        behavior: widget.behavior,
+        onTapDown: _enabled ? _down : null,
+        onTapUp: _enabled ? _up : null,
+        onTapCancel: _enabled ? _springBack : null,
+        onTap: widget.onTap,
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, child) => Transform.scale(scale: _c.value, child: child),
+          child: widget.child,
+        ),
       ),
     );
   }

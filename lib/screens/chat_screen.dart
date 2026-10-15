@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../widgets/tap_pad.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -847,7 +848,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ),
-              GestureDetector(
+              PadTap(
                 behavior: HitTestBehavior.opaque,
                 onTap: _closeSearch,
                 child: Padding(
@@ -926,7 +927,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             Semantics(
               button: true,
               label: AppStrings.t('search_friend_hint'),
-              child: GestureDetector(
+              child: PadTap(
                 behavior: HitTestBehavior.opaque,
                 onTap: _openSearch,
                 // Cerclée : un rond du même gris que la pastille « en ligne »,
@@ -2557,7 +2558,7 @@ class _RowWaveButtonState extends State<_RowWaveButton>
   @override
   Widget build(BuildContext context) {
     final live = widget.enabled && !widget.busy;
-    return GestureDetector(
+    return PadTap(
       behavior: HitTestBehavior.opaque,
       onTap: _tap,
       // L'emoji dépasse largement du rond pendant le salut. La pile ne clippe

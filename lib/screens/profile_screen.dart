@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import '../widgets/tap_pad.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -3282,7 +3283,7 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
       );
 
   Widget _round(IconData icon, bool enabled, VoidCallback onTap) {
-    return GestureDetector(
+    return PadTap(
       behavior: HitTestBehavior.opaque,
       onTap: enabled ? onTap : null,
       child: Container(
@@ -3719,7 +3720,7 @@ class _PhotoCell extends StatelessWidget {
               child: Material(
                 color: Colors.black.withValues(alpha: 0.55),
                 shape: const CircleBorder(),
-                child: InkWell(
+                child: PadInkWell(
                   customBorder: const CircleBorder(),
                   onTap: onDelete,
                   child: Container(
@@ -3943,7 +3944,7 @@ class _EditAccountSheet extends StatelessWidget {
                     Positioned(
                       top: -1,
                       right: -1,
-                      child: GestureDetector(
+                      child: PadTap(
                         behavior: HitTestBehavior.opaque,
                         onTap: onRemoveAvatar,
                         child: Container(

@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
+import '../widgets/tap_pad.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:country_flags/country_flags.dart';
 import 'package:flutter/services.dart';
@@ -4329,7 +4330,7 @@ class _ChatComposer extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          GestureDetector(
+          PadTap(
             behavior: HitTestBehavior.opaque,
             onTap: sending ? null : onSend,
             child: Container(

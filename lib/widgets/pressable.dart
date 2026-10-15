@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'spring_press.dart';
+import 'tap_pad.dart';
 
 /// Wraps a tappable child with an iOS-style "squish": it scales down while
 /// held and fires a light haptic on tap. Drop-in around buttons, icons and
@@ -55,6 +56,8 @@ class _PressableState extends State<Pressable> {
   Widget build(BuildContext context) {
     // Bounce path → the shared spring-physics press (same as the nav bar),
     // so every bounce button across the app uses one identical spring.
+    // Zone de tap élargie à 44 px pour les petits boutons (la mise en page ne
+    // bouge pas, voir [TapPad]) ; sans effet sur ce qui est déjà plus grand.
     if (widget.bounce) {
       return SpringPress(
         onTap: widget.onTap,
@@ -66,7 +69,7 @@ class _PressableState extends State<Pressable> {
       );
     }
     // Plain squish (no overshoot) for callers that opt out of bounce.
-    return GestureDetector(
+    return TapPad(minSize: _enabled ? kMinTapTarget : 0, child: GestureDetector(
       behavior: widget.behavior,
       onTapDown: _enabled ? (_) => _set(true) : null,
       onTapUp: _enabled ? (_) => _set(false) : null,
@@ -84,6 +87,6 @@ class _PressableState extends State<Pressable> {
         curve: Curves.easeOut,
         child: widget.child,
       ),
-    );
+    ));
   }
 }

@@ -4,6 +4,7 @@ import 'dart:math' show Random;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import '../widgets/tap_pad.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -1439,7 +1440,7 @@ class _DiscoverHeader extends StatelessWidget {
               // Centre un peu sous celui de la boite du logo : les minuscules de
               // « swaycø » pesent vers le bas, le bouton s'aligne sur leur milieu.
               top: 2,
-              child: GestureDetector(
+              child: PadTap(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => showPaywallSheet(context),
                 child: Sparkles(

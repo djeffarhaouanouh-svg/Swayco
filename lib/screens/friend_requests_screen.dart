@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import '../widgets/tap_pad.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -781,7 +782,7 @@ class _RevealedTile extends StatelessWidget {
                     Positioned(
                       right: 10,
                       top: 10,
-                      child: GestureDetector(
+                      child: PadTap(
                         behavior: HitTestBehavior.opaque,
                         onTap: onReject,
                         child: Container(
@@ -1012,7 +1013,7 @@ class _RejectButton extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       shape: const CircleBorder(),
-      child: InkWell(
+      child: PadInkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: Padding(

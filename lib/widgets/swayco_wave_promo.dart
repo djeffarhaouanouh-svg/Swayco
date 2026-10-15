@@ -9,6 +9,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import './tap_pad.dart';
 
 import '../services/app_strings.dart';
 import 'profile_avatar.dart';
@@ -201,7 +202,7 @@ class _SwaycoWavePromoState extends State<SwaycoWavePromo>
                 child: AnimatedOpacity(
                   opacity: _locked ? 0.35 : 1,
                   duration: const Duration(milliseconds: 200),
-                  child: GestureDetector(
+                  child: PadTap(
                     onTap: _tryDismiss,
                     child: Container(
                       width: 34,

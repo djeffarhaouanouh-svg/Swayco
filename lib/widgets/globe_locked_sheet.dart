@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import './tap_pad.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -171,7 +172,7 @@ class _LockedSheetState extends State<_LockedSheet> {
   }
 
   Widget _closeButton() {
-    return GestureDetector(
+    return PadTap(
       behavior: HitTestBehavior.opaque,
       onTap: () => Navigator.of(context).pop(),
       child: Container(

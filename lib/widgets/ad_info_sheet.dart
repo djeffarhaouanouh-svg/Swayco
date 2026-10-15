@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import './tap_pad.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../screens/paywall_screen.dart';
@@ -82,7 +83,7 @@ class _SheetShell extends StatelessWidget {
                   const PopupHandle(),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: GestureDetector(
+                    child: PadTap(
                       onTap: () => Navigator.of(context).pop(),
                       child: Container(
                         width: 30,

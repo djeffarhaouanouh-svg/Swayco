@@ -5,6 +5,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../widgets/tap_pad.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -3331,7 +3332,7 @@ class _TranslatePill extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Center(
-        child: GestureDetector(
+        child: PadTap(
           behavior: HitTestBehavior.opaque,
           onTap: onTap,
           child: AnimatedContainer(
