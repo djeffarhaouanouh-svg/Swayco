@@ -347,10 +347,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _loadFeed(countries: null);
   }
 
-  /// A bubble of the country row is a filter toggle: it adds its country to
-  /// the filter (several can be on at once), or removes it. The set keeps
-  /// insertion order, so the country just switched on is the LAST one — the
-  /// row shows it first. Last one switched off = back to the whole deck.
+  /// A bubble of the country row is a filter toggle: it REPLACES the selected
+  /// country (one at a time from the row; the globe can still pick several),
+  /// or removes it via its ✕. Switched off = back to the whole deck.
   Future<void> _toggleCountry(String key) async {
     HapticFeedback.selectionClick();
     final removing = _countryKeys.contains(key);
@@ -362,7 +361,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       }
       setState(() => _countryKeys = rest);
     } else {
-      setState(() => _countryKeys = {..._countryKeys, key});
+      // Un seul pays à la fois depuis la rangée : choisir une bulle remplace la
+      // précédente (le globe, lui, reste multi-sélection).
+      setState(() => _countryKeys = {key});
       _showFilterAd();
     }
     // The "Go" loader animation only when a country is ADDED — removing one
@@ -1666,8 +1667,8 @@ class _CountryRowState extends State<_CountryRow> {
                   // change, chaque bulle garde sa silhouette déjà chargée.
                   key: ValueKey(key),
                   label: AppStrings.t('country_$code'),
-                  // Plusieurs pays à la fois : un tap AJOUTE. Retirer passe
-                  // par la petite croix, jamais par un tap sur la bulle.
+                  // Un tap CHOISIT ce pays (et retire le précédent). Retirer
+                  // passe par la petite croix, jamais par un tap sur la bulle.
                   onTap: () {
                     if (!on) widget.onCountry(key);
                   },
@@ -1687,10 +1688,12 @@ class _CountryRowState extends State<_CountryRow> {
                               child: Semantics(
                                 button: true,
                                 label: AppStrings.t('cancel'),
-                                // Zone de tap 24, dessin 17 dans le coin.
+                                // Zone de tap 40, dessin 17 dans le coin : un tap
+                                // sur une bulle déjà choisie ne fait rien d'autre,
+                                // donc la zone peut mordre largement sur le rond.
                                 child: SizedBox(
-                                  width: 24,
-                                  height: 24,
+                                  width: 40,
+                                  height: 40,
                                   child: Align(
                                     alignment: Alignment.topRight,
                                     child: Container(
