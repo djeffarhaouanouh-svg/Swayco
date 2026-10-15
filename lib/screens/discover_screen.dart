@@ -288,7 +288,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       barrierColor: Colors.transparent,
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (_, _, _) => DiscoverGlobeSheet(
-        initial: _countryKeys,
+        // Aucun pays pr?s?lectionn? : le filtre en cours ne se coche pas ? la
+        // r?ouverture, on choisit ? nouveau.
+        initial: const {},
         initialGender: _gender,
       ),
       // Plein écran : apparaît SUR PLACE (fondu + très léger zoom), sans
