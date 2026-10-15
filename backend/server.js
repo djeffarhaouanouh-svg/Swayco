@@ -594,6 +594,7 @@ app.get('/api', (_req, res) => {
       translationSession: 'POST /translation/realtime/session',
       translationCalls: 'POST /translation/realtime/calls (SDP relay, Authorization: Bearer ephemeral)',
       translationVoice: 'POST /translation/voice (multipart audio → STT/translate/TTS)',
+      egressAllowed: 'GET /livekit/egress/allowed (Authorization: Bearer <Supabase JWT>)',
       egressStart: 'POST /livekit/egress/start (dev-only, Authorization: Bearer <Supabase JWT>)',
       egressStop: 'POST /livekit/egress/stop (dev-only, Authorization: Bearer <Supabase JWT>)',
     },
@@ -709,11 +710,25 @@ app.post('/invite/create', _limLite, async (req, res) => {
 });
 
 /**
+ * GET /livekit/egress/allowed
+ * Auth: Authorization: Bearer <Supabase JWT>. Lets the call screen decide
+ * whether to show the REC button WITHOUT a compile-time value — the
+ * allow-list (EGRESS_ADMIN_EMAIL / EGRESS_ADMIN_EMAILS) lives in Railway, so
+ * granting someone access is a Railway edit, not a new app build.
+ * Returns: { allowed }
+ */
+app.get('/livekit/egress/allowed', _limLite, async (req, res) => {
+  const email = await egressCallerEmail(req);
+  return res.json({ allowed: Boolean(email) && egress.isEgressAdmin(email) });
+});
+
+/**
  * POST /livekit/egress/start
- * Auth: Authorization: Bearer <Supabase JWT> — must resolve to the single
- * account in EGRESS_ADMIN_EMAIL. Records both call participants' video +
- * audio into one file, uploaded straight to Supabase Storage. Dev-only:
- * used to capture footage for ads, never exposed to regular users.
+ * Auth: Authorization: Bearer <Supabase JWT> — must resolve to an
+ * allow-listed account (EGRESS_ADMIN_EMAIL / EGRESS_ADMIN_EMAILS). Records
+ * both call participants' video + audio into one file, uploaded straight to
+ * Supabase Storage. Dev-only: used to capture footage for ads, never
+ * exposed to regular users.
  * Body: { roomName }
  * Returns: { egressId }
  */

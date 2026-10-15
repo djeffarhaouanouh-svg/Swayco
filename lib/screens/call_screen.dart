@@ -22,7 +22,6 @@ import '../services/analytics.dart';
 import '../services/attribution.dart';
 import '../services/app_strings.dart';
 import '../services/swayco_sounds.dart';
-import '../config/app_config.dart';
 import '../services/auth_service.dart';
 import '../services/egress_api.dart';
 import '../swayco/asr/apple_stt_channel.dart';
@@ -150,15 +149,14 @@ class _CallScreenState extends State<CallScreen> {
 
   /// Dev-only ad-footage recording (LiveKit Egress). Non-null while a
   /// recording is running. Never surfaced to a regular user: the REC button
-  /// itself only renders for [_isEgressAdmin], and the backend re-checks the
-  /// caller's Supabase email regardless.
+  /// itself only renders once [_egressAllowed] comes back true, and the
+  /// backend re-checks the caller's Supabase email on every request
+  /// regardless. [_egressAllowed] is fetched from the backend (not baked
+  /// into the build) so granting someone access is a Railway env edit, not
+  /// a new app release — see EgressApi.checkAllowed.
   String? _egressId;
   bool _egressBusy = false;
-  bool get _isEgressAdmin {
-    final admin = resolvedEgressAdminEmail();
-    return admin.isNotEmpty &&
-        AuthService.currentEmail.toLowerCase() == admin.toLowerCase();
-  }
+  bool _egressAllowed = false;
 
   /// Keep the connecting splash on screen for at least this long — LiveKit
   /// often connects in well under a second, so the splash used to flash by
@@ -1686,6 +1684,14 @@ class _CallScreenState extends State<CallScreen> {
       if (mounted) setState(() => _minSplashDone = true);
     });
     unawaited(_loadPeerProfile());
+    // Dev-only REC button: asked fresh from the backend (allow-list lives
+    // in Railway, not in this build) rather than compared against a
+    // compile-time value, so granting someone access needs no new release.
+    unawaited(
+      EgressApi.checkAllowed().then((allowed) {
+        if (mounted) setState(() => _egressAllowed = allowed);
+      }),
+    );
     // Le système peut refuser de transcrire (Siri / Dictée coupés) : sans ce
     // fil, la panne serait totalement muette côté utilisateur.
     AsrService.osRefusedKey.addListener(_onSttRefused);
@@ -2415,7 +2421,7 @@ class _CallScreenState extends State<CallScreen> {
 
   /// Dev-only: starts/stops the LiveKit Egress recording of this call
   /// (both participants' video + audio, for ad footage). Gated by
-  /// [_isEgressAdmin] at the call site; the backend re-checks independently.
+  /// [_egressAllowed] at the call site; the backend re-checks independently.
   Future<void> _toggleEgress() async {
     if (_egressBusy) return;
     final room = _room;
@@ -3884,11 +3890,12 @@ class _CallScreenState extends State<CallScreen> {
                                         ),
                                         // Dev-only: capture ad footage via
                                         // LiveKit Egress. Never shown to a
-                                        // regular user — [_isEgressAdmin]
-                                        // checks the signed-in account's
-                                        // email, and the backend checks it
-                                        // again independently.
-                                        if (_isEgressAdmin)
+                                        // regular user — [_egressAllowed]
+                                        // is fetched from the backend's
+                                        // allow-list, and the backend
+                                        // checks it again independently on
+                                        // every start/stop call.
+                                        if (_egressAllowed)
                                           _RoundCallButton(
                                             icon: Icons.fiber_manual_record,
                                             label: _egressId == null

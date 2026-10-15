@@ -3,10 +3,12 @@
 // LiveKit Egress — server-side call recording for ad footage only. Records
 // BOTH participants' video + audio (RoomComposite, not a screen capture of
 // one phone) straight to a Supabase Storage bucket via its S3-compatible
-// endpoint. Gated to a single Supabase account (EGRESS_ADMIN_EMAIL) so no
-// other user can ever trigger it. Nothing here touches the call's own
-// audio/WebRTC path — Egress joins the room as an extra, invisible
-// participant.
+// endpoint. Gated to an allow-list of Supabase accounts (EGRESS_ADMIN_EMAIL /
+// EGRESS_ADMIN_EMAILS) so no other user can ever trigger it. The list lives
+// in Railway env vars, not in the app build, so granting someone access is a
+// Railway edit, not a new app release — see isEgressAdmin(). Nothing here
+// touches the call's own audio/WebRTC path — Egress joins the room as an
+// extra, invisible participant.
 
 const {
   EgressClient,
@@ -20,7 +22,17 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL?.trim();
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY?.trim();
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET?.trim();
 
-const EGRESS_ADMIN_EMAIL = process.env.EGRESS_ADMIN_EMAIL?.trim().toLowerCase();
+// Allow-list of emails that may start/stop a recording. Union of the single
+// legacy var (kept so the Railway value already set doesn't need renaming)
+// and a comma-separated list for adding more people without touching code.
+const EGRESS_ADMIN_EMAILS = new Set(
+  [
+    process.env.EGRESS_ADMIN_EMAIL,
+    ...(process.env.EGRESS_ADMIN_EMAILS?.split(',') ?? []),
+  ]
+    .map((e) => e?.trim().toLowerCase())
+    .filter(Boolean),
+);
 
 const S3_ACCESS_KEY = process.env.EGRESS_S3_ACCESS_KEY?.trim();
 const S3_SECRET_KEY = process.env.EGRESS_S3_SECRET_KEY?.trim();
@@ -45,14 +57,12 @@ function egressConfigured() {
   );
 }
 
-/** Only the developer's own Supabase-authenticated account may start/stop a
+/** Only an allow-listed Supabase-authenticated account may start/stop a
  *  recording — `email` comes from a verified Supabase JWT, never a client
- *  claim. */
+ *  claim. Add/remove people by editing EGRESS_ADMIN_EMAILS in Railway. */
 function isEgressAdmin(email) {
   return Boolean(
-    EGRESS_ADMIN_EMAIL &&
-      typeof email === 'string' &&
-      email.trim().toLowerCase() === EGRESS_ADMIN_EMAIL,
+    typeof email === 'string' && EGRESS_ADMIN_EMAILS.has(email.trim().toLowerCase()),
   );
 }
 

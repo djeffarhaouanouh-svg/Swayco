@@ -6,11 +6,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
 
-/// Thin client for the dev-only `POST /livekit/egress/start` and
-/// `/livekit/egress/stop` — records both call participants' video + audio
-/// straight to the Supabase Storage bucket, for ad footage only. The
-/// backend re-checks the caller's Supabase email against
-/// `EGRESS_ADMIN_EMAIL`; a non-admin call fails closed with 403.
+/// Thin client for the dev-only `/livekit/egress/*` routes — records both
+/// call participants' video + audio straight to the Supabase Storage
+/// bucket, for ad footage only. Access is an allow-list kept server-side
+/// (`EGRESS_ADMIN_EMAIL(S)` in Railway), checked fresh on every call —
+/// [checkAllowed] is what lets the call screen show/hide the REC button
+/// without that list being baked into the app build.
 abstract final class EgressApi {
   static Uri _endpoint(String path) {
     const fromEnv = String.fromEnvironment('TOKEN_API_BASE');
@@ -28,6 +29,28 @@ abstract final class EgressApi {
       port: o.hasPort ? o.port : null,
       path: path,
     );
+  }
+
+  /// Whether the signed-in account may record calls, per the server-side
+  /// allow-list. `false` on any error or when signed out — the REC button
+  /// stays hidden rather than risk showing a button that will 403.
+  static Future<bool> checkAllowed() async {
+    final token = Supabase.instance.client.auth.currentSession?.accessToken;
+    if (token == null) return false;
+    try {
+      final res = await http
+          .get(
+            _endpoint('/livekit/egress/allowed'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200) return false;
+      final j = jsonDecode(res.body);
+      return j is Map && j['allowed'] == true;
+    } catch (e) {
+      debugPrint('EgressApi.checkAllowed exception: $e');
+      return false;
+    }
   }
 
   /// Starts recording `roomName`. Returns the egress id to pass to [stop],
