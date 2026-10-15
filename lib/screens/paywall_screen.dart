@@ -80,7 +80,7 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
 
   bool _busy = false;
 
-  /// Store-localized price from RevenueCat ("6,99 €"). Null while loading,
+  /// Store-localized price from RevenueCat ("8,99 €"). Null while loading,
   /// on web (Stripe shows its own price) or when the package can't load.
   String? _price;
 
@@ -764,7 +764,7 @@ class _PerkRow extends StatelessWidget {
   }
 }
 
-/// Yellow pill, 64 high: "Activer Pro" over "6,99 €/mois · résiliable…".
+/// Yellow pill, 64 high: "Activer Pro" over "8,99 €/mois · résiliable…".
 class _TwoLineCta extends StatelessWidget {
   const _TwoLineCta({
     required this.title,

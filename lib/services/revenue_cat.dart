@@ -292,7 +292,7 @@ abstract final class RevenueCat {
     return product == null ? null : PurchaseParams.storeProduct(product);
   }
 
-  /// Store-localized price of [packageId] (e.g. "6,99 €"), or null when the
+  /// Store-localized price of [packageId] (e.g. "8,99 €"), or null when the
   /// product can't be loaded at all.
   static Future<String?> priceOf(String packageId) async =>
       (await _package(packageId))?.storeProduct.priceString ??
