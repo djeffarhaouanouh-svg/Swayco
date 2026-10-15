@@ -141,6 +141,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _showWavePromo = false;
 
   Future<void> _maybeShowWavePromo() async {
+    // Seulement quand l'onglet Messages est SOUS LES YEUX : cette page est
+    // construite au lancement, et le coach, pos? en arri?re-plan puis marqu?
+    // ? vu ?, ne se montrait jamais. Il revient ? l'arriv?e sur l'onglet
+    // (_onNavTabChanged recharge la liste, qui le redemande).
+    if (NavTab.index.value != NavTab.chat) return;
     if (await UserPrefs.isWavePromoSeen()) return;
     await UserPrefs.markWavePromoSeen();
     if (!mounted) return;

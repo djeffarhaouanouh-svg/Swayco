@@ -22,6 +22,7 @@ import '../services/local_notifications.dart';
 import '../services/match_celebration.dart';
 import '../services/persona_categories.dart';
 import '../services/nav_chrome.dart';
+import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
 import '../services/rewarded_video.dart';
@@ -533,6 +534,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     // Devenir Pro (depuis le paywall) rouvre Discover sans recharger l'app.
     RevenueCat.proActive.addListener(_refreshLimit);
     _maybeShowSwipeCoach();
+    NavTab.index.addListener(_maybeShowSwipeCoach);
     _pollTimer = WebPoll.every(const Duration(seconds: 12), _refreshFriendships);
     // Un nouveau match (annoncé par le shell, en temps réel) : on retire cette
     // personne du paquet tout de suite, sans sondage sur mobile.
@@ -545,6 +547,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Future<void> _maybeShowSwipeCoach() async {
+    // Seulement quand Discover est SOUS LES YEUX : un lancement par une
+    // notification (ou tout autre onglet d'abord) le posait en arri?re-plan
+    // et le marquait ? vu ? sans que personne ne le voie. Il revient ?
+    // l'arriv?e sur l'onglet (?couteur ci-dessous).
+    if (NavTab.index.value != NavTab.discover) return;
     if (await UserPrefs.isSwipeCoachSeen()) return;
     await UserPrefs.markSwipeCoachSeen();
     if (!mounted) return;
@@ -557,6 +564,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _pollTimer?.cancel();
     MatchCelebration.matchesChanged.removeListener(_refreshFriendships);
     RevenueCat.proActive.removeListener(_refreshLimit);
+    NavTab.index.removeListener(_maybeShowSwipeCoach);
     super.dispose();
   }
 
