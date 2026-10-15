@@ -396,6 +396,9 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
                       _PreviewCard(
                         me: _me,
                         highlighted: _pro,
+                        badge: _pro
+                            ? AppStrings.t('paywall_popular').toUpperCase()
+                            : null,
                       ),
                       const SizedBox(height: 28),
                       _HighlightTitle(
