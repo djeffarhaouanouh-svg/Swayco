@@ -1712,8 +1712,8 @@ class _PerkGrid extends StatelessWidget {
       return Opacity(
         opacity: on ? 1 : 0.5,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 74),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          constraints: const BoxConstraints(minHeight: 68),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             color: SC.light
                 ? const Color(0xFFF2F6FF)
@@ -1724,8 +1724,8 @@ class _PerkGrid extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 38,
+                height: 38,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
@@ -1733,7 +1733,7 @@ class _PerkGrid extends StatelessWidget {
                     end: Alignment(0.6, 1),
                     colors: [SC.brandBlueDeep, SC.brandBlue, SC.brandCyan],
                   ),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: const [
                     BoxShadow(
                       color: Color(0xD92B7FFF),
@@ -1745,15 +1745,15 @@ class _PerkGrid extends StatelessWidget {
                 ),
                 child: SvgPicture.asset(
                   item.$1,
-                  width: 36,
-                  height: 36,
+                  width: 30,
+                  height: 30,
                   colorFilter: const ColorFilter.mode(
                     SC.accent,
                     BlendMode.srcIn,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 9),
               Expanded(
                 child: Text(
                   item.$2,
@@ -1761,7 +1761,7 @@ class _PerkGrid extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: PopupTokens.ink,
-                    fontSize: 15,
+                    fontSize: 14,
                     height: 1.15,
                     fontWeight: FontWeight.w700,
                   ),
