@@ -3161,6 +3161,9 @@ class _ComposerState extends State<_Composer>
                           maxLines: 5,
                           textAlignVertical: TextAlignVertical.center,
                           textCapitalization: TextCapitalization.sentences,
+                          // Pas de champ « vide » fait d'espaces ou de retours à la
+                          // ligne : il grandissait à deux lignes sans rien montrer.
+                          inputFormatters: const [_NoBlankFormatter()],
                           cursorColor: SC.accentFg,
                           style: TextStyle(color: SC.textPrimary),
                           decoration: InputDecoration(
@@ -3230,6 +3233,24 @@ class _ComposerState extends State<_Composer>
       );
   }
 
+}
+
+/// Refuse un texte fait uniquement d'espaces / de retours à la ligne : la
+/// touche Entrée (multiligne) sur un champ vide ajoutait une 2e ligne invisible,
+/// et la barre restait agrandie alors que « GIF » indiquait un champ vide.
+class _NoBlankFormatter extends TextInputFormatter {
+  const _NoBlankFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isNotEmpty && newValue.text.trim().isEmpty) {
+      return const TextEditingValue();
+    }
+    return newValue;
+  }
 }
 
 class _CircleActionButton extends StatelessWidget {
