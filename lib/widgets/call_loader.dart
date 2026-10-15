@@ -68,22 +68,13 @@ class _CallLoaderState extends State<CallLoader>
                       alignment: Alignment.center,
                       children: [
                         for (var i = 0; i < 3; i++) _wave(i),
-                        DecoratedBox(
-                          decoration: const BoxDecoration(
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0x66020C3C),
-                                blurRadius: 22,
-                                offset: Offset(0, 14),
-                              ),
-                            ],
-                          ),
-                          child: Image(
-                            image: widget.logo,
-                            width: 278,
-                            height: 278,
-                            fit: BoxFit.contain,
-                          ),
+                        // Pas d'ombre : posée sur le cadre de l'image, elle dessinait
+                        // un gros carré sombre derrière le logo.
+                        Image(
+                          image: widget.logo,
+                          width: 278,
+                          height: 278,
+                          fit: BoxFit.contain,
                         ),
                       ],
                     ),
