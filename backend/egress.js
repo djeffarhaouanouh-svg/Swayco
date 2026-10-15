@@ -8,8 +8,13 @@
 // audio/WebRTC path — Egress joins the room as an extra, invisible
 // participant.
 
-const { EgressClient, EncodedFileOutput, EncodedFileType, S3Upload } =
-  require('livekit-server-sdk');
+const {
+  EgressClient,
+  EncodedFileOutput,
+  EncodedFileType,
+  EncodingOptionsPreset,
+  S3Upload,
+} = require('livekit-server-sdk');
 
 const LIVEKIT_URL = process.env.LIVEKIT_URL?.trim();
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY?.trim();
@@ -75,10 +80,13 @@ async function startEgress(room) {
       }),
     },
   });
+  // Portrait (1080x1920) — matches how the call screen itself is framed and
+  // how the footage gets used (TikTok/Reels/Stories ads), not the landscape
+  // default.
   const info = await client.startRoomCompositeEgress(
     room,
     { file },
-    { layout: 'grid' },
+    { layout: 'grid', encodingOptions: EncodingOptionsPreset.PORTRAIT_H264_1080P_30 },
   );
   return { egressId: info.egressId, filename };
 }
