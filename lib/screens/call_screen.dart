@@ -2152,7 +2152,6 @@ class _CallScreenState extends State<CallScreen> {
   void _playCallConnected() {
     SwaycoSounds.callActive = true;
     HapticFeedback.mediumImpact();
-    SwaycoSounds.play(SwSound.callConnected);
   }
 
   Future<void> _toggleMic() async {
@@ -2694,7 +2693,6 @@ class _CallScreenState extends State<CallScreen> {
     final startedAt = _connectedAt;
     if (_hadRemote && startedAt != null && mounted) {
       _finalDuration = DateTime.now().difference(startedAt);
-      SwaycoSounds.play(SwSound.callEnded);
       setState(() => _ended = true);
       unawaited(_prepareEndedCard());
       return;
