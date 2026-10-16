@@ -58,3 +58,26 @@ la configuration a disparu. Le workflow iOS l'exécute avant toute signature.
 Toute chaîne visible par l'utilisateur va dans **les 12 maps** de
 `lib/services/app_strings.dart` (fr en es it pt nl ar ru zh ko de ja), pas
 seulement fr/en. Une clé manquante retombe silencieusement sur l'anglais.
+
+## Pipeline d'appel : natif Apple + DeepSeek + voix de l'iPhone
+
+**C'est l'architecture voulue, sur iPhone :**
+
+1. **STT** : reconnaissance vocale native d'Apple (`SFSpeechRecognizer`), sur le téléphone.
+2. **Traduction** : DeepSeek (`/translation/fix`).
+3. **TTS** : voix native de l'iPhone (`flutter_tts`, événements `tts=local`).
+
+**Ni Whisper, ni Grok sur iOS.** Ils ont été écartés, plusieurs fois, volontairement.
+Si « grok stt » apparaît dans les logs du serveur pendant un appel iPhone, ce n'est
+PAS le fonctionnement normal : le code est tombé sur son repli cloud
+(`_startFallback` dans `lib/swayco/sway_local_mic_streamer_io.dart`). C'est un bug à
+corriger à la cause, pas un comportement à accepter.
+
+**Piège connu (build iOS GitHub) :** le détecteur de voix s'appuie sur sherpa-onnx, dont
+`native/sherpa_onnx_ios_patched/ios/sherpa_onnx.xcframework` est ignoré par git (recréé par
+`setup.sh`). Le workflow iOS ne le recrée pas : un build de magasin peut donc partir sans
+cette bibliothèque, et le repli cloud se déclenche alors que tout marche en local.
+
+**Observabilité :** `DebugOverlay.log` est muet en release. Les lignes de choix du moteur STT
+(`stt engine…`, `stt fallback…`, `stt VAD…`) partent vers `analytics_events`, événement
+`stt_debug`, sans aucune phrase dite.
