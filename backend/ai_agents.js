@@ -594,12 +594,9 @@ async function execute(ctx, a) {
   }
 
   if (a.kind === 'message') {
-    if (await isBlocked(sb, ai.id, target.id)) return { status: 'skipped', detail: 'blocked' };
-    let body = String(a.body || '').trim();
-    if (!body) body = await generate(ctx, ai, target, [], 'opener', a.id);
-    if (!body) return { status: 'failed', detail: 'empty_generation' };
-    await sendMessage(ctx, ai, target, body);
-    return { status: 'done', detail: a.body ? 'manual_text' : 'generated' };
+    // Une IA n'écrit JAMAIS la première : elle répond seulement à un message reçu
+    // (voir le répondeur). Une action « message » en file est ignorée.
+    return { status: 'skipped', detail: 'ai_never_writes_first' };
   }
   return { status: 'failed', detail: `kind_${a.kind}` };
 }

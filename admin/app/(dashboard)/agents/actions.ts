@@ -52,7 +52,14 @@ export async function queueAiActions(
     const { svc, userId } = await requireAdmin();
 
     const kind = String(formData.get("kind") ?? "");
-    if (kind !== "like" && kind !== "message") {
+    if (kind === "message") {
+      // Une IA n'écrit JAMAIS la première : elle répond seulement quand on lui écrit.
+      return {
+        ok: false,
+        message: "Refusé : une IA n'envoie jamais le premier message (elle répond seulement).",
+      };
+    }
+    if (kind !== "like") {
       return { ok: false, message: "Action inconnue." };
     }
     const country = String(formData.get("country") ?? "").trim();
