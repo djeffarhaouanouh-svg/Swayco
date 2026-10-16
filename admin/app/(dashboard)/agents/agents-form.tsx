@@ -128,13 +128,14 @@ export function AgentsForm({
         {kind === "message" ? (
           <div className="mt-4">
             <label className={label} htmlFor="body">
-              Texte du message (laisse vide : chaque compte écrit le sien)
+              Texte du message (obligatoire : l'IA n'écrit jamais seule le premier message)
             </label>
             <textarea
               id="body"
               name="body"
               rows={3}
               maxLength={500}
+              required
               className={field}
             />
           </div>

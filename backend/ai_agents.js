@@ -141,6 +141,32 @@ async function getProfile(sb, id) {
   return data || null;
 }
 
+// Comptes PROTÉGÉS : leur email est dans `ai_exempt_emails` (migration 0075, géré
+// depuis l'admin). Une IA ne les contacte jamais : ni like, ni message, ni
+// réponse, ni acceptation automatique, ni like d'accueil. Liste relue au plus
+// toutes les 30 s ; table absente ou erreur = personne n'est protégé (comme avant).
+const PROTECTED_TTL_MS = 30_000;
+let protectedCache = { at: 0, ids: new Set() };
+async function protectedIds(sb) {
+  if (Date.now() - protectedCache.at < PROTECTED_TTL_MS) return protectedCache.ids;
+  const ids = new Set();
+  try {
+    const { data: rows, error } = await sb.from('ai_exempt_emails').select('email').limit(500);
+    if (!error) {
+      for (const r of rows || []) {
+        const email = String(r.email || '').trim();
+        if (!email) continue;
+        // ilike sans joker : on échappe % _ \ (le « _ » est courant dans un email).
+        const pattern = email.replace(/[\\%_]/g, (c) => `\\${c}`);
+        const { data: ps } = await sb.from('profiles').select('id').ilike('email', pattern).limit(5);
+        for (const p of ps || []) ids.add(p.id);
+      }
+    }
+  } catch { /* table absente : personne n'est protégé */ }
+  protectedCache = { at: Date.now(), ids };
+  return ids;
+}
+
 async function aiIdsAmong(sb, ids) {
   const out = new Set();
   const list = [...new Set(ids.filter((i) => UUID.test(String(i))))];
@@ -532,6 +558,7 @@ async function pushMatch(ctx, ai, target) {
 /** Un « like » : ligne friendships en attente, ou match si l'autre avait deja like. */
 async function doLike(ctx, ai, target) {
   const { sb } = ctx;
+  if ((await protectedIds(sb)).has(target.id)) return { status: 'skipped', detail: 'protected_email' };
   if (await isBlocked(sb, ai.id, target.id)) return { status: 'skipped', detail: 'blocked' };
   const { data: rows } = await sb
     .from('friendships')
@@ -586,6 +613,7 @@ async function execute(ctx, a) {
   const target = await getProfile(sb, a.target_id);
   if (!target) return { status: 'failed', detail: 'target_missing' };
   if (target.is_ai) return { status: 'skipped', detail: 'target_is_ai' };
+  if ((await protectedIds(sb)).has(target.id)) return { status: 'skipped', detail: 'protected_email' };
 
   if (a.kind === 'like') {
     // Like d'accueil programmé, photo supprimée entre-temps : on ne l'envoie pas.
@@ -595,11 +623,12 @@ async function execute(ctx, a) {
 
   if (a.kind === 'message') {
     if (await isBlocked(sb, ai.id, target.id)) return { status: 'skipped', detail: 'blocked' };
-    let body = String(a.body || '').trim();
-    if (!body) body = await generate(ctx, ai, target, [], 'opener', a.id);
-    if (!body) return { status: 'failed', detail: 'empty_generation' };
+    // Une IA n'écrit JAMAIS un premier message toute seule : le texte est celui
+    // que l'admin a saisi. Sans texte, rien ne part (pas de génération).
+    const body = String(a.body || '').trim();
+    if (!body) return { status: 'skipped', detail: 'manual_text_required' };
     await sendMessage(ctx, ai, target, body);
-    return { status: 'done', detail: a.body ? 'manual_text' : 'generated' };
+    return { status: 'done', detail: 'manual_text' };
   }
   return { status: 'failed', detail: `kind_${a.kind}` };
 }
@@ -678,7 +707,9 @@ async function processReplies(ctx) {
 
   const dayStart = utcDayStart();
   let sent = 0;
+  const prot = await protectedIds(sb);
   for (const m of latest.values()) {
+    if (prot.has(m.sender)) continue; // protégé : aucune IA ne lui répond
     const instant = TEST_INSTANT_TARGETS.has(m.sender);
     const level = await attentionLevel(sb, m.recipient).catch(() => 3);
     if (!instant && now - Date.parse(m.created_at) < replyDelayForLevel(m.id, level)) continue;
@@ -854,8 +885,10 @@ async function autoAcceptLikes(ctx) {
   const rows = [...fetched].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
   const aiSet = await aiIdsAmong(sb, rows.flatMap((r) => [r.addressee, r.requester]));
   let done = 0;
+  const prot = await protectedIds(sb);
   for (const r of rows) {
     if (!aiSet.has(r.addressee) || aiSet.has(r.requester)) continue;
+    if (prot.has(r.requester)) continue; // protégé : aucune IA n'accepte son like
     // Entre 2 min et 1 h apres le like, stable pour cette ligne.
     if (Date.now() - Date.parse(r.created_at) < 120000 + (hash(r.id) % (58 * 60000))) continue;
     // Selon son niveau, elle accepte ce like ou l'ignore (tirage stable).
@@ -994,7 +1027,9 @@ async function autoWelcome(ctx) {
   if (!users || users.length === 0) return 0;
 
   let queued = 0;
+  const prot = await protectedIds(sb);
   for (const user of users) {
+    if (prot.has(user.id)) continue; // protégé : pas de like d'accueil
     const target = welcomeTarget(photoPostedAt(user), now);
     if (target === 0) continue;
 
@@ -1103,6 +1138,7 @@ module.exports = {
     DELAY_BY_LEVEL, MAX_DELAY_MS, REPLY_WINDOW_MS, STYLE_WEIGHTS, pickStyle,
     welcomeTarget, welcomeSequence, continentOf, photoPostedAt, WELCOME_DAYS, WELCOME_LIKES_TOTAL, LATAM, ASIA, autoWelcome,
     autoAcceptLikes, acceptRoll, ACCEPT_CHANCE, AUTO_ACCEPT_PER_USER_PER_DAY,
+    protectedIds, resetProtectedCache: () => { protectedCache = { at: 0, ids: new Set() }; },
     sleepWindow, isAwakeAt, isPhotoRequest, isInsult, generate, tidyReply, cleanPersona, localClock,
   },
 };

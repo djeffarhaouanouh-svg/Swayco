@@ -2,6 +2,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { KpiCard, KpiGrid } from "@/components/kpi-card";
 import { PageHeader, Section } from "@/components/section";
 import { AgentsForm } from "./agents-form";
+import { addProtectedEmail, removeProtectedEmail } from "./actions";
 
 type ActionRow = {
   id: string;
@@ -85,6 +86,24 @@ export default async function AgentsPage() {
 
   const missingTable = Boolean(actErr);
 
+  const { data: protectedRows, error: protErr } = await svc
+    .from("ai_exempt_emails")
+    .select("email, note, created_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  const protectedEmails = protectedRows ?? [];
+  // Combien de ces emails ont déjà un compte (pour rassurer : « ça marche »).
+  const hasAccount = new Set<string>();
+  if (protectedEmails.length) {
+    for (const p of protectedEmails) {
+      const { count } = await svc
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .ilike("email", p.email.replace(/[\\%_]/g, (c: string) => `\\${c}`));
+      if ((count ?? 0) > 0) hasAccount.add(p.email);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -114,6 +133,68 @@ export default async function AgentsPage() {
         hint="Choisis la cible et combien de comptes (d'un pays, ou de tous) agissent. Rien ne part instantanément si tu étales."
       >
         <AgentsForm countries={countries} />
+      </Section>
+
+      <Section
+        title="Protégés"
+        hint="Une IA ne contacte jamais le compte qui a l'un de ces emails : ni like, ni message, ni réponse. Tu peux l'ajouter avant que la personne s'inscrive."
+      >
+        {protErr ? (
+          <p className="mb-4 rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-300">
+            La table ai_exempt_emails n'existe pas encore : applique la migration 0075.
+          </p>
+        ) : null}
+        <form action={addProtectedEmail} className="mb-4 flex flex-wrap gap-3">
+          <input
+            name="email"
+            type="email"
+            required
+            placeholder="email@exemple.com"
+            className="min-w-64 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+          />
+          <input
+            name="note"
+            maxLength={120}
+            placeholder="Note (ex. maman)"
+            className="min-w-40 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+          />
+          <button
+            type="submit"
+            className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/15"
+          >
+            Protéger
+          </button>
+        </form>
+        <div className="overflow-x-auto rounded-2xl border border-white/10">
+          <table className="w-full text-left text-sm">
+            <tbody>
+              {protectedEmails.map((p) => (
+                <tr key={p.email} className="border-t border-white/5 first:border-t-0">
+                  <td className="px-4 py-2">{p.email}</td>
+                  <td className="px-4 py-2 text-sc-text-muted">{p.note ?? ""}</td>
+                  <td className="px-4 py-2 text-sc-text-muted">
+                    {hasAccount.has(p.email) ? "compte trouvé" : "pas encore inscrit"}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <form action={removeProtectedEmail}>
+                      <input type="hidden" name="email" value={p.email} />
+                      <button type="submit" className="text-xs text-red-300 hover:underline">
+                        Retirer
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+              {protectedEmails.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-6 text-center text-sc-text-muted">
+                    Aucun email protégé.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
       </Section>
 
       <Section title="Journal" hint="Les 40 dernières actions, toutes sources.">

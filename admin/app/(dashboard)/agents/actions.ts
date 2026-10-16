@@ -29,6 +29,30 @@ async function requireAdmin() {
   return { svc, userId: user.id };
 }
 
+/**
+ * Emails protégés : aucune IA ne contacte jamais le compte qui porte cet email
+ * (voir migration 0075 et protectedIds() dans backend/ai_agents.js). Peut être
+ * ajouté avant que la personne crée son compte.
+ */
+export async function addProtectedEmail(formData: FormData): Promise<void> {
+  const { svc } = await requireAdmin();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const note = String(formData.get("note") ?? "").trim().slice(0, 120);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+  await svc
+    .from("ai_exempt_emails")
+    .upsert({ email, note: note || null }, { onConflict: "email" });
+  revalidatePath("/agents");
+}
+
+export async function removeProtectedEmail(formData: FormData): Promise<void> {
+  const { svc } = await requireAdmin();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email) return;
+  await svc.from("ai_exempt_emails").delete().eq("email", email);
+  revalidatePath("/agents");
+}
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -69,6 +93,10 @@ export async function queueAiActions(
       return { ok: false, message: "Étalement : entre 0 et 720 minutes." };
     }
     const body = String(formData.get("body") ?? "").trim().slice(0, 500);
+    if (kind === "message" && !body) {
+      // Une IA n'écrit jamais un premier message toute seule : c'est toi qui écris.
+      return { ok: false, message: "Écris le texte du message : l'IA n'en génère pas." };
+    }
 
     // Target: a user id, or a handle (with or without the @).
     const rawTarget = String(formData.get("target") ?? "").trim();

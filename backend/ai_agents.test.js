@@ -398,3 +398,25 @@ test('auto-accept: the chance depends on the level and is fixed per like', () =>
     if (t.acceptRoll(`row-${i}`, 1)) assert.equal(t.acceptRoll(`row-${i}`, 2) && t.acceptRoll(`row-${i}`, 3), true);
   }
 });
+
+// ── Emails protégés : aucune IA ne les contacte ─────────────────────────────
+test('protectedIds : les comptes dont l\'email est protégé (insensible à la casse), table absente = personne', async () => {
+  const mk = (exempt, profiles, tableError) => ({
+    from(table) {
+      if (table === 'ai_exempt_emails') {
+        return { select: () => ({ limit: async () => (tableError ? { data: null, error: { message: 'no table' } } : { data: exempt.map((email) => ({ email })), error: null }) }) };
+      }
+      return { select: () => ({ ilike: (_col, pat) => ({ limit: async () => ({
+        data: profiles.filter((p) => p.email.toLowerCase() === pat.replace(/\\(.)/g, '$1').toLowerCase()).map((p) => ({ id: p.id })),
+      }) }) }) };
+    },
+  });
+  t.resetProtectedCache();
+  const sb = mk(['maman@mail.fr', 'a_b@x.fr'], [
+    { id: 'u1', email: 'Maman@Mail.fr' }, { id: 'u2', email: 'a_b@x.fr' }, { id: 'u3', email: 'aXb@x.fr' }, { id: 'u4', email: 'autre@x.fr' },
+  ]);
+  const ids = await t.protectedIds(sb);
+  assert.deepEqual([...ids].sort(), ['u1', 'u2']); // u3 : le « _ » n'est pas un joker
+  t.resetProtectedCache();
+  assert.equal((await t.protectedIds(mk([], [], true))).size, 0);
+});
