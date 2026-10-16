@@ -73,10 +73,12 @@ PAS le fonctionnement normal : le code est tombé sur son repli cloud
 (`_startFallback` dans `lib/swayco/sway_local_mic_streamer_io.dart`). C'est un bug à
 corriger à la cause, pas un comportement à accepter.
 
-**Piège connu (build iOS GitHub) :** le détecteur de voix s'appuie sur sherpa-onnx, dont
-`native/sherpa_onnx_ios_patched/ios/sherpa_onnx.xcframework` est ignoré par git (recréé par
-`setup.sh`). Le workflow iOS ne le recrée pas : un build de magasin peut donc partir sans
-cette bibliothèque, et le repli cloud se déclenche alors que tout marche en local.
+**Piège connu (build iOS GitHub), corrigé le 2026-10-16 :** le détecteur de voix s'appuie sur
+sherpa-onnx. Son `xcframework` était ignoré par git, donc absent des builds GitHub (depuis le
+20 août, fin de MacinCloud) : le repli cloud se déclenchait alors que tout marchait en local.
+Il est maintenant **versionné** dans `native/sherpa_onnx_ios_patched/ios/sherpa_onnx.xcframework`
+(tranche iPhone `ios-arm64` seulement, 24 Mo). Ne pas le remettre dans le `.gitignore`.
+Copie complète (avec simulateur) sauvegardée hors dépôt ; `setup.sh` la régénère.
 
 **Observabilité :** `DebugOverlay.log` est muet en release. Les lignes de choix du moteur STT
 (`stt engine…`, `stt fallback…`, `stt VAD…`) partent vers `analytics_events`, événement
