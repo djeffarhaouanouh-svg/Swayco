@@ -123,6 +123,13 @@ abstract final class SwaycoSounds {
 
   static Future<void> play(SwSound s) async {
     if (!enabled || !_supported) return;
+    // iOS: pendant un appel, WebRTC possède la session audio (catégorie +
+    // mode videoChat posés par AppDelegate / CallKit). Un lecteur qui y
+    // touche, même pour un « bip », la reconfigure sous ses pieds : le micro
+    // et la STT continuent, mais plus rien ne sort — ni la voix distante ni le
+    // TTS. Constaté en TestFlight 6.1.12 (203), silence des deux côtés. Donc
+    // aucun son d'app tant que l'appel est actif.
+    if (callActive && defaultTargetPlatform == TargetPlatform.iOS) return;
     try {
       var p = _players[s];
       if (p == null) {
