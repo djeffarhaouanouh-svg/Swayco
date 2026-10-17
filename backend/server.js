@@ -792,12 +792,28 @@ app.get('/livekit/egress/debug', _limLite, async (req, res) => {
   }
   const testEmail = typeof req.query.email === 'string' ? req.query.email : null;
   try {
+    const config = egress.debugConfig();
+    // LiveKit's listEgress() doesn't reliably report file_results even for
+    // uploads we've visually confirmed landed — so check the bucket itself
+    // (service-role storage client, bypasses RLS) instead of trusting that
+    // field.
+    let bucketFiles = null;
+    const sb = supabase();
+    if (sb && config.s3Bucket) {
+      const { data, error } = await sb.storage
+        .from(config.s3Bucket)
+        .list('recordings', { limit: 20, sortBy: { column: 'created_at', order: 'desc' } });
+      bucketFiles = error
+        ? { error: error.message }
+        : data.map((f) => ({ name: f.name, size: f.metadata?.size ?? null, created_at: f.created_at }));
+    }
     return res.json({
-      config: egress.debugConfig(),
+      config,
       // Same check /livekit/egress/allowed does, without needing a live
       // Supabase session token — pass ?email=... to simulate a given account.
       wouldAllow: testEmail ? egress.isEgressAdmin(testEmail) : null,
       jobs: await egress.listRecentEgress(),
+      bucketFiles,
     });
   } catch (e) {
     return res.status(500).json({ error: e.message, config: egress.debugConfig() });
