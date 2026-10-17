@@ -107,4 +107,35 @@ async function stopEgress(egressId) {
   return client.stopEgress(egressId);
 }
 
-module.exports = { isEgressAdmin, egressConfigured, startEgress, stopEgress };
+/** Diagnostic only: the last few egress jobs with their actual status/error
+ *  from LiveKit — start/stop only confirm the job was ACCEPTED, not that the
+ *  S3 upload succeeded, so this is the only place that failure surfaces. */
+async function listRecentEgress() {
+  const client = egressClient();
+  if (!client) throw new Error('egress_unconfigured');
+  const jobs = await client.listEgress();
+  return jobs
+    .sort((a, b) => Number(b.startedAt) - Number(a.startedAt))
+    .slice(0, 10)
+    .map((j) => ({
+      egressId: j.egressId,
+      roomName: j.roomName,
+      status: j.status,
+      error: j.error || null,
+      startedAt: Number(j.startedAt),
+      endedAt: Number(j.endedAt) || null,
+      files: j.fileResults.map((f) => ({
+        filename: f.filename,
+        location: f.location,
+        size: Number(f.size),
+      })),
+    }));
+}
+
+module.exports = {
+  isEgressAdmin,
+  egressConfigured,
+  startEgress,
+  stopEgress,
+  listRecentEgress,
+};

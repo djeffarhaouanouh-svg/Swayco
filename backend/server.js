@@ -777,6 +777,27 @@ app.post('/livekit/egress/stop', _limLite, async (req, res) => {
 });
 
 /**
+ * GET /livekit/egress/debug
+ * Auth: X-Egress-Debug-Key header matching EGRESS_DEBUG_KEY — separate from
+ * the Supabase-JWT gate on the other /livekit/egress routes, so this can be
+ * queried from outside the app (curl) while diagnosing a recording that
+ * "starts fine" client-side but never produces a file: start/stop only
+ * confirm LiveKit ACCEPTED the job, never that the S3 upload worked.
+ * Temporary — remove once the S3 config is confirmed working.
+ */
+app.get('/livekit/egress/debug', _limLite, async (req, res) => {
+  const key = process.env.EGRESS_DEBUG_KEY;
+  if (!key || req.headers['x-egress-debug-key'] !== key) {
+    return res.status(404).end();
+  }
+  try {
+    return res.json({ jobs: await egress.listRecentEgress() });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+/**
  * GET /invite/resolve?code=<code>
  * Public — resolves a short invite code back to { roomName, sig, exp } so
  * a `…/i/<code>` link can be opened with no account. 404 unknown,
