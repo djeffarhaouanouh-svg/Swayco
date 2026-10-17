@@ -132,10 +132,25 @@ async function listRecentEgress() {
     }));
 }
 
+/** Diagnostic only: what this process actually parsed from env — the fastest
+ *  way to tell "wrong email in Railway" apart from "right email, something
+ *  else is broken" without guessing. */
+function debugConfig() {
+  return {
+    hasLiveKitClient: Boolean(egressClient()),
+    s3Configured: egressConfigured(),
+    s3Bucket: S3_BUCKET || null,
+    s3Endpoint: S3_ENDPOINT || null,
+    s3Region: S3_REGION,
+    adminEmails: [...EGRESS_ADMIN_EMAILS],
+  };
+}
+
 module.exports = {
   isEgressAdmin,
   egressConfigured,
   startEgress,
   stopEgress,
   listRecentEgress,
+  debugConfig,
 };

@@ -790,10 +790,17 @@ app.get('/livekit/egress/debug', _limLite, async (req, res) => {
   if (!key || req.headers['x-egress-debug-key'] !== key) {
     return res.status(404).end();
   }
+  const testEmail = typeof req.query.email === 'string' ? req.query.email : null;
   try {
-    return res.json({ jobs: await egress.listRecentEgress() });
+    return res.json({
+      config: egress.debugConfig(),
+      // Same check /livekit/egress/allowed does, without needing a live
+      // Supabase session token — pass ?email=... to simulate a given account.
+      wouldAllow: testEmail ? egress.isEgressAdmin(testEmail) : null,
+      jobs: await egress.listRecentEgress(),
+    });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message, config: egress.debugConfig() });
   }
 });
 
