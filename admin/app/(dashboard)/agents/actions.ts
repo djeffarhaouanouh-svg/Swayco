@@ -53,6 +53,37 @@ export async function removeProtectedEmail(formData: FormData): Promise<void> {
   revalidatePath("/agents");
 }
 
+/**
+ * Journal des phrases d'appel (migration 0076) : comptes dont les phrases sont
+ * enregistrées (ce que le micro a compris + la traduction). On ajoute par
+ * pseudo (handle), email ou identifiant.
+ */
+export async function addCallDebugUser(formData: FormData): Promise<void> {
+  const { svc } = await requireAdmin();
+  const raw = String(formData.get("who") ?? "").trim().replace(/^@/, "");
+  if (!raw) return;
+  const q = svc.from("profiles").select("id, handle");
+  const { data } = await (UUID.test(raw)
+    ? q.eq("id", raw)
+    : raw.includes("@")
+      ? q.ilike("email", raw.replace(/[\\%_]/g, (c) => `\\${c}`))
+      : q.eq("handle", raw)
+  ).limit(1);
+  const p = data?.[0];
+  if (!p) return;
+  await svc
+    .from("call_debug_users")
+    .upsert({ user_id: p.id, note: p.handle ?? null }, { onConflict: "user_id" });
+  revalidatePath("/agents");
+}
+
+export async function removeCallDebugUser(formData: FormData): Promise<void> {
+  const { svc } = await requireAdmin();
+  const id = String(formData.get("user_id") ?? "").trim();
+  if (!UUID.test(id)) return;
+  await svc.from("call_debug_users").delete().eq("user_id", id);
+  revalidatePath("/agents");
+}
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {

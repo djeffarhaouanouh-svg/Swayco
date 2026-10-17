@@ -2,7 +2,12 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { KpiCard, KpiGrid } from "@/components/kpi-card";
 import { PageHeader, Section } from "@/components/section";
 import { AgentsForm } from "./agents-form";
-import { addProtectedEmail, removeProtectedEmail } from "./actions";
+import {
+  addCallDebugUser,
+  addProtectedEmail,
+  removeCallDebugUser,
+  removeProtectedEmail,
+} from "./actions";
 
 type ActionRow = {
   id: string;
@@ -92,6 +97,28 @@ export default async function AgentsPage() {
     .order("created_at", { ascending: false })
     .limit(200);
   const protectedEmails = protectedRows ?? [];
+  // Journal des phrases d'appel (migration 0076) : comptes suivis + dernières phrases.
+  const { data: dbgUsers, error: dbgErr } = await svc
+    .from("call_debug_users")
+    .select("user_id, note, created_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  const { data: phrases } = await svc
+    .from("call_phrase_log")
+    .select("created_at, user_id, from_lang, to_lang, heard, repaired, translated, route, unclear")
+    .order("created_at", { ascending: false })
+    .limit(60);
+  const dbgIds = [
+    ...new Set([
+      ...(dbgUsers ?? []).map((u) => u.user_id as string),
+      ...(phrases ?? []).map((p) => p.user_id as string),
+    ]),
+  ];
+  const dbgNames = new Map<string, string>();
+  if (dbgIds.length) {
+    const { data: ps } = await svc.from("profiles").select("id, handle, display_name").in("id", dbgIds);
+    for (const p of ps ?? []) dbgNames.set(p.id, p.handle || p.display_name || "—");
+  }
   // Combien de ces emails ont déjà un compte (pour rassurer : « ça marche »).
   const hasAccount = new Set<string>();
   if (protectedEmails.length) {
@@ -189,6 +216,88 @@ export default async function AgentsPage() {
                 <tr>
                   <td className="px-4 py-6 text-center text-sc-text-muted">
                     Aucun email protégé.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      <Section
+        title="Phrases d'appel (test)"
+        hint="Pour les comptes ajoutés ici, le serveur garde ce que le micro a compris, la phrase réparée et la traduction, 7 jours. Ajoute les deux comptes d'un appel de test pour voir les deux sens. Les autres comptes ne sont jamais enregistrés."
+      >
+        {dbgErr ? (
+          <p className="mb-4 rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-300">
+            Les tables n'existent pas encore : applique la migration 0076.
+          </p>
+        ) : null}
+        <form action={addCallDebugUser} className="mb-4 flex flex-wrap gap-3">
+          <input
+            name="who"
+            required
+            placeholder="pseudo (lely-b0253e), email ou identifiant"
+            className="min-w-72 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+          />
+          <button
+            type="submit"
+            className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/15"
+          >
+            Enregistrer ses phrases
+          </button>
+        </form>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {(dbgUsers ?? []).map((u) => (
+            <form
+              key={u.user_id}
+              action={removeCallDebugUser}
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs"
+            >
+              <input type="hidden" name="user_id" value={u.user_id} />
+              <span>{dbgNames.get(u.user_id) ?? u.note ?? u.user_id}</span>
+              <button type="submit" className="text-red-300 hover:underline">
+                retirer
+              </button>
+            </form>
+          ))}
+          {(dbgUsers ?? []).length === 0 && !dbgErr ? (
+            <span className="text-sm text-sc-text-muted">Aucun compte suivi.</span>
+          ) : null}
+        </div>
+        <div className="overflow-x-auto rounded-2xl border border-white/10">
+          <table className="w-full text-left text-sm">
+            <thead className="text-xs text-sc-text-muted">
+              <tr>
+                <th className="px-4 py-2">Quand</th>
+                <th className="px-4 py-2">Qui</th>
+                <th className="px-4 py-2">Sens</th>
+                <th className="px-4 py-2">Compris</th>
+                <th className="px-4 py-2">Réparé</th>
+                <th className="px-4 py-2">Traduit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(phrases ?? []).map((p, i) => (
+                <tr key={`${p.created_at}-${i}`} className="border-t border-white/5 align-top">
+                  <td className="px-4 py-2 whitespace-nowrap text-sc-text-muted">
+                    {new Date(p.created_at).toLocaleString("fr-FR")}
+                  </td>
+                  <td className="px-4 py-2">{dbgNames.get(p.user_id) ?? "—"}</td>
+                  <td className="px-4 py-2 whitespace-nowrap">
+                    {p.from_lang}→{p.to_lang}
+                  </td>
+                  <td className="px-4 py-2">{p.heard}</td>
+                  <td className="px-4 py-2 text-sc-text-muted">{p.repaired}</td>
+                  <td className="px-4 py-2">
+                    {p.unclear ? <span className="text-sc-text-muted">illisible, rien envoyé</span> : p.translated}
+                  </td>
+                </tr>
+              ))}
+              {(phrases ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-6 text-center text-sc-text-muted">
+                    Aucune phrase enregistrée.
                   </td>
                 </tr>
               ) : null}
