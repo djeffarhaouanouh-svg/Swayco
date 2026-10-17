@@ -1049,9 +1049,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     // La liste leur réserve juste la place de ne pas cacher un message au
     // repos — au défilement, les messages passent dessous et s'y dissolvent.
     // (La pastille « ES → FR » de la maquette a été retirée à la demande.)
+    // Même langue des deux côtés : rien à traduire, donc pas d'îlot Traduction
+    // (et la liste ne lui réserve plus sa hauteur). Langue du pair inconnue :
+    // on le garde, comme avant.
+    final peerPrimary =
+        (_peer?.language ?? '').trim().split(RegExp(r'[-_]')).first.toLowerCase();
+    final myPrimary = _myLang.trim().split(RegExp(r'[-_]')).first.toLowerCase();
+    final showPill =
+        peerPrimary.isEmpty || myPrimary.isEmpty || peerPrimary != myPrimary;
+    final pillH = showPill ? _TranslatePill.blockHeight : 0.0;
     final headerH = safeTop +
         _ThreadHeader.height +
-        _TranslatePill.blockHeight +
+        pillH +
         (_error != null ? 40 : 0);
     // Hauteur du composer (champ ~50 + 4 dessus + 12 dessous + une part de
     // la safe area, cf. _buildIdleBar) : le fond y reste constant.
@@ -1103,11 +1112,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       top: 0,
                       left: 0,
                       right: 0,
-                      height: headerH - _TranslatePill.blockHeight + _kChromeFade,
+                      height: headerH - pillH + _kChromeFade,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: _chromeGradient(
-                            solid: headerH - _TranslatePill.blockHeight,
+                            solid: headerH - pillH,
                             top: true,
                           ),
                         ),
@@ -1138,12 +1147,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                         ),
                         // Le réglage de traduction : sous l'en-tête, plus dans
                         // la barre d'écriture (maquette 8c).
-                        _TranslatePill(
-                          active: _autoTranslate,
-                          fromLang: _peer?.language ?? '',
-                          toLang: _myLang,
-                          onTap: _toggleAutoTranslate,
-                        ),
+                        if (showPill)
+                          _TranslatePill(
+                            active: _autoTranslate,
+                            fromLang: _peer?.language ?? '',
+                            toLang: _myLang,
+                            onTap: _toggleAutoTranslate,
+                          ),
                         if (_error != null) _ErrorBanner(message: _error!),
                       ],
                     ),
@@ -3323,7 +3333,9 @@ class _CircleActionButton extends StatelessWidget {
 
 /// The translation switch, under the header (8c): « 文A Traduction JA → FR ⬤ ».
 /// On = brand gradient, yellow icon and track; off = faint glass.
-class _TranslatePill extends StatelessWidget {
+/// À l'ouverture : tombe du haut, puis « JA → FR » disparaît et le toggle se
+/// colle à « Traduction ».
+class _TranslatePill extends StatefulWidget {
   const _TranslatePill({
     required this.active,
     required this.fromLang,
@@ -3342,94 +3354,253 @@ class _TranslatePill extends StatelessWidget {
   static const double blockHeight = 42;
 
   @override
+  State<_TranslatePill> createState() => _TranslatePillState();
+}
+
+class _TranslatePillState extends State<_TranslatePill>
+    with TickerProviderStateMixin {
+  late final AnimationController _in = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  )..forward();
+  late final AnimationController _pop = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 800),
+  );
+  bool _showPair = true;
+  double _turns = 0;
+  Timer? _pairTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _pairTimer = Timer(const Duration(milliseconds: 700 + 2400), () {
+      if (mounted) setState(() => _showPair = false);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _TranslatePill old) {
+    super.didUpdateWidget(old);
+    if (!old.active && widget.active) {
+      _pop.forward(from: 0);
+      setState(() => _turns += 1);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pairTimer?.cancel();
+    _in.dispose();
+    _pop.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final from = fromLang.trim().split('-').first.toUpperCase();
-    final to = toLang.trim().split('-').first.toUpperCase();
+    final active = widget.active;
+    final from = widget.fromLang.trim().split('-').first.toUpperCase();
+    final to = widget.toLang.trim().split('-').first.toUpperCase();
     final pair = from.isNotEmpty && to.isNotEmpty && from != to
         ? '$from → $to'
         : '';
     // Actif : texte blanc sur le dégradé bleu ; inactif : encre (clair) ou blanc 60 %.
     final fg = active ? Colors.white : SC.fgA(0.6);
+
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Center(
-        child: PadTap(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            height: 36,
-            padding: const EdgeInsets.fromLTRB(14, 0, 6, 0),
-            decoration: BoxDecoration(
-              gradient: active ? SC.brandGradient : null,
-              color: active ? null : SC.fg.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: SC.stroke.withValues(alpha: active ? 0.3 : 0.2),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.translate_rounded,
-                  size: 18,
-                  color: active
-                      ? SC.accent
-                      : SC.fg.withValues(alpha: 0.6),
-                ),
-                const SizedBox(width: 9),
-                Text(
-                  AppStrings.t('call_lang_translation'),
-                  style: TextStyle(
-                    color: fg,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                if (pair.isNotEmpty) ...[
-                  const SizedBox(width: 9),
-                  Text(
-                    pair,
-                    style: TextStyle(
-                      color: fg,
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-                const SizedBox(width: 9),
-                // The switch: 38×24 track, 18 knob.
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 38,
-                  height: 24,
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: active
-                        ? SC.accent
-                        : SC.fg.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: AnimatedAlign(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                    alignment:
-                        active ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: active ? SC.onAccent : SC.fg,
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_in, _pop]),
+          builder: (context, _) {
+            final drop = Curves.easeOutBack
+                .transform(const Interval(0, 0.7).transform(_in.value));
+            final fade = const Interval(0, 0.3).transform(_in.value);
+            final reveal = Curves.easeOutCubic
+                .transform(const Interval(0.4, 1).transform(_in.value));
+            final bump = 1 + 0.08 * math.sin(math.pi * _pop.value);
+            final ring = _pop.value;
+
+            return Opacity(
+              opacity: fade,
+              child: Transform.translate(
+                offset: Offset(0, (1 - drop) * -44),
+                child: Transform.scale(
+                  scale: (0.5 + 0.5 * drop) * bump,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      if (ring > 0 && ring < 1)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: Transform.scale(
+                              scaleX: 1 + 0.9 * ring,
+                              scaleY: 1 + 1.6 * ring,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: SC.brandCyan.withValues(
+                                      alpha: 0.8 * (1 - ring),
+                                    ),
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      PadTap(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: widget.onTap,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          height: 36,
+                          padding: const EdgeInsets.fromLTRB(14, 0, 6, 0),
+                          decoration: BoxDecoration(
+                            gradient: active ? SC.brandGradient : null,
+                            color: active ? null : SC.fg.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: SC.stroke
+                                  .withValues(alpha: active ? 0.3 : 0.2),
+                            ),
+                            boxShadow: active
+                                ? [
+                                    BoxShadow(
+                                      color: SC.brandBlue
+                                          .withValues(alpha: 0.55),
+                                      blurRadius: 22,
+                                      spreadRadius: -6,
+                                    ),
+                                  ]
+                                : const [],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AnimatedRotation(
+                                turns: _turns,
+                                duration: const Duration(milliseconds: 700),
+                                curve: Curves.easeOutBack,
+                                child: Icon(
+                                  Icons.translate_rounded,
+                                  size: 18,
+                                  color: active
+                                      ? SC.accent
+                                      : SC.fg.withValues(alpha: 0.6),
+                                ),
+                              ),
+                              // « Traduction » : se déploie à l'arrivée, reste.
+                              ClipRect(
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  widthFactor: reveal,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(width: 9),
+                                      Text(
+                                        AppStrings.t('call_lang_translation'),
+                                        maxLines: 1,
+                                        softWrap: false,
+                                        style: TextStyle(
+                                          color: fg,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              // « JA → FR » : disparaît après ~2,4 s.
+                              if (pair.isNotEmpty)
+                                TweenAnimationBuilder<double>(
+                                  tween: Tween(end: _showPair ? 1.0 : 0.0),
+                                  duration: const Duration(milliseconds: 600),
+                                  curve: Curves.easeOutCubic,
+                                  builder: (_, v, child) => ClipRect(
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      widthFactor: reveal * v,
+                                      child: Opacity(opacity: v, child: child),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(width: 9),
+                                      Text(
+                                        pair,
+                                        maxLines: 1,
+                                        softWrap: false,
+                                        style: TextStyle(
+                                          color: fg,
+                                          fontFamily: 'monospace',
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              // The switch: 38×24 track, 18 knob — toujours là.
+                              ClipRect(
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  widthFactor: reveal,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(width: 9),
+                                      AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 200),
+                                        width: 38,
+                                        height: 24,
+                                        padding: const EdgeInsets.all(3),
+                                        decoration: BoxDecoration(
+                                          color: active
+                                              ? SC.accent
+                                              : SC.fg.withValues(alpha: 0.22),
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                        ),
+                                        child: AnimatedAlign(
+                                          duration:
+                                              const Duration(milliseconds: 500),
+                                          curve: Curves.easeOutBack,
+                                          alignment: active
+                                              ? Alignment.centerRight
+                                              : Alignment.centerLeft,
+                                          child: Container(
+                                            width: 18,
+                                            height: 18,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: active
+                                                  ? SC.onAccent
+                                                  : SC.fg,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
