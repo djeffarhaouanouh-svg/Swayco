@@ -1867,9 +1867,54 @@ async function repairProbe({ transcript, from, to }) {
   }
 }
 
+// ── Journal des phrases d'appel (comptes de TEST uniquement) ────────────────
+// Pour juger la précision d'une traduction quand les deux personnes ne parlent
+// pas la même langue : on garde, phrase par phrase, ce que le micro a compris,
+// la phrase réparée et la traduction. UNIQUEMENT pour les comptes listés dans
+// `call_debug_users` (migration 0076) ; tout autre compte n'écrit rien. Les
+// lignes de plus de 7 jours sont supprimées. Table ou liste absente = rien.
+const CALL_LOG_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+let _callDebugUsers = { at: 0, ids: new Set() };
+let _callLogPurgeAt = 0;
+async function callDebugUserIds(sb) {
+  if (Date.now() - _callDebugUsers.at < 60_000) return _callDebugUsers.ids;
+  let ids = new Set();
+  try {
+    const { data, error } = await sb.from('call_debug_users').select('user_id').limit(200);
+    if (!error) ids = new Set((data || []).map((r) => r.user_id));
+  } catch { /* table absente : rien n'est journalisé */ }
+  _callDebugUsers = { at: Date.now(), ids };
+  return ids;
+}
+function logCallPhrase(row) {
+  const uid = String(row.uid || '');
+  if (!CALL_LOG_UUID.test(uid)) return;
+  const sb = supabase();
+  if (!sb) return;
+  Promise.resolve().then(async () => {
+    if (!(await callDebugUserIds(sb)).has(uid)) return;
+    await sb.from('call_phrase_log').insert({
+      user_id: uid,
+      from_lang: row.from || null,
+      to_lang: row.to || null,
+      heard: String(row.heard || '').slice(0, 1000),
+      repaired: String(row.repaired || '').slice(0, 1000),
+      translated: String(row.translated || '').slice(0, 2000),
+      route: row.route || null,
+      engine: row.engine || null,
+      unclear: !!row.unclear,
+    });
+    if (Date.now() - _callLogPurgeAt > 3600_000) {
+      _callLogPurgeAt = Date.now();
+      await sb.from('call_phrase_log').delete()
+        .lt('created_at', new Date(Date.now() - 7 * 86400_000).toISOString());
+    }
+  }).catch(() => {});
+}
+
 /**
  * POST /translation/fix  (application/json)
- * Body: { text, from, to?, context?: { authorGender, peerGender } }
+ * Body: { text, from, to?, context?: { authorGender, peerGender }, uid? }
  *   →  { text, engine, unclear }
  *
  * `unclear: true` means no model could read the transcript with confidence. The
@@ -1892,6 +1937,9 @@ app.post('/translation/fix', _limText, async (req, res) => {
   const g = (v) => (v === 'm' || v === 'f' ? v : '');
   const authorGender = g(ctx.authorGender);
   const peerGender = g(ctx.peerGender);
+
+  // Journal des phrases : seulement si `uid` est un compte de test (voir plus haut).
+  const logUid = typeof req.body?.uid === 'string' ? req.body.uid.trim() : '';
 
   const fromName = fixLanguageName(from);
   const toName = to && to !== from ? fixLanguageName(to) : '';
@@ -1973,6 +2021,7 @@ app.post('/translation/fix', _limText, async (req, res) => {
     try {
       let any = false;
       let usage = null;
+      const outSentences = [];
       const full = await fixStreamSentences({
         base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL, prompt, noThink: true,
         json: isJson,
@@ -1981,6 +2030,7 @@ app.post('/translation/fix', _limText, async (req, res) => {
           const t = s.trim();
           if (!t || t.toUpperCase().startsWith(FIX_UNCLEAR)) return;
           any = true;
+          outSentences.push(t);
           send({ out: t });
         },
       });
@@ -2011,8 +2061,12 @@ app.post('/translation/fix', _limText, async (req, res) => {
             noThink: true,
           }));
         }
-        if (rr.out) { send({ out: rr.out }); any = true; fixed = rr.fixed; }
+        if (rr.out) { send({ out: rr.out }); outSentences.push(rr.out); any = true; fixed = rr.fixed; }
       }
+      logCallPhrase({
+        uid: logUid, from, to, heard: text, repaired: fixed,
+        translated: outSentences.join(' '), route, engine, unclear: !any,
+      });
       // Token counts ride along so the on-screen panel can show the cache hit
       // rate live, instead of it being estimated. `hit` is the slice of the
       // prompt served from cache at 1/50th the price; on a warm cache it should
@@ -2041,7 +2095,14 @@ app.post('/translation/fix', _limText, async (req, res) => {
         base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL, prompt, noThink: true,
       }));
     }
-    if (!r.out) return res.json({ text: '', engine, route, unclear: true });
+    if (!r.out) {
+      logCallPhrase({ uid: logUid, from, to, heard: text, route, engine, unclear: true });
+      return res.json({ text: '', engine, route, unclear: true });
+    }
+    logCallPhrase({
+      uid: logUid, from, to, heard: text, repaired: r.fixed,
+      translated: r.out, route, engine, unclear: false,
+    });
     // `fixed` is the repaired SOURCE sentence. It is never spoken — it is
     // returned so the caller can log it next to the raw transcript and see
     // whether the repair changed anything at all. That comparison is the only

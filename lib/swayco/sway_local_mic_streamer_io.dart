@@ -8,6 +8,7 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import '../services/call_audio.dart';
 import '../services/debug_overlay.dart';
+import '../services/device_id.dart';
 import 'sway_webrtc_mic_tap.dart';
 import 'asr/asr_model_downloader.dart';
 import 'asr/asr_service.dart';
@@ -261,6 +262,10 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// gender and the translator falls back to its own guess, as before.
   String _myGender = '';
 
+  /// Identifiant du compte, joint à chaque phrase envoyée à /translation/fix : le
+  /// serveur ne s'en sert que pour journaliser les comptes de TEST (migration 0076).
+  String _myUid = '';
+
   /// The peer's gender. A setter rather than a [start] argument because their
   /// profile is fetched asynchronously and often lands after the call connects.
   String _peerGender = '';
@@ -336,6 +341,11 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       _myGender = (await UserPrefs.loadProfile())?.gender.trim() ?? '';
     } catch (_) {
       _myGender = '';
+    }
+    try {
+      _myUid = await DeviceId.getOrCreate();
+    } catch (_) {
+      _myUid = '';
     }
     _onTranslation = onTranslation;
     _onError = onError;
@@ -1156,6 +1166,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         peerGender: _peerGender.isEmpty ? null : _peerGender,
         alternatives: hypotheses.alternatives,
         lowConfidence: hypotheses.lowConfidence,
+        uid: _myUid.isEmpty ? null : _myUid,
         onSentence: (sentence) {
           _publish('', sentence, onTranslation, force: force);
         },

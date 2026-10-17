@@ -458,6 +458,7 @@ Future<TranscriptFix> fetchTranscriptFix({
   String? to,
   String? authorGender,
   String? peerGender,
+  String? uid,
 }) async {
   if (text.trim().isEmpty) {
     return const TranscriptFix(text: '', unclear: true);
@@ -465,6 +466,8 @@ Future<TranscriptFix> fetchTranscriptFix({
   try {
     final body = <String, dynamic>{'text': text, 'from': from};
     if (to != null && to.isNotEmpty) body['to'] = to;
+    // Le serveur ne journalise les phrases que pour les comptes de test (0076).
+    if (uid != null && uid.isNotEmpty) body['uid'] = uid;
     final ctx = <String, dynamic>{};
     if (authorGender != null && authorGender.isNotEmpty) {
       ctx['authorGender'] = authorGender;
@@ -529,6 +532,7 @@ Future<TranscriptFix> fetchTranscriptFixStream({
   String? peerGender,
   List<String> alternatives = const [],
   List<String> lowConfidence = const [],
+  String? uid,
   required void Function(String sentence) onSentence,
 }) async {
   if (text.trim().isEmpty) return const TranscriptFix(text: '', unclear: true);
@@ -536,6 +540,8 @@ Future<TranscriptFix> fetchTranscriptFixStream({
   try {
     final body = <String, dynamic>{'text': text, 'from': from, 'stream': true};
     if (to != null && to.isNotEmpty) body['to'] = to;
+    // Le serveur ne journalise les phrases que pour les comptes de test (0076).
+    if (uid != null && uid.isNotEmpty) body['uid'] = uid;
     // What the recogniser ranked BELOW [text], and the words it scored lowest.
     // Sent only when there is something to send: on a clean phrase the OS
     // returns one hypothesis, and an empty field every utterance would be pure
