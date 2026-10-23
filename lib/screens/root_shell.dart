@@ -26,7 +26,6 @@ import '../services/profile_api.dart';
 import '../services/received_activity_unread.dart';
 import '../services/supabase_service.dart';
 import '../services/token_api.dart';
-import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../theme/swayco_palette.dart';
@@ -78,12 +77,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// every further join for ANY room is dropped: one call screen at a time.
   String? _joiningRoom;
 
-  /// Guards the one-shot coach-mark dialogs from overlapping each other.
+  /// Guards the coach-mark dialogs from overlapping each other.
   bool _tipBusy = false;
-
-  /// After the Discover-photo tip, we land on Profile and open the gallery
-  /// sheet — skip the "ta photo, c'est ici" dialog that would stack on top.
-  bool _skipNextProfileTip = false;
 
   /// Watches my friendship rows so a match created by the OTHER side (they
   /// accepted / liked back while I was elsewhere) still pops the celebration
@@ -135,10 +130,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     NavTab.index.addListener(_onNavTabChanged);
     // A cold launch from a notification tap may have set an intent
     // before this shell mounted — handle it once after the first frame.
-    // The same frame is a safe point to fire the post-onboarding nudge.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _onNotificationIntent();
-      _maybeShowOnboardingTips();
       // (The call "connecting" logo is warmed in main() — earlier than this
       // shell mounts, and on the call paths that never mount it at all.)
     });
@@ -733,18 +726,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     // round-trip from a swipe (onPageChanged → NavTab.select → here) doesn't
     // re-animate to the page we're already on.
     if (_pageController.hasClients && _pageController.page?.round() != i) {
-      // Tip #4 jumps Discover → Profile. Animating would pass Likes and
-      // fire onPageChanged(profile) a second time, which used to show
-      // "Ta photo, c'est ici" instead of the gallery picker.
-      if (_skipNextProfileTip) {
-        _pageController.jumpToPage(i);
-      } else {
-        _pageController.animateToPage(
-          i,
-          duration: const Duration(milliseconds: 190),
-          curve: Curves.easeOutCubic,
-        );
-      }
+      _pageController.animateToPage(
+        i,
+        duration: const Duration(milliseconds: 190),
+        curve: Curves.easeOutCubic,
+      );
     }
     if (i == NavTab.profile) _maybeShowProfileTip();
   }
@@ -762,37 +748,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
   }
 
-  /// Post-onboarding nudge to add a Discover photo (4th screen after the
-  /// wizard). "Suivant" sends the user to their Profil tab and opens the
-  /// same add-photo sheet as the + on "Tes photos" (Photothèque / caméra /
-  /// fichier) instead of picking from whatever tab they were on.
-  Future<void> _maybeShowOnboardingTips() async {
-    if (_tipBusy || !mounted) return;
-    if (await UserPrefs.isOnboardingTipsSeen() || !mounted) return;
-    await UserPrefs.markOnboardingTipsSeen();
-    if (!mounted) return;
-    if (await _hasDiscoverPhoto() || !mounted) return;
-    _tipBusy = true;
-    final next = await _showTip(
-      title: AppStrings.t('tip_photo_title'),
-      body: AppStrings.t('tip_photo_body'),
-      buttonLabel: AppStrings.t('tip_next'),
-      secondaryLabel: AppStrings.t('tip_later'),
-      art: SwayTipArt.discoverTiles,
-    );
-    _tipBusy = false;
-    if (!mounted || next != true) return;
-    // Keep this true for the rest of the session so a second tab event
-    // (PageView onPageChanged after the jump) cannot open "Ta photo,
-    // c'est ici" on top of — or instead of — the gallery sheet.
-    _skipNextProfileTip = true;
-    _selectTab(NavTab.profile);
-    // Let the profile page paint before the system picker covers it.
-    await Future<void>.delayed(const Duration(milliseconds: 320));
-    if (!mounted) return;
-    NavTab.requestAddPhoto();
-  }
-
   /// Photo-nudge on the Profile tab. Shows on EVERY navigation into
   /// the Profile tab — and stops showing entirely once the user has
   /// actually uploaded a Discover photo. (The legacy one-shot
@@ -801,7 +756,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// events (NavTab.index listener), so a user who stays on the
   /// profile tab does not get the dialog re-shown.
   Future<void> _maybeShowProfileTip() async {
-    if (_skipNextProfileTip || NavTab.hasAddPhotoRequest) return;
+    if (NavTab.hasAddPhotoRequest) return;
     if (_tipBusy || !mounted) return;
     if (NavTab.index.value != NavTab.profile) return;
     if (await _hasDiscoverPhoto() || !mounted) return;
