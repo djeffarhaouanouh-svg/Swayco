@@ -262,6 +262,9 @@ flutter:
     - assets/geo/world-50m.geo.json
     # Signes du zodiaque de la carte Mes infos.
     - assets/zodiac/
+    # Photos d'exemple de l'étape photo de l'onboarding (photo_ok_1..3.jpg),
+    # fournies par le produit. Absentes, un dégradé gris les remplace.
+    - assets/onboarding/
 
   # The swaycø wordmark is set in Glacial Indifference (SIL Open Font
   # License — see assets/fonts/OFL.txt). Brand type only: the rest of the UI

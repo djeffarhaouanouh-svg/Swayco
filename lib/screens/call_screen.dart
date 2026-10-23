@@ -4817,12 +4817,16 @@ class _TranslationOrb extends StatefulWidget {
   /// La taille par défaut. Toutes les cotes du dessin sont données pour 130
   /// puis mises à l'échelle, donc ce seul nombre redimensionne l'ensemble sans
   /// rien déformer.
-  static const double kSize = 104;
+  static const double kSize = 84;
 
   /// La pierre endormie est plus petite que le galet vivant : couper la
   /// traduction se voit à sa taille avant même qu'on lise l'icône. Même
   /// rapport qu'avant — 104 sur 130.
   static const double dormantRatio = 0.8;
+
+  /// Le triangle de lecture de la pierre endormie, en part de son diamètre
+  /// (30 sur 83 quand le galet faisait 104) : il rétrécit avec elle.
+  static const double dormantIconRatio = 0.36;
 
   /// La place réservée AUTOUR du galet. Le halo déborde de 18 px et les ondes
   /// montent jusqu'à 2,4 fois le disque : sans cette marge, elles sont peintes
@@ -5112,7 +5116,9 @@ class _TranslationOrbState extends State<_TranslationOrb>
               child: Center(
                 child: Icon(
                   Icons.play_arrow_rounded,
-                  size: 30,
+                  size: _TranslationOrb.kSize *
+                      _TranslationOrb.dormantRatio *
+                      _TranslationOrb.dormantIconRatio,
                   color: Colors.white.withValues(alpha: 0.5),
                 ),
               ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../swayco/asr/asr_service.dart';
 import '../services/app_strings.dart';
@@ -22,6 +23,8 @@ import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/location_picker_sheet.dart';
 import '../widgets/sway_onb_kit.dart';
+import 'discover_screen.dart' show discoverCardAspect;
+import 'photo_crop_screen.dart';
 
 /// First-run flow: first name + the user's own spoken language (stored locally).
 /// The remote participant's language is discovered from their LiveKit metadata
@@ -86,18 +89,37 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// location step can show a spinner instead of a dead tap target.
   bool _locating = false;
 
+  /// The cropped photo picked on the (optional) last step, kept in memory
+  /// until [_finish] uploads it. Null = no photo chosen.
+  Uint8List? _photoBytes;
+
+  /// Set in [_prefill] from [UserPrefs.isPhotoSet]. When true the photo page
+  /// is omitted from the flow, mirroring [_genderAlreadySet].
+  bool _photoAlreadySet = false;
+
+  /// True while the gallery picker / cropper is open, so a double tap can't
+  /// stack two pickers.
+  bool _picking = false;
+
+  /// True from the moment [_finish] passes validation until it is done —
+  /// the photo upload can take a few seconds, and "Commencer" must not fire
+  /// twice meanwhile.
+  bool _finishing = false;
+
   int _page = 0;
 
   /// Total pages shown in the first-run wizard:
   ///   Welcome(0) · Language(1) · [Location] · [Gender] · [PersonaCategory]
-  /// Location, Gender and PersonaCategory are each omitted once already
-  /// known, so the count flexes. Interests are edited later from the
+  ///   · [Photo]
+  /// Location, Gender, PersonaCategory and Photo are each omitted once
+  /// already known, so the count flexes. Interests are edited later from the
   /// profile, not here.
   int get _pageCount =>
       2 +
       (_locationAlreadySet ? 0 : 1) +
       (_personaAlreadySet ? 0 : 1) +
-      (_genderAlreadySet ? 0 : 1);
+      (_genderAlreadySet ? 0 : 1) +
+      (_photoAlreadySet ? 0 : 1);
 
   @override
   void initState() {
@@ -131,6 +153,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final genderAlready = await UserPrefs.isGenderSet();
     final personaAlready = await UserPrefs.isPersonaCategorySet();
     final locationAlready = await UserPrefs.isLocationSet();
+    final photoAlready = await UserPrefs.isPhotoSet();
     if (!mounted) return;
     if (snap != null) {
       setState(() {
@@ -181,6 +204,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         _genderAlreadySet = genderAlready;
         _personaAlreadySet = personaAlready;
         _locationAlreadySet = locationAlready;
+        _photoAlreadySet = photoAlready;
         _prefillDone = true;
       });
     }
@@ -308,6 +332,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       );
       return;
     }
+    if (_finishing) return;
+    setState(() => _finishing = true);
+    try {
+      await _completeOnboarding(name);
+    } finally {
+      if (mounted) setState(() => _finishing = false);
+    }
+  }
+
+  /// Everything [_finish] does once the answers are validated: persist them
+  /// locally, push the profile (and the photo) to the account, leave.
+  Future<void> _completeOnboarding(String name) async {
     final genderToSave = _selectedGender ?? '';
     final personaCategoryToSave = _selectedPersonaCategory ?? '';
     await UserPrefs.completeOnboarding(
@@ -366,6 +402,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           category: personaCategoryToSave,
         );
       }
+      // The photo goes up last: it updates the `profiles` row the upsert
+      // above just made sure exists.
+      await _uploadOnboardingPhoto(deviceId);
     }
     // Start pulling the speech model the moment the language is committed, so it
     // is on disk before the first call instead of downloading during it. Fire
@@ -379,6 +418,105 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     Attribution.logOnboardingCompleted();
     if (!mounted) return;
     widget.onCompleted();
+  }
+
+  /// Gallery → crop to the Discover card ratio → keep the bytes in memory.
+  /// Same flow as the profile's `_pickAndAddPhoto`; nothing is uploaded here
+  /// ([_finish] does it, once the profile row exists).
+  Future<void> _pickPhoto() async {
+    if (_picking) return;
+    _picking = true;
+    try {
+      final Uint8List bytes;
+      try {
+        final file = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+          // The Discover card is portrait — keep the same resolution as the
+          // profile's photo picker so the card isn't soft full-screen.
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 88,
+        );
+        if (file == null) return;
+        bytes = await file.readAsBytes();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
+            duration: const Duration(seconds: 8),
+          ),
+        );
+        return;
+      }
+      if (!mounted) return;
+      final cropped = await PhotoCropScreen.pick(
+        context,
+        bytes: bytes,
+        aspect: discoverCardAspect(context),
+        maxEdge: 1600,
+      );
+      if (cropped == null || !mounted) return;
+      HapticFeedback.selectionClick();
+      SwaycoSounds.play(SwSound.photoAdded);
+      setState(() => _photoBytes = cropped);
+    } finally {
+      _picking = false;
+    }
+  }
+
+  /// "Passer pour l'instant" with no photo: ask once more. Adding a photo
+  /// opens the picker; skipping anyway finishes; tapping outside does nothing.
+  Future<void> _skipPhoto() async {
+    final choice = await showSwayPhotoSkipDialog(context);
+    if (!mounted) return;
+    if (choice == true) {
+      await _pickPhoto();
+    } else if (choice == false) {
+      await _finish();
+    }
+  }
+
+  /// Send the photo picked on the photo step to the account's gallery.
+  ///
+  /// [ProfileApi.addProfilePhoto] appends it to `profiles.photos` and, for a
+  /// first photo, makes it the Discover-card photo (`discover_photo_url`). The
+  /// PDP is `avatar_url` or, while that is empty — as it is on a brand-new
+  /// account — that same Discover photo (`RemoteProfile.bestAvatarUrl`), so the
+  /// photo shows as the PDP everywhere without writing `avatar_url`.
+  ///
+  /// A failed upload never blocks the end of onboarding: the user is told, and
+  /// the app's usual "add a Discover photo" nudge (it checks the account) takes
+  /// over.
+  Future<void> _uploadOnboardingPhoto(String deviceId) async {
+    final bytes = _photoBytes;
+    if (bytes == null) return;
+    try {
+      // The row may already hold photos (written from another device): append
+      // to them rather than overwrite the gallery with a one-photo list.
+      final existing = await ProfileApi.fetchById(deviceId);
+      final current = existing?.photos ?? const <String>[];
+      if (current.length < profilePhotosMax) {
+        final isPng = bytes.length > 1 && bytes[0] == 0x89 && bytes[1] == 0x50;
+        await ProfileApi.addProfilePhoto(
+          deviceId: deviceId,
+          bytes: bytes,
+          current: current,
+          contentType: isPng ? 'image/png' : 'image/jpeg',
+          currentDiscover: existing?.discoverPhotoUrl ?? '',
+        );
+      }
+      await UserPrefs.setPhotoSet();
+    } catch (e) {
+      debugPrint('onboarding photo upload failed: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+    }
   }
 
   @override
@@ -528,6 +666,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final showPersonaStep = !_personaAlreadySet;
     final showGenderStep = !_genderAlreadySet;
     final showLocationStep = !_locationAlreadySet;
+    final showPhotoStep = !_photoAlreadySet;
 
     return SwayOnbShell(
       page: _page,
@@ -552,9 +691,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           onSelect: _onLanguageSelected,
           onBack: _back,
           onFinish: _goFromLanguage,
-          // Last page when the location, gender and persona steps are all
-          // skipped.
-          finishLabelKey: (showLocationStep || showGenderStep || showPersonaStep)
+          // Last page when the location, gender, persona and photo steps are
+          // all skipped.
+          finishLabelKey: (showLocationStep ||
+                  showGenderStep ||
+                  showPersonaStep ||
+                  showPhotoStep)
               ? 'onb_next'
               : 'onb_finish',
         ),
@@ -566,9 +708,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             onManual: _openLocationPicker,
             onBack: _back,
             onFinish: _goFromLocation,
-            // Last page when both the gender and persona steps are skipped.
-            finishLabelKey:
-                (showGenderStep || showPersonaStep) ? 'onb_next' : 'onb_finish',
+            // Last page when the gender, persona and photo steps are skipped.
+            finishLabelKey: (showGenderStep || showPersonaStep || showPhotoStep)
+                ? 'onb_next'
+                : 'onb_finish',
           ),
         if (showGenderStep)
           SwayStepGender(
@@ -576,8 +719,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             onSelect: (g) => setState(() => _selectedGender = g),
             onBack: _back,
             onFinish: _goFromGender,
-            // Last page when the persona step is skipped.
-            finishLabelKey: showPersonaStep ? 'onb_next' : 'onb_finish',
+            // Last page when the persona and photo steps are skipped.
+            finishLabelKey: (showPersonaStep || showPhotoStep)
+                ? 'onb_next'
+                : 'onb_finish',
           ),
         if (showPersonaStep)
           SwayStepPersonaCategory(
@@ -586,7 +731,21 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             onSelect: (c) => setState(() => _selectedPersonaCategory =
                 _selectedPersonaCategory == c ? null : c),
             onBack: _back,
+            // The photo step follows whenever it hasn't been done yet.
+            onFinish: showPhotoStep ? _next : _finish,
+            finishLabelKey: showPhotoStep ? 'onb_next' : 'onb_finish',
+          ),
+        if (showPhotoStep)
+          SwayStepPhoto(
+            photo: _photoBytes,
+            name: _nameCtrl.text.trim(),
+            country: _countryCtrl.text,
+            city: _cityCtrl.text,
+            onPick: _pickPhoto,
+            onSkip: _skipPhoto,
+            onBack: _back,
             onFinish: _finish,
+            busy: _finishing,
           ),
       ],
     );
@@ -617,7 +776,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       return;
     }
     // Location comes right after language whenever it's still unknown.
-    if (_locationAlreadySet && _personaAlreadySet && _genderAlreadySet) {
+    if (_locationAlreadySet &&
+        _personaAlreadySet &&
+        _genderAlreadySet &&
+        _photoAlreadySet) {
       _finish();
       return;
     }
@@ -630,7 +792,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// pattern. No need to re-validate the country here — [SwayStepLocation]
   /// already disables its own CTA until one is known.
   void _goFromLocation() {
-    if (_genderAlreadySet && _personaAlreadySet) {
+    if (_genderAlreadySet && _personaAlreadySet && _photoAlreadySet) {
       _finish();
       return;
     }
@@ -643,7 +805,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// re-validate [_selectedGender] here — [SwayStepGender] already disables
   /// its own CTA until an option is picked.
   void _goFromGender() {
-    if (_personaAlreadySet) {
+    if (_personaAlreadySet && _photoAlreadySet) {
       _finish();
       return;
     }

@@ -23,6 +23,10 @@ abstract final class UserPrefs {
   /// to [ProfileApi.updateMyLocation] once auth completes — see
   /// `main.dart::_hydrateAuthedSession`. Empty when not yet provided.
   static const String keyCountry = 'profile_country';
+  /// True once a profile photo was uploaded from the onboarding photo step.
+  /// Asked once, like [keyGender]: the step is skipped on later runs. The
+  /// photo itself lives on the account (`profiles.photos`), not here.
+  static const String keyPhotoSet = 'profile_photo_set';
   static const String keyTranslatedVolume = 'audio_translated_volume';
   static const String keyOriginalVolume = 'audio_original_volume';
   static const String keyDuckingEnabled = 'audio_ducking_enabled';
@@ -179,6 +183,7 @@ abstract final class UserPrefs {
     await p.remove(keyGender);
     await p.remove(keyPersonaCategory);
     await p.remove(keyCountry);
+    await p.remove(keyPhotoSet);
   }
 
   /// Keep the cached first name in step with the account (rename, or a
@@ -226,6 +231,18 @@ abstract final class UserPrefs {
   static Future<bool> isPersonaCategorySet() async {
     final p = await SharedPreferences.getInstance();
     return (p.getString(keyPersonaCategory) ?? '').trim().isNotEmpty;
+  }
+
+  /// True once the onboarding photo step uploaded a photo. Mirrors
+  /// [isGenderSet] — the step is skipped on subsequent runs.
+  static Future<bool> isPhotoSet() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getBool(keyPhotoSet) ?? false;
+  }
+
+  static Future<void> setPhotoSet() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(keyPhotoSet, true);
   }
 
   /// Clears onboarding flag so the welcome flow shows again (e.g. from
