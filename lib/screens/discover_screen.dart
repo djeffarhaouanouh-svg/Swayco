@@ -1805,9 +1805,11 @@ class _CountryRowState extends State<_CountryRow> {
                         // Compteur : centré sous le rond, 8 px en dessous ; il
                         // reste dans la respiration de _CountryRow.height.
                         Positioned(
+                          // Ancré sur le rond (la case, elle, prend toute la
+                          // hauteur de la liste) : déborde de 8 px en dessous.
                           left: 0,
                           width: _kBubble,
-                          bottom: -8,
+                          top: _kBubble - 8,
                           height: 16,
                           child: IgnorePointer(
                             child: Center(
