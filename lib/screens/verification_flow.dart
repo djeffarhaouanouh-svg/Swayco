@@ -301,29 +301,54 @@ class _Intro extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SwayCta(
-                icon: Icons.photo_camera_rounded,
-                label: AppStrings.t('verif_start'),
-                onPressed: onStart,
+              // « Commencer » en bleu Swayco plein (#1F5EFF), « Passer » en
+              // jaune : les couleurs de l'ancienne paire, échangées.
+              SizedBox(
+                height: SwayOnb.ctaHeight,
+                child: TextButton(
+                  onPressed: onStart,
+                  style: TextButton.styleFrom(
+                    backgroundColor: SC.brandBlueDeep,
+                    foregroundColor: Colors.white,
+                    shape: StadiumBorder(
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.45),
+                        width: 1.5,
+                      ),
+                    ),
+                    shadowColor: const Color(0x8004123A),
+                    elevation: 6,
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.photo_camera_rounded, size: 22),
+                        const SizedBox(width: 8),
+                        Text(
+                          AppStrings.t('verif_start'),
+                          style: GoogleFonts.archivoBlack(
+                            fontSize: 17,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
               if (onSkip != null) ...[
                 const SizedBox(height: 10),
-                // Le bleu Swayco plein, pas le dégradé (maquette : #1F5EFF).
                 SizedBox(
                   height: 48,
-                  child: TextButton(
+                  child: FilledButton(
                     onPressed: onSkip,
-                    style: TextButton.styleFrom(
-                      backgroundColor: SC.brandBlueDeep,
-                      foregroundColor: Colors.white,
-                      shape: StadiumBorder(
-                        side: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.45),
-                          width: 1.5,
-                        ),
-                      ),
-                      shadowColor: const Color(0x8004123A),
-                      elevation: 6,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: SC.accent,
+                      foregroundColor: SC.onAccent,
+                      shape: const StadiumBorder(),
+                      elevation: 0,
                     ),
                     child: Text(
                       AppStrings.t('verif_skip'),
