@@ -17,7 +17,6 @@ class ProfileAvatar extends StatelessWidget {
     this.fontSize,
     this.onTap,
     this.showSeal = false,
-    this.sealOnTop = false,
     this.sealRingColor,
   });
 
@@ -37,10 +36,6 @@ class ProfileAvatar extends StatelessWidget {
   /// plus) reçoit la capsule de verre, centrée sous elle ; une petite, la
   /// pastille seule sur son coin. Faux par défaut : rien ne change ailleurs.
   final bool showSeal;
-
-  /// Petite photo : la pastille va en haut à droite au lieu du bas à droite,
-  /// là où une pastille « en ligne » occupe déjà le coin.
-  final bool sealOnTop;
 
   /// Couleur du fond de la ligne, pour le liseré de la petite pastille.
   final Color? sealRingColor;
@@ -156,8 +151,7 @@ class ProfileAvatar extends StatelessWidget {
               else
                 Positioned(
                   right: -3,
-                  top: sealOnTop ? -3 : null,
-                  bottom: sealOnTop ? null : -3,
+                  bottom: -3,
                   child: SwaycoSealCorner(ringColor: sealRingColor ?? SC.bg),
                 ),
             ],

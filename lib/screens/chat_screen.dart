@@ -1736,12 +1736,13 @@ class _FriendChatRow extends StatelessWidget {
         child: Row(
           children: [
             // Avatar — tap goes straight to the peer's profile. The light-
-            // green presence dot rides the bottom-right corner when online.
+            // green presence dot rides the TOP-right corner when online: the
+            // bottom-right one belongs to the seal.
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onViewProfile,
               child: Stack(
-                // La pastille déborde de 3 px en haut à droite.
+                // La pastille déborde de 3 px en bas à droite.
                 clipBehavior: Clip.none,
                 children: [
                   ProfileAvatar(
@@ -1750,13 +1751,11 @@ class _FriendChatRow extends StatelessWidget {
                     fallbackUrl: profile.fallbackPhotoUrl,
                     size: 52,
                     showSeal: kSealOnEveryProfile,
-                    // En haut : le coin du bas porte le point « en ligne ».
-                    sealOnTop: true,
                   ),
                   if (_peerOnline)
                     Positioned(
                       right: 1,
-                      bottom: 1,
+                      top: 1,
                       child: Container(
                         width: 13,
                         height: 13,

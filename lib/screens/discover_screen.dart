@@ -3023,50 +3023,47 @@ class _TinderCardState extends State<_TinderCard> {
               ),
             ),
 
-          // ── En haut à gauche : la pastille, puis « POPULAIRE » — le badge que
-          //    vend le paywall Pro — à sa droite quand le profil l'a. Ils
-          //    partagent la rangée : le coin n'a qu'une place. Ne captent
-          //    aucun tap (le carrousel de photos reste cliquable dessous).
-          if (kSealOnEveryProfile || p.isPro || p.isPlus)
+          // ── En haut à gauche, UNE seule pastille. « POPULAIRE » — le badge que
+          //    vend le paywall Pro — a la priorité : un profil Pro ou Plus
+          //    l'affiche seul. Tous les autres portent la pastille. Ni l'un ni
+          //    l'autre ne capte de tap (le carrousel reste cliquable dessous).
+          if (p.isPro || p.isPlus)
             Positioned(
               top: 14,
               left: 14,
               child: IgnorePointer(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (kSealOnEveryProfile) const SwaycoSealCapsule(),
-                    if (kSealOnEveryProfile && (p.isPro || p.isPlus))
-                      const SizedBox(width: 8),
-                    if (p.isPro || p.isPlus)
-                      // Etincelles sur « POPULAIRE » : la carte de Discover, et
-                      // donc aussi l'apercu de l'oeil.
-                      Sparkles(
+                // Etincelles sur « POPULAIRE » : la carte de Discover, et donc
+                // aussi l'apercu de l'oeil.
+                child: Sparkles(
+                  color: SC.onAccent,
+                  count: 5,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: SC.accent,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      AppStrings.t('paywall_popular').toUpperCase(),
+                      style: const TextStyle(
                         color: SC.onAccent,
-                        count: 5,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 11,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: SC.accent,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            AppStrings.t('paywall_popular').toUpperCase(),
-                            style: const TextStyle(
-                              color: SC.onAccent,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
                       ),
-                  ],
+                    ),
+                  ),
                 ),
               ),
+            )
+          else if (kSealOnEveryProfile)
+            const Positioned(
+              top: 14,
+              left: 14,
+              child: IgnorePointer(child: SwaycoSealCapsule()),
             ),
 
           // ── Dégradé noir en bas (style Tinder) — transparent sur le haut,

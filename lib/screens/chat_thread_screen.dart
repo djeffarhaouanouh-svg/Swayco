@@ -1659,14 +1659,13 @@ class _ThreadHeader extends StatelessWidget {
                     fallbackUrl: peer?.fallbackPhotoUrl,
                     size: 44,
                     showSeal: kSealOnEveryProfile,
-                    // En haut : le coin du bas porte le point « en ligne ».
-                    sealOnTop: true,
                     sealRingColor: SC.bgDeep,
                   ),
+                  // En haut à droite : le coin du bas est à la pastille.
                   if (_peerOnline)
                     Positioned(
                       right: -1,
-                      bottom: -1,
+                      top: -1,
                       child: Container(
                         width: 12,
                         height: 12,
