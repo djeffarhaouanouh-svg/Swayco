@@ -1806,11 +1806,13 @@ class _CountryRowState extends State<_CountryRow> {
                         // reste dans la respiration de _CountryRow.height.
                         Positioned(
                           // Ancré sur le rond (la case, elle, prend toute la
-                          // hauteur de la liste) : déborde de 8 px en dessous.
+                          // hauteur de la liste) : presque entièrement SOUS
+                          // la bulle, 11 px en dessous (la silhouette ne laisse
+                          // que 5,5 px de marge au bas du rond).
                           left: 0,
                           width: _kBubble,
-                          top: _kBubble - 8,
-                          height: 16,
+                          top: _kBubble + 11 - 17,
+                          height: 17,
                           child: IgnorePointer(
                             child: Center(
                               child: AnimatedSwitcher(
@@ -1890,30 +1892,37 @@ class _CountCapsule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 16,
-      padding: const EdgeInsets.symmetric(horizontal: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B2A55),
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: SC.bgDeep, width: 1.5),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.person_rounded, size: 10, color: Colors.white),
-          const SizedBox(width: 2),
-          Text(
-            text,
-            maxLines: 1,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w800,
-              height: 1,
-              color: Colors.white,
-            ),
+    // Jamais plus large que la bulle (50), 6 px entre deux bulles.
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: _kBubble),
+      child: Container(
+        height: 17,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1B2A55),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: SC.bgDeep, width: 1.5),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.person_rounded, size: 10, color: Colors.white),
+              const SizedBox(width: 2),
+              Text(
+                text,
+                maxLines: 1,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                  color: Colors.white,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
