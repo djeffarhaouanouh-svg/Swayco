@@ -1678,8 +1678,9 @@ class _CountryRowState extends State<_CountryRow> {
                     color: _kSurface,
                     shape: BoxShape.circle,
                   ),
+                  // La Terre qu'avait l'onglet Discover de la barre.
                   child: Icon(
-                    Icons.tune_rounded,
+                    Icons.public,
                     color: SC.fg,
                     size: 26,
                   ),

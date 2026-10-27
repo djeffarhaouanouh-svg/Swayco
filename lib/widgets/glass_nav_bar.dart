@@ -189,9 +189,9 @@ class _GlassNavBarState extends State<GlassNavBar>
         badge: unreadChat,
       ),
       _NavItemData(
-        // La Terre de Material (Icons.public) : aucune icône à maintenir.
-        icon: Icons.public,
-        selectedIcon: Icons.public,
+        // Les deux cartes de Discover ; la Terre est passée sur la bulle
+        // « Filtrer » de la page.
+        kind: SwaycoNavKind.discover,
         label: AppStrings.t('nav_search'),
       ),
       _NavItemData(
