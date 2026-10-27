@@ -29,6 +29,7 @@ import '../widgets/profile_avatar.dart';
 import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_popups_extra.dart';
 import 'paywall_screen.dart';
+import 'verification_flow.dart';
 
 /// Hosts every secondary account-level action that doesn't belong on the
 /// main profile view: account management, notification toggles, privacy,
@@ -56,6 +57,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // My profile — used to render the translation-credits card (moved here
   // from the profile screen).
   RemoteProfile? _profile;
+
+  /// A verification selfie is waiting for the team's decision.
+  bool _verifPending = false;
 
   // '' means "not chosen yet" — calls fall back to the interface language
   // (see UserPrefs.loadCallSpokenLang / resolveSpokenLanguage).
@@ -117,7 +121,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
           await AppSettings.adoptAccountHideOnline(remote.hideOnlineStatus);
         }
       } catch (_) {}
+      // Séparé : une table absente (migration 0077 pas encore appliquée) ne
+      // doit rien casser d'autre dans les réglages.
+      try {
+        final pending = await ProfileApi.hasPendingVerification();
+        if (mounted) setState(() => _verifPending = pending);
+      } catch (_) {}
     }
+  }
+
+  /// La vérification du profil : un selfie avec un geste, relu par l'équipe.
+  Future<void> _openVerification() async {
+    final sent = await VerificationScreen.open(context);
+    if (sent == true && mounted) setState(() => _verifPending = true);
+  }
+
+  /// Trois états : vérifié (rien à faire), en attente de décision, ou pas
+  /// encore demandé — seul celui-là ouvre le parcours. Un refus remet la
+  /// ligne dans ce dernier état : la personne peut réessayer.
+  Widget _verificationRow() {
+    if (_profile?.isVerified ?? false) {
+      return _SettingsRow(
+        icon: Icons.verified_rounded,
+        label: AppStrings.t('seal_verified'),
+      );
+    }
+    if (_verifPending) {
+      return _SettingsRow(
+        icon: Icons.hourglass_top_rounded,
+        label: AppStrings.t('verif_settings_row'),
+        trailing: _SubtleText(AppStrings.t('verif_pending')),
+      );
+    }
+    return _SettingsRow(
+      icon: Icons.verified_outlined,
+      label: AppStrings.t('verif_settings_row'),
+      onTap: _openVerification,
+    );
   }
 
   Future<void> _setHideOnline(bool value) async {
@@ -589,6 +629,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       trailing: _SubtleText(_locationLabel),
                       onTap: _editLocation,
                     ),
+                    _verificationRow(),
                     _SettingsRow(
                       icon: Icons.lock_reset,
                       label: AppStrings.t('settings_change_password'),

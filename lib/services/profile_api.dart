@@ -613,6 +613,20 @@ abstract final class ProfileApi {
     return true;
   }
 
+  /// Une demande de vérification attend-elle la décision de l'équipe ? Faux
+  /// après un refus : la personne peut alors en refaire une.
+  static Future<bool> hasPendingVerification() async {
+    final uid = AuthService.currentUserId;
+    if (!isSupabaseReady || uid.isEmpty) return false;
+    final rows = await _c
+        .from('profile_verifications')
+        .select('id')
+        .eq('user_id', uid)
+        .eq('status', 'pending')
+        .limit(1);
+    return (rows as List).isNotEmpty;
+  }
+
   /// Upload [bytes] as the user's avatar to Supabase Storage and write the
   /// resulting public URL back into `profiles.avatar_url`. Throws on failure
   /// so the caller can surface the real error (bucket missing, RLS, etc.).

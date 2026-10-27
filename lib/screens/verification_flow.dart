@@ -70,12 +70,17 @@ class VerificationFlow extends StatefulWidget {
     required this.onDone,
     this.onSkip,
     this.doneLabelKey = 'onb_finish',
+    this.onSent,
     this.capture,
     this.submit,
   });
 
   /// Fin du parcours, depuis l'écran « envoyé ».
   final VoidCallback onDone;
+
+  /// La demande est partie (ou une autre attendait déjà) : l'écran « envoyé »
+  /// vient de s'afficher. Pour qui sort autrement que par [onDone].
+  final VoidCallback? onSent;
 
   /// « Passer » : rien n'est envoyé. Null = pas de bouton.
   final VoidCallback? onSkip;
@@ -108,6 +113,7 @@ class _VerificationFlowState extends State<VerificationFlow> {
       if (!mounted) return;
       HapticFeedback.mediumImpact();
       setState(() => _stage = _Stage.sent);
+      widget.onSent?.call();
     } catch (e) {
       if (!mounted) return;
       setState(() => _stage = _Stage.intro);
@@ -145,6 +151,97 @@ class _VerificationFlowState extends State<VerificationFlow> {
           onDone: widget.onDone,
         );
     }
+  }
+}
+
+/// La vérification ouverte HORS onboarding (les réglages) : la même
+/// [VerificationFlow] sur le dégradé de l'onboarding, avec une croix pour
+/// sortir. Rend `true` quand une demande est partie ou attendait déjà — que
+/// l'on sorte par le bouton « Fermer », la croix ou le retour du système.
+class VerificationScreen extends StatefulWidget {
+  const VerificationScreen({super.key, this.capture, this.submit});
+
+  /// Coutures de test, passées telles quelles à [VerificationFlow].
+  final Future<VerificationShot?> Function(BuildContext context)? capture;
+  final Future<bool> Function(Uint8List bytes, String gesture)? submit;
+
+  static Future<bool?> open(BuildContext context) {
+    return Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => const VerificationScreen()),
+    );
+  }
+
+  @override
+  State<VerificationScreen> createState() => _VerificationScreenState();
+}
+
+class _VerificationScreenState extends State<VerificationScreen> {
+  bool _sent = false;
+
+  void _close() => Navigator.of(context).pop(_sent);
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      // Le retour du système passe aussi par [_close] : l'appelant doit
+      // savoir si une demande est partie.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _close();
+      },
+      child: Scaffold(
+        backgroundColor: SC.brandBlueDeep,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(gradient: SwayOnb.stepGradient),
+          child: SafeArea(
+            child: Stack(
+              children: [
+                VerificationFlow(
+                  onDone: _close,
+                  doneLabelKey: 'verif_close',
+                  onSent: () => _sent = true,
+                  capture: widget.capture,
+                  submit: widget.submit,
+                ),
+                // Dans la marge vide au-dessus du titre (48).
+                Positioned(
+                  left: 14,
+                  top: 4,
+                  child: _GlassCloseButton(onTap: _close),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Le rond de verre avec une croix.
+class _GlassCloseButton extends StatelessWidget {
+  const _GlassCloseButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withValues(alpha: 0.16),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.3),
+            width: 1.2,
+          ),
+        ),
+        child: const Icon(Icons.close_rounded, size: 22, color: Colors.white),
+      ),
+    );
   }
 }
 
@@ -482,26 +579,7 @@ class _VerificationCaptureScreenState extends State<VerificationCaptureScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.16),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            width: 1.2,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.close_rounded,
-                          size: 22,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+                    _GlassCloseButton(onTap: () => Navigator.of(context).pop()),
                     Text(
                       AppStrings.t('verif_gesture'),
                       style: GoogleFonts.plusJakartaSans(
