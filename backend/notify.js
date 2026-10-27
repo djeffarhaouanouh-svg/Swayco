@@ -486,4 +486,59 @@ async function notifyUser(recipientUid, payload) {
   return out;
 }
 
-module.exports = { notifyUser };
+// ── Held pushes ──────────────────────────────────────────────────────────────
+// Discover's "retour" can take a like back right after the swipe, and a push
+// already sent can't be recalled. So the "veut te matcher" push of a like is held
+// for a few minutes and sent only if that like is still pending when the time
+// comes: a like withdrawn in between never makes a notification, and neither
+// does one the other side already answered in the app.
+//
+// The wait lives in this process: a restart inside the delay drops the push (the
+// request is still in the recipient's Demandes). Held pushes are bounded, and a
+// request that can't be held is simply sent at once by the caller.
+const MAX_HOLD_SEC = 600;
+const MAX_HELD = 5000;
+const UUID_RE = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+let _held = 0;
+
+/**
+ * Holds `payload` for `delaySeconds`, then sends it unless the friendship row
+ * `friendshipId` is gone or no longer `pending`. Returns false (nothing held)
+ * when the delay or the id is unusable, Supabase is off, or too many pushes are
+ * already waiting: the caller then sends right away, as before.
+ */
+function scheduleNotify(recipientUid, payload, { delaySeconds, friendshipId }, deps = {}) {
+  const sb = (deps.supabase || supabase)();
+  const send = deps.notifyUser || notifyUser;
+  const later = deps.setTimeout || setTimeout;
+  const delay = Math.min(Number(delaySeconds), MAX_HOLD_SEC);
+  if (!(delay > 0) || !UUID_RE.test(String(friendshipId || '')) || !sb || _held >= MAX_HELD) {
+    return false;
+  }
+  _held += 1;
+  const timer = later(async () => {
+    _held -= 1;
+    try {
+      const { data: row, error } = await sb
+        .from('friendships')
+        .select('status')
+        .eq('id', friendshipId)
+        .maybeSingle();
+      // A failed lookup sends: better a push for a like just withdrawn than none.
+      if (!error && (!row || row.status !== 'pending')) {
+        console.log(
+          `[notify] held ${payload.type} for ${recipientUid} dropped: ` +
+            `like ${row ? row.status : 'withdrawn'}`,
+        );
+        return;
+      }
+      await send(recipientUid, payload);
+    } catch (e) {
+      console.error('[notify] held push failed', e);
+    }
+  }, delay * 1000);
+  if (timer && typeof timer.unref === 'function') timer.unref();
+  return true;
+}
+
+module.exports = { notifyUser, scheduleNotify, _test: { heldCount: () => _held } };

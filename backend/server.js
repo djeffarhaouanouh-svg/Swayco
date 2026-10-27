@@ -10,7 +10,7 @@ const multer = require('multer');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const { AccessToken } = require('livekit-server-sdk');
-const { notifyUser } = require('./notify');
+const { notifyUser, scheduleNotify } = require('./notify');
 const { onlineNotif } = require('./nationalities');
 const { track, ingestEvents, countryFromReq } = require('./analytics');
 const {
@@ -2405,13 +2405,23 @@ app.post('/api/stripe/portal', async (req, res) => {
 
 // Fan-out push notification dispatcher. Body: { recipientUid, title,
 // body, type, data }. See backend/notify.js for env-var requirements.
+// Optional { delaySeconds, pendingFriendshipId }: hold the push, and drop it if
+// that friendship (a like) was withdrawn or answered meanwhile.
 app.post('/api/notify', _limLite, async (req, res) => {
-  const { recipientUid, title, body, type, data, image } = req.body || {};
+  const {
+    recipientUid, title, body, type, data, image, delaySeconds, pendingFriendshipId,
+  } = req.body || {};
   if (!recipientUid || !title) {
     return res.status(400).json({ error: 'missing_recipient_or_title' });
   }
   try {
-    const out = await notifyUser(recipientUid, { title, body, type, data, image });
+    const payload = { title, body, type, data, image };
+    if (delaySeconds && scheduleNotify(
+      recipientUid, payload, { delaySeconds, friendshipId: pendingFriendshipId },
+    )) {
+      return res.json({ ok: 0, failed: 0, results: [{ held: Number(delaySeconds) }] });
+    }
+    const out = await notifyUser(recipientUid, payload);
     return res.json(out);
   } catch (e) {
     console.error('/api/notify error', e);

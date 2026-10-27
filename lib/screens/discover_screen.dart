@@ -103,6 +103,10 @@ const double _kMessageSize = 47.0;
 /// Respiration au-dessus et au-dessous de la rangée ✕ / message / ❤.
 const double _kActionPadV = 16.0;
 
+/// Le push « veut te matcher » d'un like part avec ce retard : le temps de
+/// laisser « retour » reprendre le like avant que l'autre soit prévenu.
+const Duration _kLikePushDelay = Duration(minutes: 3);
+
 /// Surfaces pleines du handoff : bulles pays, bouton message.
 Color get _kSurface =>
     SC.light
@@ -686,7 +690,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final slot = _likeUndo.begin(peer.id);
     try {
       await _likeUndo.turn(peer.id);
-      final res = await FriendshipApi.like(meId: _myId, peerId: peer.id);
+      final res = await FriendshipApi.like(
+        meId: _myId,
+        peerId: peer.id,
+        notifyDelay: _kLikePushDelay,
+      );
       // Only a pending row this swipe wrote can be taken back: an older like
       // stays, and a match is never undone by "retour".
       slot.complete(res.created && !res.matched ? res.friendship?.id : null);

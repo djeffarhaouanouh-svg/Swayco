@@ -171,9 +171,15 @@ abstract final class FriendshipApi {
   /// [created] is true only when THIS call wrote the pending row: that row is
   /// the one [retractLike] may take back. A like that already existed, or one
   /// that became a match, is not the caller's to withdraw.
+  ///
+  /// [notifyDelay] holds the "veut te matcher" push of a NEW like back (the
+  /// backend sends it only if the like is still pending then). Discover uses it
+  /// so that "retour" can take a like back before anyone is notified; a match
+  /// push is never held.
   static Future<({Friendship? friendship, bool matched, bool created})> like({
     required String meId,
     required String peerId,
+    Duration notifyDelay = Duration.zero,
   }) async {
     if (!isSupabaseReady) {
       return (friendship: null, matched: false, created: false);
@@ -233,12 +239,11 @@ abstract final class FriendshipApi {
         .single();
     // Fire-and-forget push: peer gets a "X veut te matcher" notif. Best
     // effort — never block the insert on the dispatch call.
-    unawaited(_notifyNewFollower(meId, peerId));
-    return (
-      friendship: Friendship.fromMap(Map<String, dynamic>.from(inserted)),
-      matched: false,
-      created: true,
+    final row = Friendship.fromMap(Map<String, dynamic>.from(inserted));
+    unawaited(
+      _notifyNewFollower(meId, peerId, friendshipId: row.id, delay: notifyDelay),
     );
+    return (friendship: row, matched: false, created: true);
   }
 
   /// Take back a like I just sent — Discover's "retour". Deletes the row only
@@ -337,7 +342,12 @@ abstract final class FriendshipApi {
     return byId.values.toList(growable: false);
   }
 
-  static Future<void> _notifyNewFollower(String meId, String peerId) async {
+  static Future<void> _notifyNewFollower(
+    String meId,
+    String peerId, {
+    String? friendshipId,
+    Duration delay = Duration.zero,
+  }) async {
     if (!isSupabaseReady) return;
     try {
       final myProfile = await ProfileApi.fetchById(meId);
@@ -365,6 +375,8 @@ abstract final class FriendshipApi {
         data: {'requesterId': meId},
         // Blurred likes must not leak a face the Likes tab hides.
         imageUrl: blurred ? null : myProfile?.bestAvatarUrl,
+        delaySeconds: delay.inSeconds,
+        pendingFriendshipId: friendshipId,
       );
     } catch (e) {
       debugPrint('friendship notify failed: $e');

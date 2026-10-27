@@ -37,6 +37,10 @@ abstract final class PushDispatcher {
     return Uri.parse('$b$path');
   }
 
+  /// With [delaySeconds] AND [pendingFriendshipId] the backend holds the push
+  /// and sends it only if that friendship (a like) is still pending by then —
+  /// so a like taken back in the meantime never notifies. The wait is on the
+  /// server, not here: the app may well be suspended before it elapses.
   static Future<void> notify({
     required String recipientUid,
     required String title,
@@ -44,6 +48,8 @@ abstract final class PushDispatcher {
     String? type,
     Map<String, dynamic>? data,
     String? imageUrl,
+    int delaySeconds = 0,
+    String? pendingFriendshipId,
   }) async {
     if (recipientUid.isEmpty || title.isEmpty) return;
     final pic = (imageUrl ?? '').trim();
@@ -59,6 +65,10 @@ abstract final class PushDispatcher {
               'type': ?type,
               'data': ?data,
               if (pic.isNotEmpty) 'image': pic,
+              if (delaySeconds > 0 && (pendingFriendshipId ?? '').isNotEmpty) ...{
+                'delaySeconds': delaySeconds,
+                'pendingFriendshipId': pendingFriendshipId,
+              },
             }),
           )
           .timeout(const Duration(seconds: 6));
