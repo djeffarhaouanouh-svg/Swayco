@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/swayco_theme.dart';
+import 'swayco_seal.dart';
 
 /// Reusable circular avatar: shows the network photo when [avatarUrl] is
 /// provided, falls back to the first letter of [displayName] on a colored
@@ -15,6 +16,9 @@ class ProfileAvatar extends StatelessWidget {
     this.size = 44,
     this.fontSize,
     this.onTap,
+    this.showSeal = false,
+    this.sealOnTop = false,
+    this.sealRingColor,
   });
 
   /// Public URL of the uploaded avatar. Null / empty → fall back to the
@@ -28,6 +32,18 @@ class ProfileAvatar extends StatelessWidget {
   final double size;
   final double? fontSize;
   final VoidCallback? onTap;
+
+  /// Pose la pastille ([SwaycoSeal]) sur la photo. Une grande photo (100 et
+  /// plus) reçoit la capsule de verre, centrée sous elle ; une petite, la
+  /// pastille seule sur son coin. Faux par défaut : rien ne change ailleurs.
+  final bool showSeal;
+
+  /// Petite photo : la pastille va en haut à droite au lieu du bas à droite,
+  /// là où une pastille « en ligne » occupe déjà le coin.
+  final bool sealOnTop;
+
+  /// Couleur du fond de la ligne, pour le liseré de la petite pastille.
+  final Color? sealRingColor;
 
   /// No photo → a colour drawn from the name. The stored `avatar_color` is
   /// deliberately ignored: it had drifted to the same teal for most accounts,
@@ -122,11 +138,36 @@ class ProfileAvatar extends StatelessWidget {
           : _letterFallback(letterFontSize),
     );
 
-    if (onTap == null) return circle;
+    // La pastille déborde de la photo (-12, -3) : le cercle rogne ses enfants,
+    // donc elle vit dans une pile à part qui, elle, ne rogne pas.
+    final Widget avatar = !showSeal
+        ? circle
+        : Stack(
+            clipBehavior: Clip.none,
+            children: [
+              circle,
+              if (size >= 100)
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: -12,
+                  child: Center(child: SwaycoSealCapsule()),
+                )
+              else
+                Positioned(
+                  right: -3,
+                  top: sealOnTop ? -3 : null,
+                  bottom: sealOnTop ? null : -3,
+                  child: SwaycoSealCorner(ringColor: sealRingColor ?? SC.bg),
+                ),
+            ],
+          );
+
+    if (onTap == null) return avatar;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: circle,
+      child: avatar,
     );
   }
 

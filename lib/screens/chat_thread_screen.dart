@@ -43,6 +43,7 @@ import '../widgets/liquid_glass_button.dart';
 import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/swayco_seal.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_animations.dart';
 import '../widgets/swayco_dialog.dart';
@@ -1657,6 +1658,10 @@ class _ThreadHeader extends StatelessWidget {
                     avatarUrl: peer?.avatarUrl,
                     fallbackUrl: peer?.fallbackPhotoUrl,
                     size: 44,
+                    showSeal: kSealOnEveryProfile,
+                    // En haut : le coin du bas porte le point « en ligne ».
+                    sealOnTop: true,
+                    sealRingColor: SC.bgDeep,
                   ),
                   if (_peerOnline)
                     Positioned(
@@ -3734,6 +3739,11 @@ class _EmptyThreadState extends State<_EmptyThread>
                   ],
                 ),
               ),
+              // La photo, et sous elle la pastille en capsule (grande photo) :
+              // elle déborde de l'anneau, donc une pile qui ne rogne pas.
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
               Container(
                 width: 132,
                 height: 132,
@@ -3765,6 +3775,15 @@ class _EmptyThreadState extends State<_EmptyThread>
                           ),
                         ),
                 ),
+              ),
+                  if (kSealOnEveryProfile)
+                    const Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: -12,
+                      child: Center(child: SwaycoSealCapsule()),
+                    ),
+                ],
               ),
               if (theirs.isNotEmpty)
                 Positioned(

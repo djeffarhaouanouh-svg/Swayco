@@ -44,6 +44,7 @@ import '../swayco/realtime_translation_port.dart';
 import '../widgets/appear.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/swayco_seal.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/spoken_language_gate.dart';
 import '../widgets/swayco_dialog.dart';
@@ -1364,6 +1365,8 @@ class _SpecialChatRow extends StatelessWidget {
                           avatarUrl: profile.avatarUrl,
                           fallbackUrl: profile.fallbackPhotoUrl,
                           size: 50,
+                          showSeal: kSealOnEveryProfile,
+                          sealRingColor: fill,
                         ),
                       ),
                       Positioned(
@@ -1738,12 +1741,17 @@ class _FriendChatRow extends StatelessWidget {
               behavior: HitTestBehavior.opaque,
               onTap: onViewProfile,
               child: Stack(
+                // La pastille déborde de 3 px en haut à droite.
+                clipBehavior: Clip.none,
                 children: [
                   ProfileAvatar(
                     displayName: profile.displayName,
                     avatarUrl: profile.avatarUrl,
                     fallbackUrl: profile.fallbackPhotoUrl,
                     size: 52,
+                    showSeal: kSealOnEveryProfile,
+                    // En haut : le coin du bas porte le point « en ligne ».
+                    sealOnTop: true,
                   ),
                   if (_peerOnline)
                     Positioned(
@@ -1949,6 +1957,7 @@ class _SearchResultRow extends StatelessWidget {
               avatarUrl: profile.avatarUrl,
               fallbackUrl: profile.fallbackPhotoUrl,
               size: 46,
+              showSeal: kSealOnEveryProfile,
             ),
             const SizedBox(width: 12),
             Expanded(
