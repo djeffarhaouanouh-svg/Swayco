@@ -3060,10 +3060,12 @@ class _TinderCardState extends State<_TinderCard> {
               ),
             )
           else if (kSealOnEveryProfile)
-            const Positioned(
+            Positioned(
               top: 14,
               left: 14,
-              child: IgnorePointer(child: SwaycoSealCapsule()),
+              child: IgnorePointer(
+                child: SwaycoSealCapsule(label: AppStrings.t('seal_verified')),
+              ),
             ),
 
           // ── Dégradé noir en bas (style Tinder) — transparent sur le haut,
