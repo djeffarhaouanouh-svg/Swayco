@@ -3059,7 +3059,8 @@ class _TinderCardState extends State<_TinderCard> {
                 ),
               ),
             )
-          else if (kSealOnEveryProfile)
+          // Pas sur l'aperçu de ma carte (l'œil du profil).
+          else if (kSealOnEveryProfile && !widget.preview)
             Positioned(
               top: 14,
               left: 14,
