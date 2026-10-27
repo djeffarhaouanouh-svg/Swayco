@@ -1,4 +1,4 @@
-"NSCameraUsageDescription" = "영상 통화에 카메라를 사용합니다.";
+"NSCameraUsageDescription" = "화상 통화와 인증용 셀카 촬영에 카메라를 사용합니다.";
 "NSMicrophoneUsageDescription" = "영상 통화와 음성 메시지에 마이크를 사용합니다.";
 "NSPhotoLibraryUsageDescription" = "갤러리에서 프로필 사진과 Discover 사진을 선택하는 데 사용합니다.";
 "NSPhotoLibraryAddUsageDescription" = "공유된 사진을 갤러리에 저장하는 데 사용합니다.";

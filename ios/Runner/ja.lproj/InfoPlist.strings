@@ -1,4 +1,4 @@
-"NSCameraUsageDescription" = "ビデオ通話にカメラを使用します。";
+"NSCameraUsageDescription" = "ビデオ通話と、本人確認用の自撮り写真の撮影にカメラを使用します。";
 "NSMicrophoneUsageDescription" = "ビデオ通話とボイスメッセージにマイクを使用します。";
 "NSPhotoLibraryUsageDescription" = "ギャラリーからプロフィール写真とDiscover写真を選ぶために使用します。";
 "NSPhotoLibraryAddUsageDescription" = "共有された写真をギャラリーに保存するために使用します。";

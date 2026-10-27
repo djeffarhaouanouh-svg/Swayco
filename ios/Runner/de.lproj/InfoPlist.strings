@@ -1,4 +1,4 @@
-"NSCameraUsageDescription" = "Die Kamera wird für Videoanrufe verwendet.";
+"NSCameraUsageDescription" = "Die Kamera wird für Videoanrufe und für dein Verifizierungs-Selfie verwendet.";
 "NSMicrophoneUsageDescription" = "Das Mikrofon wird für Videoanrufe und Sprachnachrichten verwendet.";
 "NSPhotoLibraryUsageDescription" = "Wird verwendet, um dein Profilbild und Discover-Fotos aus deiner Galerie auszuwählen.";
 "NSPhotoLibraryAddUsageDescription" = "Wird verwendet, um geteilte Fotos in deiner Galerie zu speichern.";

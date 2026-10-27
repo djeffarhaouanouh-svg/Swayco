@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BadgeCheck,
   Bot,
   LayoutDashboard,
   LogOut,
@@ -21,6 +22,7 @@ const NAV = [
   { href: "/social", label: "Social", icon: Users },
   { href: "/retention", label: "Rétention", icon: Repeat },
   { href: "/agents", label: "Comptes IA", icon: Bot },
+  { href: "/verifications", label: "Vérifications", icon: BadgeCheck },
 ];
 
 export function Sidebar({ adminEmail }: { adminEmail: string }) {

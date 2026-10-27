@@ -37,6 +37,7 @@ class RemoteProfile {
     this.nameChangedAt,
     this.boostedUntil,
     this.isAi = false,
+    this.isVerified = false,
     this.age,
     this.heightCm,
     this.job = '',
@@ -198,6 +199,11 @@ class RemoteProfile {
   /// classement de Discover, qui favorise les VRAIS comptes.
   final bool isAi;
 
+  /// Profil vérifié par l'équipe (selfie avec un geste, migration 0077) : c'est
+  /// ce qui donne la pastille « Vérifié ». Écrit seulement par l'admin ; un
+  /// trigger ignore toute écriture d'un client.
+  final bool isVerified;
+
   bool get isBoosted {
     final until = boostedUntil;
     return until != null && until.isAfter(DateTime.now());
@@ -297,6 +303,7 @@ class RemoteProfile {
     nameChangedAt: _parseDate(m['display_name_changed_at']),
     boostedUntil: _parseDate(m['boosted_until']),
     isAi: m['is_ai'] == true,
+    isVerified: m['is_verified'] == true,
   );
 
   /// Returns a copy with the given fields overridden. Used by the few call
@@ -368,6 +375,7 @@ class RemoteProfile {
     nameChangedAt: nameChangedAt ?? this.nameChangedAt,
     boostedUntil: boostedUntil,
     isAi: isAi,
+    isVerified: isVerified,
   );
 }
 
@@ -552,6 +560,57 @@ abstract final class ProfileApi {
     // Only latch success — a failed write (network blip) should retry on the
     // next action instead of staying silently un-healed for the session.
     if (lastSync?.ok == true) _profileRowEnsured = true;
+  }
+
+  /// Envoie le selfie de vérification : dépôt dans le bucket PRIVÉ
+  /// `verification-selfies` (dossier = mon id), puis une ligne `pending` dans
+  /// `profile_verifications` (migration 0077). Le selfie ne devient jamais une
+  /// photo du profil, et l'app ne le relit jamais.
+  ///
+  /// Renvoie `false` quand une demande est déjà en attente (rien n'est
+  /// envoyé). Jette si la session manque ou si l'envoi échoue, pour que
+  /// l'appelant montre la vraie erreur.
+  static Future<bool> submitVerification({
+    required Uint8List bytes,
+    required String gesture,
+    String contentType = 'image/jpeg',
+  }) async {
+    if (!isSupabaseReady) {
+      throw StateError('Supabase non configuré');
+    }
+    final uid = AuthService.currentUserId;
+    if (!AuthService.isAuthenticated || uid.isEmpty) {
+      throw StateError('Non connecté');
+    }
+    if (bytes.isEmpty) throw ArgumentError('image vide');
+
+    // Une seule demande en attente : on le vérifie AVANT d'envoyer le fichier,
+    // pour ne pas laisser un selfie orphelin dans le bucket.
+    final pending = await _c
+        .from('profile_verifications')
+        .select('id')
+        .eq('user_id', uid)
+        .eq('status', 'pending')
+        .limit(1);
+    if ((pending as List).isNotEmpty) return false;
+
+    final ext = contentType.endsWith('png') ? 'png' : 'jpg';
+    final path = '$uid/${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await _c.storage
+        .from('verification-selfies')
+        .uploadBinary(path, bytes, fileOptions: FileOptions(contentType: contentType));
+    try {
+      await _c.from('profile_verifications').insert({
+        'user_id': uid,
+        'gesture': gesture,
+        'selfie_path': path,
+      });
+    } on PostgrestException catch (e) {
+      // 23505 : une autre demande est passée entre-temps (index unique).
+      if (e.code == '23505') return false;
+      rethrow;
+    }
+    return true;
   }
 
   /// Upload [bytes] as the user's avatar to Supabase Storage and write the

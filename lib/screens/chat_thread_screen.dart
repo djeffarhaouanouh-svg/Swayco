@@ -1370,6 +1370,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       : (_peer?.fallbackPhotoUrl ?? ''),
                   peerLang: _peer?.language ?? '',
                   myLang: _myLang,
+                  verified: _peer?.isVerified ?? false,
                 ),
               ),
             ),
@@ -1658,7 +1659,7 @@ class _ThreadHeader extends StatelessWidget {
                     avatarUrl: peer?.avatarUrl,
                     fallbackUrl: peer?.fallbackPhotoUrl,
                     size: 44,
-                    showSeal: kSealOnEveryProfile,
+                    showSeal: peer?.isVerified ?? false,
                     sealRingColor: SC.bgDeep,
                   ),
                   // En haut à droite : le coin du bas est à la pastille.
@@ -3663,7 +3664,11 @@ class _EmptyThread extends StatefulWidget {
     required this.photoUrl,
     required this.peerLang,
     required this.myLang,
+    required this.verified,
   });
+
+  /// Le profil porte la pastille : la capsule se pose sous sa photo.
+  final bool verified;
 
   final String peerName;
   final String photoUrl;
@@ -3775,7 +3780,7 @@ class _EmptyThreadState extends State<_EmptyThread>
                         ),
                 ),
               ),
-                  if (kSealOnEveryProfile)
+                  if (widget.verified)
                     const Positioned(
                       left: 0,
                       right: 0,

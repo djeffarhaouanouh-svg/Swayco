@@ -25,6 +25,7 @@ import '../widgets/location_picker_sheet.dart';
 import '../widgets/sway_onb_kit.dart';
 import 'discover_screen.dart' show discoverCardAspect;
 import 'photo_crop_screen.dart';
+import 'verification_flow.dart';
 
 /// First-run flow: first name + the user's own spoken language (stored locally).
 /// The remote participant's language is discovered from their LiveKit metadata
@@ -97,6 +98,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// is omitted from the flow, mirroring [_genderAlreadySet].
   bool _photoAlreadySet = false;
 
+  /// Set in [_prefill] from [UserPrefs.isVerificationSent]. When true the
+  /// verification page is omitted from the flow.
+  bool _verificationAlreadySent = false;
+
+  /// The profile-verification page closes the wizard, and only makes sense when
+  /// there is a photo to compare the selfie to: one picked on the photo step, or
+  /// one already on the account. A person who skipped the photo never sees it.
+  bool get _showVerificationStep =>
+      !_verificationAlreadySent && (_photoAlreadySet || _photoBytes != null);
+
   /// True while the gallery picker / cropper is open, so a double tap can't
   /// stack two pickers.
   bool _picking = false;
@@ -110,16 +121,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   /// Total pages shown in the first-run wizard:
   ///   Welcome(0) · Language(1) · [Location] · [Gender] · [PersonaCategory]
-  ///   · [Photo]
+  ///   · [Photo] · [Verification]
   /// Location, Gender, PersonaCategory and Photo are each omitted once
-  /// already known, so the count flexes. Interests are edited later from the
-  /// profile, not here.
+  /// already known, so the count flexes; Verification only follows a photo.
+  /// Interests are edited later from the profile, not here.
   int get _pageCount =>
       2 +
       (_locationAlreadySet ? 0 : 1) +
       (_personaAlreadySet ? 0 : 1) +
       (_genderAlreadySet ? 0 : 1) +
-      (_photoAlreadySet ? 0 : 1);
+      (_photoAlreadySet ? 0 : 1) +
+      (_showVerificationStep ? 1 : 0);
 
   @override
   void initState() {
@@ -154,6 +166,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final personaAlready = await UserPrefs.isPersonaCategorySet();
     final locationAlready = await UserPrefs.isLocationSet();
     final photoAlready = await UserPrefs.isPhotoSet();
+    final verificationSent = await UserPrefs.isVerificationSent();
     if (!mounted) return;
     if (snap != null) {
       setState(() {
@@ -205,6 +218,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         _personaAlreadySet = personaAlready;
         _locationAlreadySet = locationAlready;
         _photoAlreadySet = photoAlready;
+        _verificationAlreadySent = verificationSent;
         _prefillDone = true;
       });
     }
@@ -667,6 +681,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final showGenderStep = !_genderAlreadySet;
     final showLocationStep = !_locationAlreadySet;
     final showPhotoStep = !_photoAlreadySet;
+    final showVerificationStep = _showVerificationStep;
+    // Une étape suit la persona, la position, le genre… tant que la photo ou la
+    // vérification n'est pas passée.
+    final stepAfterPersona = showPhotoStep || showVerificationStep;
 
     return SwayOnbShell(
       page: _page,
@@ -691,12 +709,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           onSelect: _onLanguageSelected,
           onBack: _back,
           onFinish: _goFromLanguage,
-          // Last page when the location, gender, persona and photo steps are
-          // all skipped.
+          // Last page when every step after it is skipped.
           finishLabelKey: (showLocationStep ||
                   showGenderStep ||
                   showPersonaStep ||
-                  showPhotoStep)
+                  stepAfterPersona)
               ? 'onb_next'
               : 'onb_finish',
         ),
@@ -708,8 +725,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             onManual: _openLocationPicker,
             onBack: _back,
             onFinish: _goFromLocation,
-            // Last page when the gender, persona and photo steps are skipped.
-            finishLabelKey: (showGenderStep || showPersonaStep || showPhotoStep)
+            // Last page when every step after it is skipped.
+            finishLabelKey: (showGenderStep || showPersonaStep || stepAfterPersona)
                 ? 'onb_next'
                 : 'onb_finish',
           ),
@@ -719,8 +736,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             onSelect: (g) => setState(() => _selectedGender = g),
             onBack: _back,
             onFinish: _goFromGender,
-            // Last page when the persona and photo steps are skipped.
-            finishLabelKey: (showPersonaStep || showPhotoStep)
+            // Last page when every step after it is skipped.
+            finishLabelKey: (showPersonaStep || stepAfterPersona)
                 ? 'onb_next'
                 : 'onb_finish',
           ),
@@ -731,9 +748,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             onSelect: (c) => setState(() => _selectedPersonaCategory =
                 _selectedPersonaCategory == c ? null : c),
             onBack: _back,
-            // The photo step follows whenever it hasn't been done yet.
-            onFinish: showPhotoStep ? _next : _finish,
-            finishLabelKey: showPhotoStep ? 'onb_next' : 'onb_finish',
+            // The photo step follows whenever it hasn't been done yet, then
+            // the verification one.
+            onFinish: stepAfterPersona ? _next : _finish,
+            finishLabelKey: stepAfterPersona ? 'onb_next' : 'onb_finish',
           ),
         if (showPhotoStep)
           SwayStepPhoto(
@@ -744,9 +762,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             onPick: _pickPhoto,
             onSkip: _skipPhoto,
             onBack: _back,
-            onFinish: _finish,
+            // With a photo, the verification page comes next; without one it
+            // never exists, and this button is "add a photo" anyway.
+            onFinish: showVerificationStep ? _next : _finish,
+            finishLabelKey: showVerificationStep ? 'onb_next' : 'onb_finish',
             busy: _finishing,
           ),
+        // Last page: the selfie with a gesture. "Passer" ends the onboarding
+        // without sending anything.
+        if (showVerificationStep)
+          VerificationFlow(onDone: _finish, onSkip: _finish),
       ],
     );
   }
@@ -779,7 +804,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     if (_locationAlreadySet &&
         _personaAlreadySet &&
         _genderAlreadySet &&
-        _photoAlreadySet) {
+        _photoAlreadySet &&
+        !_showVerificationStep) {
       _finish();
       return;
     }
@@ -792,7 +818,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// pattern. No need to re-validate the country here — [SwayStepLocation]
   /// already disables its own CTA until one is known.
   void _goFromLocation() {
-    if (_genderAlreadySet && _personaAlreadySet && _photoAlreadySet) {
+    if (_genderAlreadySet &&
+        _personaAlreadySet &&
+        _photoAlreadySet &&
+        !_showVerificationStep) {
       _finish();
       return;
     }
@@ -805,7 +834,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// re-validate [_selectedGender] here — [SwayStepGender] already disables
   /// its own CTA until an option is picked.
   void _goFromGender() {
-    if (_personaAlreadySet && _photoAlreadySet) {
+    if (_personaAlreadySet && _photoAlreadySet && !_showVerificationStep) {
       _finish();
       return;
     }

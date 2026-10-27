@@ -27,6 +27,10 @@ abstract final class UserPrefs {
   /// Asked once, like [keyGender]: the step is skipped on later runs. The
   /// photo itself lives on the account (`profiles.photos`), not here.
   static const String keyPhotoSet = 'profile_photo_set';
+  /// True once a verification selfie was sent (onboarding last step). Asked
+  /// once, like [keyPhotoSet]; the request itself lives on the account
+  /// (`profile_verifications`).
+  static const String keyVerificationSent = 'profile_verification_sent';
   static const String keyTranslatedVolume = 'audio_translated_volume';
   static const String keyOriginalVolume = 'audio_original_volume';
   static const String keyDuckingEnabled = 'audio_ducking_enabled';
@@ -184,6 +188,7 @@ abstract final class UserPrefs {
     await p.remove(keyPersonaCategory);
     await p.remove(keyCountry);
     await p.remove(keyPhotoSet);
+    await p.remove(keyVerificationSent);
   }
 
   /// Keep the cached first name in step with the account (rename, or a
@@ -243,6 +248,18 @@ abstract final class UserPrefs {
   static Future<void> setPhotoSet() async {
     final p = await SharedPreferences.getInstance();
     await p.setBool(keyPhotoSet, true);
+  }
+
+  /// True once a verification selfie was sent. The onboarding step is skipped
+  /// on later runs, so it never asks twice.
+  static Future<bool> isVerificationSent() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getBool(keyVerificationSent) ?? false;
+  }
+
+  static Future<void> setVerificationSent() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(keyVerificationSent, true);
   }
 
   /// Clears onboarding flag so the welcome flow shows again (e.g. from

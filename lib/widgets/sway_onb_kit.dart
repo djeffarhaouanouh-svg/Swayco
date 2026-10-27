@@ -1225,6 +1225,7 @@ class SwayStepPhoto extends StatelessWidget {
     required this.onBack,
     required this.onFinish,
     this.busy = false,
+    this.finishLabelKey = 'onb_finish',
   });
 
   /// La photo recadrée, ou null tant que rien n'est choisi.
@@ -1242,6 +1243,10 @@ class SwayStepPhoto extends StatelessWidget {
 
   /// L'onboarding se termine (envoi de la photo en cours) : plus rien à toucher.
   final bool busy;
+
+  /// Libellé du bouton quand une photo est choisie : « Commencer » à la fin,
+  /// « Suivant » quand la vérification du profil vient ensuite.
+  final String finishLabelKey;
 
   /// Les photos d'exemple, de la plus importante à la moins importante : c'est
   /// la dernière qu'on retire quand la place manque.
@@ -1372,7 +1377,7 @@ class SwayStepPhoto extends StatelessWidget {
             children: [
               SwayCta(
                 icon: has ? null : Icons.photo_camera_rounded,
-                label: AppStrings.t(has ? 'onb_finish' : 'onb_photo_add'),
+                label: AppStrings.t(has ? finishLabelKey : 'onb_photo_add'),
                 onPressed: busy ? null : (has ? onFinish : onPick),
               ),
               const SizedBox(height: 4),

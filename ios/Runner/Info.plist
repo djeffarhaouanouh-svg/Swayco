@@ -76,7 +76,7 @@
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<key>NSCameraUsageDescription</key>
-		<string>Camera is used for video calls.</string>
+		<string>Camera is used for video calls and to take your verification selfie.</string>
 		<key>NSMicrophoneUsageDescription</key>
 		<string>Microphone is used for video calls.</string>
 		<key>NSSpeechRecognitionUsageDescription</key>

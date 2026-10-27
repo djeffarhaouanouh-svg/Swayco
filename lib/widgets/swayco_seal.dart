@@ -5,11 +5,6 @@ import 'package:flutter/material.dart';
 import '../services/app_strings.dart';
 import '../theme/swayco_theme.dart';
 
-/// Qui porte la pastille. Décision produit : tout le monde, pour l'instant.
-/// Les écrans passent ce réglage à `showSeal` ; le jour où elle se restreint,
-/// c'est ici (et à la donnée qu'il faudra alors lire) que ça change.
-const bool kSealOnEveryProfile = true;
-
 /// La pastille : un rond en dégradé de marque avec son icône. Pas de texte —
 /// seulement un libellé d'accessibilité.
 class SwaycoSeal extends StatelessWidget {
