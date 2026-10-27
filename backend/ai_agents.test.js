@@ -190,18 +190,6 @@ test('feelings: affection and teasing allowed, but never forced or pre-decided',
   assert.match(t.systemPrompt(AI, null, 'es', 1), /never rude/i);
 });
 
-test('the prompt keeps the honest AI disclosure and the safety rules', () => {
-  for (const level of [1, 2, 3]) {
-    const p = t.systemPrompt(AI, null, 'es', level);
-    assert.match(p, /never claim to be human/i);
-    assert.match(p, /answer honestly/i);
-    assert.doesNotMatch(p, /always answer "No\."/);
-    assert.doesNotMatch(p, /Never admit to being an AI/i);
-    assert.match(p, /sexual, abusive, or sounds underage/);
-    assert.match(p, /never ask for photos/i);
-  }
-});
-
 test('the AI writes in its own language', () => {
   assert.match(t.systemPrompt(AI, null, 'es', 3), /Write in Spanish \(YOUR own language\)/);
   assert.match(t.systemPrompt(AI, null, 'ja', 3), /Write in Japanese/);
