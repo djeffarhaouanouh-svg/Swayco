@@ -17,6 +17,7 @@ import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/languages.dart';
+import '../services/like_undo.dart';
 import '../services/locations.dart';
 import '../services/local_notifications.dart';
 import '../services/match_celebration.dart';
@@ -234,6 +235,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   final _stackKey = GlobalKey<_TinderCardStackState>();
   List<Friendship> _myFriendships = const [];
+
+  /// What "retour" may take back: the pending like the last swipe on a person
+  /// wrote.
+  late final LikeUndo _likeUndo = LikeUndo(
+    (id) => FriendshipApi.retractLike(meId: _myId, friendshipId: id),
+  );
 
   bool get _hasActiveCard =>
       !_feedLoading && _cards.isNotEmpty && !_deckDone;
@@ -676,17 +683,50 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// already liked me the likes meet and it's a match right away —
   /// celebrate it over the card stack.
   Future<void> _likePeer(RemoteProfile peer) async {
-    final res = await FriendshipApi.like(meId: _myId, peerId: peer.id);
-    Analytics.track(
-      'friend_request_sent',
-      props: {'source': 'discover', 'kind': res.matched ? 'match' : 'like'},
-    );
-    if (!mounted) return;
-    final f = res.friendship;
-    if (f != null) {
-      setState(() => _myFriendships = [..._myFriendships, f]);
+    final slot = _likeUndo.begin(peer.id);
+    try {
+      await _likeUndo.turn(peer.id);
+      final res = await FriendshipApi.like(meId: _myId, peerId: peer.id);
+      // Only a pending row this swipe wrote can be taken back: an older like
+      // stays, and a match is never undone by "retour".
+      slot.complete(res.created && !res.matched ? res.friendship?.id : null);
+      Analytics.track(
+        'friend_request_sent',
+        props: {'source': 'discover', 'kind': res.matched ? 'match' : 'like'},
+      );
+      if (!mounted) return;
+      final f = res.friendship;
+      if (f != null) {
+        setState(() => _myFriendships = [..._myFriendships, f]);
+      }
+      if (res.matched) {
+        // Back on a match already celebrated (undo, then like again): no replay.
+        if (!MatchCelebration.shown.contains(peer.id)) {
+          await _celebrateMatch(peer);
+        }
+        // The matched card leaves the deck, so "retour" lands on the one before.
+        if (mounted) setState(_dropMatchedCards);
+      }
+    } catch (_) {
+      if (!slot.isCompleted) slot.complete(null);
+      rethrow;
     }
-    if (res.matched) await _celebrateMatch(peer);
+  }
+
+  /// "Retour" on a card I had liked: the like is withdrawn with it, server side
+  /// too. Runs behind the UI (the card is already back), best effort.
+  void _withdrawLike(String peerId) {
+    unawaited(
+      _likeUndo.undo(peerId).then((withdrawn) {
+        if (withdrawn == null || !mounted) return;
+        setState(() {
+          _myFriendships = [
+            for (final f in _myFriendships)
+              if (f.id != withdrawn) f,
+          ];
+        });
+      }),
+    );
   }
 
   /// "It's a match!" over the Discover stack. "Dis bonjour" opens the DM.
@@ -736,6 +776,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     } else {
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.pass);
+      // A pass is the last word on this person: a "retour" onto it has no
+      // like left to take back.
+      _likeUndo.forget(profile.id);
     }
     // Un profil de plus passé aujourd'hui (gratuit : 100 par jour).
     _recentSeen.insert(0, (
@@ -808,6 +851,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       UserPrefs.saveDiscoverCursor(_cards[_currentIndex].profile.id);
       _precacheAround(_currentIndex);
     });
+    // Back on a card I had just liked: the like goes with it.
+    _withdrawLike(_cards[_currentIndex].profile.id);
   }
 
   void _onSwipeLeft() => _stackKey.currentState?.triggerSwipe(false);

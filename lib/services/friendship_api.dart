@@ -167,13 +167,19 @@ abstract final class FriendshipApi {
   /// There is no instant one-way follow any more: an accepted row always means
   /// both sides said yes. Idempotent — re-liking someone returns the existing
   /// state instead of duplicating a row.
-  static Future<({Friendship? friendship, bool matched})> like({
+  ///
+  /// [created] is true only when THIS call wrote the pending row: that row is
+  /// the one [retractLike] may take back. A like that already existed, or one
+  /// that became a match, is not the caller's to withdraw.
+  static Future<({Friendship? friendship, bool matched, bool created})> like({
     required String meId,
     required String peerId,
   }) async {
-    if (!isSupabaseReady) return (friendship: null, matched: false);
+    if (!isSupabaseReady) {
+      return (friendship: null, matched: false, created: false);
+    }
     if (meId.isEmpty || peerId.isEmpty || meId == peerId) {
-      return (friendship: null, matched: false);
+      return (friendship: null, matched: false, created: false);
     }
 
     // Guarantee my own `profiles` row exists first — the insert below FK-
@@ -192,11 +198,11 @@ abstract final class FriendshipApi {
     if (reverse != null) {
       final theirs = Friendship.fromMap(Map<String, dynamic>.from(reverse));
       if (theirs.status == 'accepted') {
-        return (friendship: theirs, matched: true);
+        return (friendship: theirs, matched: true, created: false);
       }
       final matched = await _promoteToMatch(theirs.id);
       unawaited(_notifyMatch(meId, peerId));
-      return (friendship: matched ?? theirs, matched: true);
+      return (friendship: matched ?? theirs, matched: true, created: false);
     }
 
     // 2. I already liked them → idempotent, still waiting on their answer.
@@ -209,7 +215,11 @@ abstract final class FriendshipApi {
         .maybeSingle();
     if (sameDir != null) {
       final mine = Friendship.fromMap(Map<String, dynamic>.from(sameDir));
-      return (friendship: mine, matched: mine.status == 'accepted');
+      return (
+        friendship: mine,
+        matched: mine.status == 'accepted',
+        created: false,
+      );
     }
 
     final inserted = await _c
@@ -227,7 +237,29 @@ abstract final class FriendshipApi {
     return (
       friendship: Friendship.fromMap(Map<String, dynamic>.from(inserted)),
       matched: false,
+      created: true,
     );
+  }
+
+  /// Take back a like I just sent — Discover's "retour". Deletes the row only
+  /// while it is still mine AND `pending`: if the other side said yes in the
+  /// meantime it is a match by now, and a match is never cancelled from here
+  /// (that is [unmatchWith], on purpose). Returns `true` when the like was
+  /// withdrawn. The "veut te matcher" push already left and can't be recalled,
+  /// but the request vanishes from the other side's Demandes (realtime).
+  static Future<bool> retractLike({
+    required String meId,
+    required String friendshipId,
+  }) async {
+    if (!isSupabaseReady || meId.isEmpty || friendshipId.isEmpty) return false;
+    final rows = await _c
+        .from('friendships')
+        .delete()
+        .eq('id', friendshipId)
+        .eq('requester', meId)
+        .eq('status', 'pending')
+        .select();
+    return (rows as List).isNotEmpty;
   }
 
   /// Flip a row to `accepted` (= matched) and return it.
