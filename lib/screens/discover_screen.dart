@@ -16,6 +16,8 @@ import '../services/swayco_sounds.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
+import '../services/count_format.dart';
+import '../services/globe_places.dart';
 import '../services/languages.dart';
 import '../services/like_undo.dart';
 import '../services/locations.dart';
@@ -1602,6 +1604,32 @@ class _CountryRowState extends State<_CountryRow> {
     ...widget.selected.where(kGlobeCountries.containsKey).toList().reversed,
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    // Les nombres des puces sont ceux du globe : même chargement, même source
+    // (vue country_counts, ou le décompte local). Rien ne s'affiche avant.
+    GlobePlaces.load({
+      for (final e in kGlobeCountries.entries) e.value.dbName: e.key,
+    }).then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  int _countOf(String key) => GlobePlaces.country(key)?.count ?? 0;
+
+  int get _total => [
+        for (final k in kGlobeCountries.keys) _countOf(k),
+      ].fold(0, (a, b) => a + b);
+
+  String _format(int n) => formatCount(
+        n,
+        Locale(AppStrings.currentBcp47.value.split(RegExp('[-_]')).first),
+      );
+
+  String _countLabel(int n) =>
+      AppStrings.t('country_profiles_count', args: {'n': '$n'});
+
   void _touch(Iterable<String> keys) {
     for (final k in keys) {
       if (!kGlobeCountries.containsKey(k)) continue;
@@ -1658,33 +1686,59 @@ class _CountryRowState extends State<_CountryRow> {
             // 52, les bulles restent exactement où elles étaient.
             padding: const EdgeInsets.fromLTRB(15, 8, 2, 0),
             child: _RowItem(
-              label: AppStrings.t('globe_filter_cta'),
+              label: _total > 0
+                  ? '${AppStrings.t('globe_filter_cta')}, ${_countLabel(_total)}'
+                  : AppStrings.t('globe_filter_cta'),
               onTap: widget.onFilter,
               // Pas de verre dans la rangée : la bulle « Filtrer » est
               // pleine, comme les bulles pays.
               // Anneau de 1,5 px au dégradé de marque (le fond du rond extérieur
               // vu à travers le padding) ; les bulles pays, elles, ont un fin
               // liseré de verre.
-              bubble: Container(
-                width: _kBubble,
-                height: _kBubble,
-                padding: const EdgeInsets.all(1.5),
-                decoration: const BoxDecoration(
-                  gradient: SC.brandGradient,
-                  shape: BoxShape.circle,
-                ),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: _kSurface,
-                    shape: BoxShape.circle,
+              // passthrough : la bulle garde exactement les contraintes d'avant ;
+              // la puce du total déborde en haut à droite du rond.
+              bubble: Stack(
+                fit: StackFit.passthrough,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: _kBubble,
+                    height: _kBubble,
+                    padding: const EdgeInsets.all(1.5),
+                    decoration: const BoxDecoration(
+                      gradient: SC.brandGradient,
+                      shape: BoxShape.circle,
+                    ),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: _kSurface,
+                        shape: BoxShape.circle,
+                      ),
+                      // La Terre qu'avait l'onglet Discover de la barre.
+                      child: Icon(
+                        Icons.public,
+                        color: SC.fg,
+                        size: 26,
+                      ),
+                    ),
                   ),
-                  // La Terre qu'avait l'onglet Discover de la barre.
-                  child: Icon(
-                    Icons.public,
-                    color: SC.fg,
-                    size: 26,
+                  Positioned(
+                    top: -7,
+                    right: -2,
+                    height: 18,
+                    child: IgnorePointer(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 150),
+                        child: _total > 0
+                            ? _TotalChip(
+                                key: const ValueKey('total'),
+                                text: _format(_total),
+                              )
+                            : const SizedBox.shrink(key: ValueKey('none')),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -1732,7 +1786,10 @@ class _CountryRowState extends State<_CountryRow> {
                   // La clé suit le pays, pas sa place : quand l'ordre
                   // change, chaque bulle garde sa silhouette déjà chargée.
                   key: ValueKey(key),
-                  label: AppStrings.t('country_$code'),
+                  label: _countOf(key) > 0
+                      ? '${AppStrings.t('country_$code')}, '
+                          '${_countLabel(_countOf(key))}'
+                      : AppStrings.t('country_$code'),
                   // Un tap CHOISIT ce pays (et retire le précédent). Retirer
                   // passe par la petite croix, jamais par un tap sur la bulle.
                   onTap: () {
@@ -1742,8 +1799,32 @@ class _CountryRowState extends State<_CountryRow> {
                     width: _kBubble,
                     height: _kBubble,
                     child: Stack(
+                      clipBehavior: Clip.none,
                       children: [
                         circle,
+                        // Compteur : centré sous le rond, 8 px en dessous ; il
+                        // reste dans la respiration de _CountryRow.height.
+                        Positioned(
+                          left: 0,
+                          width: _kBubble,
+                          bottom: -8,
+                          height: 16,
+                          child: IgnorePointer(
+                            child: Center(
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 150),
+                                child: _countOf(key) > 0
+                                    ? _CountCapsule(
+                                        key: const ValueKey('count'),
+                                        text: _format(_countOf(key)),
+                                      )
+                                    : const SizedBox.shrink(
+                                        key: ValueKey('none'),
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ),
                         if (on)
                           Positioned(
                             top: 0,
@@ -1792,6 +1873,75 @@ class _CountryRowState extends State<_CountryRow> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Le nombre de profils d'un pays, sous sa bulle (design C). Blanc sur bleu
+/// nuit, liseré de la couleur du fond pour la détacher du rond. Aucun point
+/// d'état : ce sont des profils, pas des gens en ligne.
+class _CountCapsule extends StatelessWidget {
+  const _CountCapsule({super.key, required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B2A55),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: SC.bgDeep, width: 1.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.person_rounded, size: 10, color: Colors.white),
+          const SizedBox(width: 2),
+          Text(
+            text,
+            maxLines: 1,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              height: 1,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Le total des profils, en puce jaune sur la bulle du globe.
+class _TotalChip extends StatelessWidget {
+  const _TotalChip({super.key, required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 18,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: SC.accent,
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          height: 1,
+          color: SC.onAccent,
+        ),
       ),
     );
   }
