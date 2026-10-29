@@ -1667,11 +1667,22 @@ class _CountryRowState extends State<_CountryRow> {
     super.dispose();
   }
 
-  List<String> get _orderedKeys => [
-        ..._recent,
-        for (final k in kGlobeCountries.keys)
-          if (!_recent.contains(k)) k,
-      ];
+  /// En dessous de ce nombre de comptes, un pays passe au fond de la rangée.
+  static const _kMinCountryCount = 15;
+
+  List<String> get _orderedKeys {
+    final rest = [
+      for (final k in kGlobeCountries.keys)
+        if (!_recent.contains(k)) k,
+    ];
+    return [
+      ..._recent,
+      for (final k in rest)
+        if (_countOf(k) >= _kMinCountryCount) k,
+      for (final k in rest)
+        if (_countOf(k) < _kMinCountryCount) k,
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
