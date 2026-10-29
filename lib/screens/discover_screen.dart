@@ -1828,7 +1828,8 @@ class _CountryRowState extends State<_CountryRow> {
                             child: Center(
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 150),
-                                child: _countOf(key) > 0
+                                // Le compteur n'apparait que sur la bulle choisie.
+                                child: on && _countOf(key) > 0
                                     ? _CountCapsule(
                                         key: const ValueKey('count'),
                                         text: _format(_countOf(key)),
