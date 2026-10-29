@@ -1618,6 +1618,19 @@ class _CountryRowState extends State<_CountryRow> {
 
   int _countOf(String key) => GlobePlaces.country(key)?.count ?? 0;
 
+  /// Le pays sous le doigt (appui) ou sous la souris (survol) : c'est lui, et
+  /// lui seul, qui montre son compteur.
+  String? _peek;
+
+  void _setPeek(String key, bool on) {
+    if (on) {
+      if (_peek == key) return;
+      setState(() => _peek = key);
+    } else if (_peek == key) {
+      setState(() => _peek = null);
+    }
+  }
+
   int get _total => [
         for (final k in kGlobeCountries.keys) _countOf(k),
       ].fold(0, (a, b) => a + b);
@@ -1806,6 +1819,7 @@ class _CountryRowState extends State<_CountryRow> {
                   onTap: () {
                     if (!on) widget.onCountry(key);
                   },
+                  onPeek: (v) => _setPeek(key, v),
                   bubble: SizedBox(
                     width: _kBubble,
                     height: _kBubble,
@@ -1828,8 +1842,8 @@ class _CountryRowState extends State<_CountryRow> {
                             child: Center(
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 150),
-                                // Le compteur n'apparait que sur la bulle choisie.
-                                child: on && _countOf(key) > 0
+                                // Le compteur n'apparait que sous le doigt / la souris.
+                                child: _peek == key && _countOf(key) > 0
                                     ? _CountCapsule(
                                         key: const ValueKey('count'),
                                         text: _format(_countOf(key)),
@@ -1976,23 +1990,42 @@ class _RowItem extends StatelessWidget {
     required this.bubble,
     required this.label,
     required this.onTap,
+    this.onPeek,
   });
 
   final Widget bubble;
   final String label;
   final VoidCallback onTap;
 
+  /// Appelé avec true quand un doigt appuie ou que la souris survole la case,
+  /// false quand il la quitte. Null : la case n'a pas de compteur à montrer.
+  final ValueChanged<bool>? onPeek;
+
   @override
   Widget build(BuildContext context) {
     // Plus aucun nom sous les bulles, même choisies : la silhouette parle
     // d'elle-même et la croix jaune dit ce qui filtre. Le nom reste lu par
     // le lecteur d'écran.
-    return GestureDetector(
+    final item = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: SizedBox(
         width: 60,
         child: Semantics(label: label, button: true, child: bubble),
+      ),
+    );
+    final peek = onPeek;
+    if (peek == null) return item;
+    // Listener (et non un geste) : il ne joue pas dans l'arène, donc ni le tap
+    // ni le défilement de la rangée ne changent.
+    return MouseRegion(
+      onEnter: (_) => peek(true),
+      onExit: (_) => peek(false),
+      child: Listener(
+        onPointerDown: (_) => peek(true),
+        onPointerUp: (_) => peek(false),
+        onPointerCancel: (_) => peek(false),
+        child: item,
       ),
     );
   }
