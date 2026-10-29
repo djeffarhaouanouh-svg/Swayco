@@ -298,6 +298,58 @@ abstract final class RevenueCat {
       (await _package(packageId))?.storeProduct.priceString ??
       (await _storeProductFallback(packageId))?.priceString;
 
+  /// Free-trial length, in days, that the CURRENT user would really get when
+  /// buying [packageId] — or null when there is no free trial or the user is
+  /// not (or not provably) eligible, in which case the paywall shows the plain
+  /// price. Read from the store data, never assumed:
+  ///   * Android: RevenueCat's `defaultOption` is the offer this user is
+  ///     eligible for; a trial shows up there as `freePhase`, and an ineligible
+  ///     user simply gets the base plan (no free phase).
+  ///   * iOS: the product's introductory price must be free AND
+  ///     `checkTrialOrIntroductoryPriceEligibility` must say "eligible"
+  ///     (unknown counts as not eligible, as RevenueCat advises).
+  /// Only day/week trials are reported; anything else is hidden rather than
+  /// approximated.
+  static Future<int?> trialDaysOf(String packageId) async {
+    if (!_configured) return null;
+    try {
+      final product = (await _package(packageId))?.storeProduct ??
+          await _storeProductFallback(packageId);
+      if (product == null) return null;
+
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        final intro = product.introductoryPrice;
+        if (intro == null || intro.price != 0) return null;
+        final eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility(
+          [product.identifier],
+        );
+        if (eligibility[product.identifier]?.status !=
+            IntroEligibilityStatus.introEligibilityStatusEligible) {
+          return null;
+        }
+        return _days(intro.periodUnit, intro.periodNumberOfUnits * intro.cycles);
+      }
+
+      final free = product.defaultOption?.freePhase;
+      final period = free?.billingPeriod;
+      if (free == null || period == null) return null;
+      return _days(period.unit, period.value * (free.billingCycleCount ?? 1));
+    } catch (e) {
+      debugPrint('RevenueCat trialDaysOf failed: $e');
+      return null;
+    }
+  }
+
+  static int? _days(PeriodUnit unit, int n) {
+    final days = switch (unit) {
+      PeriodUnit.day => n,
+      PeriodUnit.week => n * 7,
+      _ => 0,
+    };
+    // A 1-day "trial" or an unknown unit isn't worth announcing.
+    return days >= 2 ? days : null;
+  }
+
   /// High-level purchase: buy the offering package [packageId] and report
   /// whether [entitlementId] is active afterwards. Keeps `purchases_flutter`
   /// types out of the UI.

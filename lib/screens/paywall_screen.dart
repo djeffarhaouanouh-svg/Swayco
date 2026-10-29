@@ -84,11 +84,33 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
   /// on web (Stripe shows its own price) or when the package can't load.
   String? _price;
 
+  /// Free-trial length in days, only when the store says THIS user gets it.
+  /// Null → no trial (none configured, already used, or eligibility unknown):
+  /// the paywall then shows the plain price.
+  int? _trialDays;
+
   void _loadPrice() {
     if (!RevenueCat.isSupported) return;
     RevenueCat.priceOf(RevenueCat.proPackageId).then((p) {
       if (mounted) setState(() => _price = p);
     });
+    RevenueCat.trialDaysOf(RevenueCat.proPackageId).then((d) {
+      if (mounted) setState(() => _trialDays = d);
+    });
+  }
+
+  /// "7 jours gratuits, puis 9,99 €/mois" when a trial applies, else
+  /// "9,99 €/mois"; null while the price is still loading.
+  String? _priceLine() {
+    final price = _price;
+    if (price == null) return null;
+    final perMonth = '$price${AppStrings.t('paywall_period_month')}';
+    final days = _trialDays;
+    if (days == null) return perMonth;
+    return AppStrings.t(
+      'pw_trial_then',
+      args: {'days': '$days', 'price': perMonth},
+    );
   }
 
   Future<void> _subscribe() async {
@@ -219,10 +241,17 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
     final tiers = price == null
         ? 'Pro'
         : 'Pro $price${AppStrings.t('paywall_period_month')}';
+    final days = _trialDays;
     return Text(
       AppStrings.t(
-        'paywall_legal',
-        args: {'tiers': tiers, 'account': _accountPhrase()},
+        // With a free trial the first charge happens when it ends, not at
+        // purchase: the plain disclosure would be wrong.
+        days != null && price != null ? 'paywall_legal_trial' : 'paywall_legal',
+        args: {
+          'tiers': tiers,
+          'account': _accountPhrase(),
+          if (days != null) 'days': '$days',
+        },
       ),
       textAlign: TextAlign.center,
       style: TextStyle(
@@ -295,11 +324,10 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
   @override
   Widget build(BuildContext context) {
     final safe = MediaQuery.paddingOf(context);
-    final price = _price;
-    final ctaSub = price == null
+    final priceLine = _priceLine();
+    final ctaSub = priceLine == null
         ? AppStrings.t('pw_cancel_anytime')
-        : '$price${AppStrings.t('paywall_period_month')} · '
-            '${AppStrings.t('pw_cancel_anytime')}';
+        : '$priceLine · ${AppStrings.t('pw_cancel_anytime')}';
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SC.light ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
       child: Scaffold(
@@ -1157,8 +1185,7 @@ class _LikesSheetState extends State<_LikesSheet> with _PaywallPurchase {
     final country = p?.country.trim() ?? '';
     final iso = countryIso2For(country);
     final hasCountry = country.isNotEmpty;
-    final price = _price;
-    final perMonth = AppStrings.t('paywall_period_month');
+    final priceLine = _priceLine();
 
     // Drapeaux des AUTRES likers : pays distincts d'abord, 5 au plus.
     final seen = <String>{};
@@ -1181,8 +1208,7 @@ class _LikesSheetState extends State<_LikesSheet> with _PaywallPurchase {
     final proSub = many
         ? AppStrings.t('pw_pro_reveal_n', args: {'n': '$total'})
         : AppStrings.t('pw_pro_all_likes');
-    final proSubFull =
-        price == null ? proSub : '$proSub · $price$perMonth';
+    final proSubFull = priceLine == null ? proSub : '$proSub · $priceLine';
     final videoLabel = widget.videoAvailable
         ? AppStrings.t(many ? 'pw_video_reveal_only' : 'pw_video_reveal_one')
         : AppStrings.t('likes_video_soon');
