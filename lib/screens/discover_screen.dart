@@ -1618,8 +1618,8 @@ class _CountryRowState extends State<_CountryRow> {
 
   int _countOf(String key) => GlobePlaces.country(key)?.count ?? 0;
 
-  /// Le pays sous le doigt (appui) ou sous la souris (survol) : c'est lui, et
-  /// lui seul, qui montre son compteur.
+  /// Le pays sous le doigt (appui) ou sous la souris (survol). Tant qu'il y en
+  /// a un, TOUS les compteurs de la rangée sont visibles.
   String? _peek;
 
   void _setPeek(String key, bool on) {
@@ -1842,8 +1842,9 @@ class _CountryRowState extends State<_CountryRow> {
                             child: Center(
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 150),
-                                // Le compteur n'apparait que sous le doigt / la souris.
-                                child: _peek == key && _countOf(key) > 0
+                                // Doigt ou souris sur UNE bulle : tous les compteurs
+                                // s'affichent ensemble.
+                                child: _peek != null && _countOf(key) > 0
                                     ? _CountCapsule(
                                         key: const ValueKey('count'),
                                         text: _format(_countOf(key)),
