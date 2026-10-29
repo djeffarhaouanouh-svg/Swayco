@@ -1222,6 +1222,11 @@ class _LikesSheetState extends State<_LikesSheet> with _PaywallPurchase {
         ? AppStrings.t('pw_pro_reveal_n', args: {'n': '$total'})
         : AppStrings.t('pw_pro_all_likes');
     final proSubFull = priceLine == null ? proSub : '$proSub · $priceLine';
+    // Free trial this user really gets: same button as the Pro paywall,
+    // "Essayer 7 jours offerts" over "puis 9,99 €/mois · …".
+    final trialDays = _trialDays;
+    final trialPrice = _price;
+    final trial = trialDays != null && trialPrice != null;
     final videoLabel = widget.videoAvailable
         ? AppStrings.t(many ? 'pw_video_reveal_only' : 'pw_video_reveal_one')
         : AppStrings.t('likes_video_soon');
@@ -1346,8 +1351,14 @@ class _LikesSheetState extends State<_LikesSheet> with _PaywallPurchase {
                 Sparkles(
                   color: SC.onAccent,
                   child: _TwoLineCta(
-                    title: AppStrings.t('pw_pro_switch'),
-                    subtitle: proSubFull,
+                    title: trial
+                        ? AppStrings.t('pw_trial_cta', args: {'days': '$trialDays'})
+                        : AppStrings.t('pw_pro_switch'),
+                    subtitle: trial
+                        ? '${AppStrings.t('pw_trial_after', args: {
+                            'price': '$trialPrice${AppStrings.t('paywall_period_month')}',
+                          })} · $proSub'
+                        : proSubFull,
                     busy: _busy,
                     onPressed: _subscribe,
                   ),
