@@ -157,6 +157,8 @@ abstract final class AppStrings {
     'paywall_ultra_sub': 'Heures d\'appel *illimitées*',
     'paywall_period_month': '/mois',
     'pw_trial_then': '{days} jours gratuits, puis {price}',
+    'pw_trial_cta': 'Essayer {days} jours offerts',
+    'pw_trial_after': 'puis {price}',
     'paywall_legal_trial':
         'Abonnement à renouvellement automatique. {tiers}, avec {days} jours gratuits : aucun montant n\'est débité pendant l\'essai. À la fin de l\'essai, le montant est débité sur {account}, puis l\'abonnement se renouvelle automatiquement pour la même durée et au même tarif, sauf désactivation au moins 24 h avant la fin de la période en cours. Vous pouvez gérer ou résilier votre abonnement à tout moment dans les réglages de votre compte. En vous abonnant, vous acceptez les Conditions d\'utilisation et la Politique de confidentialité (liens ci-dessous).',
     'paywall_popular': 'Populaire',
@@ -1070,6 +1072,8 @@ abstract final class AppStrings {
     'paywall_ultra_sub': '*Unlimited* call hours',
     'paywall_period_month': '/mo',
     'pw_trial_then': '{days} days free, then {price}',
+    'pw_trial_cta': 'Try {days} days free',
+    'pw_trial_after': 'then {price}',
     'paywall_legal_trial':
         'Auto-renewing subscription. {tiers}, with {days} days free: nothing is charged during the trial. When the trial ends, payment is charged to {account}, and the subscription then renews automatically for the same duration and price unless turned off at least 24 hours before the end of the current period. You can manage or cancel your subscription at any time in your account settings. By subscribing, you agree to the Terms of Use and Privacy Policy (links below).',
     'paywall_popular': 'Popular',
@@ -1965,6 +1969,8 @@ abstract final class AppStrings {
     'paywall_ultra_sub': 'Horas de llamada *ilimitadas*',
     'paywall_period_month': '/mes',
     'pw_trial_then': '{days} días gratis, luego {price}',
+    'pw_trial_cta': 'Prueba {days} días gratis',
+    'pw_trial_after': 'luego {price}',
     'paywall_legal_trial':
         'Suscripción de renovación automática. {tiers}, con {days} días gratis: no se cobra nada durante la prueba. Al terminar la prueba, el importe se carga a {account} y la suscripción se renueva automáticamente por la misma duración y al mismo precio, salvo que la desactives al menos 24 horas antes del final del período en curso. Puedes gestionar o cancelar tu suscripción en cualquier momento en los ajustes de tu cuenta. Al suscribirte, aceptas los Términos de uso y la Política de privacidad (enlaces abajo).',
     'paywall_popular': 'Popular',
@@ -2854,6 +2860,8 @@ abstract final class AppStrings {
     'paywall_ultra_sub': '*Unbegrenzte* Anrufstunden',
     'paywall_period_month': '/Monat',
     'pw_trial_then': '{days} Tage kostenlos, danach {price}',
+    'pw_trial_cta': '{days} Tage kostenlos testen',
+    'pw_trial_after': 'danach {price}',
     'paywall_legal_trial':
         'Automatisch verlängerndes Abo. {tiers}, mit {days} Tagen kostenlos: Während der Testphase wird nichts abgebucht. Nach Ende der Testphase wird der Betrag über {account} abgebucht, danach verlängert sich das Abo automatisch um denselben Zeitraum zum selben Preis, sofern es nicht mindestens 24 Stunden vor Ende des laufenden Zeitraums deaktiviert wird. Du kannst dein Abo jederzeit in den Kontoeinstellungen verwalten oder kündigen. Mit dem Abschluss akzeptierst du die Nutzungsbedingungen und die Datenschutzerklärung (Links unten).',
     'paywall_popular': 'Beliebt',
@@ -3749,6 +3757,8 @@ abstract final class AppStrings {
     'paywall_ultra_sub': 'Ore di chiamata *illimitate*',
     'paywall_period_month': '/mese',
     'pw_trial_then': '{days} giorni gratis, poi {price}',
+    'pw_trial_cta': 'Prova {days} giorni gratis',
+    'pw_trial_after': 'poi {price}',
     'paywall_legal_trial':
         'Abbonamento a rinnovo automatico. {tiers}, con {days} giorni gratis: durante la prova non viene addebitato nulla. Al termine della prova l\'importo viene addebitato su {account}, poi l\'abbonamento si rinnova automaticamente per la stessa durata e allo stesso prezzo, a meno che non venga disattivato almeno 24 ore prima della fine del periodo in corso. Puoi gestire o annullare l\'abbonamento in qualsiasi momento nelle impostazioni del tuo account. Abbonandoti accetti i Termini di utilizzo e l\'Informativa sulla privacy (link qui sotto).',
     'paywall_popular': 'Popolare',
@@ -4636,6 +4646,8 @@ abstract final class AppStrings {
     'paywall_ultra_sub': 'Horas de chamada *ilimitadas*',
     'paywall_period_month': '/mês',
     'pw_trial_then': '{days} dias grátis, depois {price}',
+    'pw_trial_cta': 'Experimenta {days} dias grátis',
+    'pw_trial_after': 'depois {price}',
     'paywall_legal_trial':
         'Subscrição de renovação automática. {tiers}, com {days} dias grátis: nada é cobrado durante o período de teste. No fim do teste, o valor é cobrado em {account} e a subscrição renova-se automaticamente pela mesma duração e ao mesmo preço, a menos que seja desativada pelo menos 24 horas antes do fim do período em curso. Podes gerir ou cancelar a subscrição a qualquer momento nas definições da tua conta. Ao subscrever, aceitas os Termos de Utilização e a Política de Privacidade (links abaixo).',
     'paywall_popular': 'Popular',
@@ -5524,6 +5536,8 @@ abstract final class AppStrings {
     'paywall_ultra_sub': '*Onbeperkte* beluren',
     'paywall_period_month': '/maand',
     'pw_trial_then': '{days} dagen gratis, daarna {price}',
+    'pw_trial_cta': '{days} dagen gratis proberen',
+    'pw_trial_after': 'daarna {price}',
     'paywall_legal_trial':
         'Automatisch verlengend abonnement. {tiers}, met {days} dagen gratis: tijdens de proefperiode wordt niets afgeschreven. Na afloop van de proefperiode wordt het bedrag afgeschreven via {account}, daarna wordt het abonnement automatisch verlengd voor dezelfde duur en tegen dezelfde prijs, tenzij je het ten minste 24 uur voor het einde van de lopende periode uitschakelt. Je kunt je abonnement op elk moment beheren of opzeggen in de instellingen van je account. Door je te abonneren ga je akkoord met de Gebruiksvoorwaarden en het Privacybeleid (links hieronder).',
     'paywall_popular': 'Populair',
@@ -6407,6 +6421,8 @@ abstract final class AppStrings {
     'paywall_ultra_sub': 'ساعات مكالمات *غير محدودة*',
     'paywall_period_month': '/شهر',
     'pw_trial_then': '{days} أيام مجانًا، ثم {price}',
+    'pw_trial_cta': 'جرّب {days} أيام مجانًا',
+    'pw_trial_after': 'ثم {price}',
     'paywall_legal_trial':
         'اشتراك يتجدد تلقائيًا. {tiers}، مع {days} أيام مجانًا: لا يُخصم أي مبلغ خلال فترة التجربة. عند انتهاء التجربة يُخصم المبلغ من {account}، ثم يتجدد الاشتراك تلقائيًا للمدة نفسها وبالسعر نفسه ما لم يتم إيقافه قبل 24 ساعة على الأقل من نهاية الفترة الحالية. يمكنك إدارة اشتراكك أو إلغاؤه في أي وقت من إعدادات حسابك. باشتراكك فإنك توافق على شروط الاستخدام وسياسة الخصوصية (الروابط أدناه).',
     'paywall_popular': 'شائع',
@@ -7284,6 +7300,8 @@ abstract final class AppStrings {
     'paywall_ultra_sub': '*Безлимитные* часы звонков',
     'paywall_period_month': '/мес',
     'pw_trial_then': '{days} дн. бесплатно, затем {price}',
+    'pw_trial_cta': 'Попробовать {days} дн. бесплатно',
+    'pw_trial_after': 'затем {price}',
     'paywall_legal_trial':
         'Подписка с автопродлением. {tiers}, {days} дн. бесплатно: во время пробного периода ничего не списывается. По окончании пробного периода сумма списывается с {account}, затем подписка автоматически продлевается на тот же срок по той же цене, если не отключить её не позднее чем за 24 часа до конца текущего периода. Управлять подпиской или отменить её можно в любое время в настройках аккаунта. Оформляя подписку, вы принимаете Условия использования и Политику конфиденциальности (ссылки ниже).',
     'paywall_popular': 'Популярно',
@@ -8163,6 +8181,8 @@ abstract final class AppStrings {
     'paywall_ultra_sub': '*无限* 通话时长',
     'paywall_period_month': '/月',
     'pw_trial_then': '免费试用{days}天，之后 {price}',
+    'pw_trial_cta': '免费试用{days}天',
+    'pw_trial_after': '之后 {price}',
     'paywall_legal_trial':
         '自动续订订阅。{tiers}，含{days}天免费试用：试用期内不会扣费。试用结束后，费用将从{account}扣除，之后订阅将以相同的周期和价格自动续订，除非在当前周期结束前至少24小时关闭自动续订。你可以随时在账户设置中管理或取消订阅。订阅即表示你同意使用条款和隐私政策（链接见下方）。',
     'paywall_popular': '热门',
@@ -9044,6 +9064,8 @@ abstract final class AppStrings {
     'paywall_ultra_sub': '通話時間 *無制限*',
     'paywall_period_month': '/月',
     'pw_trial_then': '{days}日間無料、その後 {price}',
+    'pw_trial_cta': '{days}日間無料で試す',
+    'pw_trial_after': 'その後 {price}',
     'paywall_legal_trial':
         '自動更新サブスクリプションです。{tiers}、{days}日間無料：無料期間中は課金されません。無料期間の終了時に{account}に請求され、その後は、現在の期間が終わる24時間以上前に解除しない限り、同じ期間・同じ料金で自動的に更新されます。サブスクリプションはアカウント設定からいつでも管理・解約できます。登録することで、利用規約とプライバシーポリシー（下記リンク）に同意したものとみなされます。',
     'paywall_popular': '人気',
@@ -9829,6 +9851,8 @@ abstract final class AppStrings {
     'paywall_ultra_sub': '*무제한* 통화 시간',
     'paywall_period_month': '/월',
     'pw_trial_then': '{days}일 무료, 이후 {price}',
+    'pw_trial_cta': '{days}일 무료 체험',
+    'pw_trial_after': '이후 {price}',
     'paywall_legal_trial':
         '자동 갱신 구독입니다. {tiers}, {days}일 무료: 체험 기간 중에는 결제되지 않습니다. 체험이 끝나면 {account}로 결제되며, 현재 기간이 끝나기 최소 24시간 전에 해지하지 않으면 같은 기간·같은 요금으로 자동 갱신됩니다. 구독은 언제든지 계정 설정에서 관리하거나 해지할 수 있습니다. 구독하면 이용약관과 개인정보 처리방침(아래 링크)에 동의하는 것으로 간주됩니다.',
     'paywall_popular': '인기',

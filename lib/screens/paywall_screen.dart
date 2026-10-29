@@ -324,10 +324,23 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
   @override
   Widget build(BuildContext context) {
     final safe = MediaQuery.paddingOf(context);
-    final priceLine = _priceLine();
-    final ctaSub = priceLine == null
+    final price = _price;
+    final days = _trialDays;
+    final perMonth = price == null
+        ? null
+        : '$price${AppStrings.t('paywall_period_month')}';
+    // Trial: "Essayer 7 jours offerts" over "puis 9,99 €/mois · résiliable…".
+    final ctaTitle = days != null
+        ? AppStrings.t('pw_trial_cta', args: {'days': '$days'})
+        : AppStrings.t('pw_activate');
+    final ctaLead = perMonth == null
+        ? null
+        : days != null
+            ? AppStrings.t('pw_trial_after', args: {'price': perMonth})
+            : perMonth;
+    final ctaSub = ctaLead == null
         ? AppStrings.t('pw_cancel_anytime')
-        : '$priceLine · ${AppStrings.t('pw_cancel_anytime')}';
+        : '$ctaLead · ${AppStrings.t('pw_cancel_anytime')}';
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SC.light ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
       child: Scaffold(
@@ -474,7 +487,7 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
                       const Spacer(),
                       const SizedBox(height: 22),
                       _TwoLineCta(
-                        title: AppStrings.t('pw_activate'),
+                        title: ctaTitle,
                         subtitle: ctaSub,
                         busy: _busy,
                         onPressed: _subscribe,
