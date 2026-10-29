@@ -104,6 +104,10 @@
 		     a locale we don't ship. -->
 		<key>NSUserTrackingUsageDescription</key>
 		<string>Used to deliver a more relevant experience. You can decline without losing access to any feature.</string>
+		<!-- Apple sends a copy of every SKAdNetwork postback to AppsFlyer, which
+		     clears the "SKAN postbacks not received" warning in its dashboard. -->
+		<key>NSAdvertisingAttributionReportEndpoint</key>
+		<string>https://appsflyer-skadnetwork.com/</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Used to pick your profile photo and Discover photo from your gallery.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>
