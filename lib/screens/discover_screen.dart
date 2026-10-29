@@ -1695,7 +1695,7 @@ class _CountryRowState extends State<_CountryRow> {
           Padding(
             // 15 + 2 (et non 20 + 12) : les cases font 62 de large au lieu de
             // 52, les bulles restent exactement où elles étaient.
-            padding: const EdgeInsets.fromLTRB(15, 8, 2, 0),
+            padding: const EdgeInsets.fromLTRB(15, 6, 2, 0),
             child: _RowItem(
               label: _total > 0
                   ? '${AppStrings.t('globe_filter_cta')}, ${_countLabel(_total)}'
@@ -1757,7 +1757,7 @@ class _CountryRowState extends State<_CountryRow> {
             child: ListView.separated(
               controller: _scroll,
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(0, 8, 20, 0),
+              padding: const EdgeInsets.fromLTRB(0, 6, 20, 0),
               itemCount: keys.length,
               separatorBuilder: (_, _) => const SizedBox(width: 6),
               itemBuilder: (_, i) {
