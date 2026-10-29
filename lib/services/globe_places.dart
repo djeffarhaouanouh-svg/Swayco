@@ -105,6 +105,13 @@ abstract final class GlobePlaces {
         if (key == null) continue;
         final city = (m['city']?.toString() ?? '').trim();
         final id = m['id']?.toString() ?? '';
+        // Un compte sans photo n'apparait pas dans le fil : on ne le compte pas.
+        final photos = m['photos'];
+        final hasPhoto =
+            (m['avatar_url']?.toString() ?? '').trim().isNotEmpty ||
+            (m['discover_photo_url']?.toString() ?? '').trim().isNotEmpty ||
+            (photos is List && photos.isNotEmpty);
+        if (!hasPhoto) continue;
         countryCount[key] = (countryCount[key] ?? 0) + 1;
         if (city.isNotEmpty) {
           final cc = cityCount.putIfAbsent(key, () => {});
@@ -117,9 +124,8 @@ abstract final class GlobePlaces {
         if (!isFake || id.isEmpty) continue;
         var url = (m['avatar_url']?.toString() ?? '').trim();
         if (url.isEmpty) url = (m['discover_photo_url']?.toString() ?? '').trim();
-        if (url.isEmpty) {
-          final photos = m['photos'];
-          if (photos is List && photos.isNotEmpty) url = photos.first.toString().trim();
+        if (url.isEmpty && photos is List && photos.isNotEmpty) {
+          url = photos.first.toString().trim();
         }
         if (url.isEmpty) continue;
         final cur = countryPhoto[key];
