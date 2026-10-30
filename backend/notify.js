@@ -232,7 +232,8 @@ async function resolveActorFlag(sb, payload, recipientUid) {
 /**
  * Le drapeau remplace les emojis decoratifs des notifications : « Léa t'a
  * ajouté 🇧🇷 ». Sur un message le corps est le texte de la personne, donc le
- * drapeau va a cote de son nom (titre) ; partout ailleurs, en fin de phrase.
+ * drapeau va a cote de son nom (titre) ; idem pour une demande d'ami
+ * (« Isabela 🇧🇷 / veut être ami ») ; partout ailleurs, en fin de phrase.
  * Les appels (CallKit / sonnerie) restent tels quels.
  */
 function withActorFlag(payload, flag) {
@@ -242,7 +243,9 @@ function withActorFlag(payload, flag) {
   const d = payload.data || {};
   const isPlainMessage =
     t === 'message' && d.kind !== 'reaction' && String(d.special || '') !== 'true';
-  if (isPlainMessage) return { ...payload, title: `${payload.title} ${flag}` };
+  if (isPlainMessage || t === 'friend_request') {
+    return { ...payload, title: `${payload.title} ${flag}` };
+  }
   return { ...payload, body: `${payload.body || ''} ${flag}`.trim() };
 }
 
