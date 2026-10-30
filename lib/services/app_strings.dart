@@ -136,7 +136,7 @@ abstract final class AppStrings {
     'push_photo': '📷 Photo',
     'push_reaction_body': 'a réagi {emoji}',
     'push_friend_request_title': 'Nouvelle demande',
-    'push_friend_request_body': 'veut être ami',
+    'push_friend_request_body': 'veut être ton ami',
     'push_added_anon': "Quelqu'un t'a ajouté",
     'wave_sent': 'Tu as fait signe à {name} 👋',
     'wave_capped_streak': 'Trois signes sans réponse. À {name} de jouer.',

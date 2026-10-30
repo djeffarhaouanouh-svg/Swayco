@@ -53,7 +53,7 @@ const DEEPSEEK_MODEL = process.env.FIX_MODEL?.trim() || 'deepseek-v4-flash';
 
 // ── Textes localises (memes libelles que lib/services/app_strings.dart) ──────
 const LIKE_BODY = {
-  fr: 'veut être ami', en: 'wants to be friends', es: 'quiere ser tu amigo',
+  fr: 'veut être ton ami', en: 'wants to be friends', es: 'quiere ser tu amigo',
   de: 'möchte mit dir befreundet sein', it: 'vuole essere tuo amico',
   pt: 'quer ser teu amigo', nl: 'wil bevriend zijn', ar: 'يريد أن يكون صديقك',
   ru: 'хочет дружить', zh: '想加你为好友', ja: '友だちになりたいそうです',
