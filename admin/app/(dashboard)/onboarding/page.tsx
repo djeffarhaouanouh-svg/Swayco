@@ -112,18 +112,84 @@ export default async function OnboardingPage({
       />
 
       <Section
-        title="Les étapes de l'onboarding"
+        title="Où s'arrêtent-ils ?"
+        hint="Chaque écran de l'assistant, avec le nombre de sessions qui l'ont affiché et celles qui s'arrêtent là. Une session = une ouverture de l'app : quelqu'un qui revient finir plus tard compte deux fois au premier écran."
+      >
+        {r.startedSessions === 0 ? (
+          <Card className="p-6 text-sm leading-relaxed text-sc-text-muted">
+            <strong className="text-sc-text-secondary">Pas encore de données.</strong> Ces chiffres
+            viennent de l&apos;app elle-même : ils apparaissent dès que les gens utilisent une version
+            de l&apos;app qui envoie les écrans de l&apos;onboarding (prochain build publié). En attendant,
+            la partie « étapes » plus bas se base sur les comptes déjà créés.
+            {r.anonymousSessions > 0 ? (
+              <>
+                {" "}
+                Indice : <strong>{fmtInt(r.anonymousSessions)}</strong> sessions ont été ouvertes sans
+                compte connecté sur la période.
+              </>
+            ) : null}
+          </Card>
+        ) : (
+          <>
+            <GridTable
+              cols="minmax(0,1.3fr) minmax(0,1.6fr) 80px 80px 110px"
+              head={[
+                { label: "Écran" },
+                { label: "Sessions arrivées" },
+                { label: "Nombre", right: true },
+                { label: "Part", right: true },
+                { label: "Arrêtés ici", right: true },
+              ]}
+            >
+              {r.stops.map((st) => (
+                <GridRow
+                  key={st.label}
+                  cols="minmax(0,1.3fr) minmax(0,1.6fr) 80px 80px 110px"
+                >
+                  <span className="font-semibold">{st.label}</span>
+                  <span className="sc-track">
+                    <i style={{ width: `${Math.round(st.pct * 100)}%` }} />
+                  </span>
+                  <span className="sc-nums text-right font-extrabold">{fmtInt(st.count)}</span>
+                  <span className="sc-nums text-right text-sc-text-muted">{fmtPct(st.pct)}</span>
+                  <span className="flex justify-end">
+                    {st.lost > 0 ? (
+                      <span className="sc-nums rounded-full bg-sc-lemon px-3 py-1 text-sm font-bold">
+                        −{fmtInt(st.lost)}
+                      </span>
+                    ) : (
+                      <span className="text-sc-text-muted">—</span>
+                    )}
+                  </span>
+                </GridRow>
+              ))}
+              <GridRow cols="minmax(0,1.3fr) minmax(0,1.6fr) 80px 80px 110px">
+                <span className="font-extrabold">Onboarding terminé</span>
+                <span className="sc-track">
+                  <i style={{ width: `${Math.round((r.startedSessions > 0 ? r.doneSessions / r.startedSessions : 0) * 100)}%` }} />
+                </span>
+                <span className="sc-nums text-right font-extrabold">{fmtInt(r.doneSessions)}</span>
+                <span className="sc-nums text-right text-sc-text-muted">
+                  {fmtPct(r.startedSessions > 0 ? r.doneSessions / r.startedSessions : 0)}
+                </span>
+                <span />
+              </GridRow>
+            </GridTable>
+            <p className="mt-3 text-[13px] leading-relaxed text-sc-text-muted">
+              {fmtInt(r.photoSkipped)} session{r.photoSkipped > 1 ? "s ont" : " a"} choisi « Passer »
+              à l&apos;étape photo. Ces chiffres ne comptent que les gens qui ont une version de l&apos;app
+              avec le suivi : ils sont donc plus bas que les comptes créés tant que tout le monde n&apos;a
+              pas mis à jour.
+            </p>
+          </>
+        )}
+      </Section>
+
+      <Section
+        title="Les comptes créés"
         hint="Part des comptes créés qui ont renseigné chaque information. « Terminé » = prénom, langue, genre et catégorie (le genre et la catégorie ne sont écrits que par l'onboarding ; un prénom peut être pré-rempli par Google ou Apple)."
       >
         <Bars steps={r.funnel} lastStrong />
-        <p className="mt-3 text-[13px] leading-relaxed text-sc-text-muted">
-          <strong className="text-sc-text-secondary">Limite :</strong> l&apos;onboarding se fait avant la
-          connexion, et le profil n&apos;est enregistré qu&apos;à la fin. Quelqu&apos;un qui quitte avant de
-          se connecter n&apos;apparaît donc pas ici. Indice : <strong>{fmtInt(r.anonymousSessions)}</strong>{" "}
-          sessions de l&apos;app ont été ouvertes sans compte connecté sur la période (installations
-          neuves et ouvertures sans connexion). Pour voir à quel écran les gens partent, il faut
-          ajouter des événements dans l&apos;app (prochain build).
-        </p>
       </Section>
 
       <Section

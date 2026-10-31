@@ -48,10 +48,38 @@ export type RecentSignup = {
   returned: boolean;
 };
 
+/** Une étape de l'assistant, vue côté app (événements onboarding_step). */
+export type StopStep = {
+  label: string;
+  /** Sessions qui ont affiché cet écran. */
+  count: number;
+  /** Part de ceux qui sont arrivés sur le premier écran. */
+  pct: number;
+  /** Sessions arrêtées ici : vues de cet écran moins celles de l'écran suivant. */
+  lost: number;
+};
+
+/** Écrans de l'assistant, dans l'ordre où ils s'affichent. */
+const STOP_STEPS: { key: string; label: string }[] = [
+  { key: "welcome", label: "Bienvenue (prénom)" },
+  { key: "language", label: "Langue" },
+  { key: "location", label: "Pays" },
+  { key: "gender", label: "Genre" },
+  { key: "persona", label: "Catégorie" },
+  { key: "photo", label: "Photo" },
+  { key: "verification", label: "Vérification" },
+];
+
 export type OnboardingReport = {
   days: number;
   created: number;
   completed: number;
+  /** Sessions ayant ouvert le premier écran (0 = pas encore de données de l'app). */
+  startedSessions: number;
+  stops: StopStep[];
+  /** Sessions allées jusqu'au bout de l'assistant (onboarding_done). */
+  doneSessions: number;
+  photoSkipped: number;
   /** Sessions app_open sans utilisateur connecté (avant ou sans inscription). */
   anonymousSessions: number;
   funnel: FunnelStep[];
@@ -65,7 +93,7 @@ const pct = (n: number, d: number): number => (d > 0 ? n / d : 0);
 export async function getOnboardingReport(days = 30): Promise<OnboardingReport> {
   const since = sinceISO(days);
 
-  const [profiles, aiRows, friendships, messages, events, anon] = await Promise.all([
+  const [profiles, aiRows, friendships, messages, events, anon, wizard] = await Promise.all([
     rows(
       "profiles",
       "id, created_at, display_name, handle, language, gender, persona_category, country, city, discover_photo_url, photos, avatar_url, is_pro, subscription_tier",
@@ -87,7 +115,48 @@ export async function getOnboardingReport(days = 30): Promise<OnboardingReport> 
     rows("analytics_events", "session_id", (q) =>
       q.eq("event", "app_open").is("user_id", null).gte("created_at", since).limit(100000),
     ),
+    // Événements de l'assistant (app ≥ build qui les envoie), invités compris.
+    rows("analytics_events", "event, session_id, props", (q) =>
+      q
+        .in("event", ["onboarding_step", "onboarding_done", "onboarding_photo_skipped"])
+        .gte("created_at", since)
+        .limit(100000),
+    ),
   ]);
+
+  // Sessions distinctes par écran de l'assistant.
+  const bySession = new Map<string, Set<string>>();
+  const doneSet = new Set<string>();
+  const skipSet = new Set<string>();
+  for (const e of wizard) {
+    const sid = s(e.session_id);
+    if (!sid) continue;
+    const ev = s(e.event);
+    if (ev === "onboarding_done") doneSet.add(sid);
+    else if (ev === "onboarding_photo_skipped") skipSet.add(sid);
+    else {
+      const step = s(((e.props ?? {}) as Record<string, unknown>).step);
+      if (!step) continue;
+      if (!bySession.has(step)) bySession.set(step, new Set());
+      bySession.get(step)!.add(sid);
+    }
+  }
+  const startedSessions = bySession.get("welcome")?.size ?? 0;
+  // Écrans réellement vus au moins une fois (location/genre/… peuvent être
+  // sautés quand la réponse est déjà connue) : on compare chaque écran au
+  // suivant ÉCRAN VU, pas au suivant théorique.
+  const seen = STOP_STEPS.filter((st) => (bySession.get(st.key)?.size ?? 0) > 0);
+  const stops: StopStep[] = seen.map((st, i) => {
+    const count = bySession.get(st.key)!.size;
+    const nextCount =
+      i + 1 < seen.length ? bySession.get(seen[i + 1].key)!.size : doneSet.size;
+    return {
+      label: st.label,
+      count,
+      pct: pct(count, startedSessions),
+      lost: Math.max(0, count - nextCount),
+    };
+  });
 
   // Profils de test exclus.
   const people = profiles.filter((p) => !s(p.handle).startsWith("seed_"));
@@ -223,5 +292,17 @@ export async function getOnboardingReport(days = 30): Promise<OnboardingReport> 
 
   const anonymousSessions = new Set(anon.map((r) => s(r.session_id)).filter(Boolean)).size;
 
-  return { days, created, completed, anonymousSessions, funnel, after, recent };
+  return {
+    days,
+    created,
+    completed,
+    startedSessions,
+    stops,
+    doneSessions: doneSet.size,
+    photoSkipped: skipSet.size,
+    anonymousSessions,
+    funnel,
+    after,
+    recent,
+  };
 }

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../swayco/asr/asr_service.dart';
+import '../services/analytics.dart';
 import '../services/app_strings.dart';
 import '../services/swayco_sounds.dart';
 import '../services/attribution.dart';
@@ -119,6 +120,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   int _page = 0;
 
+  /// Steps already reported to the admin dashboard, so going back and forth
+  /// never counts a step twice in one session.
+  final Set<String> _trackedSteps = {};
+
+  /// Reports that a step of the first-run wizard was shown, so the admin can
+  /// see where people stop. Nothing personal: just the step's name. The
+  /// "edit profile" reuse of this screen is not onboarding and is not counted.
+  void _trackStep(String step) {
+    if (widget.editing || !_trackedSteps.add(step)) return;
+    Analytics.track('onboarding_step', props: {'step': step});
+  }
+
   /// Total pages shown in the first-run wizard:
   ///   Welcome(0) · Language(1) · [Location] · [Gender] · [PersonaCategory]
   ///   · [Photo] · [Verification]
@@ -221,6 +234,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         _verificationAlreadySent = verificationSent;
         _prefillDone = true;
       });
+      _trackStep('welcome');
     }
     if (!widget.editing || !isSupabaseReady) return;
     try {
@@ -430,6 +444,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     // The "activated user" signal — the account is only really usable from
     // here, so this is what a paid campaign should optimise against.
     Attribution.logOnboardingCompleted();
+    if (!widget.editing) Analytics.track('onboarding_done');
     if (!mounted) return;
     widget.onCompleted();
   }
@@ -487,6 +502,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     if (choice == true) {
       await _pickPhoto();
     } else if (choice == false) {
+      if (!widget.editing) Analytics.track('onboarding_photo_skipped');
       await _finish();
     }
   }
@@ -686,11 +702,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     // vérification n'est pas passée.
     final stepAfterPersona = showPhotoStep || showVerificationStep;
 
+    // Same order as [pages] below, for the admin's "where do they stop" funnel.
+    final stepNames = <String>[
+      'welcome',
+      'language',
+      if (showLocationStep) 'location',
+      if (showGenderStep) 'gender',
+      if (showPersonaStep) 'persona',
+      if (showPhotoStep) 'photo',
+      if (showVerificationStep) 'verification',
+    ];
+
     return SwayOnbShell(
       page: _page,
       pageCount: _pageCount,
       controller: _pageController,
-      onPageChanged: (i) => setState(() => _page = i),
+      onPageChanged: (i) {
+        setState(() => _page = i);
+        if (i >= 0 && i < stepNames.length) _trackStep(stepNames[i]);
+      },
       pages: [
         SwayStepWelcome(
           nameCtrl: _nameCtrl,
