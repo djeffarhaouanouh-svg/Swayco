@@ -146,10 +146,21 @@ async function getProfile(sb, id) {
 // réponse, ni acceptation automatique, ni like d'accueil. Liste relue au plus
 // toutes les 30 s ; table absente ou erreur = personne n'est protégé (comme avant).
 const PROTECTED_TTL_MS = 30_000;
+// Domaines entiers protégés, sans avoir à lister chaque adresse : relais Apple
+// (testeurs et relecteurs « Se connecter avec Apple », une adresse masquée
+// différente à chaque fois) et comptes de test.
+const PROTECTED_EMAIL_DOMAINS = ['privaterelay.appleid.com', 'swayco.test', 'test.fr'];
 let protectedCache = { at: 0, ids: new Set() };
 async function protectedIds(sb) {
   if (Date.now() - protectedCache.at < PROTECTED_TTL_MS) return protectedCache.ids;
   const ids = new Set();
+  try {
+    for (const domain of PROTECTED_EMAIL_DOMAINS) {
+      const { data: ps } = await sb.from('profiles').select('id')
+        .ilike('email', `%@${domain.replace(/[\\%_]/g, (c) => `\\${c}`)}`).limit(2000);
+      for (const p of ps || []) ids.add(p.id);
+    }
+  } catch { /* erreur de lecture : on retombe sur la liste d'emails seule */ }
   try {
     const { data: rows, error } = await sb.from('ai_exempt_emails').select('email').limit(500);
     if (!error) {
