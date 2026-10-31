@@ -133,7 +133,7 @@ const containsCliche = (text, userText = '') =>
 // ── Acces donnees ────────────────────────────────────────────────────────────
 
 const PROFILE_COLS =
-  'id, display_name, language, country, city, gender, age, job, bio, interests, is_ai, created_at, discover_photo_url';
+  'id, display_name, language, country, city, gender, age, job, bio, interests, is_ai, created_at, discover_photo_url, photos, avatar_url';
 
 async function getProfile(sb, id) {
   if (!UUID.test(String(id))) return null;
@@ -941,7 +941,13 @@ const LATAM = new Set(['Mexique', 'Argentine', 'Colombie', 'Brésil']);
 const ASIA = new Set(['Japon', 'Corée du Sud', 'Philippines', 'Inde', 'Chine']);
 
 const continentOf = (country) => (LATAM.has(country) ? 'latam' : ASIA.has(country) ? 'asia' : '');
-const hasPhoto = (p) => String((p && p.discover_photo_url) || '').trim() !== '';
+// Une photo, n'importe laquelle : celle de Discover, la galerie ou l'avatar.
+const hasPhoto = (p) => {
+  if (!p) return false;
+  const gallery = Array.isArray(p.photos) ? p.photos : [];
+  return [p.discover_photo_url, p.avatar_url, ...gallery]
+    .some((u) => String(u || '').trim() !== '');
+};
 
 /** Quand la photo a été postée : l'horodatage (ms) dans le nom du fichier, sinon l'inscription. */
 function photoPostedAt(p) {
@@ -1011,7 +1017,7 @@ async function cancelWelcomeForPhotoless(sb) {
     .eq('status', 'pending').eq('kind', 'like').eq('source', 'auto').is('ref', null).limit(300);
   if (!pending || pending.length === 0) return 0;
   const ids = [...new Set(pending.map((a) => a.target_id))];
-  const { data: profs } = await sb.from('profiles').select('id, discover_photo_url').in('id', ids);
+  const { data: profs } = await sb.from('profiles').select('id, discover_photo_url, photos, avatar_url').in('id', ids);
   const withPhoto = new Set((profs || []).filter(hasPhoto).map((p) => p.id));
   let n = 0;
   for (const a of pending) {
@@ -1030,9 +1036,9 @@ async function autoWelcome(ctx) {
   await cancelWelcomeForPhotoless(sb);
 
   const now = Date.now();
-  const { data: users } = await sb.from('profiles').select(`${PROFILE_COLS}, photos, updated_at`)
+  const { data: users } = await sb.from('profiles').select(`${PROFILE_COLS}, updated_at`)
     .eq('is_ai', false)
-    .not('discover_photo_url', 'is', null).neq('discover_photo_url', '')
+    .or('discover_photo_url.neq.,avatar_url.neq.')
     .gte('updated_at', new Date(now - (WELCOME_DAYS + 1) * DAY).toISOString())
     .order('updated_at', { ascending: false }).limit(300);
   if (!users || users.length === 0) return 0;
