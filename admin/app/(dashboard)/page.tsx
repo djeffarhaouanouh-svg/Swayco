@@ -9,7 +9,7 @@ import {
   getOverview,
 } from "@/lib/metrics";
 import { countryName, fmtInt, languageName } from "@/lib/format";
-import { buildWorldMap } from "@/lib/geo";
+import { buildGlobe } from "@/lib/globe";
 import { PageHero } from "@/components/page-hero";
 import { KpiStrip } from "@/components/kpi-card";
 import { Section } from "@/components/section";
@@ -17,7 +17,7 @@ import { SeriesChart } from "@/components/charts/series";
 import { RankTabs } from "@/components/rank-tabs";
 import { Card } from "@/components/ui/card";
 import { Flag } from "@/components/flag";
-import { WorldMap } from "@/components/world-map";
+import { Globe } from "@/components/globe";
 
 // Page de référence : toutes les autres pages suivent le même patron
 // (PageHero → Sections), voir INSTRUCTIONS.md. Les requêtes sont inchangées.
@@ -33,7 +33,7 @@ export default async function OverviewPage() {
     ]);
 
   const { live } = overview;
-  const worldMap = buildWorldMap(countries);
+  const globe = buildGlobe(countries);
 
   return (
     <>
@@ -102,11 +102,11 @@ export default async function OverviewPage() {
 
       <Section
         title="Où sont-ils"
-        hint="Pays sur 30 jours — un point par pays actif, taille proportionnelle au nombre de personnes."
+        hint="Pays sur 30 jours — un point par pays actif, taille proportionnelle au nombre de personnes. Glisse le globe pour le faire tourner."
       >
         <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-          <Card className="p-4">
-            <WorldMap {...worldMap} labels={3} />
+          <Card className="relative overflow-hidden p-0">
+            <Globe {...globe} labels={3} />
           </Card>
           <RankTabs
             countries={countries.slice(0, 8).map((c) => ({

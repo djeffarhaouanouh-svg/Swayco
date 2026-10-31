@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { getLiveSnapshot } from "@/lib/metrics";
 import { countryName, fmtDuration, fmtInt, languageName } from "@/lib/format";
-import { buildWorldMap } from "@/lib/geo";
+import { buildGlobe } from "@/lib/globe";
 import { PageHero } from "@/components/page-hero";
 import { Section } from "@/components/section";
 import { RankBars } from "@/components/rank-bars";
@@ -9,15 +9,16 @@ import { Card } from "@/components/ui/card";
 import { Flag } from "@/components/flag";
 import { PingDot } from "@/components/ui/chip";
 import { GridTable, GridRow, GridEmpty } from "@/components/ui/grid-table";
-import { WorldMap } from "@/components/world-map";
+import { Globe } from "@/components/globe";
 import { AutoRefresh } from "@/components/auto-refresh";
 
 const CALL_COLS = "minmax(0,1.1fr) minmax(0,1.2fr) minmax(0,1fr) 120px";
 
 export default async function LivePage() {
   const live = await getLiveSnapshot();
-  const worldMap = buildWorldMap(
+  const globe = buildGlobe(
     live.countries.map((c) => ({ code: c.label, users: c.value })),
+    "FR", // point de départ des arcs
   );
 
   return (
@@ -106,9 +107,9 @@ export default async function LivePage() {
         hint="Comptés sur les appels en cours ci-dessus."
       >
         <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-          <Card className="relative p-4">
-            <WorldMap {...worldMap} pulse labels={4} />
-            <span className="absolute bottom-3.5 left-4 flex items-center gap-2 rounded-full bg-sc-text px-3.5 py-[7px] text-[12.5px] font-bold text-white">
+          <Card className="relative overflow-hidden p-0">
+            <Globe {...globe} pulse arcs labels={4} />
+            <span className="absolute top-4 left-4 flex items-center gap-2 rounded-full bg-sc-text px-3.5 py-[7px] text-[12.5px] font-bold text-white">
               <PingDot />
               {fmtInt(live.liveCalls)} appels · {fmtInt(live.countries.length)} pays
             </span>
