@@ -2592,6 +2592,8 @@ if (hasLegalSite) {
     // to Apple (https://www.swayco.fr/support) is self-explanatory.
     '/support': 'help.html',
     '/child-safety': 'child-safety.html',
+    // Google Play Data safety form requires a public account-deletion URL.
+    '/delete-account': 'delete-account.html',
   };
   for (const [route, file] of Object.entries(legalRoutes)) {
     app.get(route, (_req, res) =>
@@ -2663,7 +2665,8 @@ if (hasWebUi) {
       p === '/privacy' ||
       p === '/help' ||
       p === '/support' ||
-      p === '/child-safety'
+      p === '/child-safety' ||
+      p === '/delete-account'
     ) {
       return next();
     }
