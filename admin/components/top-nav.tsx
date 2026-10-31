@@ -15,6 +15,7 @@ import {
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
+// Mêmes 7 entrées, même ordre, mêmes routes que l'ancienne Sidebar.
 const NAV = [
   { href: "/", label: "Vue d'ensemble", icon: LayoutDashboard },
   { href: "/tableau", label: "Tableau global", icon: Table2 },
@@ -25,7 +26,7 @@ const NAV = [
   { href: "/verifications", label: "Vérifications", icon: BadgeCheck },
 ];
 
-export function Sidebar({ adminEmail }: { adminEmail: string }) {
+export function TopNav({ adminEmail }: { adminEmail: string }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -36,17 +37,15 @@ export function Sidebar({ adminEmail }: { adminEmail: string }) {
   }
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-white/10 bg-white/[0.03] backdrop-blur-xl">
-      <div className="px-5 py-6">
-        <div className="font-display text-xl font-bold tracking-tight text-sc-text">
-          swaycø
-        </div>
-        <div className="mt-0.5 text-xs text-sc-text-muted">
-          Tableau de bord admin
-        </div>
-      </div>
+    <header className="sticky top-0 z-30 flex h-[76px] items-center gap-7 border-b border-sc-line bg-white px-8">
+      <Link
+        href="/"
+        className="font-logo text-[30px] font-bold tracking-[-0.01em] text-sc-text"
+      >
+        swayc<span className="text-sc-accent">ø</span>
+      </Link>
 
-      <nav className="flex-1 space-y-1 px-3">
+      <nav className="flex flex-1 gap-1 overflow-x-auto">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active =
             href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -55,31 +54,34 @@ export function Sidebar({ adminEmail }: { adminEmail: string }) {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors",
+                "flex items-center gap-2 rounded-full py-2.5 text-sm whitespace-nowrap transition-colors",
                 active
-                  ? "bg-sc-accent/12 text-sc-accent"
-                  : "text-sc-text-secondary hover:bg-white/5 hover:text-sc-text",
+                  ? "bg-sc-text px-4 font-bold text-white"
+                  : "px-3.5 font-semibold text-sc-text-secondary hover:bg-sc-text/5",
               )}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-[19px] w-[19px]" />
               {label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t border-white/10 p-3">
-        <div className="truncate px-2 pb-2 text-xs text-sc-text-muted">
+      <div className="flex items-center gap-3">
+        <span className="hidden text-[13px] text-sc-text-muted xl:inline">
           {adminEmail}
-        </div>
+        </span>
+        <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-gradient-to-br from-sc-accent to-sc-cyan text-sm font-extrabold text-white">
+          {(adminEmail[0] ?? "A").toUpperCase()}
+        </span>
         <button
           onClick={signOut}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-sc-text-secondary transition-colors hover:bg-white/5 hover:text-sc-text"
+          aria-label="Déconnexion"
+          className="cursor-pointer text-sc-text-secondary transition-colors hover:text-sc-text"
         >
-          <LogOut className="h-4 w-4" />
-          Déconnexion
+          <LogOut className="h-[22px] w-[22px]" />
         </button>
       </div>
-    </aside>
+    </header>
   );
 }

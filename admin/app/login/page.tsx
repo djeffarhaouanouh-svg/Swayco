@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CircleAlert } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 /**
@@ -53,44 +54,44 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
+    <div className="sc-login-bg flex min-h-screen items-center justify-center px-6">
       <form
         onSubmit={onSubmit}
-        className="sc-glass w-full max-w-sm rounded-2xl p-7"
+        className="w-full max-w-[400px] rounded-[28px] border border-sc-line bg-white p-9 shadow-[0_30px_60px_-30px_rgba(4,18,58,.35)]"
       >
-        <div className="font-display text-2xl font-bold tracking-tight text-sc-text">
-          swaycø
+        <div className="font-logo text-4xl font-bold tracking-[-0.01em]">
+          swayc<span className="text-sc-accent">ø</span>
         </div>
         <p className="mt-1 mb-6 text-sm text-sc-text-muted">
           Tableau de bord admin
         </p>
 
-        <label className="block text-xs font-semibold text-sc-text-secondary">
-          E-mail
-          <input
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-white/10 bg-sc-menu px-3 py-2.5 text-sm font-normal text-sc-text outline-none transition-colors focus:border-sc-accent"
-          />
-        </label>
+        <label className="sc-label">E-mail</label>
+        <input
+          type="email"
+          required
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="sc-field"
+        />
 
-        <label className="mt-4 block text-xs font-semibold text-sc-text-secondary">
-          Mot de passe
-          <input
-            type="password"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-white/10 bg-sc-menu px-3 py-2.5 text-sm font-normal text-sc-text outline-none transition-colors focus:border-sc-accent"
-          />
-        </label>
+        <label className="sc-label mt-4">Mot de passe</label>
+        <input
+          type="password"
+          required
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="sc-field"
+        />
 
         {error ? (
-          <p className="mt-4 text-sm text-red-400" role="alert">
+          <p
+            className="mt-4 flex items-center gap-1.5 text-sm font-bold text-sc-danger"
+            role="alert"
+          >
+            <CircleAlert className="h-[18px] w-[18px]" />
             {error}
           </p>
         ) : null}
@@ -98,7 +99,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={busy}
-          className="mt-6 w-full rounded-xl bg-sc-accent py-3 text-sm font-bold text-sc-bg-deep transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="sc-btn sc-btn-primary mt-6 h-[50px] w-full justify-center text-[15px]"
         >
           {busy ? "Connexion…" : "Se connecter"}
         </button>

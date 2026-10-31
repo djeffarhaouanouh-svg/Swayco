@@ -1,15 +1,15 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-import { Sidebar } from "@/components/sidebar";
+import { TopNav } from "@/components/top-nav";
 
 // Every dashboard page reads live data — never statically cache them.
 export const dynamic = "force-dynamic";
 
 /**
  * Access gate for the whole dashboard: must be signed in AND flagged
- * `profiles.is_admin`. This server-side check is the real boundary —
- * the proxy only refreshes the session (see proxy.ts).
+ * `profiles.is_admin`. Logique d'accès INCHANGÉE — seule la coque change :
+ * la barre latérale (Sidebar) devient une barre haute (TopNav).
  */
 export default async function DashboardLayout({
   children,
@@ -37,10 +37,12 @@ export default async function DashboardLayout({
   if (!isAdmin) redirect("/login");
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar adminEmail={user.email ?? ""} />
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-6xl px-8 py-8">{children}</div>
+    <div className="min-h-screen">
+      <TopNav adminEmail={user.email ?? ""} />
+      {/* flex-col + gap : l'espacement entre le bandeau et les sections
+          vient d'ici, les <Section> n'ont plus de marge basse. */}
+      <main className="mx-auto flex max-w-[1440px] flex-col gap-9 px-8 pt-7 pb-14">
+        {children}
       </main>
     </div>
   );

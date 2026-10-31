@@ -1,18 +1,37 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, DM_Sans } from "next/font/google";
+import {
+  Didact_Gothic,
+  IBM_Plex_Mono,
+  Plus_Jakarta_Sans,
+  Unbounded,
+} from "next/font/google";
 import "./globals.css";
 
-// The app's two faces (lib/theme/swayco_theme.dart → SCText):
-// Bricolage Grotesque for headings, DM Sans for everything else.
-const bricolage = Bricolage_Grotesque({
+// Polices de l'admin (direction 1c) :
+// Unbounded = titres et gros chiffres, Plus Jakarta Sans = tout le reste,
+// Didact Gothic = logo « swaycø », IBM Plex Mono = identifiants / sens de langue.
+const unbounded = Unbounded({
   subsets: ["latin"],
-  variable: "--font-bricolage",
+  weight: ["600", "700"],
+  variable: "--font-unbounded",
   display: "swap",
 });
-
-const dmSans = DM_Sans({
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  variable: "--font-dm-sans",
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-jakarta",
+  display: "swap",
+});
+const didact = Didact_Gothic({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-didact",
+  display: "swap",
+});
+const plex = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["500"],
+  variable: "--font-plex",
   display: "swap",
 });
 
@@ -27,9 +46,10 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${bricolage.variable} ${dmSans.variable} h-full`}
+      className={`${unbounded.variable} ${jakarta.variable} ${didact.variable} ${plex.variable} h-full`}
     >
-      <body className="sc-mesh min-h-full">{children}</body>
+      {/* La classe sc-mesh (fond sombre à halos) n'existe plus. */}
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

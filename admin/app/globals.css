@@ -1,56 +1,42 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Swayco "Midnight" — the exact palette the app ships (single source of
-   truth: lib/theme/swayco_theme.dart, class SC). Keep these values in
-   sync with it; never invent a neighbouring shade.
+   Admin Swayco — direction « 1c clair ».
+   Remplace TOUT l'ancien fichier (palette Midnight sombre).
+   Les noms sc-* sont conservés quand le rôle est le même (sc-text, sc-accent…)
+   pour que les composants non réécrits ne cassent pas ; les valeurs changent.
    ───────────────────────────────────────────────────────────────────── */
 @theme {
-  /* Backgrounds */
-  --color-sc-bg: #0e0e0e;
-  --color-sc-bg-deep: #050817;
+  /* Fonds */
+  --color-sc-bg: #f4f6fb;
+  --color-sc-surface: #ffffff;
 
-  /* Mesh halo colors (MeshBackground in the app) */
-  --color-sc-mesh-blue: #3b82f6;
-  --color-sc-mesh-violet: #7c3aed;
-  --color-sc-mesh-cyan: #06b6d4;
-  --color-sc-mesh-navy: #1e40af;
+  /* Texte (encre bleu nuit) */
+  --color-sc-text: #04123a;
+  --color-sc-text-secondary: #4a5478;
+  --color-sc-text-muted: #5a6382;
 
-  /* Accent */
-  --color-sc-accent: #22d3ee;
-  --color-sc-accent-deep: #0891b2;
+  /* Marque */
+  --color-sc-accent: #1f5eff;
+  --color-sc-accent-deep: #1a44d8;
+  --color-sc-accent-soft: #2b86f5;
+  --color-sc-cyan: #18ddea;
+  --color-sc-lemon: #f4ff1f;
+  --color-sc-danger: #c62828;
 
-  /* Presence */
-  --color-sc-online: #4ade80;
-  --color-sc-online-deep: #22c55e;
+  /* Alias de l'ancien « vert présence » : plus de vert dans l'admin */
+  --color-sc-online: #18ddea;
 
-  /* Text. The app writes these ARGB (0xB3F5F7FF); CSS is RRGGBBAA, so the
-     alpha byte moves to the end — same colour, different byte order. */
-  --color-sc-text: #f5f7ff;
-  --color-sc-text-secondary: #f5f7ffb3;
-  --color-sc-text-muted: #f5f7ff80;
+  /* Traits */
+  --color-sc-line: rgba(4, 18, 58, 0.08);
+  --color-sc-line-strong: rgba(4, 18, 58, 0.14);
 
-  /* Surfaces */
-  --color-sc-menu: #2b2b2b;
-  --color-sc-bubble: #1a2138;
-
-  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-unbounded), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-logo: var(--font-didact), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex), ui-monospace, monospace;
 }
 
-/* Semantic aliases used by the components. Defined on bare :root so a
-   value never lives only inside a conditional block. */
-:root {
-  --sc-glass: rgba(255, 255, 255, 0.06);
-  --sc-glass-strong: rgba(255, 255, 255, 0.10);
-  --sc-border: rgba(255, 255, 255, 0.10);
-  --sc-border-strong: rgba(255, 255, 255, 0.20);
-  --sc-text-2: rgba(245, 247, 255, 0.70);
-  --sc-text-3: rgba(245, 247, 255, 0.50);
-}
-
-/* The admin is dark-only, exactly like the app — there is no light
-   Swayco. Paint the ground explicitly rather than inheriting it. */
 html,
 body {
   background-color: var(--color-sc-bg);
@@ -59,64 +45,225 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* The app's mesh halo, flattened into a fixed backdrop: four soft radial
-   bleeds over the near-black ground. `fixed` so it never scrolls away. */
-.sc-mesh::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(
-      60rem 40rem at 10% -10%,
-      color-mix(in oklab, var(--color-sc-mesh-navy) 26%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      50rem 34rem at 85% 0%,
-      color-mix(in oklab, var(--color-sc-mesh-violet) 18%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      44rem 30rem at 95% 85%,
-      color-mix(in oklab, var(--color-sc-mesh-cyan) 14%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      40rem 28rem at 0% 95%,
-      color-mix(in oklab, var(--color-sc-mesh-blue) 12%, transparent),
-      transparent 70%
-    );
-}
-
-/* Glass surface — the app's card/panel treatment. */
-.sc-glass {
-  background-color: var(--sc-glass);
-  border: 1px solid var(--sc-border);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-}
-
-/* Headings ride the display face, like SCText.h1/h2/h3 in the app. */
+/* h1 / h2 : Unbounded. h3 (titres de cartes) : Plus Jakarta Sans. */
 h1,
-h2,
-h3 {
+h2 {
   font-family: var(--font-display);
   letter-spacing: -0.02em;
 }
+h3 {
+  font-family: var(--font-sans);
+}
 
-/* Tabular figures everywhere numbers are compared column-to-column. */
 .sc-nums {
   font-variant-numeric: tabular-nums;
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--color-sc-accent) 35%, transparent);
+  background: color-mix(in oklab, var(--color-sc-accent) 28%, transparent);
 }
 
-/* Scrollbars, so the dark page doesn't get a bright native gutter. */
 * {
-  scrollbar-color: var(--sc-border-strong) transparent;
+  scrollbar-color: var(--color-sc-line-strong) transparent;
   scrollbar-width: thin;
+}
+
+/* ── Carte blanche ─────────────────────────────────────────────────────── */
+.sc-card {
+  background: #fff;
+  border: 1px solid var(--color-sc-line);
+  border-radius: 22px;
+  box-shadow:
+    0 1px 2px rgba(4, 18, 58, 0.04),
+    0 10px 24px -14px rgba(4, 18, 58, 0.14);
+}
+
+/* ── Bandeau bleu de page (titre + chiffres clés) ─────────────────────── */
+.sc-hero {
+  border-radius: 32px;
+  padding: 34px 40px 36px;
+  color: #fff;
+  background:
+    radial-gradient(640px 320px at 100% 0%, rgba(24, 221, 234, 0.55), transparent 70%),
+    linear-gradient(120deg, #1a44d8 0%, #1f5eff 50%, #2b86f5 100%);
+  box-shadow: 0 24px 48px -24px rgba(31, 94, 255, 0.6);
+}
+.sc-hero-kpi {
+  border-radius: 22px;
+  padding: 20px 22px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+/* Le chiffre à mettre en avant : jaune plein, sans verre */
+.sc-hero-kpi[data-lemon] {
+  background: #f4ff1f;
+  border-color: transparent;
+  color: #04123a;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.sc-hero-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  padding: 11px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* ── Boutons ───────────────────────────────────────────────────────────── */
+.sc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 24px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.sc-btn:hover {
+  opacity: 0.9;
+}
+.sc-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.sc-btn-primary {
+  color: #fff;
+  background: linear-gradient(120deg, #1a44d8, #1f5eff 55%, #2b86f5);
+  box-shadow: 0 10px 20px -10px rgba(31, 94, 255, 0.7);
+}
+.sc-btn-outline {
+  padding: 0 20px;
+  font-weight: 700;
+  color: #04123a;
+  background: #fff;
+  border: 1.5px solid rgba(4, 18, 58, 0.16);
+}
+.sc-btn-danger {
+  padding: 0 20px;
+  font-weight: 700;
+  color: #c62828;
+  background: rgba(209, 43, 43, 0.08);
+}
+
+/* ── Champs de formulaire ─────────────────────────────────────────────── */
+.sc-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #4a5478;
+}
+.sc-field {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(4, 18, 58, 0.14);
+  background: #fff;
+  color: #04123a;
+  font-size: 14.5px;
+  outline: none;
+}
+.sc-field::placeholder {
+  color: #8b93ae;
+}
+.sc-field:focus {
+  border-color: #1f5eff;
+  box-shadow: 0 0 0 4px rgba(31, 94, 255, 0.14);
+}
+textarea.sc-field {
+  height: auto;
+  min-height: 92px;
+  padding: 12px 14px;
+  line-height: 1.5;
+}
+
+/* ── Pastilles de statut ──────────────────────────────────────────────── */
+.sc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.sc-chip-blue {
+  background: rgba(31, 94, 255, 0.1);
+  color: #1f5eff;
+}
+.sc-chip-lemon {
+  background: #f4ff1f;
+  color: #04123a;
+}
+.sc-chip-cyan {
+  background: rgba(24, 221, 234, 0.2);
+  color: #0a6e78;
+}
+.sc-chip-red {
+  background: rgba(209, 43, 43, 0.1);
+  color: #c62828;
+}
+.sc-chip-grey {
+  background: rgba(4, 18, 58, 0.07);
+  color: #4a5478;
+}
+
+/* ── Divers ───────────────────────────────────────────────────────────── */
+/* Zone vide / image absente */
+.sc-stripe {
+  background:
+    repeating-linear-gradient(135deg, rgba(31, 94, 255, 0.08) 0 12px, rgba(31, 94, 255, 0.03) 12px 24px),
+    #fff;
+}
+/* Barre de classement */
+.sc-track {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(31, 94, 255, 0.09);
+  overflow: hidden;
+}
+.sc-track > i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #1f5eff, #18ddea);
+}
+@keyframes sc-ping {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+.sc-ping {
+  animation: sc-ping 2s ease-out infinite;
+}
+/* Fond de la page de connexion */
+.sc-login-bg {
+  background:
+    radial-gradient(520px 380px at 100% 0%, rgba(24, 221, 234, 0.38), transparent 70%),
+    radial-gradient(520px 420px at 0% 100%, rgba(31, 94, 255, 0.24), transparent 70%),
+    #f4f6fb;
 }

@@ -1,6 +1,10 @@
+import { Check } from "lucide-react";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-import { KpiCard, KpiGrid } from "@/components/kpi-card";
-import { PageHeader, Section } from "@/components/section";
+import { PageHero } from "@/components/page-hero";
+import { Section } from "@/components/section";
+import { Card } from "@/components/ui/card";
+import { Chip, type ChipTone } from "@/components/ui/chip";
+import { GridTable, GridRow, GridEmpty } from "@/components/ui/grid-table";
 import { AgentsForm } from "./agents-form";
 import {
   addCallDebugUser,
@@ -33,6 +37,21 @@ const STATUS: Record<string, string> = {
   failed: "échec",
   skipped: "ignoré",
 };
+const STATUS_TONE: Record<string, ChipTone> = {
+  done: "blue",
+  pending: "lemon",
+  running: "cyan",
+  failed: "red",
+  skipped: "grey",
+};
+
+const ERROR_BOX =
+  "rounded-2xl bg-[rgba(209,43,43,.08)] px-4 py-3 text-sm font-semibold text-sc-danger";
+
+const PHRASE_COLS =
+  "150px 120px 70px minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr)";
+const LOG_COLS =
+  "150px 100px minmax(0,1fr) minmax(0,1fr) 90px minmax(0,1.2fr)";
 
 export default async function AgentsPage() {
   const svc = createSupabaseServiceClient();
@@ -133,117 +152,121 @@ export default async function AgentsPage() {
 
   return (
     <>
-      <PageHeader
+      <PageHero
         title="Comptes IA"
         subtitle="Piloter à distance les comptes marqués « IA » : likes et messages planifiés. Le backend exécute, aux heures choisies."
+        kpis={{
+          chip: "PARC",
+          hint: "Les comptes pilotés depuis cette page.",
+          items: [
+            { label: "Comptes IA", value: String(ais?.length ?? 0) },
+            { label: "Femmes / Hommes", value: `${women} / ${men}` },
+            { label: "En attente", value: String(pendingCount ?? 0), lemon: true },
+            { label: "Faites (24 h)", value: String(doneToday ?? 0) },
+          ],
+        }}
       />
 
       {aiErr || missingTable ? (
-        <p className="mb-8 rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-300">
+        <p className={ERROR_BOX}>
           {missingTable
             ? "La table ai_actions n'existe pas encore : applique les migrations 0064 et 0068."
             : aiErr?.message}
         </p>
       ) : null}
 
-      <Section title="Parc">
-        <KpiGrid cols={4}>
-          <KpiCard label="Comptes IA" value={String(ais?.length ?? 0)} />
-          <KpiCard label="Femmes / Hommes" value={`${women} / ${men}`} />
-          <KpiCard label="En attente" value={String(pendingCount ?? 0)} />
-          <KpiCard label="Faites (24 h)" value={String(doneToday ?? 0)} />
-        </KpiGrid>
-      </Section>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+        <Section
+          title="Planifier"
+          hint="Choisis la cible et combien de comptes (d'un pays, ou de tous) agissent. Rien ne part instantanément si tu étales."
+        >
+          <AgentsForm countries={countries} />
+        </Section>
 
-      <Section
-        title="Planifier"
-        hint="Choisis la cible et combien de comptes (d'un pays, ou de tous) agissent. Rien ne part instantanément si tu étales."
-      >
-        <AgentsForm countries={countries} />
-      </Section>
-
-      <Section
-        title="Protégés"
-        hint="Une IA ne contacte jamais le compte qui a l'un de ces emails : ni like, ni message, ni réponse. Tu peux l'ajouter avant que la personne s'inscrive."
-      >
-        {protErr ? (
-          <p className="mb-4 rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-300">
-            La table ai_exempt_emails n'existe pas encore : applique la migration 0075.
-          </p>
-        ) : null}
-        <form action={addProtectedEmail} className="mb-4 flex flex-wrap gap-3">
-          <input
-            name="email"
-            type="email"
-            required
-            placeholder="email@exemple.com"
-            className="min-w-64 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
-          />
-          <input
-            name="note"
-            maxLength={120}
-            placeholder="Note (ex. maman)"
-            className="min-w-40 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/15"
-          >
-            Protéger
-          </button>
-        </form>
-        <div className="overflow-x-auto rounded-2xl border border-white/10">
-          <table className="w-full text-left text-sm">
-            <tbody>
-              {protectedEmails.map((p) => (
-                <tr key={p.email} className="border-t border-white/5 first:border-t-0">
-                  <td className="px-4 py-2">{p.email}</td>
-                  <td className="px-4 py-2 text-sc-text-muted">{p.note ?? ""}</td>
-                  <td className="px-4 py-2 text-sc-text-muted">
-                    {hasAccount.has(p.email) ? "compte trouvé" : "pas encore inscrit"}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <form action={removeProtectedEmail}>
-                      <input type="hidden" name="email" value={p.email} />
-                      <button type="submit" className="text-xs text-red-300 hover:underline">
-                        Retirer
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-              {protectedEmails.length === 0 ? (
-                <tr>
-                  <td className="px-4 py-6 text-center text-sc-text-muted">
-                    Aucun email protégé.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </Section>
+        <Section
+          title="Protégés"
+          hint="Une IA ne contacte jamais le compte qui a l'un de ces emails : ni like, ni message, ni réponse. Tu peux l'ajouter avant que la personne s'inscrive."
+        >
+          {protErr ? (
+            <p className={`${ERROR_BOX} mb-4`}>
+              La table ai_exempt_emails n&apos;existe pas encore : applique la migration 0075.
+            </p>
+          ) : null}
+          <Card className="p-6">
+            <form action={addProtectedEmail} className="mb-3 flex gap-2.5">
+              <input
+                name="email"
+                type="email"
+                required
+                placeholder="email@exemple.com"
+                className="sc-field flex-[1.4]"
+              />
+              <input
+                name="note"
+                maxLength={120}
+                placeholder="Note (ex. maman)"
+                className="sc-field flex-1"
+              />
+              <button type="submit" className="sc-btn sc-btn-outline">
+                Protéger
+              </button>
+            </form>
+            {protectedEmails.map((p) => (
+              <div
+                key={p.email}
+                className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3.5 border-t border-sc-line py-3"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-[14.5px] font-semibold">{p.email}</div>
+                  {p.note ? (
+                    <div className="text-[12.5px] text-sc-text-muted">{p.note}</div>
+                  ) : null}
+                </div>
+                {hasAccount.has(p.email) ? (
+                  <Chip tone="blue">
+                    <Check className="h-3.5 w-3.5" />
+                    compte trouvé
+                  </Chip>
+                ) : (
+                  <Chip tone="grey">pas encore inscrit</Chip>
+                )}
+                <form action={removeProtectedEmail}>
+                  <input type="hidden" name="email" value={p.email} />
+                  <button
+                    type="submit"
+                    className="text-[13px] font-bold text-sc-danger hover:underline"
+                  >
+                    Retirer
+                  </button>
+                </form>
+              </div>
+            ))}
+            {protectedEmails.length === 0 ? (
+              <p className="border-t border-sc-line pt-5 pb-2 text-center text-sm text-sc-text-muted">
+                Aucun email protégé.
+              </p>
+            ) : null}
+          </Card>
+        </Section>
+      </div>
 
       <Section
         title="Phrases d'appel (test)"
         hint="Pour les comptes ajoutés ici, le serveur garde ce que le micro a compris, la phrase réparée et la traduction, 7 jours. Ajoute les deux comptes d'un appel de test pour voir les deux sens. Les autres comptes ne sont jamais enregistrés."
       >
         {dbgErr ? (
-          <p className="mb-4 rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-300">
-            Les tables n'existent pas encore : applique la migration 0076.
+          <p className={`${ERROR_BOX} mb-4`}>
+            Les tables n&apos;existent pas encore : applique la migration 0076.
           </p>
         ) : null}
-        <form action={addCallDebugUser} className="mb-4 flex flex-wrap gap-3">
+        <form action={addCallDebugUser} className="mb-4 flex items-center gap-3">
           <input
             name="who"
             required
             placeholder="pseudo (lely-b0253e), email ou identifiant"
-            className="min-w-72 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+            className="sc-field w-[460px]"
           />
-          <button
-            type="submit"
-            className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/15"
-          >
+          <button type="submit" className="sc-btn sc-btn-primary">
             Enregistrer ses phrases
           </button>
         </form>
@@ -252,11 +275,11 @@ export default async function AgentsPage() {
             <form
               key={u.user_id}
               action={removeCallDebugUser}
-              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs"
+              className="flex items-center gap-2 rounded-full border border-sc-line-strong bg-white px-3.5 py-2 text-[13px] font-semibold"
             >
               <input type="hidden" name="user_id" value={u.user_id} />
               <span>{dbgNames.get(u.user_id) ?? u.note ?? u.user_id}</span>
-              <button type="submit" className="text-red-300 hover:underline">
+              <button type="submit" className="font-bold text-sc-danger hover:underline">
                 retirer
               </button>
             </form>
@@ -265,91 +288,78 @@ export default async function AgentsPage() {
             <span className="text-sm text-sc-text-muted">Aucun compte suivi.</span>
           ) : null}
         </div>
-        <div className="overflow-x-auto rounded-2xl border border-white/10">
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs text-sc-text-muted">
-              <tr>
-                <th className="px-4 py-2">Quand</th>
-                <th className="px-4 py-2">Qui</th>
-                <th className="px-4 py-2">Sens</th>
-                <th className="px-4 py-2">Compris</th>
-                <th className="px-4 py-2">Réparé</th>
-                <th className="px-4 py-2">Traduit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(phrases ?? []).map((p, i) => (
-                <tr key={`${p.created_at}-${i}`} className="border-t border-white/5 align-top">
-                  <td className="px-4 py-2 whitespace-nowrap text-sc-text-muted">
-                    {new Date(p.created_at).toLocaleString("fr-FR")}
-                  </td>
-                  <td className="px-4 py-2">{dbgNames.get(p.user_id) ?? "—"}</td>
-                  <td className="px-4 py-2 whitespace-nowrap">
-                    {p.from_lang}→{p.to_lang}
-                  </td>
-                  <td className="px-4 py-2">{p.heard}</td>
-                  <td className="px-4 py-2 text-sc-text-muted">{p.repaired}</td>
-                  <td className="px-4 py-2">
-                    {p.unclear ? <span className="text-sc-text-muted">illisible, rien envoyé</span> : p.translated}
-                  </td>
-                </tr>
-              ))}
-              {(phrases ?? []).length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-sc-text-muted">
-                    Aucune phrase enregistrée.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+        <GridTable
+          cols={PHRASE_COLS}
+          head={[
+            { label: "Quand" },
+            { label: "Qui" },
+            { label: "Sens" },
+            { label: "Compris" },
+            { label: "Réparé" },
+            { label: "Traduit" },
+          ]}
+        >
+          {(phrases ?? []).map((p, i) => (
+            <GridRow key={`${p.created_at}-${i}`} cols={PHRASE_COLS}>
+              <span className="text-[13.5px] whitespace-nowrap text-sc-text-muted">
+                {new Date(p.created_at).toLocaleString("fr-FR")}
+              </span>
+              <span className="font-bold">{dbgNames.get(p.user_id) ?? "—"}</span>
+              <span className="font-mono text-[13px] whitespace-nowrap">
+                {p.from_lang}→{p.to_lang}
+              </span>
+              <span>{p.heard}</span>
+              <span className="text-sc-text-muted">{p.repaired}</span>
+              <span className="font-semibold">
+                {p.unclear ? (
+                  <span className="font-normal text-sc-text-muted">
+                    illisible, rien envoyé
+                  </span>
+                ) : (
+                  p.translated
+                )}
+              </span>
+            </GridRow>
+          ))}
+          {(phrases ?? []).length === 0 ? (
+            <GridEmpty>Aucune phrase enregistrée.</GridEmpty>
+          ) : null}
+        </GridTable>
       </Section>
 
       <Section title="Journal" hint="Les 40 dernières actions, toutes sources.">
-        <div className="overflow-x-auto rounded-2xl border border-white/10">
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs text-sc-text-muted">
-              <tr>
-                <th className="px-4 py-2">Quand</th>
-                <th className="px-4 py-2">Action</th>
-                <th className="px-4 py-2">Compte IA</th>
-                <th className="px-4 py-2">Cible</th>
-                <th className="px-4 py-2">Source</th>
-                <th className="px-4 py-2">Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t border-white/5">
-                  <td className="px-4 py-2 whitespace-nowrap text-sc-text-muted">
-                    {new Date(r.created_at).toLocaleString("fr-FR")}
-                  </td>
-                  <td className="px-4 py-2">{KIND[r.kind] ?? r.kind}</td>
-                  <td className="px-4 py-2">{names.get(r.ai_id) ?? "—"}</td>
-                  <td className="px-4 py-2">{names.get(r.target_id) ?? "—"}</td>
-                  <td className="px-4 py-2 text-sc-text-muted">{r.source}</td>
-                  <td className="px-4 py-2">
-                    {STATUS[r.status] ?? r.status}
-                    {r.detail ? (
-                      <span className="text-sc-text-muted"> · {r.detail}</span>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-6 text-center text-sc-text-muted"
-                  >
-                    Rien pour l'instant.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+        <GridTable
+          cols={LOG_COLS}
+          head={[
+            { label: "Quand" },
+            { label: "Action" },
+            { label: "Compte IA" },
+            { label: "Cible" },
+            { label: "Source" },
+            { label: "Statut" },
+          ]}
+        >
+          {rows.map((r) => (
+            <GridRow key={r.id} cols={LOG_COLS}>
+              <span className="text-[13.5px] whitespace-nowrap text-sc-text-muted">
+                {new Date(r.created_at).toLocaleString("fr-FR")}
+              </span>
+              <span className="font-bold">{KIND[r.kind] ?? r.kind}</span>
+              <span>{names.get(r.ai_id) ?? "—"}</span>
+              <span>{names.get(r.target_id) ?? "—"}</span>
+              <span className="text-sc-text-muted">{r.source}</span>
+              <span className="flex flex-wrap items-center gap-2">
+                <Chip tone={STATUS_TONE[r.status] ?? "grey"}>
+                  {STATUS[r.status] ?? r.status}
+                </Chip>
+                {r.detail ? (
+                  <span className="text-[12.5px] text-sc-text-muted">{r.detail}</span>
+                ) : null}
+              </span>
+            </GridRow>
+          ))}
+          {rows.length === 0 ? <GridEmpty>Rien pour l&apos;instant.</GridEmpty> : null}
+        </GridTable>
       </Section>
     </>
   );

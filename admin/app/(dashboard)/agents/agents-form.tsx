@@ -1,24 +1,23 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { CheckCircle2, SendHorizontal } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import {
   cancelPendingAiActions,
   queueAiActions,
   type QueueState,
 } from "./actions";
 
-const field =
-  "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-sc-text outline-none focus:border-sc-accent/50";
-const label = "mb-1 block text-xs font-medium text-sc-text-muted";
-
 function Result({ state }: { state: QueueState }) {
   if (!state) return null;
-  return (
-    <p
-      className={`mt-3 text-sm ${state.ok ? "text-sc-accent" : "text-red-400"}`}
-    >
+  return state.ok ? (
+    <p className="flex items-center gap-1.5 text-sm font-bold text-sc-accent">
+      <CheckCircle2 className="h-[18px] w-[18px]" />
       {state.message}
     </p>
+  ) : (
+    <p className="text-sm font-bold text-sc-danger">{state.message}</p>
   );
 }
 
@@ -38,20 +37,17 @@ export function AgentsForm({
   const [kind, setKind] = useState("like");
 
   return (
-    <div className="space-y-6">
-      <form
-        action={action}
-        className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
-      >
-        <div className="grid gap-4 md:grid-cols-2">
+    <Card className="p-6">
+      <form action={action}>
+        <div className="grid gap-x-[18px] gap-y-4 md:grid-cols-2">
           <div>
-            <label className={label} htmlFor="kind">
+            <label className="sc-label" htmlFor="kind">
               Action
             </label>
             <select
               id="kind"
               name="kind"
-              className={field}
+              className="sc-field"
               value={kind}
               onChange={(e) => setKind(e.target.value)}
             >
@@ -60,22 +56,22 @@ export function AgentsForm({
             </select>
           </div>
           <div>
-            <label className={label} htmlFor="target">
+            <label className="sc-label" htmlFor="target">
               Cible (id ou @handle)
             </label>
             <input
               id="target"
               name="target"
-              className={field}
+              className="sc-field"
               placeholder="@pseudo ou 0b9c…"
               required
             />
           </div>
           <div>
-            <label className={label} htmlFor="country">
+            <label className="sc-label" htmlFor="country">
               Pays des comptes IA
             </label>
-            <select id="country" name="country" className={field} defaultValue="">
+            <select id="country" name="country" className="sc-field" defaultValue="">
               <option value="">Tous les pays</option>
               {countries.map((c) => (
                 <option key={c.name} value={c.name}>
@@ -85,17 +81,17 @@ export function AgentsForm({
             </select>
           </div>
           <div>
-            <label className={label} htmlFor="gender">
+            <label className="sc-label" htmlFor="gender">
               Genre des comptes IA
             </label>
-            <select id="gender" name="gender" className={field} defaultValue="">
+            <select id="gender" name="gender" className="sc-field" defaultValue="">
               <option value="">Tous</option>
               <option value="f">Femmes</option>
               <option value="m">Hommes</option>
             </select>
           </div>
           <div>
-            <label className={label} htmlFor="count">
+            <label className="sc-label" htmlFor="count">
               Combien de comptes
             </label>
             <input
@@ -105,12 +101,12 @@ export function AgentsForm({
               min={1}
               max={200}
               defaultValue={2}
-              className={field}
+              className="sc-field"
               required
             />
           </div>
           <div>
-            <label className={label} htmlFor="spread">
+            <label className="sc-label" htmlFor="spread">
               Étalé sur (minutes, 0 = tout de suite)
             </label>
             <input
@@ -120,15 +116,15 @@ export function AgentsForm({
               min={0}
               max={720}
               defaultValue={60}
-              className={field}
+              className="sc-field"
             />
           </div>
         </div>
 
         {kind === "message" ? (
           <div className="mt-4">
-            <label className={label} htmlFor="body">
-              Texte du message (obligatoire : l'IA n'écrit jamais seule le premier message)
+            <label className="sc-label" htmlFor="body">
+              Texte du message (obligatoire : l&apos;IA n&apos;écrit jamais seule le premier message)
             </label>
             <textarea
               id="body"
@@ -136,33 +132,26 @@ export function AgentsForm({
               rows={3}
               maxLength={500}
               required
-              className={field}
+              className="sc-field"
             />
           </div>
         ) : null}
 
-        <div className="mt-5 flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-xl bg-sc-accent/20 px-4 py-2 text-sm font-medium text-sc-accent transition-colors hover:bg-sc-accent/30 disabled:opacity-50"
-          >
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <button type="submit" disabled={pending} className="sc-btn sc-btn-primary">
+            <SendHorizontal className="h-[17px] w-[17px]" />
             {pending ? "Planification…" : "Planifier"}
           </button>
+          <Result state={state} />
         </div>
-        <Result state={state} />
       </form>
 
-      <form action={cancelAction} className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={cancelling}
-          className="rounded-xl border border-white/10 px-4 py-2 text-sm text-sc-text-secondary transition-colors hover:bg-white/5 disabled:opacity-50"
-        >
+      <form action={cancelAction} className="mt-4 flex flex-wrap items-center gap-3">
+        <button type="submit" disabled={cancelling} className="sc-btn sc-btn-outline">
           Annuler toutes les actions en attente
         </button>
         <Result state={cancelState} />
       </form>
-    </div>
+    </Card>
   );
 }

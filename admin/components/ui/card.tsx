@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/** The app's glass panel: translucent white over the mesh, hairline border. */
+/** Carte blanche de la direction 1c (rayon 22, ombre douce). */
 export function Card({
   className,
   children,
@@ -8,7 +8,5 @@ export function Card({
   className?: string;
   children: React.ReactNode;
 }) {
-  return (
-    <div className={cn("sc-glass rounded-2xl", className)}>{children}</div>
-  );
+  return <div className={cn("sc-card", className)}>{children}</div>;
 }

@@ -1,6 +1,8 @@
+import { Check, TriangleAlert } from "lucide-react";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-import { KpiCard, KpiGrid } from "@/components/kpi-card";
-import { PageHeader, Section } from "@/components/section";
+import { PageHero } from "@/components/page-hero";
+import { Section } from "@/components/section";
+import { Card } from "@/components/ui/card";
 import { approveVerification, rejectVerification } from "./actions";
 import { GESTURE_LABELS, REJECT_REASONS } from "./labels";
 
@@ -27,6 +29,8 @@ type Prof = {
   avatar_url: string | null;
   is_ai: boolean | null;
 };
+
+const LABEL = "text-xs font-bold tracking-[0.08em] text-sc-text-muted uppercase";
 
 /** Profile pictures to compare the selfie to: gallery, Discover photo, PDP. */
 function photosOf(p: Prof | undefined): string[] {
@@ -89,30 +93,32 @@ export default async function VerificationsPage() {
 
   return (
     <>
-      <PageHeader
+      <PageHero
         title="Vérifications"
         subtitle="Compare le selfie aux photos du profil et vérifie que le geste demandé est fait. Le selfie est supprimé dès que tu as décidé."
+        kpis={{
+          chip: "FILE D'ATTENTE",
+          hint: "Les plus anciennes demandes en premier.",
+          cols: 2,
+          items: [
+            { label: "En attente", value: String(rows.length), lemon: true },
+            { label: "Profils vérifiés", value: String(verifiedCount ?? 0) },
+          ],
+        }}
       />
 
       {missingTable ? (
-        <p className="mb-8 rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-300">
+        <p className="rounded-2xl bg-[rgba(209,43,43,.08)] px-4 py-3 text-sm font-semibold text-sc-danger">
           La table profile_verifications n&apos;existe pas encore : applique la
           migration 0077.
         </p>
       ) : null}
 
-      <Section title="File d'attente">
-        <KpiGrid cols={3}>
-          <KpiCard label="En attente" value={String(rows.length)} tone="accent" />
-          <KpiCard label="Profils vérifiés" value={String(verifiedCount ?? 0)} />
-        </KpiGrid>
-      </Section>
-
       <Section
         title="Demandes"
         hint="Les plus anciennes d'abord. Les liens des selfies expirent au bout de 10 minutes : recharge la page si une image ne s'affiche plus."
       >
-        <div className="space-y-6">
+        <div className="flex flex-col gap-5">
           {rows.map((r) => {
             const p = profiles.get(r.user_id);
             const photos = photosOf(p);
@@ -123,54 +129,52 @@ export default async function VerificationsPage() {
             return (
               <article
                 key={r.id}
-                className="grid gap-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5 lg:grid-cols-[minmax(0,320px)_1fr]"
+                className="sc-card grid gap-7 p-[22px] lg:grid-cols-[320px_minmax(0,1fr)]"
               >
-                <div>
-                  <div className="mb-2 text-xs font-semibold tracking-wide text-sc-text-muted uppercase">
-                    Selfie
-                  </div>
+                <div className="flex flex-col gap-2">
+                  <div className={LABEL}>Selfie</div>
                   {selfie ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={selfie}
                       alt="Selfie de vérification"
-                      className="max-h-[420px] w-full rounded-xl border border-white/10 object-contain"
+                      className="aspect-[3/4] w-full rounded-2xl border border-sc-line object-cover"
                     />
                   ) : (
-                    <div className="flex h-40 items-center justify-center rounded-xl border border-white/10 text-sm text-sc-text-muted">
+                    <div className="sc-stripe flex aspect-[3/4] w-full items-center justify-center rounded-2xl border border-sc-line p-4 text-center text-sm text-sc-text-muted">
                       Selfie introuvable (déjà supprimé ?)
                     </div>
                   )}
                 </div>
 
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-[18px]">
                   <div>
-                    <div className="text-lg font-bold text-sc-text">
+                    <div className="text-[22px] font-extrabold">
                       {p?.display_name || "—"}
                       {p?.age ? `, ${p.age}` : ""}
                     </div>
-                    <div className="text-sm text-sc-text-muted">
+                    <div className="mt-1 text-sm text-sc-text-muted">
                       {[p?.handle ? `@${p.handle}` : "", place]
                         .filter(Boolean)
                         .join(" · ")}
                       {" · "}
                       {new Date(r.created_at).toLocaleString("fr-FR")}
                     </div>
-                    {p?.is_ai ? (
-                      <div className="mt-1 text-sm text-red-300">
-                        Compte IA : ne pas vérifier.
-                      </div>
-                    ) : null}
                   </div>
 
-                  <div className="inline-flex w-fit items-center rounded-full bg-sc-accent/15 px-4 py-2 text-sm font-bold text-sc-accent">
+                  {p?.is_ai ? (
+                    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[rgba(209,43,43,.1)] px-3 py-1.5 text-[13px] font-bold text-sc-danger">
+                      <TriangleAlert className="h-4 w-4" />
+                      Compte IA : ne pas vérifier.
+                    </span>
+                  ) : null}
+
+                  <span className="self-start rounded-full bg-sc-lemon px-[18px] py-[9px] text-[14.5px] font-extrabold">
                     Geste demandé : {GESTURE_LABELS[r.gesture] ?? r.gesture}
-                  </div>
+                  </span>
 
-                  <div>
-                    <div className="mb-2 text-xs font-semibold tracking-wide text-sc-text-muted uppercase">
-                      Photos du profil
-                    </div>
+                  <div className="flex flex-col gap-2">
+                    <div className={LABEL}>Photos du profil</div>
                     {photos.length ? (
                       <div className="flex flex-wrap gap-2">
                         {photos.map((u) => (
@@ -179,7 +183,7 @@ export default async function VerificationsPage() {
                             key={u}
                             src={u}
                             alt="Photo du profil"
-                            className="h-28 w-20 rounded-lg border border-white/10 object-cover"
+                            className="h-28 w-20 rounded-xl border border-sc-line object-cover"
                           />
                         ))}
                       </div>
@@ -193,10 +197,8 @@ export default async function VerificationsPage() {
                   <div className="mt-auto flex flex-wrap items-center gap-3">
                     <form action={approveVerification}>
                       <input type="hidden" name="id" value={r.id} />
-                      <button
-                        type="submit"
-                        className="rounded-xl bg-sc-accent px-5 py-2 text-sm font-bold text-black hover:opacity-90"
-                      >
+                      <button type="submit" className="sc-btn sc-btn-primary">
+                        <Check className="h-[17px] w-[17px]" />
                         Approuver
                       </button>
                     </form>
@@ -209,7 +211,7 @@ export default async function VerificationsPage() {
                         name="reason"
                         required
                         defaultValue=""
-                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+                        className="sc-field w-[230px]"
                       >
                         <option value="" disabled>
                           Motif du refus…
@@ -220,10 +222,7 @@ export default async function VerificationsPage() {
                           </option>
                         ))}
                       </select>
-                      <button
-                        type="submit"
-                        className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-white/15"
-                      >
+                      <button type="submit" className="sc-btn sc-btn-danger">
                         Refuser
                       </button>
                     </form>
@@ -233,9 +232,9 @@ export default async function VerificationsPage() {
             );
           })}
           {rows.length === 0 && !missingTable ? (
-            <p className="rounded-2xl border border-white/10 px-4 py-10 text-center text-sc-text-muted">
+            <Card className="py-10 text-center text-sc-text-muted">
               Aucune demande en attente.
-            </p>
+            </Card>
           ) : null}
         </div>
       </Section>

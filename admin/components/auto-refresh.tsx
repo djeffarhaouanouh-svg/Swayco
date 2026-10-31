@@ -5,12 +5,8 @@ import { useRouter } from "next/navigation";
 
 /**
  * Re-runs the server components of the current route on an interval —
- * used by the Live page, which is only useful if it is actually live.
- *
- * `router.refresh()` swaps in fresh server-rendered content without a
- * full reload and without unmounting, so there is no skeleton flash and
- * no layout jump; the previous render simply stays until the new one
- * lands.
+ * used by the Live page. Logique INCHANGÉE ; seul le rendu passe en
+ * pastille de verre pour le coin haut-droit du bandeau bleu (<PageHero right=…>).
  */
 export function AutoRefresh({ seconds = 20 }: { seconds?: number }) {
   const router = useRouter();
@@ -30,12 +26,9 @@ export function AutoRefresh({ seconds = 20 }: { seconds?: number }) {
   }, [router, seconds]);
 
   return (
-    <span className="flex items-center gap-2 text-xs text-sc-text-muted">
-      <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sc-online opacity-60" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-sc-online" />
-      </span>
-      Actualisation dans {countdown} s
+    <span className="sc-hero-pill">
+      <span className="h-[9px] w-[9px] rounded-full bg-sc-lemon shadow-[0_0_0_4px_rgba(244,255,31,0.3)]" />
+      Actualisation auto · {countdown} s
     </span>
   );
 }

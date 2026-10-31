@@ -1,52 +1,82 @@
 import { Card } from "@/components/ui/card";
+import { CardTitle } from "@/components/section";
 import { fmtInt } from "@/lib/format";
 
-export type RankItem = { label: string; value: number; lead?: string };
+export type RankItem = {
+  label: string;
+  value: number;
+  /** Drapeau : <Flag code="fr" size={24} />. */
+  lead?: React.ReactNode;
+  /** Code court de langue (« FR », « JA ») affiché en petit à la place d'un drapeau. */
+  code?: string;
+};
 
 /**
- * Ranked list with a proportional bar behind each row — a horizontal bar
- * chart that stays readable at any label length (top countries, top
- * languages). Bars are scaled against the largest value, not the total.
+ * Classement avec barre dégradé bleu → cyan (une ligne = un pays / une langue).
+ * Barres proportionnelles au plus grand, pas au total.
+ * `title` : titre de la carte (h3). `bare` : sans Card (à l'intérieur d'une autre carte).
  */
 export function RankBars({
   items,
   empty = "Aucune donnée sur la période",
   unit,
+  title,
+  bare = false,
 }: {
   items: RankItem[];
   empty?: string;
   unit?: string;
+  title?: string;
+  bare?: boolean;
 }) {
   if (items.length === 0) {
-    return (
+    return bare ? (
+      <div className="p-6 text-sm text-sc-text-muted">{empty}</div>
+    ) : (
       <Card className="p-6 text-sm text-sc-text-muted">{empty}</Card>
     );
   }
   const max = Math.max(...items.map((i) => i.value), 1);
+  const hasLead = items.some((i) => i.lead || i.code);
+  const cols = hasLead
+    ? "30px 104px minmax(0,1fr) 84px"
+    : "minmax(0,128px) minmax(0,1fr) 84px";
 
-  return (
-    <Card className="divide-y divide-white/5 overflow-hidden">
+  const rows = (
+    <>
+      {title ? <CardTitle className="px-4 pb-1.5">{title}</CardTitle> : null}
       {items.map((it) => (
-        <div key={it.label} className="relative px-4 py-3">
-          <div
-            className="absolute inset-y-0 left-0 bg-sc-accent/12"
-            style={{ width: `${(it.value / max) * 100}%` }}
-            aria-hidden
-          />
-          <div className="relative flex items-center justify-between gap-4">
-            <span className="flex min-w-0 items-center gap-2 text-sm text-sc-text">
-              {it.lead ? (
-                <span className="shrink-0 text-base">{it.lead}</span>
-              ) : null}
-              <span className="truncate">{it.label}</span>
+        <div
+          key={it.label}
+          className="grid items-center gap-2.5 px-4 py-[11px]"
+          style={{ gridTemplateColumns: cols }}
+        >
+          {hasLead ? (
+            <span className="flex justify-center">
+              {it.lead ??
+                (it.code ? (
+                  <span className="text-[11px] font-extrabold tracking-[0.06em] opacity-60">
+                    {it.code}
+                  </span>
+                ) : null)}
             </span>
-            <span className="sc-nums shrink-0 text-sm font-semibold text-sc-text-secondary">
-              {fmtInt(it.value)}
-              {unit ? <span className="text-sc-text-muted"> {unit}</span> : null}
-            </span>
-          </div>
+          ) : null}
+          <span className="truncate text-[14.5px] font-semibold" title={it.label}>
+            {it.label}
+          </span>
+          <span className="sc-track">
+            <i style={{ width: `${(it.value / max) * 100}%` }} />
+          </span>
+          <span className="sc-nums text-right text-sm font-extrabold whitespace-nowrap">
+            {fmtInt(it.value)}
+            {unit ? (
+              <span className="font-medium text-sc-text-muted"> {unit}</span>
+            ) : null}
+          </span>
         </div>
       ))}
-    </Card>
+    </>
   );
+
+  return bare ? rows : <Card className="pt-4 pr-2 pb-2 pl-2">{rows}</Card>;
 }

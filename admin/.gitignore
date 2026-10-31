@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scripts: working files, never commit
+/scripts/.*.json
+/scripts/recrop_preview/
+/scripts/__pycache__/
