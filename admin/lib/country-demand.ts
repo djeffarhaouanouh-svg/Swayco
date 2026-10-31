@@ -4,6 +4,7 @@
 // (hors RLS) et reste défensif : table absente = zéro, jamais une page cassée.
 
 import { createSupabaseServiceClient } from "./supabase/service";
+import { pagedRows } from "./db";
 
 const DAY_MS = 86_400_000;
 
@@ -91,13 +92,12 @@ export async function getCountryDemand(): Promise<CountryDemandRow[]> {
 
   const profiles = new Map<string, { total: number; active: number }>();
   try {
-    const { data } = await sb
-      .from("profiles")
-      .select("country, last_seen")
-      .not("country", "is", null)
-      .neq("country", "")
-      .limit(100000);
-    for (const r of (data ?? []) as { country: string; last_seen: string | null }[]) {
+    // Vrais comptes seulement : les profils IA sont posés dans des pays précis
+    // par construction, ils ne disent rien de la demande réelle.
+    const data = await pagedRows("profiles", "country, last_seen", (q) =>
+      q.eq("is_ai", false).not("country", "is", null).neq("country", ""),
+    );
+    for (const r of data as unknown as { country: string; last_seen: string | null }[]) {
       const key = FR_TO_KEY[r.country] ?? r.country;
       const cur = profiles.get(key) ?? { total: 0, active: 0 };
       cur.total += 1;

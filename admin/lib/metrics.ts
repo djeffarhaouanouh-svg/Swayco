@@ -16,6 +16,7 @@
 
 import { createSupabaseServiceClient } from "./supabase/service";
 import { dayKey, fmtInt, fmtMinutes, fmtNum, fmtPct } from "./format";
+import { aiIdSet, pagedRows } from "./db";
 
 const DAY_MS = 86_400_000;
 
@@ -56,24 +57,31 @@ async function safeCount(table: string, apply?: QueryFn): Promise<number> {
   }
 }
 
+// Lecture page par page : l'API plafonne chaque réponse (1 000 lignes), un
+// `.limit(100000)` seul ne suffit donc pas (voir lib/db.ts). Les `.limit()`
+// restants dans les appelants sont sans effet : la pagination les remplace.
 async function safeRows(
   table: string,
   columns: string,
   apply?: QueryFn,
 ): Promise<Row[]> {
-  try {
-    const sb = createSupabaseServiceClient();
-    let q = sb.from(table).select(columns);
-    if (apply) q = apply(q);
-    const { data, error } = await q;
-    return error || !data ? [] : (data as unknown as Row[]);
-  } catch {
-    return [];
-  }
+  return pagedRows(table, columns, apply);
 }
 
 function str(v: unknown): string | null {
   return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+/**
+ * Messages écrits par de vrais utilisateurs sur les `days` derniers jours.
+ * Ceux envoyés par un compte IA sont retirés ; `columns` doit contenir `sender`.
+ */
+async function humanMessages(days: number, columns: string): Promise<Row[]> {
+  const [rows, ai] = await Promise.all([
+    pagedRows("messages", columns, (q) => q.gte("created_at", sinceISO(days))),
+    aiIdSet(),
+  ]);
+  return rows.filter((r) => !ai.has(str(r.sender) ?? ""));
 }
 
 /** Read a numeric field out of an event's jsonb `props`. */
@@ -189,7 +197,7 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
         .limit(5000),
     ),
     safeCount("profiles", (q) =>
-      q.gte("last_seen", sinceISO(ONLINE_WINDOW_MIN / 1440)),
+      q.eq("is_ai", false).gte("last_seen", sinceISO(ONLINE_WINDOW_MIN / 1440)),
     ),
     safeCount("incoming_calls", (q) =>
       q.gte("created_at", sinceISO(2 / 1440)),
@@ -298,9 +306,9 @@ export async function getOverview(): Promise<Overview> {
     messages24h,
     live,
   ] = await Promise.all([
-    safeCount("profiles"),
-    safeCount("profiles", (q) => q.gte("created_at", sinceISO(1))),
-    safeCount("profiles", (q) => q.gte("created_at", sinceISO(7))),
+    safeCount("profiles", (q) => q.eq("is_ai", false)),
+    safeCount("profiles", (q) => q.eq("is_ai", false).gte("created_at", sinceISO(1))),
+    safeCount("profiles", (q) => q.eq("is_ai", false).gte("created_at", sinceISO(7))),
     safeRows("analytics_events", "user_id", (q) =>
       q
         .eq("event", "app_open")
@@ -311,7 +319,7 @@ export async function getOverview(): Promise<Overview> {
     safeCount("analytics_events", (q) =>
       q.eq("event", "call_started").gte("created_at", sinceISO(1)),
     ),
-    safeCount("messages", (q) => q.gte("created_at", sinceISO(1))),
+    humanMessages(1, "sender").then((r) => r.length),
     getLiveSnapshot(),
   ]);
 
@@ -341,8 +349,8 @@ export async function getCallsSeries(days = 14): Promise<DayPoint[]> {
 }
 
 export async function getNewUsersSeries(days = 14): Promise<DayPoint[]> {
-  const rows = await safeRows("profiles", "created_at", (q) =>
-    q.gte("created_at", sinceISO(days)).limit(100000),
+  const rows = await pagedRows("profiles", "created_at", (q) =>
+    q.eq("is_ai", false).gte("created_at", sinceISO(days)),
   );
   return bucketByDay(
     rows.map((r) => r.created_at),
@@ -351,9 +359,7 @@ export async function getNewUsersSeries(days = 14): Promise<DayPoint[]> {
 }
 
 export async function getMessagesSeries(days = 14): Promise<DayPoint[]> {
-  const rows = await safeRows("messages", "created_at", (q) =>
-    q.gte("created_at", sinceISO(days)).limit(100000),
-  );
+  const rows = await humanMessages(days, "sender, created_at");
   return bucketByDay(
     rows.map((r) => r.created_at),
     days,
@@ -390,8 +396,8 @@ export async function getCountries(days = 30): Promise<CountryStat[]> {
 
 /** Languages users actually speak, straight off their profile. */
 export async function getLanguages(): Promise<Pair[]> {
-  const rows = await safeRows("profiles", "language", (q) =>
-    q.not("language", "is", null).limit(100000),
+  const rows = await pagedRows("profiles", "language", (q) =>
+    q.eq("is_ai", false).not("language", "is", null),
   );
   const m = new Map<string, number>();
   for (const r of rows) {
@@ -473,28 +479,23 @@ export type SocialStats = {
 
 export async function getSocial(days = 30): Promise<SocialStats> {
   const [
-    friendsTotal,
-    friendsNew,
-    pendingRequests,
-    requestsSent,
+    allFriendships,
+    ai,
     likes,
     blocks,
     reports,
     msgs,
     appOpens,
   ] = await Promise.all([
-    safeCount("friendships", (q) => q.eq("status", "accepted")),
-    safeCount("friendships", (q) =>
-      q.eq("status", "accepted").gte("responded_at", sinceISO(days)),
+    pagedRows(
+      "friendships",
+      "requester, addressee, status, created_at, responded_at",
     ),
-    safeCount("friendships", (q) => q.eq("status", "pending")),
-    safeCount("friendships", (q) => q.gte("created_at", sinceISO(days))),
+    aiIdSet(),
     safeCount("likes", (q) => q.gte("created_at", sinceISO(days))),
     safeCount("blocked_users"),
     safeCount("reports", (q) => q.gte("created_at", sinceISO(days))),
-    safeRows("messages", "conversation_id, sender, created_at", (q) =>
-      q.gte("created_at", sinceISO(days)).limit(100000),
-    ),
+    humanMessages(days, "conversation_id, sender, created_at"),
     safeRows("analytics_events", "user_id, created_at", (q) =>
       q
         .eq("event", "app_open")
@@ -503,6 +504,29 @@ export async function getSocial(days = 30): Promise<SocialStats> {
         .limit(100000),
     ),
   ]);
+
+  // Amitiés entre vrais utilisateurs : toute ligne dont l'un des deux côtés est
+  // un compte IA est écartée (les acceptations automatiques des IA gonflaient
+  // les « amis » et les « demandes »).
+  const sinceMs = Date.now() - days * DAY_MS;
+  const afterWindow = (v: unknown): boolean => {
+    const t = typeof v === "string" ? Date.parse(v) : NaN;
+    return Number.isFinite(t) && t >= sinceMs;
+  };
+  let friendsTotal = 0;
+  let friendsNew = 0;
+  let pendingRequests = 0;
+  let requestsSent = 0;
+  for (const f of allFriendships) {
+    if (ai.has(str(f.requester) ?? "") || ai.has(str(f.addressee) ?? "")) continue;
+    if (f.status === "accepted") {
+      friendsTotal++;
+      if (afterWindow(f.responded_at)) friendsNew++;
+    } else if (f.status === "pending") {
+      pendingRequests++;
+    }
+    if (afterWindow(f.created_at)) requestsSent++;
+  }
 
   // "Revient parler à la même personne": a conversation carrying messages
   // on ≥ 2 distinct days means at least one side came back to that person
@@ -552,9 +576,7 @@ export async function getSocial(days = 30): Promise<SocialStats> {
 
 /** Daily distinct senders — "combien de gens ont écrit ce jour-là". */
 export async function getActiveSendersSeries(days = 14): Promise<DayPoint[]> {
-  const rows = await safeRows("messages", "sender, created_at", (q) =>
-    q.gte("created_at", sinceISO(days)).limit(100000),
-  );
+  const rows = await humanMessages(days, "sender, created_at");
   return bucketDistinctByDay(rows, "created_at", "sender", days);
 }
 
@@ -788,13 +810,13 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
     retention,
     calls,
   ] = await Promise.all([
-    safeCount("profiles"),
-    safeCount("profiles", (q) => q.gte("created_at", sinceISO(1))),
-    safeCount("profiles", (q) => q.gte("created_at", sinceISO(7))),
-    safeCount("profiles", (q) => q.gte("created_at", sinceISO(30))),
-    safeCount("profiles", (q) => q.not("photos", "eq", "{}")),
-    safeCount("profiles", (q) => q.not("interests", "eq", "{}")),
-    safeCount("profiles", (q) => q.neq("city", "")),
+    safeCount("profiles", (q) => q.eq("is_ai", false)),
+    safeCount("profiles", (q) => q.eq("is_ai", false).gte("created_at", sinceISO(1))),
+    safeCount("profiles", (q) => q.eq("is_ai", false).gte("created_at", sinceISO(7))),
+    safeCount("profiles", (q) => q.eq("is_ai", false).gte("created_at", sinceISO(30))),
+    safeCount("profiles", (q) => q.eq("is_ai", false).not("photos", "eq", "{}")),
+    safeCount("profiles", (q) => q.eq("is_ai", false).not("interests", "eq", "{}")),
+    safeCount("profiles", (q) => q.eq("is_ai", false).neq("city", "")),
     getLiveSnapshot(),
     getSocial(30),
     getRetention(30),
@@ -813,7 +835,7 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
       label: "Nombre d'utilisateurs",
       value: fmtInt(totalUsers),
       window: `+${fmtInt(new30d)}`,
-      hint: "Lignes dans profiles",
+      hint: "Vrais comptes : profils IA exclus",
     },
     {
       group: "Croissance",

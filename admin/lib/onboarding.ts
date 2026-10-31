@@ -10,26 +10,12 @@
 // Comptes comptés : humains uniquement (is_ai = false, hors profils de test
 // « seed_… »).
 
-import { createSupabaseServiceClient } from "./supabase/service";
 import { dayKey } from "./format";
 import { sinceISO } from "./metrics";
+import { aiIdSet, pagedRows, type Row } from "./db";
 
-type Row = Record<string, unknown>;
-
-async function rows(
-  table: string,
-  columns: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  apply: (q: any) => any,
-): Promise<Row[]> {
-  try {
-    const sb = createSupabaseServiceClient();
-    const { data, error } = await apply(sb.from(table).select(columns));
-    return error || !data ? [] : (data as Row[]);
-  } catch {
-    return [];
-  }
-}
+// Lecture complète, page par page (l'API plafonne chaque réponse à 1 000 lignes).
+const rows = pagedRows;
 
 const s = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
@@ -93,36 +79,34 @@ const pct = (n: number, d: number): number => (d > 0 ? n / d : 0);
 export async function getOnboardingReport(days = 30): Promise<OnboardingReport> {
   const since = sinceISO(days);
 
-  const [profiles, aiRows, friendships, messages, events, anon, wizard] = await Promise.all([
+  const [profilesRaw, aiIds, friendships, messages, events, anon, wizard] = await Promise.all([
+    // Vrais comptes seulement (les profils IA sont exclus de toutes les stats).
     rows(
       "profiles",
       "id, created_at, display_name, handle, language, gender, persona_category, country, city, discover_photo_url, photos, avatar_url, is_pro, subscription_tier",
-      (q) =>
-        q
-          .eq("is_ai", false)
-          .gte("created_at", since)
-          .order("created_at", { ascending: false })
-          .limit(20000),
+      (q) => q.eq("is_ai", false).gte("created_at", since),
     ),
-    rows("profiles", "id", (q) => q.eq("is_ai", true).limit(20000)),
-    rows("friendships", "requester, addressee, status", (q) =>
-      q.gte("created_at", since).limit(100000),
-    ),
-    rows("messages", "sender", (q) => q.gte("created_at", since).limit(100000)),
+    aiIdSet(),
+    rows("friendships", "requester, addressee, status", (q) => q.gte("created_at", since)),
+    rows("messages", "sender", (q) => q.gte("created_at", since)),
     rows("analytics_events", "user_id, event, created_at, props", (q) =>
-      q.not("user_id", "is", null).gte("created_at", since).limit(100000),
+      q.not("user_id", "is", null).gte("created_at", since),
     ),
     rows("analytics_events", "session_id", (q) =>
-      q.eq("event", "app_open").is("user_id", null).gte("created_at", since).limit(100000),
+      q.eq("event", "app_open").is("user_id", null).gte("created_at", since),
     ),
     // Événements de l'assistant (app ≥ build qui les envoie), invités compris.
     rows("analytics_events", "event, session_id, props", (q) =>
       q
         .in("event", ["onboarding_step", "onboarding_done", "onboarding_photo_skipped"])
-        .gte("created_at", since)
-        .limit(100000),
+        .gte("created_at", since),
     ),
   ]);
+  // Plus récents d'abord (le tri par id imposé par la lecture par pages ne
+  // reflète pas la date d'inscription).
+  const profiles = [...profilesRaw].sort((a, b) =>
+    s(b.created_at).localeCompare(s(a.created_at)),
+  );
 
   // Sessions distinctes par écran de l'assistant.
   const bySession = new Map<string, Set<string>>();
@@ -160,7 +144,6 @@ export async function getOnboardingReport(days = 30): Promise<OnboardingReport> 
 
   // Profils de test exclus.
   const people = profiles.filter((p) => !s(p.handle).startsWith("seed_"));
-  const aiIds = new Set(aiRows.map((r) => s(r.id)));
 
   const hasPhoto = (p: Row): boolean => {
     const gallery = Array.isArray(p.photos) ? (p.photos as unknown[]) : [];
