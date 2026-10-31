@@ -35,9 +35,12 @@ export type GlobeData = {
   active: number[];
   /** Un marqueur par pays actif, du plus gros au plus petit. */
   markers: GlobeMarker[];
-  /** Point de départ des arcs (page Live) ; null si non demandé. */
-  origin: { code: string; lon: number; lat: number } | null;
+  /** Appels en cours entre deux pays (page Live) : un arc par liaison. */
+  routes: GlobeRoute[];
 };
+
+export type GlobeEnd = { code: string; lon: number; lat: number };
+export type GlobeRoute = { from: GlobeEnd; to: GlobeEnd; count: number };
 
 /** Écart de la grille, en degrés. Plus petit = plus de points (et plus lourd). */
 const STEP = 2.1;
@@ -107,9 +110,14 @@ const r2 = (v: number) => Math.round(v * 100) / 100;
  * @param stats       même tableau que celui donné à buildWorldMap()
  *                    (vue d'ensemble : getCountries(30) ; Live : countries
  *                    du snapshot, `{ code: c.label, users: c.value }`).
- * @param originCode  code ISO-2 du point de départ des arcs (ex. "FR").
+ * @param links       appels réels en cours entre deux pays (page Live) :
+ *                    chacun devient un arc entre ses deux pays. Un code
+ *                    inconnu est ignoré.
  */
-export function buildGlobe(stats: CountryStat[], originCode?: string): GlobeData {
+export function buildGlobe(
+  stats: CountryStat[],
+  links: { a: string; b: string; count: number }[] = [],
+): GlobeData {
   const { lands, dots, owner } = land();
   const byId = new Map<string, number>();
   lands.forEach((l, i) => {
@@ -136,14 +144,18 @@ export function buildGlobe(stats: CountryStat[], originCode?: string): GlobeData
     if (activeLands.has(k)) active.push(i);
   });
 
-  let origin: GlobeData["origin"] = null;
-  if (originCode) {
-    const k = locate(originCode);
-    if (k !== undefined) {
-      const [lon, lat] = mainlandCentroid(lands[k].f);
-      origin = { code: originCode, lon: r2(lon), lat: r2(lat) };
-    }
+  const end = (code: string): GlobeEnd | null => {
+    const k = locate(code);
+    if (k === undefined) return null;
+    const [lon, lat] = mainlandCentroid(lands[k].f);
+    return { code, lon: r2(lon), lat: r2(lat) };
+  };
+  const routes: GlobeRoute[] = [];
+  for (const l of links) {
+    const from = end(l.a);
+    const to = end(l.b);
+    if (from && to) routes.push({ from, to, count: l.count });
   }
 
-  return { dots, active, markers, origin };
+  return { dots, active, markers, routes };
 }

@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowLeftRight, ArrowRight } from "lucide-react";
 import { getLiveSnapshot } from "@/lib/metrics";
 import { countryName, fmtDuration, fmtInt, languageName } from "@/lib/format";
 import { buildGlobe } from "@/lib/globe";
@@ -18,7 +18,7 @@ export default async function LivePage() {
   const live = await getLiveSnapshot();
   const globe = buildGlobe(
     live.countries.map((c) => ({ code: c.label, users: c.value })),
-    "FR", // point de départ des arcs
+    live.links, // un arc par appel réel entre deux pays
   );
 
   return (
@@ -83,15 +83,18 @@ export default async function LivePage() {
                     "—"
                   )}
                 </span>
-                <span className="flex items-center gap-2">
-                  {c.country ? (
-                    <>
-                      <Flag code={c.country} />
-                      {countryName(c.country)}
-                    </>
-                  ) : (
-                    "—"
-                  )}
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {c.countries.length > 0
+                    ? c.countries.map((code, i) => (
+                        <span key={code} className="flex items-center gap-2">
+                          {i > 0 ? (
+                            <ArrowLeftRight className="h-[15px] w-[15px] text-sc-accent" />
+                          ) : null}
+                          <Flag code={code} />
+                          {countryName(code)}
+                        </span>
+                      ))
+                    : "—"}
                 </span>
                 <span className="sc-nums text-right font-extrabold">
                   {fmtDuration(c.ageSec)}
@@ -104,7 +107,7 @@ export default async function LivePage() {
 
       <Section
         title="Pays et langues actifs"
-        hint="Comptés sur les appels en cours ci-dessus."
+        hint="Comptés sur les appels en cours ci-dessus : un appel entre deux pays compte pour les deux. Chaque arc relie les deux pays d'un appel en cours (pays déduit de la connexion de chaque personne)."
       >
         <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
           <Card className="relative overflow-hidden p-0">

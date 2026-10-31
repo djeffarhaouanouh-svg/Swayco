@@ -149,10 +149,16 @@ export type LiveCall = {
   /** Seconds since the first `call_started` seen for this room. */
   ageSec: number;
   participants: number;
+  /** Premier pays vu pour cette salle (conservé tel quel). */
   country: string | null;
+  /** Pays distincts des participants (chacun envoie son propre call_started). */
+  countries: string[];
   langFrom: string | null;
   langTo: string | null;
 };
+
+/** Un appel en cours entre deux pays différents (arc du globe). */
+export type LiveLink = { a: string; b: string; count: number };
 
 export type LiveSnapshot = {
   /** Rooms with an open call right now. */
@@ -166,6 +172,8 @@ export type LiveSnapshot = {
   calls: LiveCall[];
   countries: Pair[];
   languages: Pair[];
+  /** Appels en cours dont les deux participants sont dans des pays différents. */
+  links: LiveLink[];
 };
 
 /**
@@ -217,6 +225,7 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
       oldest: number;
       people: Set<string>;
       country: string | null;
+      countries: Set<string>;
       langFrom: string | null;
       langTo: string | null;
     }
@@ -235,11 +244,14 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
         oldest: t,
         people: new Set(),
         country: null,
+        countries: new Set(),
         langFrom: null,
         langTo: null,
       };
       byRoom.set(room, entry);
     }
+    const startCountry = str(s.country);
+    if (startCountry) entry.countries.add(startCountry.toUpperCase());
     entry.oldest = Math.min(entry.oldest, t);
     // Guests have no user_id — fall back to the session so they still count.
     const who = str(s.user_id) ?? str(s.session_id);
@@ -256,14 +268,25 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
       ageSec: Math.max(0, Math.round((now - e.oldest) / 1000)),
       participants: e.people.size,
       country: e.country,
+      countries: [...e.countries].sort(),
       langFrom: e.langFrom,
       langTo: e.langTo,
     }))
     .sort((a, b) => b.ageSec - a.ageSec);
 
+  const linkCounts = new Map<string, LiveLink>();
   for (const c of calls) {
-    if (c.country) {
-      countryCounts.set(c.country, (countryCounts.get(c.country) ?? 0) + 1);
+    // Chaque pays impliqué compte une fois par appel (un appel France ↔ Japon
+    // compte pour les deux).
+    for (const code of c.countries) {
+      countryCounts.set(code, (countryCounts.get(code) ?? 0) + 1);
+    }
+    if (c.countries.length >= 2) {
+      const [a, b] = c.countries;
+      const key = `${a}|${b}`;
+      const cur = linkCounts.get(key) ?? { a, b, count: 0 };
+      cur.count++;
+      linkCounts.set(key, cur);
     }
     for (const l of [c.langFrom, c.langTo]) {
       if (l) langCounts.set(l, (langCounts.get(l) ?? 0) + 1);
@@ -281,6 +304,7 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
     calls,
     countries: topPairs(countryCounts, 8),
     languages: topPairs(langCounts, 8),
+    links: [...linkCounts.values()],
   };
 }
 

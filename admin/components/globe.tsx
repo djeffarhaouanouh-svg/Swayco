@@ -12,8 +12,8 @@ import { countryName, fmtInt } from "@/lib/format";
  * - Tourne seul (6°/s). Glisser = faire tourner / incliner ; il reprend
  *   1,2 s après le lâcher. Boutons + − ⟲ et Ctrl/⌘ + molette = zoom.
  * - `pulse` : anneau qui pulse sur chaque marqueur (page Live).
- * - `arcs`  : arcs de grand cercle depuis `origin` vers chaque marqueur, avec
- *   un point jaune qui voyage (page Live).
+ * - `arcs`  : un arc de grand cercle par appel réel en cours entre deux pays
+ *   (`routes`), avec un point jaune qui voyage (page Live).
  * - `labels`: nombre d'étiquettes permanentes (drapeau + pays + nombre) sur
  *   les plus gros marqueurs ; le survol en affiche une pour les autres.
  * - prefers-reduced-motion : plus de rotation auto ni d'animation.
@@ -264,12 +264,11 @@ export function Globe(props: Props) {
       const markers = d.markers;
       const max = Math.max(1, ...markers.map((m) => m.count));
 
-      // arcs de grand cercle depuis l'origine (Live)
-      if (d.arcs && d.origin) {
-        const a = ll(d.origin.lon, d.origin.lat);
-        markers.forEach((m, k) => {
-          if (m.code === d.origin!.code) return;
-          const b = ll(m.lon, m.lat);
+      // arcs de grand cercle : un par appel réel entre deux pays (Live)
+      if (d.arcs) {
+        d.routes.forEach((route, k) => {
+          const a = ll(route.from.lon, route.from.lat);
+          const b = ll(route.to.lon, route.to.lat);
           const dot = clamp(a[0] * b[0] + a[1] * b[1] + a[2] * b[2], -1, 1);
           const om = Math.acos(dot);
           const so = Math.sin(om) || 1;
