@@ -6,6 +6,7 @@ import {
   BadgeCheck,
   Bot,
   LayoutDashboard,
+  ListChecks,
   LogOut,
   Radio,
   Repeat,
@@ -15,12 +16,13 @@ import {
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
-// Mêmes 7 entrées, même ordre, mêmes routes que l'ancienne Sidebar.
+// Les 7 entrées de l'ancienne Sidebar + Onboarding (ajoutée ensuite).
 const NAV = [
   { href: "/", label: "Vue d'ensemble", icon: LayoutDashboard },
   { href: "/tableau", label: "Tableau global", icon: Table2 },
   { href: "/live", label: "Live", icon: Radio },
   { href: "/social", label: "Social", icon: Users },
+  { href: "/onboarding", label: "Onboarding", icon: ListChecks },
   { href: "/retention", label: "Rétention", icon: Repeat },
   { href: "/agents", label: "Comptes IA", icon: Bot },
   { href: "/verifications", label: "Vérifications", icon: BadgeCheck },
