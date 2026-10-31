@@ -479,19 +479,23 @@ export type SocialStats = {
 
 export async function getSocial(days = 30): Promise<SocialStats> {
   const [
-    allFriendships,
-    ai,
+    friendsTotal,
+    friendsNew,
+    pendingRequests,
+    requestsSent,
     likes,
     blocks,
     reports,
     msgs,
     appOpens,
   ] = await Promise.all([
-    pagedRows(
-      "friendships",
-      "requester, addressee, status, created_at, responded_at",
+    // Amitiés : tous les comptes, IA comprises (choix assumé).
+    safeCount("friendships", (q) => q.eq("status", "accepted")),
+    safeCount("friendships", (q) =>
+      q.eq("status", "accepted").gte("responded_at", sinceISO(days)),
     ),
-    aiIdSet(),
+    safeCount("friendships", (q) => q.eq("status", "pending")),
+    safeCount("friendships", (q) => q.gte("created_at", sinceISO(days))),
     safeCount("likes", (q) => q.gte("created_at", sinceISO(days))),
     safeCount("blocked_users"),
     safeCount("reports", (q) => q.gte("created_at", sinceISO(days))),
@@ -504,29 +508,6 @@ export async function getSocial(days = 30): Promise<SocialStats> {
         .limit(100000),
     ),
   ]);
-
-  // Amitiés entre vrais utilisateurs : toute ligne dont l'un des deux côtés est
-  // un compte IA est écartée (les acceptations automatiques des IA gonflaient
-  // les « amis » et les « demandes »).
-  const sinceMs = Date.now() - days * DAY_MS;
-  const afterWindow = (v: unknown): boolean => {
-    const t = typeof v === "string" ? Date.parse(v) : NaN;
-    return Number.isFinite(t) && t >= sinceMs;
-  };
-  let friendsTotal = 0;
-  let friendsNew = 0;
-  let pendingRequests = 0;
-  let requestsSent = 0;
-  for (const f of allFriendships) {
-    if (ai.has(str(f.requester) ?? "") || ai.has(str(f.addressee) ?? "")) continue;
-    if (f.status === "accepted") {
-      friendsTotal++;
-      if (afterWindow(f.responded_at)) friendsNew++;
-    } else if (f.status === "pending") {
-      pendingRequests++;
-    }
-    if (afterWindow(f.created_at)) requestsSent++;
-  }
 
   // "Revient parler à la même personne": a conversation carrying messages
   // on ≥ 2 distinct days means at least one side came back to that person
