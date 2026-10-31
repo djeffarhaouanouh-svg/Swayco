@@ -353,6 +353,23 @@ function replyDelayForLevel(messageId, level) {
   return lo + (Math.floor(h / 100) % (hi - lo));
 }
 
+// ── Nouvel inscrit : les 48 premières heures, l'IA répond vite ───────────────
+// La première impression décide de la rétention : 3 à 10 min, même la nuit, et
+// jusqu'à 10 réponses par jour et par conversation. Passé 48 h, retour au
+// comportement normal (niveau d'attention, sommeil, quota du niveau).
+const NEWCOMER_WINDOW_MS = 48 * HOUR;
+const NEWCOMER_REPLIES_PER_DAY = 10;
+
+function isNewcomer(profile) {
+  const t = Date.parse(profile?.created_at || '');
+  return Number.isFinite(t) && Date.now() - t < NEWCOMER_WINDOW_MS;
+}
+
+/** Délai stable pour un message : 3 à 10 min. */
+function newcomerDelayMs(messageId) {
+  return 3 * MIN + (hash(`newcomer:${messageId}`) % (7 * MIN));
+}
+
 // ── Style de la réponse (tiré au sort, SANS appel de plus) ───────────────────
 // Parmi : réaction sans question / petite anecdote / question naturelle /
 // taquinerie ou avis différent / réponse courte sans relance. Les poids (en %)
@@ -723,11 +740,15 @@ async function processReplies(ctx) {
     if (prot.has(m.sender)) continue; // protégé : aucune IA ne lui répond
     const instant = TEST_INSTANT_TARGETS.has(m.sender);
     const level = await attentionLevel(sb, m.recipient).catch(() => 3);
-    if (!instant && now - Date.parse(m.created_at) < replyDelayForLevel(m.id, level)) continue;
-    const dailyLimit = instant ? Infinity : (REPLIES_BY_LEVEL[level] ?? REPLIES_PER_DAY);
+    // Nouvel inscrit (< 48 h) : réponse rapide, sans sommeil, quota large.
+    const newcomer = !instant && isNewcomer(await getProfile(sb, m.sender));
+    const delay = newcomer ? newcomerDelayMs(m.id) : replyDelayForLevel(m.id, level);
+    if (!instant && now - Date.parse(m.created_at) < delay) continue;
+    const dailyLimit = instant ? Infinity : newcomer ? NEWCOMER_REPLIES_PER_DAY
+      : (REPLIES_BY_LEVEL[level] ?? REPLIES_PER_DAY);
 
     // Endormie : elle répondra à son réveil (le message reste dans la fenêtre).
-    if (!instant) {
+    if (!instant && !newcomer) {
       const sleeper = await getProfile(sb, m.recipient);
       if (!sleeper || !isAwake(sleeper)) continue;
     }
@@ -1152,6 +1173,7 @@ module.exports = {
   _test: {
     hash, replyDelayMs, utcDayStart, containsCliche, systemPrompt, convIdFor, aiLabel,
     levelFor, levelWithHysteresis, nextLevel, replyDelayForLevel, REPLIES_BY_LEVEL,
+    isNewcomer, newcomerDelayMs, NEWCOMER_REPLIES_PER_DAY,
     DELAY_BY_LEVEL, MAX_DELAY_MS, REPLY_WINDOW_MS, STYLE_WEIGHTS, pickStyle,
     welcomeTarget, welcomeSequence, continentOf, photoPostedAt, WELCOME_DAYS, WELCOME_LIKES_TOTAL, LATAM, ASIA, autoWelcome,
     autoAcceptLikes, acceptRoll, ACCEPT_CHANCE, AUTO_ACCEPT_PER_USER_PER_DAY,

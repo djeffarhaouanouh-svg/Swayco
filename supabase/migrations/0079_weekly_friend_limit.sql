@@ -1,6 +1,6 @@
 -- 0079_weekly_friend_limit.sql
 --
--- Plafond d'amis (= matchs) par semaine pour un compte SANS Pro : 4 sur 7 jours
+-- Plafond d'amis (= matchs) par semaine pour un compte SANS Pro : 5 sur 7 jours
 -- glissants. Appliqué dans la base, donc impossible à contourner depuis l'app
 -- (le client écrit directement dans `friendships`).
 --
@@ -8,7 +8,7 @@
 -- trigger vérifie chaque personne de la ligne :
 --   * compte IA (profiles.is_ai) : jamais plafonné ;
 --   * compte Pro (is_pro) ou abonné (subscription_tier <> 'free') : jamais plafonné ;
---   * sinon : au moins 4 amis déjà acceptés sur les 7 derniers jours → refus.
+--   * sinon : au moins 5 amis déjà acceptés sur les 7 derniers jours → refus.
 -- Les amitiés déjà existantes ne sont pas touchées.
 --
 -- Erreur renvoyée : message 'weekly_friend_limit' (SQLSTATE P0001). L'app l'affiche
@@ -25,7 +25,7 @@ security definer
 set search_path = public
 as $$
 declare
-  v_limit constant int := 4;
+  v_limit constant int := 5;
   v_window constant interval := interval '7 days';
   v_user uuid;
   v_count int;

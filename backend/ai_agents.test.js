@@ -55,6 +55,16 @@ test('hysteresis: no flip-flop around a threshold', () => {
 
 // ── Délais, fenêtre, sommeil ────────────────────────────────────────────────
 
+test('newcomer (< 48 h): replies in 3-10 min, stable; older accounts are not newcomers', () => {
+  const ds = Array.from({ length: 2000 }, (_, i) => t.newcomerDelayMs(`msg-${i}`));
+  assert.ok(Math.min(...ds) >= 3 * 60 * 1000 && Math.max(...ds) < 10 * 60 * 1000);
+  assert.equal(t.newcomerDelayMs('msg-7'), t.newcomerDelayMs('msg-7'));
+  assert.equal(t.isNewcomer({ created_at: new Date(Date.now() - 2 * HOUR).toISOString() }), true);
+  assert.equal(t.isNewcomer({ created_at: new Date(Date.now() - 49 * HOUR).toISOString() }), false);
+  assert.equal(t.isNewcomer(null), false);
+  assert.equal(t.NEWCOMER_REPLIES_PER_DAY, 10);
+});
+
 test('reply delays: stable, varied, ordered by level, and inside the reply window', () => {
   const stats = {};
   for (const level of [3, 2, 1]) {
