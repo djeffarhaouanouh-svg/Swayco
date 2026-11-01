@@ -63,7 +63,7 @@ export default async function OnboardingPage({
 
   const get = (label: string) => r.after.find((a) => a.label === label);
   const liked = get("Ont liké quelqu'un");
-  const back = get("Sont revenus un autre jour");
+  const back = get("Sont retournés dans l'app un autre jour");
 
   return (
     <>
@@ -103,7 +103,7 @@ export default async function OnboardingPage({
               sub: `${fmtInt(liked?.count ?? 0)} sur ${fmtInt(r.completed)}`,
             },
             {
-              label: "Revenus un autre jour",
+              label: "Retournés un autre jour",
               value: fmtPct(back?.pct ?? 0),
               sub: `${fmtInt(back?.count ?? 0)} sur ${fmtInt(r.completed)}`,
             },
@@ -201,7 +201,7 @@ export default async function OnboardingPage({
 
       <Section
         title="Derniers inscrits"
-        hint="Les 15 plus récents. Une coche = fait au moins une fois sur la période."
+        hint="Les 15 plus récents. Une coche = fait au moins une fois sur la période. « Retour » = a rouvert l'app sur au moins 2 jours différents."
       >
         <GridTable
           cols={RECENT_COLS}
@@ -213,7 +213,7 @@ export default async function OnboardingPage({
             { label: "Photo" },
             { label: "Like" },
             { label: "Message" },
-            { label: "Revenu" },
+            { label: "Retour" },
           ]}
         >
           {r.recent.length === 0 ? (

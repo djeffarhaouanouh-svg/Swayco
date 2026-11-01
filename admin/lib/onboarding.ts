@@ -247,7 +247,7 @@ export async function getOnboardingReport(days = 30): Promise<OnboardingReport> 
     { label: "Ont regardé une pub (like débloqué)", count: withEvent("ad_watched") },
     { label: "Ont lancé un appel", count: withEvent("call_started") },
     {
-      label: "Sont revenus un autre jour",
+      label: "Sont retournés dans l'app un autre jour",
       hint: "événements sur au moins 2 jours",
       count: [...returned].filter((u) => cohortIds.has(u)).length,
     },
