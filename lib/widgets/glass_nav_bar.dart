@@ -37,9 +37,9 @@ double _navPeakLens(int i, double frac, {double amp = 0.45}) {
   return 1.0 + amp * (1.0 - d);
 }
 
-/// Taille des icônes de la barre. Plus de nom dessous : elles prennent la place
-/// (22 avant).
-const double _kNavIconSize = 28;
+/// Taille des icônes de la barre. Plus de nom dessous : elles récupèrent sa
+/// place (icône 22 + écart 3 + nom 9 = ~34 de haut avant ; 22 pour l'icône seule).
+const double _kNavIconSize = 32;
 
 /// Label painted on a nav-bar unread chip. A single arrival is a dot
 /// (`null`); two or more show `+N`, capped at `+99`.
