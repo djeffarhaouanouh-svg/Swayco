@@ -37,6 +37,10 @@ double _navPeakLens(int i, double frac, {double amp = 0.45}) {
   return 1.0 + amp * (1.0 - d);
 }
 
+/// Taille des icônes de la barre. Plus de nom dessous : elles prennent la place
+/// (22 avant).
+const double _kNavIconSize = 28;
+
 /// Label painted on a nav-bar unread chip. A single arrival is a dot
 /// (`null`); two or more show `+N`, capped at `+99`.
 String? navBarUnreadLabel(int count) {
@@ -458,7 +462,13 @@ class _NavItemState extends State<_NavItem>
     // on selection; the swipe lens magnifies as the pill nears.
     return SpringPress(
       onTap: widget.onTap,
-      child: Column(
+      child: Semantics(
+        // Le nom n'est plus affiché : le lecteur d'écran le lit toujours.
+        label: widget.data.label,
+        button: true,
+        selected: widget.selected,
+        excludeSemantics: true,
+        child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           _badged(
@@ -475,7 +485,7 @@ class _NavItemState extends State<_NavItem>
                     ? SwaycoNavIcon(
                         kind: widget.data.kind!,
                         key: ValueKey(widget.selected),
-                        size: 22,
+                        size: _kNavIconSize,
                         color: widget.selected ? _navActiveColor() : _navInactiveColor(),
                       )
                     : widget.data.assetIcon != null
@@ -484,8 +494,8 @@ class _NavItemState extends State<_NavItem>
                             ? widget.data.assetSelectedIcon!
                             : widget.data.assetIcon!,
                         key: ValueKey(widget.selected),
-                        width: 22,
-                        height: 22,
+                        width: _kNavIconSize,
+                        height: _kNavIconSize,
                         // The filled coconut carries its own two-tone shading
                         // (the dark rim of the opening) — flattening it through
                         // a srcIn filter would erase that, so only the outline
@@ -503,27 +513,17 @@ class _NavItemState extends State<_NavItem>
                             ? widget.data.selectedIcon
                             : widget.data.icon,
                         key: ValueKey(widget.selected),
-                        size: 22,
+                        size: _kNavIconSize,
                         color: widget.selected ? _navActiveColor() : _navInactiveColor(),
                       ),
               ),
             ),
             widget.data.badge,
           ),
-          const SizedBox(height: 3),
-          Text(
-            widget.data.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
-              letterSpacing: 0.1,
-              height: 1,
-              color: widget.selected ? _navActiveColor() : _navInactiveColor(),
-            ),
-          ),
+          // Plus de nom sous l'icône : seule l'icône parle. Le nom reste lu par
+          // le lecteur d'écran (Semantics ci-dessus).
         ],
+      ),
       ),
     );
   }
