@@ -1,5 +1,9 @@
 # --- Flutter Web (release) ---
-FROM ghcr.io/cirruslabs/flutter:stable AS flutter-build
+# Pinned to the release Flutter (see CLAUDE.md, FLUTTER_VERSION in
+# ios-release.yml). `stable` moves on: from Flutter 3.47 / Dart 3.13 on,
+# livekit_client 2.7.0 no longer compiles, the web build fails here and Railway
+# keeps serving the previous bundle.
+FROM ghcr.io/cirruslabs/flutter:3.41.2 AS flutter-build
 
 WORKDIR /app
 COPY pubspec.yaml pubspec.lock ./
