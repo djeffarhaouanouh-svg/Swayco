@@ -1062,6 +1062,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         recipientId: widget.peerDeviceId,
         bytes: bytes,
         durationMs: durationMs,
+        senderLang: _myLang,
         recipientLang: _peer?.language ?? '',
       );
       Analytics.track(
@@ -2231,6 +2232,14 @@ class _MessageBubbleState extends State<_MessageBubble> {
 
     // Un vocal a sa largeur (maquette 1e) : min(262, 70 %) reçu, min(240, 66 %)
     // envoyé, bulle comprise ; le padding de 15 de chaque côté s'en retranche.
+    // Transcription en route : deux lignes grises sous l'onde d'un vocal reçu,
+    // pendant 90 s au plus (au-delà, elle ne viendra plus : on n'attend pas
+    // indéfiniment).
+    final voiceSkeleton = message.isVoice &&
+        !mine &&
+        message.body.trim().isEmpty &&
+        DateTime.now().difference(message.createdAt) <
+            const Duration(seconds: 90);
     final screenW = MediaQuery.of(context).size.width;
     final voiceInnerW =
         (mine ? math.min(240.0, screenW * 0.66) : math.min(262.0, screenW * 0.7)) -
@@ -2361,6 +2370,36 @@ class _MessageBubbleState extends State<_MessageBubble> {
               ),
             ),
           ),
+        if (voiceSkeleton)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.only(top: 9),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: bubbleText.withValues(alpha: 0.12)),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final f in const [1.0, 0.6])
+                  Padding(
+                    padding: EdgeInsets.only(top: f == 1.0 ? 0 : 6),
+                    child: FractionallySizedBox(
+                      widthFactor: f,
+                      child: Container(
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: bubbleText.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         // When [displayBody] is empty, drop the Text node entirely so
         // the bubble shows no phantom line.
         if (displayBody.isNotEmpty && !message.isVoice)
@@ -2446,7 +2485,9 @@ class _MessageBubbleState extends State<_MessageBubble> {
                             15,
                             7,
                             15,
-                            !mine && displayBody.isNotEmpty ? 11 : 7,
+                            !mine && (displayBody.isNotEmpty || voiceSkeleton)
+                                ? 11
+                                : 7,
                           )
                         : const EdgeInsets.fromLTRB(15, 11, 15, 11),
                 constraints: BoxConstraints(

@@ -48,6 +48,8 @@ COPY backend/email.js ./email.js
 COPY backend/engagement.js ./engagement.js
 # Comptes IA (file d'actions, repondeur) — required by server.js (require('./ai_agents')).
 COPY backend/ai_agents.js ./ai_agents.js
+# Transcription des vocaux du chat — required by server.js (require('./voice_transcribe')).
+COPY backend/voice_transcribe.js ./voice_transcribe.js
 COPY --from=flutter-build /app/build/web ./web
 # Static legal site (Terms / Privacy / Help) — served by server.js at
 # /terms, /privacy, /help, /legal alongside the Flutter web bundle.

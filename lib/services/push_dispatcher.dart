@@ -18,6 +18,10 @@ abstract final class PushDispatcher {
   /// sits in front of the Flutter web bundle on the same host);
   /// otherwise fall back to the configured base. Mirrors the resolver
   /// in `token_api.dart`.
+  /// Public : les autres appels au backend (transcription des vocaux) passent
+  /// par le même résolveur d'adresse.
+  static Uri apiUri(String path) => _apiUri(path);
+
   static Uri _apiUri(String path) {
     const fromEnv = String.fromEnvironment('TOKEN_API_BASE');
     if (fromEnv.isNotEmpty) {

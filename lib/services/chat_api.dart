@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_strings.dart';
@@ -376,8 +378,8 @@ abstract final class ChatApi {
 
   /// Upload a voice note ([bytes], AAC in an .m4a) to the `voice-messages`
   /// bucket — in the sender's own folder, which is what the storage policy
-  /// allows — and insert the message. `body` stays empty: nothing transcribes
-  /// the note yet (no backend route), so the other side gets the player alone.
+  /// allows — and insert the message. `body` starts empty; the backend then
+  /// transcribes the note ([_transcribeVoice]) and writes the words into it.
   /// Push: "Message vocal", in the recipient's language.
   static Future<void> sendVoice({
     required String conversationId,
@@ -386,6 +388,7 @@ abstract final class ChatApi {
     required String recipientId,
     required Uint8List bytes,
     required int durationMs,
+    String senderLang = '',
     String recipientLang = '',
   }) async {
     if (bytes.isEmpty || durationMs <= 0) throw ArgumentError('vocal vide');
@@ -412,8 +415,9 @@ abstract final class ChatApi {
       'audio_url': url,
       'audio_duration_ms': durationMs,
     };
+    Map<String, dynamic> inserted;
     try {
-      await _client.from('messages').insert(row);
+      inserted = await _client.from('messages').insert(row).select('id').single();
     } on PostgrestException catch (e) {
       // Colonne de durée absente (migration 0081 pas encore appliquée) : le
       // vocal part quand même, la bulle lira la durée dans le fichier.
@@ -421,8 +425,11 @@ abstract final class ChatApi {
         rethrow;
       }
       row.remove('audio_duration_ms');
-      await _client.from('messages').insert(row);
+      inserted = await _client.from('messages').insert(row).select('id').single();
     }
+    // Le texte arrive après coup : le backend transcrit, écrit `body`, et le
+    // temps réel le pousse aux deux bulles.
+    unawaited(_transcribeVoice(inserted['id']?.toString() ?? '', senderLang));
     unawaited(_notifyMessage(
       recipientId: recipientId,
       recipientLang: recipientLang,
@@ -431,6 +438,41 @@ abstract final class ChatApi {
       senderId: senderId,
       voiceBody: true,
     ));
+  }
+
+  /// Demande au backend de transcrire mon vocal [messageId] (POST
+  /// /messages/voice/transcribe). Best-effort, une seule relance : sans réponse,
+  /// la bulle reste sans texte, le vocal s'écoute quand même.
+  static Future<void> _transcribeVoice(String messageId, String lang) async {
+    if (messageId.isEmpty) return;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final token = _client.auth.currentSession?.accessToken;
+        if (token == null) return;
+        final res = await http
+            .post(
+              PushDispatcher.apiUri('/messages/voice/transcribe'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: jsonEncode({
+                'messageId': messageId,
+                if (lang.isNotEmpty) 'language': lang,
+              }),
+            )
+            .timeout(const Duration(seconds: 60));
+        if (res.statusCode == 200) return;
+        // 4xx : la demande elle-même est refusée, la refaire n'y changerait rien.
+        if (res.statusCode >= 400 && res.statusCode < 500) {
+          debugPrint('voice transcribe refused: ${res.statusCode} ${res.body}');
+          return;
+        }
+      } catch (e) {
+        debugPrint('voice transcribe failed: $e');
+      }
+      await Future<void>.delayed(const Duration(seconds: 3));
+    }
   }
 
   /// Envoie un GIF : le fichier reste chez Giphy, on ne stocke que son URL

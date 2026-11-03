@@ -11,6 +11,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const { AccessToken } = require('livekit-server-sdk');
 const { notifyUser, scheduleNotify } = require('./notify');
+const { transcribeVoiceMessage } = require('./voice_transcribe');
 const { onlineNotif } = require('./nationalities');
 const { track, ingestEvents, countryFromReq } = require('./analytics');
 const {
@@ -2367,6 +2368,28 @@ app.post(CLIP_STT_PATHS, _limTight, voiceUpload.single('audio'), async (req, res
     // is visible in a network trace too, not only in the server logs.
     ...(probe ? { fixed: probe.fixed, repaired: probe.repaired } : {}),
   });
+});
+
+// Transcription d'un vocal du chat. Body: { messageId, language? }. Le JWT donne
+// l'expéditeur : on ne transcrit que ses propres vocaux. Voir voice_transcribe.js.
+app.post('/messages/voice/transcribe', _limTight, async (req, res) => {
+  const uid = await stripeAuthUserId(req);
+  if (!uid) return res.status(401).json({ error: 'unauthenticated' });
+  try {
+    const out = await transcribeVoiceMessage({
+      sb: supabase(),
+      uid,
+      messageId: req.body?.messageId,
+      hintLang: req.body?.language,
+      supabaseUrl: SUPABASE_URL,
+      openaiKey: OPENAI_API_KEY,
+      model: WHISPER_MODEL,
+    });
+    return res.status(out.status).json(out.body);
+  } catch (e) {
+    console.error('/messages/voice/transcribe error', e);
+    return res.status(500).json({ error: 'transcribe_failed' });
+  }
 });
 
 // Stripe Checkout — body: { tier: 'plus' | 'pro' | 'ultra' }. Authorization
