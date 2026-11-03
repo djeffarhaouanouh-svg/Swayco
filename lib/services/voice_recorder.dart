@@ -62,8 +62,8 @@ const int kVoiceLevelCount = 40;
 /// dB -> 0..1 : -45 dB (presque le silence) à 0 dB.
 double voiceLevelFromDb(double db) => ((db + 45) / 45).clamp(0.0, 1.0);
 
-/// L'enregistreur des vocaux du chat : AAC-LC dans un .m4a (Opus dans un .webm
-/// sur le web), 44,1 kHz, mono, 64 kbit/s. Rien à voir avec l'enregistreur des
+/// L'enregistreur des vocaux du chat : AAC-LC dans un .m4a, 44,1 kHz, mono,
+/// 64 kbit/s (un .wav 16 kHz sur le web). Rien à voir avec l'enregistreur des
 /// appels (WebRTC).
 ///
 /// Le fichier vit dans le dossier temporaire et disparaît dès qu'on envoie ou
@@ -128,10 +128,17 @@ class VoiceRecorder extends ChangeNotifier {
       if (_state == VoiceRecState.idle) return VoiceStart.failed;
       await _rec.start(
         RecordConfig(
-          encoder: kIsWeb ? AudioEncoder.opus : AudioEncoder.aacLc,
-          sampleRate: 44100,
+          // Web : du WAV (PCM 16 bits, 16 kHz, mono). Le MediaRecorder du
+          // navigateur écrit du WebM (Chrome) ou du MP4 (Safari / iPhone) selon
+          // l'appareil, et l'iPhone échouait à décoder ce que le plugin
+          // produisait (« media failed to decode »). Le WAV se lit partout ; à
+          // 16 kHz il pèse ~32 Ko/s, soit 1,9 Mo pour 60 s (< 2 Mo du dossier).
+          encoder: kIsWeb ? AudioEncoder.wav : AudioEncoder.aacLc,
+          sampleRate: kIsWeb ? 16000 : 44100,
           numChannels: 1,
           bitRate: 64000,
+          // Moins de blocs à recoller côté plugin : 8192 échantillons par bloc.
+          streamBufferSize: kIsWeb ? 8192 : null,
         ),
         path: path,
       );
