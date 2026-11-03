@@ -3550,28 +3550,19 @@ class _ComposerState extends State<_Composer>
                                     horizontal: 9,
                                     vertical: 5,
                                   ),
-                                  // En clair : les couleurs de l'ancien rond GIF
-                                  // (jaune plein, texte foncé) — un contour jaune
-                                  // sur blanc ne se voyait pas. En sombre : le
-                                  // contour jaune de la maquette.
+                                  // Les couleurs de l'ancien rond GIF, clair comme
+                                  // sombre : jaune plein, texte bleu foncé (un
+                                  // contour jaune ne se voyait pas sur blanc).
                                   decoration: BoxDecoration(
-                                    color: SC.light ? SC.accent : null,
+                                    color: SC.accent,
                                     borderRadius: BorderRadius.circular(99),
-                                    border: SC.light
-                                        ? null
-                                        : Border.all(
-                                            color: SC.accent
-                                                .withValues(alpha: 0.6),
-                                            width: 1.2,
-                                          ),
                                   ),
                                   child: Text(
                                     'GIF',
                                     style: popupDisplay(
                                       fontSize: 11,
                                       letterSpacing: 0.2,
-                                      color:
-                                          SC.light ? SC.onAccent : SC.accent,
+                                      color: SC.onAccent,
                                     ),
                                   ),
                                 ),
