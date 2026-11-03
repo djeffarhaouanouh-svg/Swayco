@@ -36,9 +36,14 @@ double voiceLevelFromDb(double db) => ((db + 45) / 45).clamp(0.0, 1.0);
 /// Le fichier vit dans le dossier temporaire et disparaît dès qu'on envoie ou
 /// qu'on annule.
 class VoiceRecorder extends ChangeNotifier {
-  VoiceRecorder({AudioRecorder? recorder}) : _rec = recorder ?? AudioRecorder();
+  VoiceRecorder({AudioRecorder? recorder}) : _recorder = recorder;
 
-  final AudioRecorder _rec;
+  AudioRecorder? _recorder;
+
+  /// Créé au premier usage seulement : le composer fabrique un VoiceRecorder à
+  /// chaque ouverture d'une conversation, et un plugin qui coince (plateforme
+  /// sans micro) ne doit pas pouvoir casser la barre d'écriture tout entière.
+  AudioRecorder get _rec => _recorder ??= AudioRecorder();
 
   VoiceRecState _state = VoiceRecState.idle;
   VoiceRecState get state => _state;
@@ -218,15 +223,18 @@ class VoiceRecorder extends ChangeNotifier {
     _tick?.cancel();
     _amp?.cancel();
     final path = _path;
-    unawaited(() async {
-      try {
-        await _rec.cancel();
-      } catch (_) {}
-      if (path != null) await _delete(path);
-      try {
-        await _rec.dispose();
-      } catch (_) {}
-    }());
+    final rec = _recorder; // jamais créé = rien à fermer
+    if (rec != null) {
+      unawaited(() async {
+        try {
+          await rec.cancel();
+        } catch (_) {}
+        if (path != null) await _delete(path);
+        try {
+          await rec.dispose();
+        } catch (_) {}
+      }());
+    }
     super.dispose();
   }
 }
