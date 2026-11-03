@@ -2671,7 +2671,29 @@ app.get('/email/unsubscribe', async (req, res) => {
 });
 
 if (hasWebUi) {
-  app.use(express.static(webPath));
+  // The app shell (main.dart.js, the bootstrap, the service worker…) keeps the
+  // same URL from one deploy to the next. Behind Cloudflare it was served with
+  // `max-age=14400`, and a normal reload only revalidates the page itself, so a
+  // new deploy stayed invisible for up to 4 hours. `no-cache` = "keep a copy, but
+  // ask (ETag) before using it": a 304 when nothing changed, the new file when
+  // it did. Fonts, canvaskit and assets keep their long cache.
+  const APP_SHELL = new Set([
+    '/index.html',
+    '/main.dart.js',
+    '/flutter.js',
+    '/flutter_bootstrap.js',
+    '/flutter_service_worker.js',
+    '/version.json',
+    '/manifest.json',
+  ]);
+  app.use(
+    express.static(webPath, {
+      setHeaders(res, filePath) {
+        const name = `/${require('path').basename(filePath)}`;
+        if (APP_SHELL.has(name)) res.setHeader('Cache-Control', 'no-cache');
+      },
+    }),
+  );
   app.use((req, res, next) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       return next();
