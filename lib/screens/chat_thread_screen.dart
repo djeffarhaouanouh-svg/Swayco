@@ -3550,19 +3550,29 @@ class _ComposerState extends State<_Composer>
                                     horizontal: 9,
                                     vertical: 5,
                                   ),
-                                  // Les couleurs de l'ancien rond GIF, clair comme
-                                  // sombre : jaune plein, texte bleu foncé (un
-                                  // contour jaune ne se voyait pas sur blanc).
+                                  // MODE CLAIR seulement : les couleurs de l'ancien
+                                  // rond GIF (jaune plein, texte bleu foncé) — un
+                                  // contour jaune ne se voyait pas sur blanc. Le
+                                  // mode sombre garde le contour jaune de la
+                                  // maquette.
                                   decoration: BoxDecoration(
-                                    color: SC.accent,
+                                    color: SC.light ? SC.accent : null,
                                     borderRadius: BorderRadius.circular(99),
+                                    border: SC.light
+                                        ? null
+                                        : Border.all(
+                                            color: SC.accent
+                                                .withValues(alpha: 0.6),
+                                            width: 1.2,
+                                          ),
                                   ),
                                   child: Text(
                                     'GIF',
                                     style: popupDisplay(
                                       fontSize: 11,
                                       letterSpacing: 0.2,
-                                      color: SC.onAccent,
+                                      color:
+                                          SC.light ? SC.onAccent : SC.accent,
                                     ),
                                   ),
                                 ),
