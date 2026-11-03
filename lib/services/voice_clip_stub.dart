@@ -21,8 +21,16 @@ class _AudioPlayersClip implements VoiceClip {
   @override
   Stream<void> get completed => _p.onPlayerComplete;
 
+  /// `onLog` mélange infos et erreurs : sur iPhone il émet à chaque changement
+  /// d'état (« player status: AVPlayerItemStatus(rawValue: 1) » = prêt à lire).
+  /// Seuls les vrais messages d'erreur passent ; un échec de `play()` lui-même
+  /// est déjà attrapé par le widget.
   @override
-  Stream<String> get errors => _p.onLog;
+  Stream<String> get errors => _p.onLog.where(
+        (m) => RegExp(r'error|fail|exception|invalid|unsupported|cannot|could not',
+                caseSensitive: false)
+            .hasMatch(m),
+      );
 
   @override
   Future<void> play(String url) => _p.play(UrlSource(url));
