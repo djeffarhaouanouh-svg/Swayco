@@ -44,6 +44,7 @@ import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../widgets/appear.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/nav_auto_hide.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/spoken_language_gate.dart';
@@ -738,8 +739,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     overlay.insert(entry);
   }
 
+  /// La barre du bas se range pendant que la liste défile, et revient 0,9 s
+  /// après l'arrêt (NavAutoHide enveloppe tout l'écran : les notifications de
+  /// défilement de la liste y remontent).
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      NavAutoHide(tab: NavTab.chat, child: _buildScaffold(context));
+
+  Widget _buildScaffold(BuildContext context) {
     final navBody =
         GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     return Scaffold(

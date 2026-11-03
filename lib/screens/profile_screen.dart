@@ -36,6 +36,7 @@ import '../services/web_poll.dart';
 import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/nav_auto_hide.dart';
 import '../widgets/fade_scale_route.dart';
 import '../widgets/info_bento.dart';
 import '../widgets/profile_info_card.dart';
@@ -1017,6 +1018,15 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    final page = _buildPage(context);
+    // Seulement l'onglet Profil : la page d'un pair ou l'aperçu de ma carte sont
+    // poussés par-dessus, avec leur propre barre, qu'ils ne doivent pas ranger.
+    return _isViewingOther
+        ? page
+        : NavAutoHide(tab: NavTab.profile, child: page);
+  }
+
+  Widget _buildPage(BuildContext context) {
     final lang = findLanguageByCode(_languageCode);
     // Flag shown right of the name: the COUNTRY flag once a location is set
     // (the spoken language doesn't always match â a Brazilian speaks

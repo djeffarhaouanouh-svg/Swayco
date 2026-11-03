@@ -530,9 +530,24 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   int _adAfter = _nextAdGap();
   bool _showAdCard = false;
 
+  /// La barre du bas est rangée par le glisser d'une carte (pas par le panneau
+  /// d'infos) : la carte et ✕ ✉ ❤ descendent dans sa place, au-dessus de la
+  /// poignée.
+  bool _navAway = false;
+
+  void _syncNavAway() {
+    final v = NavChrome.autoHidden.value;
+    if (mounted && v != _navAway) setState(() => _navAway = v);
+  }
+
+  void _onCardDragEngaged() => NavChrome.hideAuto();
+  void _onCardDragReleased() =>
+      NavChrome.showAfter(const Duration(milliseconds: 1900));
+
   @override
   void initState() {
     super.initState();
+    NavChrome.autoHidden.addListener(_syncNavAway);
     Analytics.track('screen_view', props: {'screen': 'discover'});
     // Le genre choisi la derniere fois : applique au deck des qu'il est lu.
     UserPrefs.loadDiscoverGender().then((v) {
@@ -574,6 +589,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   @override
   void dispose() {
+    NavChrome.autoHidden.removeListener(_syncNavAway);
     NavChrome.show();
     _pollTimer?.cancel();
     MatchCelebration.matchesChanged.removeListener(_refreshFriendships);
@@ -928,9 +944,19 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     // Handoff 3c, de haut en bas : logo · rangée de pays · carte · ✕ ✉ ❤ ·
     // nav. La rangée d'actions se pose sur la nav avec sa propre respiration
     // (16 dessus, 16 dessous) — plus de bande blanche.
-    final btnBottom =
+    final btnBottomShown =
         GlassNavBar.totalReservedHeight + safeBottom + _kActionPadV;
+    // Barre rangée : les boutons descendent dans sa place, au-dessus de la
+    // poignée.
+    final btnBottomAway =
+        math.max(safeBottom + _kActionPadV, NavChrome.handleZone + 4);
+    final btnBottom = _navAway ? btnBottomAway : btnBottomShown;
     final cardBottom = btnBottom + _kActionSize + _kActionPadV;
+    // La carte et les boutons suivent la barre un peu plus lentement que le
+    // panneau d'infos. « Réduire les animations » : instantané.
+    final moveDuration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : Duration(milliseconds: _infoOpen ? 260 : 420);
     final headerBottom = safeTop + _DiscoverHeader.height + _CountryRow.height;
 
     // Panneau ouvert : la carte prend toute la hauteur — elle monte par-dessus
@@ -966,7 +992,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
           // ── Card ─────────────────────────────────────────────────────────
           AnimatedPositioned(
-            duration: const Duration(milliseconds: 260),
+            duration: moveDuration,
             curve: Curves.easeOutCubic,
             top: currentCardTop,
             left: _kCardInset,
@@ -1012,6 +1038,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             onPullUp: _openInfo,
                             infoOpen: _infoOpen,
                             onCloseInfo: _closeInfo,
+                            onDragEngaged: _onCardDragEngaged,
+                            onDragReleased: _onCardDragReleased,
                             // Le retour vit DANS la carte : il glisse avec
                             // elle au swipe. Retiré pendant la transition
                             // "Go" et le panneau infos.
@@ -1072,7 +1100,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           // ── ✕ · message direct · ❤ — sous la carte au repos, flottant
           //    PAR-DESSUS elle (sur le panneau) dès qu'il est déplié. ─────────
           AnimatedPositioned(
-            duration: const Duration(milliseconds: 260),
+            duration: moveDuration,
             curve: Curves.easeOutCubic,
             left: 0,
             right: 0,
@@ -2046,7 +2074,13 @@ class _TinderCardStack extends StatefulWidget {
     required this.infoOpen,
     required this.onCloseInfo,
     this.topRightBadge,
+    this.onDragEngaged,
+    this.onDragReleased,
   });
+
+  /// Transmis à la carte du dessus : la main glisse / lâche la carte.
+  final VoidCallback? onDragEngaged;
+  final VoidCallback? onDragReleased;
 
   final List<({RemoteProfile profile, List<String> photos})> cards;
   final int currentIndex;
@@ -2181,6 +2215,8 @@ class _TinderCardStackState extends State<_TinderCardStack> {
               onPullUp: widget.onPullUp,
               locked: widget.infoOpen,
               topRightBadge: widget.topRightBadge,
+              onDragEngaged: widget.onDragEngaged,
+              onDragReleased: widget.onDragReleased,
               child: _buildCard(widget.cards[i]),
             ),
           ),
@@ -2907,10 +2943,18 @@ class _DraggableCard extends StatefulWidget {
     this.onPullUp,
     this.locked = false,
     this.topRightBadge,
+    this.onDragEngaged,
+    this.onDragReleased,
   });
   final Widget child;
   final ValueChanged<bool> onSwiped;
   final ValueChanged<double> onProgress;
+
+  /// La main prend la carte pour la glisser à l'horizontale / la lâche : la
+  /// barre du bas se range, puis revient. Le tirage vers le HAUT (panneau
+  /// d'infos) n'appelle ni l'un ni l'autre ; les boutons ✕ / ❤ non plus.
+  final VoidCallback? onDragEngaged;
+  final VoidCallback? onDragReleased;
 
   /// Fired when the gesture was a real upward pull — the info panel opens
   /// instead of the card flying off.
@@ -3046,6 +3090,7 @@ class _DraggableCardState extends State<_DraggableCard>
           _dragEngaged = true;
           _ctrl.stop();
           _anim = null;
+          if (!_pullingUp) widget.onDragEngaged?.call();
         }
         if (_pullingUp) {
           // On laisse la carte immobile : le panneau fera l'animation.
@@ -3064,6 +3109,7 @@ class _DraggableCardState extends State<_DraggableCard>
         _dragEngaged = false;
         _pullingUp = false;
         _dragOrigin = null;
+        if (wasEngaged && !wasPullingUp) widget.onDragReleased?.call();
         if (!wasEngaged || _flying) return;
         if (wasPullingUp) {
           _pos = Offset.zero;
@@ -3077,6 +3123,7 @@ class _DraggableCardState extends State<_DraggableCard>
         }
       },
       onPointerCancel: (_) {
+        if (_dragEngaged && !_pullingUp) widget.onDragReleased?.call();
         _dragEngaged = false;
         _dragOrigin = null;
       },

@@ -720,6 +720,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   }
 
   void _onNavTabChanged() {
+    // Changer d'onglet remet la barre, rangée par le défilement ou non.
+    NavChrome.show();
     final i = NavTab.index.value;
     // Keep the swipeable pager in sync with programmatic tab changes
     // (nav-bar taps, notification routing, pop-to-tab). Guarded so the
@@ -839,19 +841,31 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                       // Discover info panel does): the bar slides out below.
                       child: ValueListenableBuilder<bool>(
                         valueListenable: NavChrome.hidden,
-                        builder: (context, hidden, child) => IgnorePointer(
-                          ignoring: hidden,
-                          child: AnimatedSlide(
-                            offset: hidden ? const Offset(0, 1.8) : Offset.zero,
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.easeOutCubic,
-                            child: AnimatedOpacity(
-                              opacity: hidden ? 0 : 1,
-                              duration: const Duration(milliseconds: 200),
-                              child: child,
+                        builder: (context, hidden, child) {
+                          // Rangée par le défilement / le glisser d'une carte :
+                          // un peu plus lent que le panneau d'infos. « Réduire
+                          // les animations » : instantané.
+                          final auto = NavChrome.autoHidden.value;
+                          final still = MediaQuery.disableAnimationsOf(context);
+                          return IgnorePointer(
+                            ignoring: hidden,
+                            child: AnimatedSlide(
+                              offset:
+                                  hidden ? const Offset(0, 1.8) : Offset.zero,
+                              duration: still
+                                  ? Duration.zero
+                                  : Duration(milliseconds: auto ? 420 : 260),
+                              curve: Curves.easeOutCubic,
+                              child: AnimatedOpacity(
+                                opacity: hidden ? 0 : 1,
+                                duration: still
+                                    ? Duration.zero
+                                    : Duration(milliseconds: auto ? 300 : 200),
+                                child: child,
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                         // Rebuild on every pager tick so the highlight pill
                         // glides with the swipe instead of snapping at the end.
                         child: AnimatedBuilder(
@@ -868,6 +882,51 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                               onSelect: _selectTab,
                             );
                           },
+                        ),
+                      ),
+                    ),
+                    // La poignée que laisse la barre rangée par le défilement :
+                    // un tap (ou un glissement vers le haut) la rappelle tout de
+                    // suite. Absente quand c'est le panneau d'infos de Discover
+                    // qui l'a cachée.
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: NavChrome.handleZone,
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: NavChrome.autoHidden,
+                        builder: (context, auto, _) => IgnorePointer(
+                          ignoring: !auto,
+                          child: AnimatedOpacity(
+                            opacity: auto ? 1 : 0,
+                            duration: MediaQuery.disableAnimationsOf(context)
+                                ? Duration.zero
+                                : const Duration(milliseconds: 250),
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: NavChrome.show,
+                              onVerticalDragEnd: (d) {
+                                if ((d.primaryVelocity ?? 0) < -150) {
+                                  NavChrome.show();
+                                }
+                              },
+                              child: Align(
+                                alignment: const Alignment(0, 0.45),
+                                child: Container(
+                                  width: 44,
+                                  height: 5,
+                                  decoration: BoxDecoration(
+                                    color: SC.light
+                                        ? SC.brandBlueDeep
+                                            .withValues(alpha: 0.35)
+                                        : Colors.white.withValues(alpha: 0.55),
+                                    borderRadius: BorderRadius.circular(99),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),

@@ -22,6 +22,7 @@ import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/appear.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/nav_auto_hide.dart';
 import '../widgets/likes_lock.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/popup_kit.dart' show popupDisplay;
@@ -269,8 +270,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     );
   }
 
+  /// La barre du bas se range pendant que la liste défile, et revient 0,9 s
+  /// après l'arrêt (NavAutoHide enveloppe tout l'écran).
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      NavAutoHide(tab: NavTab.demandes, child: _buildScaffold(context));
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: SC.tabBg,
       body: SafeArea(
