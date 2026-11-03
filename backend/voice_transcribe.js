@@ -96,10 +96,15 @@ async function transcribeVoiceMessage({
     return { status: 400, body: { error: 'audio_size' } };
   }
 
+  // Le format suit l'extension du fichier : m4a (AAC) depuis un téléphone, webm
+  // (Opus) depuis le navigateur. OpenAI le reconnaît à son nom.
+  const ext = (/\.(m4a|webm|ogg|mp3|wav)$/i.exec(url) || [, 'm4a'])[1].toLowerCase();
+  const mime = { m4a: 'audio/mp4', webm: 'audio/webm', ogg: 'audio/ogg', mp3: 'audio/mpeg', wav: 'audio/wav' }[ext];
+
   let text = '';
   try {
     const form = new FormData();
-    form.append('file', new Blob([audio], { type: 'audio/mp4' }), 'voice.m4a');
+    form.append('file', new Blob([audio], { type: mime }), `voice.${ext}`);
     form.append('model', model);
     if (validTag(lang)) form.append('language', lang);
     form.append('response_format', 'json');

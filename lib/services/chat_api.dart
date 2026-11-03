@@ -388,16 +388,18 @@ abstract final class ChatApi {
     required String recipientId,
     required Uint8List bytes,
     required int durationMs,
+    String ext = 'm4a',
+    String contentType = 'audio/mp4',
     String senderLang = '',
     String recipientLang = '',
   }) async {
     if (bytes.isEmpty || durationMs <= 0) throw ArgumentError('vocal vide');
-    final path = '$senderId/${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final path = '$senderId/${DateTime.now().millisecondsSinceEpoch}.$ext';
     await _client.storage.from('voice-messages').uploadBinary(
           path,
           bytes,
-          fileOptions: const FileOptions(
-            contentType: 'audio/mp4',
+          fileOptions: FileOptions(
+            contentType: contentType,
             cacheControl: '3600',
           ),
         );

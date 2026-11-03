@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
@@ -14,9 +15,19 @@ enum VoiceRecState { idle, holding, locked, paused }
 enum VoiceStart { started, denied, failed }
 
 class VoiceRecording {
-  const VoiceRecording(this.bytes, this.durationMs);
+  const VoiceRecording(
+    this.bytes,
+    this.durationMs, {
+    this.ext = 'm4a',
+    this.contentType = 'audio/mp4',
+  });
   final Uint8List bytes;
   final int durationMs;
+
+  /// `m4a` (AAC) sur mobile ; `webm` (Opus) sur le web, où le navigateur n'écrit
+  /// pas d'AAC.
+  final String ext;
+  final String contentType;
 }
 
 /// En dessous : rien n'est envoyé. Au-dessus (60 s) : arrêt et envoi
@@ -30,8 +41,9 @@ const int kVoiceLevelCount = 40;
 /// dB -> 0..1 : -45 dB (presque le silence) à 0 dB.
 double voiceLevelFromDb(double db) => ((db + 45) / 45).clamp(0.0, 1.0);
 
-/// L'enregistreur des vocaux du chat : AAC-LC dans un .m4a, 44,1 kHz, mono,
-/// 64 kbit/s. Rien à voir avec l'enregistreur des appels (WebRTC).
+/// L'enregistreur des vocaux du chat : AAC-LC dans un .m4a (Opus dans un .webm
+/// sur le web), 44,1 kHz, mono, 64 kbit/s. Rien à voir avec l'enregistreur des
+/// appels (WebRTC).
 ///
 /// Le fichier vit dans le dossier temporaire et disparaît dès qu'on envoie ou
 /// qu'on annule.
@@ -77,19 +89,25 @@ class VoiceRecorder extends ChangeNotifier {
     _limitFired = false;
     _clock.reset();
     try {
-      final perm = await Permission.microphone.request();
-      if (!perm.isGranted) {
+      // Web : la demande est celle du navigateur, via le plugin d'enregistrement.
+      final granted = kIsWeb
+          ? await _rec.hasPermission()
+          : (await Permission.microphone.request()).isGranted;
+      if (!granted) {
         _set(VoiceRecState.idle);
         return VoiceStart.denied;
       }
-      final dir = await getTemporaryDirectory();
-      final path =
-          '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      // Web : pas de dossier temporaire, le navigateur garde l'enregistrement
+      // en mémoire et rend une adresse à l'arrêt.
+      final path = kIsWeb
+          ? ''
+          : '${(await getTemporaryDirectory()).path}/voice_'
+              '${DateTime.now().millisecondsSinceEpoch}.m4a';
       // Annulé pendant la demande de permission : on n'enregistre rien.
       if (_state == VoiceRecState.idle) return VoiceStart.failed;
       await _rec.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
+        RecordConfig(
+          encoder: kIsWeb ? AudioEncoder.opus : AudioEncoder.aacLc,
           sampleRate: 44100,
           numChannels: 1,
           bitRate: 64000,
@@ -174,11 +192,18 @@ class VoiceRecorder extends ChangeNotifier {
     await _teardown(deleteFile: false);
     if (path == null) return null;
     try {
-      final f = File(path);
       if (ms < kVoiceMinMs) return null;
-      final bytes = await f.readAsBytes();
+      // Web : `path` est l'adresse (blob:) que le navigateur donne à l'arrêt.
+      final bytes = kIsWeb
+          ? (await http.get(Uri.parse(path))).bodyBytes
+          : await File(path).readAsBytes();
       if (bytes.isEmpty) return null;
-      return VoiceRecording(bytes, ms.clamp(kVoiceMinMs, kVoiceMaxMs));
+      return VoiceRecording(
+        bytes,
+        ms.clamp(kVoiceMinMs, kVoiceMaxMs),
+        ext: kIsWeb ? 'webm' : 'm4a',
+        contentType: kIsWeb ? 'audio/webm' : 'audio/mp4',
+      );
     } catch (e) {
       debugPrint('voice record read failed: $e');
       return null;
@@ -207,6 +232,7 @@ class VoiceRecorder extends ChangeNotifier {
   }
 
   Future<void> _delete(String path) async {
+    if (kIsWeb) return; // pas de fichier : rien à supprimer
     try {
       final f = File(path);
       if (await f.exists()) await f.delete();

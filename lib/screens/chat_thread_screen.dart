@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../widgets/tap_pad.dart';
@@ -1047,7 +1046,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   }
 
   /// Envoie le vocal que le composer vient d'enregistrer.
-  Future<void> _sendVoice(Uint8List bytes, int durationMs) async {
+  Future<void> _sendVoice(VoiceRecording rec) async {
     if (_myId.isEmpty || _sending) return;
     if (!isSupabaseReady) {
       setState(() => _error = AppStrings.t('chat_send_failed'));
@@ -1060,8 +1059,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         senderId: _myId,
         senderName: _myName.isEmpty ? 'Moi' : _myName,
         recipientId: widget.peerDeviceId,
-        bytes: bytes,
-        durationMs: durationMs,
+        bytes: rec.bytes,
+        durationMs: rec.durationMs,
+        ext: rec.ext,
+        contentType: rec.contentType,
         senderLang: _myLang,
         recipientLang: _peer?.language ?? '',
       );
@@ -3067,8 +3068,8 @@ class _Composer extends StatefulWidget {
   /// Ouvre le catalogue Giphy et envoie le GIF choisi.
   final Future<void> Function() onSendGif;
 
-  /// Envoie le vocal enregistré (octets du .m4a, durée en ms).
-  final Future<void> Function(Uint8List bytes, int durationMs) onSendVoice;
+  /// Envoie le vocal enregistré (octets, durée, format).
+  final Future<void> Function(VoiceRecording recording) onSendVoice;
 
   /// Drives the placeholder only — the switch itself is [_TranslatePill].
   final bool autoTranslate;
@@ -3146,8 +3147,8 @@ class _ComposerState extends State<_Composer>
   bool _gestureDone = false;
   bool _finishing = false;
 
-  /// Le rond jaune montre le micro : champ vide, hors web.
-  bool get _micMode => !kIsWeb && !_hasText;
+  /// Le rond jaune montre le micro : champ vide.
+  bool get _micMode => !_hasText;
 
   void _onVoiceChanged() {
     final s = _voice.state;
@@ -3273,7 +3274,7 @@ class _ComposerState extends State<_Composer>
         _toast('voice_hold_hint');
         return;
       }
-      await widget.onSendVoice(rec.bytes, rec.durationMs);
+      await widget.onSendVoice(rec);
     } finally {
       _finishing = false;
     }

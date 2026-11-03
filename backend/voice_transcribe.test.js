@@ -74,6 +74,22 @@ test('transcribes my voice note and writes body + language', async () => {
   assert.equal(f.calls.length, 2); // le fichier, puis la transcription
 });
 
+test('names the file after its real format (webm from a browser, m4a from a phone)', async () => {
+  const names = [];
+  const impl = async (url, init) => {
+    if (String(url).includes('openai.com')) {
+      names.push(init.body.get('file').name);
+      return { ok: true, status: 200, text: async () => JSON.stringify({ text: 'salut' }) };
+    }
+    return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1, 2]).buffer };
+  };
+  for (const ext of ['webm', 'm4a']) {
+    const { sb } = fakeSb({ msg: mine({ audio_url: `${SB_URL}/storage/v1/object/public/voice-messages/${UID}/1.${ext}` }) });
+    await transcribeVoiceMessage(base(sb, impl));
+  }
+  assert.deepEqual(names, ['voice.webm', 'voice.m4a']);
+});
+
 test('falls back to the profile language when the app gives no hint', async () => {
   const { sb, updates } = fakeSb({ msg: mine(), profileLang: 'ja' });
   await transcribeVoiceMessage(base(sb, fakeFetch().impl));
