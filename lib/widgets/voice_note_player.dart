@@ -174,6 +174,13 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
   /// passe en erreur et dit pourquoi dans son infobulle.
   void _fail(String why) {
     debugPrint('voice player: $why');
+    // Le motif brut, visible sans survol : c'est ce qui permet de dire POURQUOI
+    // un vocal ne se lit pas (format non pris en charge, fichier vide, réseau…).
+    if (mounted) {
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(why)));
+    }
     if (mounted) {
       setState(() {
         _failed = true;
