@@ -43,6 +43,16 @@ void main() {
     expect(voiceLevelFromDb(6), 1);
   });
 
+  test('le vrai format se lit dans le fichier (MP4 de Safari ≠ WebM de Chrome)', () {
+    expect(sniffAudioContainer([0x1A, 0x45, 0xDF, 0xA3, 1, 2])?.ext, 'webm');
+    expect(
+      sniffAudioContainer([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70, 0x4D, 0x34])?.contentType,
+      'audio/mp4',
+    );
+    expect(sniffAudioContainer([0x4F, 0x67, 0x67, 0x53])?.ext, 'ogg');
+    expect(sniffAudioContainer([1, 2, 3]), isNull);
+  });
+
   test('les limites : 1 s minimum, 60 s maximum', () {
     expect(kVoiceMinMs, 1000);
     expect(kVoiceMaxMs, 60000);

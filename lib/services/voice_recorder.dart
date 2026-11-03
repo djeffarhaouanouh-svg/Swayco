@@ -30,6 +30,27 @@ class VoiceRecording {
   final String contentType;
 }
 
+/// Le conteneur réel d'un fichier audio, lu dans ses premiers octets.
+({String ext, String contentType})? sniffAudioContainer(List<int> b) {
+  if (b.length >= 4 &&
+      b[0] == 0x1A && b[1] == 0x45 && b[2] == 0xDF && b[3] == 0xA3) {
+    return (ext: 'webm', contentType: 'audio/webm'); // EBML : WebM / Matroska
+  }
+  if (b.length >= 8 &&
+      b[4] == 0x66 && b[5] == 0x74 && b[6] == 0x79 && b[7] == 0x70) {
+    return (ext: 'm4a', contentType: 'audio/mp4'); // « ftyp » : MP4 / AAC
+  }
+  if (b.length >= 4 &&
+      b[0] == 0x4F && b[1] == 0x67 && b[2] == 0x67 && b[3] == 0x53) {
+    return (ext: 'ogg', contentType: 'audio/ogg'); // « OggS »
+  }
+  if (b.length >= 4 &&
+      b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46) {
+    return (ext: 'wav', contentType: 'audio/wav'); // « RIFF »
+  }
+  return null;
+}
+
 /// En dessous : rien n'est envoyé. Au-dessus (60 s) : arrêt et envoi
 /// automatiques. La base accepte 120 s ; le front plafonne à 60.
 const int kVoiceMinMs = 1000;
@@ -198,11 +219,15 @@ class VoiceRecorder extends ChangeNotifier {
           ? (await http.get(Uri.parse(path))).bodyBytes
           : await File(path).readAsBytes();
       if (bytes.isEmpty) return null;
+      // Le navigateur choisit le format : Chrome écrit du WebM, Safari / iPhone du
+      // MP4. On lit le vrai conteneur dans le fichier au lieu de supposer : un MP4
+      // étiqueté « webm » passe sur Chrome ordinateur, mais pas sur iPhone.
+      final kind = kIsWeb ? sniffAudioContainer(bytes) : null;
       return VoiceRecording(
         bytes,
         ms.clamp(kVoiceMinMs, kVoiceMaxMs),
-        ext: kIsWeb ? 'webm' : 'm4a',
-        contentType: kIsWeb ? 'audio/webm' : 'audio/mp4',
+        ext: kind?.ext ?? 'm4a',
+        contentType: kind?.contentType ?? 'audio/mp4',
       );
     } catch (e) {
       debugPrint('voice record read failed: $e');
