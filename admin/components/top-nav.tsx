@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  Mic,
   Radio,
   Repeat,
   Table2,
@@ -25,6 +26,7 @@ const NAV = [
   { href: "/onboarding", label: "Onboarding", icon: ListChecks },
   { href: "/retention", label: "Rétention", icon: Repeat },
   { href: "/agents", label: "Comptes IA", icon: Bot },
+  { href: "/audios", label: "Audios", icon: Mic },
   { href: "/verifications", label: "Vérifications", icon: BadgeCheck },
 ];
 

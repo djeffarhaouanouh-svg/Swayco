@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: dirname(fileURLToPath(import.meta.url)),
   },
+  // Page « Audios » : un vocal envoyé à la main peut peser quelques Mo (la
+  // limite par défaut est de 1 Mo). Le bucket plafonne de toute façon à 5 Mo.
+  experimental: {
+    serverActions: { bodySizeLimit: "6mb" },
+  },
 };
 
 export default nextConfig;
