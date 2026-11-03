@@ -3550,20 +3550,28 @@ class _ComposerState extends State<_Composer>
                                     horizontal: 9,
                                     vertical: 5,
                                   ),
+                                  // En clair : les couleurs de l'ancien rond GIF
+                                  // (jaune plein, texte foncé) — un contour jaune
+                                  // sur blanc ne se voyait pas. En sombre : le
+                                  // contour jaune de la maquette.
                                   decoration: BoxDecoration(
+                                    color: SC.light ? SC.accent : null,
                                     borderRadius: BorderRadius.circular(99),
-                                    border: Border.all(
-                                      color:
-                                          SC.accent.withValues(alpha: 0.6),
-                                      width: 1.2,
-                                    ),
+                                    border: SC.light
+                                        ? null
+                                        : Border.all(
+                                            color: SC.accent
+                                                .withValues(alpha: 0.6),
+                                            width: 1.2,
+                                          ),
                                   ),
                                   child: Text(
                                     'GIF',
                                     style: popupDisplay(
                                       fontSize: 11,
                                       letterSpacing: 0.2,
-                                      color: SC.accent,
+                                      color:
+                                          SC.light ? SC.onAccent : SC.accent,
                                     ),
                                   ),
                                 ),
@@ -3758,7 +3766,7 @@ class _ComposerState extends State<_Composer>
                           Icons.lock_rounded,
                           size: 20,
                           color: p >= 1
-                              ? SC.accent
+                              ? SC.accentFg
                               : SC.fg.withValues(alpha: 0.85),
                         ),
                         Transform.translate(
@@ -3832,7 +3840,7 @@ class _ComposerState extends State<_Composer>
                   padding: const EdgeInsets.only(top: 8),
                   child: Row(
                     children: [
-                      Icon(Icons.translate_rounded, size: 16, color: SC.accent),
+                      Icon(Icons.translate_rounded, size: 16, color: SC.accentFg),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
