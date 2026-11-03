@@ -1690,7 +1690,9 @@ class _FriendChatRow extends StatelessWidget {
         ),
       ));
     } else if (lastMessage != null &&
-        (lastMessage!.body.isNotEmpty || lastMessage!.isImage)) {
+        (lastMessage!.body.isNotEmpty ||
+            lastMessage!.isImage ||
+            lastMessage!.isVoice)) {
       if (isMine) {
         subtitleParts.add(TextSpan(
           text: 'Vous : ',
@@ -1701,9 +1703,11 @@ class _FriendChatRow extends StatelessWidget {
         ));
       }
       subtitleParts.add(TextSpan(
-        text: lastMessage!.isImage
-            ? AppStrings.t('push_photo')
-            : lastMessage!.body,
+        text: lastMessage!.isVoice
+            ? AppStrings.t('push_voice')
+            : lastMessage!.isImage
+                ? AppStrings.t('push_photo')
+                : lastMessage!.body,
       ));
       dateSuffix = ' · ${_formatTime(lastMessage!.createdAt)}';
     } else {

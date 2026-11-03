@@ -165,12 +165,17 @@ abstract final class ChatUnread {
     final senderId = (row['sender'] ?? row['sender_id'])?.toString() ?? '';
     if (convId.isEmpty || senderId.isEmpty) return;
     final imageUrl = row['image_url']?.toString() ?? '';
+    final audioUrl = row['audio_url']?.toString() ?? '';
     final body = row['body']?.toString().trim() ?? '';
     MessageBanner.offer(MessageBannerIntent(
       conversationId: convId,
       peerId: senderId,
       senderName: row['sender_name']?.toString().trim() ?? '',
-      preview: imageUrl.isNotEmpty ? AppStrings.t('push_photo') : body,
+      preview: audioUrl.isNotEmpty
+          ? AppStrings.t('push_voice')
+          : imageUrl.isNotEmpty
+              ? AppStrings.t('push_photo')
+              : body,
     ));
   }
 

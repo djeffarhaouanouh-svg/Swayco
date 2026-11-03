@@ -44,6 +44,7 @@ import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/swayco_seal.dart';
+import '../widgets/voice_note_player.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_animations.dart';
 import '../widgets/swayco_dialog.dart';
@@ -2282,6 +2283,13 @@ class _MessageBubbleState extends State<_MessageBubble> {
                 ),
               ),
             ),
+          ),
+        // Message vocal : le lecteur, puis sous lui ce qui y est dit (traduit
+        // comme n'importe quel texte).
+        if (message.isVoice)
+          Padding(
+            padding: EdgeInsets.only(bottom: displayBody.isNotEmpty ? 8 : 0),
+            child: VoiceNotePlayer(url: message.audioUrl, color: bubbleText),
           ),
         // When [displayBody] is empty, drop the Text node entirely so
         // the bubble shows no phantom line.

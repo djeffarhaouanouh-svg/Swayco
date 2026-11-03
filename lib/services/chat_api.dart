@@ -18,6 +18,7 @@ class ChatMessage {
     required this.createdAt,
     this.language = '',
     this.imageUrl = '',
+    this.audioUrl = '',
     this.discoverPhoto = '',
     this.special = false,
   });
@@ -44,6 +45,11 @@ class ChatMessage {
   /// Public URL of an image sent in the thread. Empty for text.
   final String imageUrl;
 
+  /// Public URL of a voice note (`audio_url`, migration 0080). Empty otherwise.
+  /// [body] then holds the words spoken in it, so the chat's text translation
+  /// shows what was said under the player.
+  final String audioUrl;
+
   /// When this message was sent from a Discover card (intro message or emoji
   /// reaction), the URL of the photo it was about — shown as a Snapchat-style
   /// thumbnail above the message. Empty otherwise.
@@ -58,6 +64,9 @@ class ChatMessage {
 
   /// True when this message carries an image.
   bool get isImage => imageUrl.isNotEmpty;
+
+  /// True when this message is a voice note.
+  bool get isVoice => audioUrl.isNotEmpty;
 
   /// True when this message references a Discover photo (reaction / intro).
   bool get hasDiscoverPhoto => discoverPhoto.isNotEmpty;
@@ -79,6 +88,7 @@ class ChatMessage {
           : DateTime.now(),
       language: m['language']?.toString().trim() ?? '',
       imageUrl: m['image_url']?.toString() ?? '',
+      audioUrl: m['audio_url']?.toString() ?? '',
       discoverPhoto: m['discover_photo']?.toString() ?? '',
       special: m['special'] == true,
     );
