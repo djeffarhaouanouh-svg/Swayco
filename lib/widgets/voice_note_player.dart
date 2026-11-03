@@ -1,11 +1,11 @@
 import 'dart:async';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/app_strings.dart';
+import '../services/voice_clip.dart';
 import '../services/voice_wave.dart';
 
 /// Le point « pas encore écouté » d'un vocal reçu.
@@ -57,10 +57,13 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
 
   static const int _bars = 26;
 
-  AudioPlayer? _player;
+  VoiceClip? _player;
   final List<StreamSubscription<dynamic>> _subs = [];
   bool _playing = false;
   bool _failed = false;
+
+  /// Pourquoi la lecture a échoué (infobulle du bouton).
+  String _error = '';
   Duration _position = Duration.zero;
   Duration _total = Duration.zero;
 
@@ -110,7 +113,10 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
 
   Future<void> _toggle() async {
     if (_failed) {
-      setState(() => _failed = false);
+      setState(() {
+        _failed = false;
+        _error = '';
+      });
     }
     try {
       if (_playing) {
@@ -125,40 +131,55 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
       unawaited(_markHeard());
       var player = _player;
       if (player == null) {
-        player = AudioPlayer();
+        player = createVoiceClip();
         _player = player;
         _subs.addAll([
-          player.onPlayerStateChanged.listen((s) {
-            if (!mounted) return;
-            setState(() => _playing = s == PlayerState.playing);
+          player.playing.listen((p) {
+            if (mounted) setState(() => _playing = p);
           }),
-          player.onPositionChanged.listen((p) {
+          player.position.listen((p) {
             if (mounted) setState(() => _position = p);
           }),
-          player.onDurationChanged.listen((d) {
+          player.duration.listen((d) {
             if (mounted) setState(() => _total = d);
           }),
-          player.onPlayerComplete.listen((_) {
+          player.completed.listen((_) {
             if (!mounted) return;
             setState(() {
               _playing = false;
               _position = Duration.zero;
             });
           }),
+          player.errors.listen(_fail),
         ]);
-        await player.play(UrlSource(widget.url));
+        // Jamais d'attente infinie : sans réponse en 10 s, on le dit.
+        await player.play(widget.url).timeout(const Duration(seconds: 10));
         final at = _pendingSeek;
         _pendingSeek = null;
         if (at != null && _totalOrKnown > Duration.zero) {
           await player.seek(_totalOrKnown * at);
         }
-      } else if (_position > Duration.zero && _position < _total) {
-        await player.resume();
+      } else if (_position > Duration.zero &&
+          (_total == Duration.zero || _position < _total)) {
+        await player.resume().timeout(const Duration(seconds: 10));
       } else {
-        await player.play(UrlSource(widget.url));
+        await player.play(widget.url).timeout(const Duration(seconds: 10));
       }
-    } catch (_) {
-      if (mounted) setState(() => _failed = true);
+    } catch (e) {
+      _fail('$e');
+    }
+  }
+
+  /// La lecture n'a pas démarré (ou s'est arrêtée sur une erreur) : le bouton
+  /// passe en erreur et dit pourquoi dans son infobulle.
+  void _fail(String why) {
+    debugPrint('voice player: $why');
+    if (mounted) {
+      setState(() {
+        _failed = true;
+        _playing = false;
+        _error = why;
+      });
     }
   }
 
@@ -237,7 +258,10 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: _toggle,
-              child: SizedBox(
+              child: Tooltip(
+                // Une lecture qui échoue dit pourquoi (survol / appui long).
+                message: _failed ? _error : '',
+                child: SizedBox(
                 width: 44,
                 height: 44,
                 child: Center(
@@ -261,6 +285,7 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
                     ),
                   ),
                 ),
+              ),
               ),
             ),
             const SizedBox(width: 2),
