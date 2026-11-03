@@ -37,6 +37,7 @@ import '../services/presence_service.dart';
 import '../services/supabase_service.dart';
 import '../services/token_api.dart';
 import '../services/user_prefs.dart';
+import '../services/voice_wave.dart';
 import '../services/wave_api.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
@@ -1702,13 +1703,27 @@ class _FriendChatRow extends StatelessWidget {
           ),
         ));
       }
-      subtitleParts.add(TextSpan(
-        text: lastMessage!.isVoice
-            ? AppStrings.t('push_voice')
-            : lastMessage!.isImage
-                ? AppStrings.t('push_photo')
-                : lastMessage!.body,
-      ));
+      if (lastMessage!.isVoice) {
+        // Un vocal : l'icône micro et sa durée (« 0:27 »), sans emoji.
+        subtitleParts.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Icon(Icons.mic_rounded, size: 14, color: subtitleColor),
+          ),
+        ));
+        subtitleParts.add(TextSpan(
+          text: lastMessage!.audioDurationMs > 0
+              ? voiceClock(Duration(milliseconds: lastMessage!.audioDurationMs))
+              : AppStrings.t('voice_message'),
+        ));
+      } else {
+        subtitleParts.add(TextSpan(
+          text: lastMessage!.isImage
+              ? AppStrings.t('push_photo')
+              : lastMessage!.body,
+        ));
+      }
       dateSuffix = ' · ${_formatTime(lastMessage!.createdAt)}';
     } else {
       // Jamais un mot échangé : on le dit, au lieu d'inviter à toucher — la

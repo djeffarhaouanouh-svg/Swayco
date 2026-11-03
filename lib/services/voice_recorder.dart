@@ -1,0 +1,232 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
+
+/// `idle` : rien. `holding` : le doigt est sur le micro. `locked` : verrouillé,
+/// on peut lâcher. `paused` : verrouillé et en pause.
+enum VoiceRecState { idle, holding, locked, paused }
+
+/// Pourquoi [VoiceRecorder.start] n'a rien enregistré.
+enum VoiceStart { started, denied, failed }
+
+class VoiceRecording {
+  const VoiceRecording(this.bytes, this.durationMs);
+  final Uint8List bytes;
+  final int durationMs;
+}
+
+/// En dessous : rien n'est envoyé. Au-dessus (60 s) : arrêt et envoi
+/// automatiques. La base accepte 120 s ; le front plafonne à 60.
+const int kVoiceMinMs = 1000;
+const int kVoiceMaxMs = 60000;
+
+/// Combien de niveaux l'onde en direct garde.
+const int kVoiceLevelCount = 40;
+
+/// dB -> 0..1 : -45 dB (presque le silence) à 0 dB.
+double voiceLevelFromDb(double db) => ((db + 45) / 45).clamp(0.0, 1.0);
+
+/// L'enregistreur des vocaux du chat : AAC-LC dans un .m4a, 44,1 kHz, mono,
+/// 64 kbit/s. Rien à voir avec l'enregistreur des appels (WebRTC).
+///
+/// Le fichier vit dans le dossier temporaire et disparaît dès qu'on envoie ou
+/// qu'on annule.
+class VoiceRecorder extends ChangeNotifier {
+  VoiceRecorder({AudioRecorder? recorder}) : _rec = recorder ?? AudioRecorder();
+
+  final AudioRecorder _rec;
+
+  VoiceRecState _state = VoiceRecState.idle;
+  VoiceRecState get state => _state;
+  bool get active => _state != VoiceRecState.idle;
+
+  final List<double> _levels = [];
+
+  /// Les derniers niveaux (0..1), du plus ancien au plus récent.
+  List<double> get levels => List.unmodifiable(_levels);
+  double get level => _levels.isEmpty ? 0 : _levels.last;
+
+  final Stopwatch _clock = Stopwatch();
+  Duration get elapsed => _clock.elapsed;
+
+  /// Appelé une fois, quand les 60 s sont atteintes.
+  VoidCallback? onLimit;
+  bool _limitFired = false;
+
+  Timer? _tick;
+  StreamSubscription<Amplitude>? _amp;
+  String? _path;
+  Future<VoiceStart>? _starting;
+
+  /// Demande le micro (la 1re fois) et démarre. L'état passe à `holding`
+  /// tout de suite, pour que l'écran réagisse sans attendre la permission.
+  Future<VoiceStart> start() => _starting ??= _start();
+
+  Future<VoiceStart> _start() async {
+    _set(VoiceRecState.holding);
+    _levels.clear();
+    _limitFired = false;
+    _clock.reset();
+    try {
+      final perm = await Permission.microphone.request();
+      if (!perm.isGranted) {
+        _set(VoiceRecState.idle);
+        return VoiceStart.denied;
+      }
+      final dir = await getTemporaryDirectory();
+      final path =
+          '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      // Annulé pendant la demande de permission : on n'enregistre rien.
+      if (_state == VoiceRecState.idle) return VoiceStart.failed;
+      await _rec.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          sampleRate: 44100,
+          numChannels: 1,
+          bitRate: 64000,
+        ),
+        path: path,
+      );
+      _path = path;
+      _clock.start();
+      _amp = _rec
+          .onAmplitudeChanged(const Duration(milliseconds: 80))
+          .listen((a) {
+        _levels.add(voiceLevelFromDb(a.current));
+        if (_levels.length > kVoiceLevelCount) _levels.removeAt(0);
+        notifyListeners();
+      });
+      _tick = Timer.periodic(const Duration(milliseconds: 100), (_) {
+        if (!_limitFired && _clock.elapsedMilliseconds >= kVoiceMaxMs) {
+          _limitFired = true;
+          onLimit?.call();
+        }
+        notifyListeners();
+      });
+      return VoiceStart.started;
+    } catch (e) {
+      debugPrint('voice record start failed: $e');
+      await _teardown(deleteFile: true);
+      return VoiceStart.failed;
+    } finally {
+      _starting = null;
+    }
+  }
+
+  /// Le doigt a glissé vers le haut : on peut lâcher.
+  void lock() {
+    if (_state != VoiceRecState.holding) return;
+    _set(VoiceRecState.locked);
+  }
+
+  Future<void> pause() async {
+    if (_state != VoiceRecState.locked) return;
+    try {
+      await _rec.pause();
+    } catch (e) {
+      debugPrint('voice record pause failed: $e');
+      return;
+    }
+    _clock.stop();
+    _set(VoiceRecState.paused);
+  }
+
+  Future<void> resume() async {
+    if (_state != VoiceRecState.paused) return;
+    try {
+      await _rec.resume();
+    } catch (e) {
+      debugPrint('voice record resume failed: $e');
+      return;
+    }
+    _clock.start();
+    _set(VoiceRecState.locked);
+  }
+
+  /// Arrête et supprime le fichier.
+  Future<void> cancel() async {
+    await _starting;
+    await _teardown(deleteFile: true);
+  }
+
+  /// Arrête et rend l'enregistrement, ou `null` s'il dure moins de 1 s (le
+  /// fichier est alors supprimé).
+  Future<VoiceRecording?> finish() async {
+    await _starting;
+    if (!active) return null;
+    final ms = _clock.elapsedMilliseconds;
+    String? path;
+    try {
+      path = await _rec.stop();
+    } catch (e) {
+      debugPrint('voice record stop failed: $e');
+    }
+    path ??= _path;
+    await _teardown(deleteFile: false);
+    if (path == null) return null;
+    try {
+      final f = File(path);
+      if (ms < kVoiceMinMs) return null;
+      final bytes = await f.readAsBytes();
+      if (bytes.isEmpty) return null;
+      return VoiceRecording(bytes, ms.clamp(kVoiceMinMs, kVoiceMaxMs));
+    } catch (e) {
+      debugPrint('voice record read failed: $e');
+      return null;
+    } finally {
+      unawaited(_delete(path));
+    }
+  }
+
+  Future<void> _teardown({required bool deleteFile}) async {
+    _tick?.cancel();
+    _tick = null;
+    await _amp?.cancel();
+    _amp = null;
+    _clock
+      ..stop()
+      ..reset();
+    final path = _path;
+    _path = null;
+    if (deleteFile) {
+      try {
+        await _rec.cancel();
+      } catch (_) {}
+      if (path != null) await _delete(path);
+    }
+    if (_state != VoiceRecState.idle) _set(VoiceRecState.idle);
+  }
+
+  Future<void> _delete(String path) async {
+    try {
+      final f = File(path);
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
+  }
+
+  void _set(VoiceRecState s) {
+    _state = s;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    _amp?.cancel();
+    final path = _path;
+    unawaited(() async {
+      try {
+        await _rec.cancel();
+      } catch (_) {}
+      if (path != null) await _delete(path);
+      try {
+        await _rec.dispose();
+      } catch (_) {}
+    }());
+    super.dispose();
+  }
+}

@@ -3,12 +3,14 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../widgets/tap_pad.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/analytics.dart';
@@ -34,6 +36,8 @@ import '../services/translation_api.dart';
 import '../services/translation_cache.dart';
 import '../services/typing_signal.dart';
 import '../services/user_prefs.dart';
+import '../services/voice_recorder.dart';
+import '../services/voice_wave.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
@@ -1042,6 +1046,39 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
+  /// Envoie le vocal que le composer vient d'enregistrer.
+  Future<void> _sendVoice(Uint8List bytes, int durationMs) async {
+    if (_myId.isEmpty || _sending) return;
+    if (!isSupabaseReady) {
+      setState(() => _error = AppStrings.t('chat_send_failed'));
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      await ChatApi.sendVoice(
+        conversationId: widget.conversationId,
+        senderId: _myId,
+        senderName: _myName.isEmpty ? 'Moi' : _myName,
+        recipientId: widget.peerDeviceId,
+        bytes: bytes,
+        durationMs: durationMs,
+        recipientLang: _peer?.language ?? '',
+      );
+      Analytics.track(
+        'message_sent',
+        props: {'source': 'chat', 'type': 'voice'},
+      );
+      HapticFeedback.lightImpact();
+      SwaycoSounds.play(SwSound.msgSent);
+    } catch (e) {
+      HapticFeedback.vibrate();
+      SwaycoSounds.play(SwSound.error);
+      if (mounted) setState(() => _error = AppStrings.t('chat_send_failed'));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final peerClock = _peerClock;
@@ -1231,6 +1268,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             onSend: _send,
                             onSendImage: _sendImage,
                             onSendGif: _sendGif,
+                            onSendVoice: _sendVoice,
                             autoTranslate: _autoTranslate,
                             onTypingChanged: (t) => _typing?.setTyping(t),
                             myLang: _myLang,
@@ -2189,7 +2227,14 @@ class _MessageBubbleState extends State<_MessageBubble> {
     // Text-only bubbles hug their content so a short "👋" or "Coucou !" no
     // longer stretches the full width; media bubbles keep their own width.
     var hugContent =
-        !message.isImage && !message.hasDiscoverPhoto;
+        !message.isImage && !message.hasDiscoverPhoto && !message.isVoice;
+
+    // Un vocal a sa largeur (maquette 1e) : min(262, 70 %) reçu, min(240, 66 %)
+    // envoyé, bulle comprise ; le padding de 15 de chaque côté s'en retranche.
+    final screenW = MediaQuery.of(context).size.width;
+    final voiceInnerW =
+        (mine ? math.min(240.0, screenW * 0.66) : math.min(262.0, screenW * 0.7)) -
+            30;
 
     // Une image ou un GIF envoyé seul se montre NU : pas de bulle, pas de
     // cadre, pas de fond. L'image est déjà un objet à elle seule — l'enfermer
@@ -2285,15 +2330,40 @@ class _MessageBubbleState extends State<_MessageBubble> {
             ),
           ),
         // Message vocal : le lecteur, puis sous lui ce qui y est dit (traduit
-        // comme n'importe quel texte).
+        // comme n'importe quel texte) — sur un vocal REÇU seulement.
         if (message.isVoice)
-          Padding(
-            padding: EdgeInsets.only(bottom: displayBody.isNotEmpty ? 8 : 0),
-            child: VoiceNotePlayer(url: message.audioUrl, color: bubbleText),
+          VoiceNotePlayer(
+            // Nouvelle bulle, nouveau lecteur : l'id suffit à le distinguer.
+            key: ValueKey('voice_${message.id}'),
+            url: message.audioUrl,
+            color: bubbleText,
+            messageId: message.id,
+            mine: mine,
+            durationMs: message.audioDurationMs,
+          ),
+        if (message.isVoice && !mine && displayBody.isNotEmpty)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.only(top: 9),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: bubbleText.withValues(alpha: 0.12)),
+              ),
+            ),
+            child: _LinkifiedText(
+              text: displayBody,
+              style: TextStyle(
+                color: bubbleText.withValues(alpha: translating ? 0.55 : 0.88),
+                fontSize: 14,
+                height: 1.4,
+                fontStyle: translating ? FontStyle.italic : FontStyle.normal,
+              ),
+            ),
           ),
         // When [displayBody] is empty, drop the Text node entirely so
         // the bubble shows no phantom line.
-        if (displayBody.isNotEmpty)
+        if (displayBody.isNotEmpty && !message.isVoice)
           _LinkifiedText(
             text: displayBody,
             style: TextStyle(
@@ -2369,7 +2439,16 @@ class _MessageBubbleState extends State<_MessageBubble> {
               child: Container(
                 padding: bareMedia
                     ? EdgeInsets.zero
-                    : const EdgeInsets.fromLTRB(15, 11, 15, 11),
+                    : message.isVoice
+                        // La ligne du lecteur fait 44 (zone tactile) pour 36
+                        // dessinés : 4 px de moins en haut et en bas.
+                        ? EdgeInsets.fromLTRB(
+                            15,
+                            7,
+                            15,
+                            !mine && displayBody.isNotEmpty ? 11 : 7,
+                          )
+                        : const EdgeInsets.fromLTRB(15, 11, 15, 11),
                 constraints: BoxConstraints(
                   // Floor so a tiny "👋" / "Coucou !" / "hello" still reads as a
                   // proper bubble instead of a cramped little square. Une image nue
@@ -2388,7 +2467,11 @@ class _MessageBubbleState extends State<_MessageBubble> {
                         border: mine ? null : Border.all(color: SC.msgInBorder),
                         boxShadow: mine ? SC.msgOutShadow : SC.msgInShadow,
                       ),
-                child: hugContent ? IntrinsicWidth(child: content) : content,
+                child: message.isVoice
+                    ? SizedBox(width: voiceInnerW, child: content)
+                    : hugContent
+                        ? IntrinsicWidth(child: content)
+                        : content,
               ),
             ),
             if (chips.isNotEmpty)
@@ -2912,6 +2995,7 @@ class _Composer extends StatefulWidget {
     required this.onSend,
     required this.onSendImage,
     required this.onSendGif,
+    required this.onSendVoice,
     required this.autoTranslate,
     required this.myLang,
     this.onTypingChanged,
@@ -2942,6 +3026,9 @@ class _Composer extends StatefulWidget {
   /// Ouvre le catalogue Giphy et envoie le GIF choisi.
   final Future<void> Function() onSendGif;
 
+  /// Envoie le vocal enregistré (octets du .m4a, durée en ms).
+  final Future<void> Function(Uint8List bytes, int durationMs) onSendVoice;
+
   /// Drives the placeholder only — the switch itself is [_TranslatePill].
   final bool autoTranslate;
 
@@ -2950,7 +3037,7 @@ class _Composer extends StatefulWidget {
 }
 
 class _ComposerState extends State<_Composer>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   /// Opacité du texte d'aide : 1 = visible, 0 = effacé. S'efface vite quand
   /// on touche le champ, revient en fondu quand on le quitte — plus d'aller-
   /// retour brutal.
@@ -2991,9 +3078,173 @@ class _ComposerState extends State<_Composer>
     }
   }
 
+  // ── Vocal (maquettes 1b / 1c / 1d) ───────────────────────────────────────
+  final VoiceRecorder _voice = VoiceRecorder();
+
+  /// Où le doigt a glissé depuis le point d'appui (pendant l'appui long).
+  final ValueNotifier<Offset> _drag = ValueNotifier(Offset.zero);
+
+  /// Point rouge qui bat, texte « glisse pour annuler » qui oscille, ondes du
+  /// micro : trois horloges, lancées seulement pendant un enregistrement.
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 550),
+  );
+  late final AnimationController _sway = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 750),
+  );
+  late final AnimationController _rings = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  );
+
+  VoiceRecState _lastVoiceState = VoiceRecState.idle;
+
+  /// Verrouillé ou annulé pendant CET appui : le relâcher n'envoie rien.
+  bool _gestureDone = false;
+  bool _finishing = false;
+
+  /// Le rond jaune montre le micro : champ vide, hors web.
+  bool get _micMode => !kIsWeb && !_hasText;
+
+  void _onVoiceChanged() {
+    final s = _voice.state;
+    if (s == _lastVoiceState) return;
+    _lastVoiceState = s;
+    if (s == VoiceRecState.idle) {
+      _pulse.stop();
+      _sway.stop();
+      _rings.stop();
+      _drag.value = Offset.zero;
+    } else if (!_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+      _sway.repeat(reverse: true);
+      _rings.repeat();
+    }
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // L'app quitte le premier plan : on jette l'enregistrement.
+    if (state != AppLifecycleState.resumed && _voice.active) {
+      unawaited(_voice.cancel());
+    }
+  }
+
+  void _toast(String key) {
+    final m = ScaffoldMessenger.maybeOf(context);
+    m
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t(key)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
+  void _micDenied() {
+    final m = ScaffoldMessenger.maybeOf(context);
+    m
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t('voice_mic_denied')),
+          action: SnackBarAction(
+            label: AppStrings.t('verif_open_settings'),
+            onPressed: openAppSettings,
+          ),
+        ),
+      );
+  }
+
+  /// Appui court : un rappel, rien d'enregistré.
+  void _onMicTap() {
+    if (widget.sending) return;
+    if (SwaycoSounds.callActive) {
+      _toast('voice_unavailable_in_call');
+      return;
+    }
+    HapticFeedback.selectionClick();
+    _toast('voice_hold_hint');
+  }
+
+  Future<void> _onMicStart(LongPressStartDetails d) async {
+    if (widget.sending || _voice.active) return;
+    if (SwaycoSounds.callActive) {
+      _toast('voice_unavailable_in_call');
+      return;
+    }
+    _gestureDone = false;
+    _drag.value = Offset.zero;
+    HapticFeedback.mediumImpact();
+    final r = await _voice.start();
+    if (r == VoiceStart.denied && mounted) _micDenied();
+  }
+
+  void _onMicMove(LongPressMoveUpdateDetails d) {
+    if (_gestureDone || _voice.state != VoiceRecState.holding) return;
+    final o = d.offsetFromOrigin;
+    _drag.value = o;
+    if (o.dx < -90) {
+      _gestureDone = true;
+      unawaited(_discard());
+    } else if (o.dy < -70) {
+      _gestureDone = true;
+      _voice.lock();
+      HapticFeedback.lightImpact();
+    }
+  }
+
+  /// Le doigt se lève : l'enregistrement part, sauf s'il a été verrouillé ou
+  /// annulé en route.
+  Future<void> _onMicEnd(LongPressEndDetails d) async {
+    if (_gestureDone || !_voice.active) return;
+    _gestureDone = true;
+    await _finishAndSend();
+  }
+
+  /// Le système a repris la main (fenêtre de permission, geste système) : on
+  /// jette ce qui a été enregistré plutôt que d'envoyer à moitié.
+  void _onMicCancel() {
+    if (_gestureDone || !_voice.active) return;
+    _gestureDone = true;
+    unawaited(_discard());
+  }
+
+  Future<void> _discard() async {
+    HapticFeedback.heavyImpact();
+    SwaycoSounds.play(SwSound.deleted);
+    await _voice.cancel();
+  }
+
+  Future<void> _finishAndSend() async {
+    if (_finishing) return;
+    _finishing = true;
+    try {
+      final rec = await _voice.finish();
+      if (!mounted) return;
+      if (rec == null) {
+        // Moins d'une seconde : rien ne part.
+        HapticFeedback.lightImpact();
+        _toast('voice_hold_hint');
+        return;
+      }
+      await widget.onSendVoice(rec.bytes, rec.durationMs);
+    } finally {
+      _finishing = false;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _voice
+      ..addListener(_onVoiceChanged)
+      ..onLimit = () => unawaited(_finishAndSend());
     widget.controller.addListener(_onTextChanged);
     _focus.addListener(_onFocusChanged);
     _hasText = widget.controller.text.trim().isNotEmpty;
@@ -3004,6 +3255,14 @@ class _ComposerState extends State<_Composer>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _voice
+      ..removeListener(_onVoiceChanged)
+      ..dispose();
+    _drag.dispose();
+    _pulse.dispose();
+    _sway.dispose();
+    _rings.dispose();
     widget.controller.removeListener(_onTextChanged);
     _focus
       ..removeListener(_onFocusChanged)
@@ -3101,7 +3360,13 @@ class _ComposerState extends State<_Composer>
   }
 
   @override
-  Widget build(BuildContext context) => _buildIdleBar();
+  Widget build(BuildContext context) {
+    final s = _voice.state;
+    if (s == VoiceRecState.locked || s == VoiceRecState.paused) {
+      return _buildLockedPanel();
+    }
+    return _buildIdleBar();
+  }
 
   /// Placeholder shown in the empty input. Adapts to the user's spoken
   /// language — "Écrivez en Français" for a French user — falling back to the
@@ -3146,6 +3411,7 @@ class _ComposerState extends State<_Composer>
   }
 
   Widget _buildIdleBar() {
+    final holding = _voice.state == VoiceRecState.holding;
     // Lowered: use only part of the bottom safe-area inset so the bar sits a
     // bit closer to the screen edge.
     return Padding(
@@ -3157,12 +3423,18 @@ class _ComposerState extends State<_Composer>
         // sit a touch higher off the bottom edge.
         12 + MediaQuery.paddingOf(context).bottom * 0.4,
       ),
-      child: Row(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Row(
           // Le rond GIF / envoi reste collé en bas quand le champ grandit.
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
-              child: GlassPanel(
+              // Appui long sur le micro (1c) : toute la ligne devient la barre
+              // d'enregistrement, de la même hauteur (54) pour ne pas faire
+              // sauter la liste.
+              child: holding ? _buildRecordingBar() : GlassPanel(
                 borderRadius: 27,
                 padding: const EdgeInsets.fromLTRB(14, 2, 4, 2),
                 child: Row(
@@ -3219,6 +3491,44 @@ class _ComposerState extends State<_Composer>
                         ),
                       ),
                     ),
+                    // La pastille GIF (1b) : dans le champ, avant la photo,
+                    // seulement tant que le champ est vide.
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: _micMode
+                          ? GestureDetector(
+                              key: const ValueKey('gifChip'),
+                              behavior: HitTestBehavior.opaque,
+                              onTap: widget.sending ? null : widget.onSendGif,
+                              child: Padding(
+                                // Centré sur l'icône photo voisine (39 de haut).
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(99),
+                                    border: Border.all(
+                                      color:
+                                          SC.accent.withValues(alpha: 0.6),
+                                      width: 1.2,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'GIF',
+                                    style: popupDisplay(
+                                      fontSize: 11,
+                                      letterSpacing: 0.2,
+                                      color: SC.accent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(key: ValueKey('noGif')),
+                    ),
                     // La photo, à droite DANS le champ — la place de l'emoji
                     // de la maquette 1b (le chat n'a pas de sélecteur
                     // d'emoji ; il a l'envoi de photo).
@@ -3242,20 +3552,519 @@ class _ComposerState extends State<_Composer>
               ),
             ),
             const SizedBox(width: 10),
-            // Le rond jaune (8c) : « GIF » quand le champ est vide, l'envoi
-            // dès qu'il y a du texte.
-            _CircleActionButton(
-              send: _hasText,
-              busy: widget.sending,
-              onTap: widget.sending
-                  ? null
-                  : (_hasText ? widget.onSend : widget.onSendGif),
+            // Le rond jaune (1b) : le micro quand le champ est vide (appui
+            // long = enregistrer), l'envoi dès qu'il y a du texte. Sur le web,
+            // pas de micro : le rond GIF d'avant.
+            if (_micMode)
+              _MicButton(
+                voice: _voice,
+                rings: _rings,
+                busy: widget.sending,
+                recording: holding,
+                onTap: _onMicTap,
+                onStart: _onMicStart,
+                onMove: _onMicMove,
+                onEnd: _onMicEnd,
+                onCancel: _onMicCancel,
+              )
+            else
+              _CircleActionButton(
+                send: _hasText,
+                busy: widget.sending,
+                onTap: widget.sending
+                    ? null
+                    : (_hasText ? widget.onSend : widget.onSendGif),
+              ),
+          ],
+        ),
+          // La capsule de verrouillage, au-dessus du rond (1c).
+          if (holding)
+            Positioned(
+              right: 5,
+              bottom: 92,
+              child: _buildLockCapsule(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _recDot({required bool paused}) {
+    final opacity = paused ? 1.0 : 0.35 + 0.65 * _pulse.value;
+    final color = paused ? SC.fg.withValues(alpha: 0.4) : const Color(0xFFFF4D4D);
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          boxShadow: paused
+              ? null
+              : const [
+                  BoxShadow(
+                    color: Color(0xCCFF4D4D),
+                    blurRadius: 10,
+                  ),
+                ],
+        ),
+      ),
+    );
+  }
+
+  Widget _recTimer() => ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 38),
+        child: Text(
+          voiceTimer(_voice.elapsed),
+          style: GoogleFonts.ibmPlexMono(
+            color: SC.fg,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+
+  /// 1c — la barre d'enregistrement : point rouge, minuteur, « Glisse pour
+  /// annuler » qui suit le doigt.
+  Widget _buildRecordingBar() {
+    return GlassPanel(
+      borderRadius: 27,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SizedBox(
+        height: 54,
+        child: ListenableBuilder(
+          listenable: Listenable.merge([_voice, _pulse, _sway, _drag]),
+          builder: (context, _) {
+            final dx = _drag.value.dx.clamp(-90.0, 0.0);
+            // Au repos il oscille de 8 px vers la gauche ; sous le doigt il le
+            // suit.
+            final x = dx < -1 ? dx : -8 * _sway.value;
+            return Row(
+              children: [
+                _recDot(paused: false),
+                const SizedBox(width: 10),
+                _recTimer(),
+                Expanded(
+                  child: Center(
+                    child: Transform.translate(
+                      offset: Offset(x, 0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.chevron_left_rounded,
+                            size: 20,
+                            color: SC.fg.withValues(alpha: 0.62),
+                          ),
+                          Flexible(
+                            child: Text(
+                              AppStrings.t('voice_slide_cancel'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: SC.fg.withValues(alpha: 0.62),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// La capsule « glisse vers le haut pour verrouiller » (1c) : se remplit à
+  /// mesure que le doigt monte.
+  Widget _buildLockCapsule() {
+    return IgnorePointer(
+      child: SizedBox(
+        width: 44,
+        height: 98,
+        child: GlassPanel(
+          borderRadius: 22,
+          child: ListenableBuilder(
+            listenable: Listenable.merge([_drag, _sway]),
+            builder: (context, _) {
+              final p = (-_drag.value.dy / 70).clamp(0.0, 1.0);
+              return Stack(
+                children: [
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: FractionallySizedBox(
+                      heightFactor: p,
+                      widthFactor: 1,
+                      child: ColoredBox(
+                        color: SC.accent.withValues(alpha: 0.28),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Icon(
+                          Icons.lock_rounded,
+                          size: 20,
+                          color: p >= 1
+                              ? SC.accent
+                              : SC.fg.withValues(alpha: 0.85),
+                        ),
+                        Transform.translate(
+                          offset: Offset(0, -3 * _sway.value),
+                          child: Icon(
+                            Icons.keyboard_arrow_up_rounded,
+                            size: 26,
+                            color: SC.fg.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 1d — verrouillé : un panneau de verre. Minuteur et onde en direct, la
+  /// ligne de traduction (si elle s'applique), puis poubelle / pause / envoi.
+  Widget _buildLockedPanel() {
+    final me = widget.myLang.trim().split('-').first;
+    final peer = widget.peerLang.trim().split('-').first;
+    final cross = widget.autoTranslate &&
+        me.isNotEmpty &&
+        peer.isNotEmpty &&
+        me != peer &&
+        widget.peerFirstName.isNotEmpty;
+    final paused = _voice.state == VoiceRecState.paused;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        12,
+        4,
+        12,
+        12 + MediaQuery.paddingOf(context).bottom * 0.4,
+      ),
+      child: GlassPanel(
+        borderRadius: 32,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        child: ListenableBuilder(
+          listenable: Listenable.merge([_voice, _pulse]),
+          builder: (context, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  _recDot(paused: paused),
+                  const SizedBox(width: 10),
+                  _recTimer(),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: CustomPaint(
+                        size: const Size(40 * 3 + 39 * 2, 30),
+                        painter: _LiveWavePainter(
+                          levels: _voice.levels,
+                          color: SC.fg,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (cross)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.translate_rounded, size: 16, color: SC.accent),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          AppStrings.t(
+                            'voice_peer_reads',
+                            args: {
+                              'name': widget.peerFirstName,
+                              'lang': _langName(peer),
+                            },
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: SC.fg.withValues(alpha: 0.7),
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _lockedAction(
+                      icon: Icons.delete_rounded,
+                      iconColor: const Color(0xFFFF6B6B),
+                      fill: const Color(0xFFFF4D4D).withValues(alpha: 0.16),
+                      border: const Color(0xFFFF4D4D).withValues(alpha: 0.5),
+                      onTap: () => unawaited(_discard()),
+                    ),
+                    _lockedAction(
+                      icon: paused
+                          ? Icons.play_arrow_rounded
+                          : Icons.pause_rounded,
+                      iconColor: SC.fg,
+                      fill: SC.fg.withValues(alpha: 0.10),
+                      border: SC.fg.withValues(alpha: 0.18),
+                      onTap: () => unawaited(
+                        paused ? _voice.resume() : _voice.pause(),
+                      ),
+                    ),
+                    _lockedAction(
+                      icon: Icons.arrow_upward_rounded,
+                      iconColor: SC.onAccent,
+                      fill: SC.accent,
+                      iconSize: 28,
+                      busy: widget.sending,
+                      onTap: widget.sending
+                          ? null
+                          : () => unawaited(_finishAndSend()),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _lockedAction({
+    required IconData icon,
+    required Color iconColor,
+    required Color fill,
+    required VoidCallback? onTap,
+    Color? border,
+    double iconSize = 24,
+    bool busy = false,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          color: fill,
+          shape: BoxShape.circle,
+          border: border == null ? null : Border.all(color: border, width: 1.2),
+        ),
+        child: Center(
+          child: busy
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: iconColor,
+                  ),
+                )
+              : Icon(icon, size: iconSize, color: iconColor),
+        ),
+      ),
+    );
+  }
+}
+
+/// L'onde en direct du panneau verrouillé : 40 barres de 3 px (2 px d'écart),
+/// de 4 à 30 px selon le niveau, la plus récente à droite ; l'opacité monte de
+/// 0,3 (gauche) à 1 (droite).
+class _LiveWavePainter extends CustomPainter {
+  _LiveWavePainter({required this.levels, required this.color});
+
+  final List<double> levels;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const n = kVoiceLevelCount;
+    const barW = 3.0;
+    const gap = 2.0;
+    final paint = Paint()..isAntiAlias = true;
+    for (var i = 0; i < n; i++) {
+      // Les niveaux arrivent un à un : tant qu'il en manque, la gauche reste plate.
+      final k = i - (n - levels.length);
+      final level = k >= 0 ? levels[k] : 0.0;
+      final h = 4 + 26 * level;
+      final x = size.width - n * barW - (n - 1) * gap + i * (barW + gap);
+      paint.color = color.withValues(alpha: 0.3 + 0.7 * (i / (n - 1)));
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, (size.height - h) / 2, barW, h),
+          const Radius.circular(1.5),
+        ),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_LiveWavePainter old) =>
+      old.levels.length != levels.length ||
+      (levels.isNotEmpty && old.levels.isNotEmpty && old.levels.last != levels.last) ||
+      old.color != color;
+}
+
+/// Le rond jaune quand le champ est vide (1b) : un micro. Appui long = on
+/// enregistre (1c), tap = un rappel. Pendant l'enregistrement il grossit, passe
+/// au dégradé de marque et trois ondes en sortent, au rythme de la voix.
+class _MicButton extends StatelessWidget {
+  const _MicButton({
+    required this.voice,
+    required this.rings,
+    required this.busy,
+    required this.recording,
+    required this.onTap,
+    required this.onStart,
+    required this.onMove,
+    required this.onEnd,
+    required this.onCancel,
+  });
+
+  final VoiceRecorder voice;
+  final Animation<double> rings;
+  final bool busy;
+  final bool recording;
+  final VoidCallback onTap;
+  final GestureLongPressStartCallback onStart;
+  final GestureLongPressMoveUpdateCallback onMove;
+  final GestureLongPressEndCallback onEnd;
+  final GestureLongPressCancelCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return RawGestureDetector(
+      behavior: HitTestBehavior.opaque,
+      gestures: <Type, GestureRecognizerFactory>{
+        LongPressGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+          () => LongPressGestureRecognizer(
+            duration: const Duration(milliseconds: 250),
+          ),
+          (r) => r
+            ..onLongPressStart = onStart
+            ..onLongPressMoveUpdate = onMove
+            ..onLongPressEnd = onEnd
+            ..onLongPressCancel = onCancel,
+        ),
+        TapGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+          () => TapGestureRecognizer(),
+          (r) => r.onTap = onTap,
+        ),
+      },
+      child: SizedBox(
+        width: 46,
+        height: 46,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            if (recording)
+              Positioned.fill(
+                child: ListenableBuilder(
+                  listenable: Listenable.merge([rings, voice]),
+                  builder: (context, _) => Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      for (var k = 0; k < 3; k++) _ring(k / 3, voice.level),
+                    ],
+                  ),
+                ),
+              ),
+            AnimatedScale(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutBack,
+              scale: recording ? 54 / 46 : 1,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: recording ? null : SC.accent,
+                  gradient: recording ? SC.outBubbleGradient : null,
+                  boxShadow: recording
+                      ? [
+                          BoxShadow(
+                            color: SC.brandBlue.withValues(alpha: 0.6),
+                            blurRadius: 28,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: busy
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: SC.onAccent,
+                          ),
+                        )
+                      : Icon(
+                          Icons.mic_rounded,
+                          size: recording ? 30 : 24,
+                          color: recording ? Colors.white : SC.onAccent,
+                        ),
+                ),
+              ),
             ),
           ],
         ),
-      );
+      ),
+    );
   }
 
+  /// Une onde : bordure de 1,5 px bleu de marque, déphasée d'un tiers, qui
+  /// grandit de 1,2 à (1,8 + niveau × 0,9) en s'effaçant.
+  Widget _ring(double phase, double level) {
+    final t = (rings.value + phase) % 1.0;
+    final eased = Curves.easeOut.transform(t);
+    final scale = 1.2 + (1.8 + level * 0.9 - 1.2) * eased;
+    return Opacity(
+      opacity: (0.75 * (1 - eased)).clamp(0.0, 1.0),
+      child: Transform.scale(
+        scale: scale,
+        child: Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: SC.brandBlue, width: 1.5),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Refuse un texte fait uniquement d'espaces / de retours à la ligne : la

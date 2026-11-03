@@ -19,6 +19,7 @@ class ChatMessage {
     this.language = '',
     this.imageUrl = '',
     this.audioUrl = '',
+    this.audioDurationMs = 0,
     this.discoverPhoto = '',
     this.special = false,
   });
@@ -49,6 +50,10 @@ class ChatMessage {
   /// [body] then holds the words spoken in it, so the chat's text translation
   /// shows what was said under the player.
   final String audioUrl;
+
+  /// Length of the voice note in ms (`audio_duration_ms`, migration 0081);
+  /// 0 when unknown (an older note, or a column not migrated yet).
+  final int audioDurationMs;
 
   /// When this message was sent from a Discover card (intro message or emoji
   /// reaction), the URL of the photo it was about — shown as a Snapchat-style
@@ -89,6 +94,7 @@ class ChatMessage {
       language: m['language']?.toString().trim() ?? '',
       imageUrl: m['image_url']?.toString() ?? '',
       audioUrl: m['audio_url']?.toString() ?? '',
+      audioDurationMs: (m['audio_duration_ms'] as num?)?.toInt() ?? 0,
       discoverPhoto: m['discover_photo']?.toString() ?? '',
       special: m['special'] == true,
     );
@@ -291,6 +297,7 @@ abstract final class ChatApi {
     required String senderId,
     String body = '',
     bool imageBody = false,
+    bool voiceBody = false,
     bool special = false,
   }) async {
     final lang = recipientLang.isNotEmpty
@@ -303,7 +310,9 @@ abstract final class ChatApi {
           : senderName,
       body: special
           ? AppStrings.tIn(lang, 'push_special_message')
-          : (imageBody ? AppStrings.tIn(lang, 'push_photo') : body),
+          : (voiceBody
+              ? AppStrings.tIn(lang, 'voice_message')
+              : (imageBody ? AppStrings.tIn(lang, 'push_photo') : body)),
       type: 'message',
       data: {
         'conversationId': conversationId,
@@ -362,6 +371,65 @@ abstract final class ChatApi {
       conversationId: conversationId,
       senderId: senderId,
       imageBody: true,
+    ));
+  }
+
+  /// Upload a voice note ([bytes], AAC in an .m4a) to the `voice-messages`
+  /// bucket — in the sender's own folder, which is what the storage policy
+  /// allows — and insert the message. `body` stays empty: nothing transcribes
+  /// the note yet (no backend route), so the other side gets the player alone.
+  /// Push: "Message vocal", in the recipient's language.
+  static Future<void> sendVoice({
+    required String conversationId,
+    required String senderId,
+    required String senderName,
+    required String recipientId,
+    required Uint8List bytes,
+    required int durationMs,
+    String recipientLang = '',
+  }) async {
+    if (bytes.isEmpty || durationMs <= 0) throw ArgumentError('vocal vide');
+    final path = '$senderId/${DateTime.now().millisecondsSinceEpoch}.m4a';
+    await _client.storage.from('voice-messages').uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(
+            contentType: 'audio/mp4',
+            cacheControl: '3600',
+          ),
+        );
+    final url = _client.storage.from('voice-messages').getPublicUrl(path);
+    // Self-heal my profiles row before the FK-bound insert (see sendMessage).
+    await ProfileApi.ensureMyProfileRow();
+    final row = <String, dynamic>{
+      'conversation_id': conversationId,
+      'sender': senderId,
+      'recipient': recipientId,
+      'sender_name': senderName,
+      'body': '',
+      // `language` est NOT NULL sans défaut : rien n'est transcrit, donc vide.
+      'language': '',
+      'audio_url': url,
+      'audio_duration_ms': durationMs,
+    };
+    try {
+      await _client.from('messages').insert(row);
+    } on PostgrestException catch (e) {
+      // Colonne de durée absente (migration 0081 pas encore appliquée) : le
+      // vocal part quand même, la bulle lira la durée dans le fichier.
+      if (!(e.message.contains('audio_duration_ms') || e.code == 'PGRST204')) {
+        rethrow;
+      }
+      row.remove('audio_duration_ms');
+      await _client.from('messages').insert(row);
+    }
+    unawaited(_notifyMessage(
+      recipientId: recipientId,
+      recipientLang: recipientLang,
+      senderName: senderName,
+      conversationId: conversationId,
+      senderId: senderId,
+      voiceBody: true,
     ));
   }
 
