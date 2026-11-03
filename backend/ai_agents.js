@@ -79,6 +79,14 @@ const MATCH_BODY = {
   ja: 'あなたと{name}は友達になりました。会話を始めましょう！',
   ko: '당신과 {name}님은 이제 친구예요. 대화를 시작해보세요!',
 };
+/** Texte de la notification d'un message vocal (même rôle que « 📷 Photo »). */
+const VOICE_BODY = {
+  fr: '🎤 Message vocal', en: '🎤 Voice message', es: '🎤 Mensaje de voz',
+  de: '🎤 Sprachnachricht', it: '🎤 Messaggio vocale', pt: '🎤 Mensagem de voz',
+  nl: '🎤 Spraakbericht', ar: '🎤 رسالة صوتية', ru: '🎤 Голосовое сообщение',
+  zh: '🎤 语音消息', ja: '🎤 ボイスメッセージ', ko: '🎤 음성 메시지',
+};
+const VOICE_BUCKET = 'ai-voice-notes';
 const LANG_NAME = {
   fr: 'French', en: 'English', es: 'Spanish', de: 'German', it: 'Italian',
   pt: 'Portuguese', nl: 'Dutch', ar: 'Arabic', ru: 'Russian', zh: 'Chinese',
@@ -527,13 +535,18 @@ async function generate(ctx, ai, target, history, mode, seed = '') {
   // plus) ; stable pour un message donné.
   // Relance : toujours une petite question légère (c'est son but : donner une
   // raison de répondre) ; sinon le style est tiré au sort.
-  const style = mode === 'nudge' ? 'question' : pickStyle(level, seed || `${ai.id}:${target.id}:${lastUser}`);
+  // Vocal (accusé ou texte dit à voix haute) : pas de style tiré au sort, la consigne suffit.
+  const style = mode === 'nudge' ? 'question'
+    : mode.startsWith('voice_') ? ''
+    : pickStyle(level, seed || `${ai.id}:${target.id}:${lastUser}`);
   // Demande de photo : une limite posée en une phrase, sans rancune. La
   // conversation reprend normalement si la personne passe à autre chose.
   let extra = mode === 'reply' && isPhotoRequest(lastUser)
     ? ['They just asked you for a photo. Say briefly, in your own words and with a light or firm tone as fits you, that you do not send photos. Do not lecture, do not get angry, and do not hold a grudge: if they move on, carry on the conversation normally.']
     : [];
   if (mode === 'nudge') extra = [NUDGE_PROMPT];
+  if (mode === 'voice_ack') extra = [VOICE_ACK_PROMPT];
+  if (mode === 'voice_script') extra = [VOICE_SCRIPT_PROMPT];
   const sys = systemPrompt(ai, personaRow, lang, level, { style, extra, clock: localClock(ai.country) });
   const base = [{ role: 'system', content: sys }];
 
@@ -553,12 +566,14 @@ async function generate(ctx, ai, target, history, mode, seed = '') {
   // Rappel de langue en DERNIER : sans lui, le modèle bascule dans la langue du
   // dernier message de la personne (une Colombienne qui répond en français).
   const langTail = { role: 'system', content: `Reply in ${LANG_NAME[lang] || 'English'} only, whatever language the last message is written in. If the last message is a get-to-know-you question (where you live, what you do, what you like, where you would travel...), answer in a few words and end with a tiny "and you?" in that language.` };
-  let text = await chat([...base, ...turn, langTail]);
+  // Un texte dit à voix haute (vocal) a droit à un peu plus de mots qu'une réponse de chat.
+  const chatOpts = mode === 'voice_script' ? { maxTokens: 90 } : undefined;
+  let text = await chat([...base, ...turn, langTail], chatOpts);
   if (containsCliche(text, lastUser)) {
     text = await chat([
       ...base, ...turn, langTail,
       { role: 'system', content: 'Your draft used a national cliché. Rewrite it without any.' },
-    ]);
+    ], chatOpts);
     if (containsCliche(text, lastUser)) return '';
   }
   return tidyReply(text, style).slice(0, 300);
@@ -615,7 +630,12 @@ async function doLike(ctx, ai, target) {
   return { status: 'done', detail: 'like' };
 }
 
-async function sendMessage(ctx, ai, target, body) {
+/**
+ * Écrit un message de l'IA dans la conversation, puis notifie. Avec `audioUrl`,
+ * c'est un message vocal : `body` est le texte dit à voix haute (la traduction du
+ * chat s'applique dessus), et la notification annonce « 🎤 Message vocal ».
+ */
+async function sendMessage(ctx, ai, target, body, { audioUrl = '' } = {}) {
   const { sb } = ctx;
   const conv = convIdFor(ai.id, target.id);
   const { error } = await sb.from('messages').insert({
@@ -625,11 +645,12 @@ async function sendMessage(ctx, ai, target, body) {
     sender_name: ai.display_name || '',
     body,
     language: ai.language || '',
+    ...(audioUrl ? { audio_url: audioUrl } : {}),
   });
   if (error) throw new Error(error.message);
   await ctx.notifyUser(target.id, {
     title: aiLabel(ai),
-    body,
+    body: audioUrl ? loc(VOICE_BODY, langOf(target)) : body,
     type: 'message',
     data: { senderId: String(ai.id), conversationId: conv },
   }).catch((e) => console.error('[ai] push error', e?.message || e));
@@ -786,7 +807,11 @@ async function processReplies(ctx) {
       const { data: hist } = await sb.from('messages').select('sender, body, created_at')
         .eq('conversation_id', m.conversation_id).order('created_at', { ascending: false }).limit(HISTORY_MESSAGES);
       const history = (hist || []).reverse();
-      const text = await generate(ctx, ai, target, history, 'reply', m.id);
+      // Quelqu'un demande un vocal : l'IA prépare ce qu'elle dirait (file d'attente
+      // pour l'admin, qui fabrique l'audio à la main) et répond en texte qu'elle
+      // l'enverra plus tard. Sans demande enregistrée, réponse normale.
+      const voiceAsk = await queueVoiceRequest(ctx, ai, target, m, history);
+      const text = await generate(ctx, ai, target, history, voiceAsk ? 'voice_ack' : 'reply', m.id);
       if (!text) { await finish(sb, claimId, 'failed', 'empty_generation'); continue; }
       await sendMessage(ctx, ai, target, text);
       await finish(sb, claimId, 'done', null);
@@ -1246,6 +1271,117 @@ async function processNudges(ctx) {
   }
 }
 
+// ── Messages vocaux, fabriqués à la main ─────────────────────────────────────
+//
+// Pas d'API de voix payante : quand quelqu'un demande un vocal à une IA, elle
+// prépare le TEXTE qu'elle dirait (ligne `ai_voice_requests`, status 'pending'),
+// puis répond en texte qu'elle l'enverra plus tard. L'admin génère la voix à la
+// main (page « Audios »), envoie le fichier (status 'ready'), et ce module fait
+// envoyer le message vocal par l'IA (status 'sent'). Migration 0080.
+//
+// La demande n'est enregistrée que si AI_VOICE_REQUESTS=1. L'ENVOI d'un audio
+// déjà prêt, lui, n'a pas besoin du drapeau : l'admin l'a décidé à la main.
+const VOICE_ACK_PROMPT =
+  'They asked you for a voice message. Tell them briefly, in your own words, that you cannot record one right now but you will send one a little later. Do not promise a time. Do not send or describe any audio yourself.';
+const VOICE_SCRIPT_PROMPT =
+  'They asked you for a voice message. Write what you would SAY OUT LOUD in it: one or two short spoken sentences, warm and natural, answering what they said, in your own words. Pure speech: no emojis, no stage directions, no "voice message" mention.';
+
+// Un vocal demandé, dans les 12 langues de l'app (mots précis : « audio » seul
+// ne suffit pas, il se dit de bien d'autres choses).
+const VOICE_ASK_RE = new RegExp(
+  '(?:' + [
+    'voice\\s*(?:message|note|memo|msg)s?', 'voicemail', 'voicenote',
+    'vocal(?:e|es|s)?\\b', 'message\\s+vocal', 'note\\s+vocale',
+    'nota\\s+de\\s+voz', 'mensaje\\s+de\\s+voz', 'mensagem\\s+de\\s+voz', 'recado\\s+de\\s+voz',
+    'messaggio\\s+vocale', 'sprachnachricht', 'sprachmemo', 'spraakbericht', 'stembericht',
+    'audio\\s+(?:message|note|clip)', 'envoie[rz]?\\s+(?:moi\\s+)?(?:un\\s+)?audio', 'send\\s+(?:me\\s+)?(?:an?\\s+)?audio',
+    'm[aá]ndame\\s+(?:un\\s+)?audio', 'manda\\s+(?:um\\s+)?[aá]udio',
+    '(?:hear|entendre|[ée]couter|escuchar|ouvir|ascoltare|h[öo]ren|horen)\\s[^\\n]{0,15}(?:your voice|ta voix|tu voz|sua voz|tua voce|deine stimme|je stem)',
+  ].join('|') + ')',
+  'i',
+);
+const VOICE_ASK_NONLATIN = /голосов(?:ое|ой|ые)|аудио\s?сообщен|голос\s?твой|语音|說話聲|ボイス|音声|보이스|음성|목소리|رسالة صوتية|رسالة\s?صوت|صوتك|صوتية/i;
+
+function isVoiceRequest(text) {
+  const s = String(text || '');
+  return VOICE_ASK_RE.test(s) || VOICE_ASK_NONLATIN.test(s);
+}
+
+/**
+ * Si le dernier message demande un vocal, enregistre la demande (texte dit à voix
+ * haute) pour l'admin et rend true : l'appelant répond alors par un accusé.
+ * Rend false (réponse normale) si le mode est désactivé, si ce n'est pas une
+ * demande de vocal, s'il y a déjà une demande en cours dans cette conversation,
+ * si la personne en a déjà eu une dans les dernières 24 h, ou si quoi que ce soit
+ * échoue — jamais une promesse de vocal sans demande derrière.
+ */
+async function queueVoiceRequest(ctx, ai, target, message, history) {
+  if (process.env.AI_VOICE_REQUESTS !== '1' || !isVoiceRequest(message.body)) return false;
+  const { sb } = ctx;
+  try {
+    const { data: open, error } = await sb.from('ai_voice_requests').select('id')
+      .eq('conversation_id', message.conversation_id).in('status', ['pending', 'ready']).limit(1);
+    if (error || (open && open.length)) return false;
+    const { data: recent } = await sb.from('ai_voice_requests').select('id')
+      .eq('target_id', target.id).neq('status', 'cancelled')
+      .gte('created_at', new Date(Date.now() - DAY).toISOString()).limit(1);
+    if (recent && recent.length) return false;
+
+    const script = await generate(ctx, ai, target, history, 'voice_script', message.id);
+    if (!script) return false;
+    const ins = await sb.from('ai_voice_requests').insert({
+      ai_id: ai.id, target_id: target.id, conversation_id: message.conversation_id,
+      text: script, source: 'user_ask',
+    });
+    return !ins.error;
+  } catch (e) {
+    console.error('[ai] voice request error', e?.message || e);
+    return false;
+  }
+}
+
+/** L'admin a envoyé l'audio (status 'ready') : l'IA l'envoie dans le chat. */
+async function processVoiceReady(ctx) {
+  const { sb } = ctx;
+  const { data: ready, error } = await sb.from('ai_voice_requests').select('*')
+    .eq('status', 'ready').order('ready_at', { ascending: true }).limit(5);
+  if (error || !ready || ready.length === 0) return 0; // table absente (0080) ou rien à envoyer
+  const prot = await protectedIds(sb);
+  let sent = 0;
+  for (const r of ready) {
+    // Prise atomique : un seul processus envoie ce vocal.
+    const { data: won } = await sb.from('ai_voice_requests')
+      .update({ status: 'sent', sent_at: new Date().toISOString() })
+      .eq('id', r.id).eq('status', 'ready').select('id');
+    if (!won || won.length === 0) continue;
+    const cancel = (detail) => sb.from('ai_voice_requests')
+      .update({ status: 'cancelled', detail }).eq('id', r.id);
+    try {
+      const ai = await getProfile(sb, r.ai_id);
+      const target = await getProfile(sb, r.target_id);
+      if (!ai || ai.is_ai !== true || !target || target.is_ai) { await cancel('profile_invalid'); continue; }
+      if (prot.has(target.id)) { await cancel('protected_email'); continue; }
+      if (await isBlocked(sb, ai.id, target.id)) { await cancel('blocked'); continue; }
+      if (!r.audio_path) { await cancel('no_audio'); continue; }
+      const { data: pub } = sb.storage.from(VOICE_BUCKET).getPublicUrl(r.audio_path);
+      if (!pub || !pub.publicUrl) { await cancel('no_public_url'); continue; }
+      await sendMessage(ctx, ai, target, r.text, { audioUrl: pub.publicUrl });
+      sent++;
+    } catch (e) {
+      // Échec d'envoi : on remet « prêt » et on réessaie, 3 fois au plus.
+      const attempts = (r.attempts || 0) + 1;
+      const msg = String(e?.message || e).slice(0, 300);
+      await sb.from('ai_voice_requests').update(
+        attempts >= 3
+          ? { status: 'cancelled', attempts, detail: msg }
+          : { status: 'ready', sent_at: null, attempts, detail: msg },
+      ).eq('id', r.id);
+      console.error('[ai] voice send error', msg);
+    }
+  }
+  return sent;
+}
+
 // ── Boucles ──────────────────────────────────────────────────────────────────
 
 async function tableAvailable(sb) {
@@ -1282,6 +1418,7 @@ function start({ supabase, notifyUser }) {
     try {
       await guard('queue', processQueue);
       await guard('replies', processReplies);
+      await guard('voice', processVoiceReady);
     } finally { queueRunning = replying = false; }
   }, QUEUE_TICK_MS);
   q.unref?.();
@@ -1314,5 +1451,6 @@ module.exports = {
     protectedIds, resetProtectedCache: () => { protectedCache = { at: 0, ids: new Set() }; },
     sleepWindow, isAwakeAt, isPhotoRequest, isInsult, generate, tidyReply, cleanPersona, localClock,
     nudgeCandidates, nudgeGapMs, processNudges, NUDGE_MAX_PER_CONV, NUDGE_MIN_GAP_MS,
+    isVoiceRequest, VOICE_BODY, queueVoiceRequest, processVoiceReady,
   },
 };

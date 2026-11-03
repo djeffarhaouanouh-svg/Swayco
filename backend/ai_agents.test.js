@@ -105,6 +105,44 @@ test('nudges stay off unless AI_NUDGES=1', async () => {
   }
 });
 
+// ── Vocaux faits à la main ──────────────────────────────────────────────────
+
+test('voice request: recognised in the 12 languages, not in ordinary talk', () => {
+  const asks = [
+    'tu peux m’envoyer un vocal ?', 'envoie moi un message vocal', 'can you send a voice message?',
+    'send me a voice note please', 'mándame una nota de voz', 'quiero un mensaje de voz',
+    'manda uma mensagem de voz', 'puoi mandarmi un messaggio vocale?', 'schick mir eine Sprachnachricht',
+    'stuur me een spraakbericht', 'I want to hear your voice', 'je voudrais entendre ta voix',
+    'пришли голосовое', '发个语音消息给我', 'ボイスメッセージ送って', '보이스 메시지 보내줘', 'ابعتي رسالة صوتية',
+  ];
+  for (const s of asks) assert.equal(t.isVoiceRequest(s), true, s);
+  const not = [
+    'salut ça va ?', 'what do you do?', 'I love audio books', 'j’adore la musique', 'hola, ¿de dónde eres?',
+    'wie geht es dir', 'こんにちは', '你好', 'привет', '', null,
+  ];
+  for (const s of not) assert.equal(t.isVoiceRequest(s), false, String(s));
+});
+
+test('voice notification text exists in all 12 languages', () => {
+  for (const l of ['fr', 'en', 'es', 'it', 'pt', 'nl', 'ar', 'ru', 'zh', 'ko', 'de', 'ja']) {
+    assert.ok(String(t.VOICE_BODY[l] || '').trim().length > 2, l);
+  }
+});
+
+test('voice requests are not queued unless AI_VOICE_REQUESTS=1', async () => {
+  const saved = process.env.AI_VOICE_REQUESTS;
+  delete process.env.AI_VOICE_REQUESTS;
+  try {
+    // sb absent : plante si la fonction y touche.
+    assert.equal(
+      await t.queueVoiceRequest({ sb: null }, {}, {}, { body: 'envoie un vocal' }, []),
+      false,
+    );
+  } finally {
+    if (saved !== undefined) process.env.AI_VOICE_REQUESTS = saved;
+  }
+});
+
 // ── Délais, fenêtre, sommeil ────────────────────────────────────────────────
 
 test('newcomer (< 48 h): replies in 3-10 min, stable; older accounts are not newcomers', () => {
