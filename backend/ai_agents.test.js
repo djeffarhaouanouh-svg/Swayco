@@ -53,6 +53,58 @@ test('hysteresis: no flip-flop around a threshold', () => {
   assert.equal(lvl, 3);
 });
 
+// ── Relance (nudge) ─────────────────────────────────────────────────────────
+
+test('nudge candidates: AI had the last word, human wrote at least once, silence long enough', () => {
+  const H = 60 * 60 * 1000;
+  const now = Date.now();
+  const ai = new Set(['ai1', 'ai2']);
+  const at = (hoursAgo) => new Date(now - hoursAgo * H).toISOString();
+  const msgs = [
+    // conv A : l'humain a écrit, l'IA a répondu il y a 25 h -> à relancer
+    { id: 'a2', conversation_id: 'A', sender: 'ai1', recipient: 'h1', created_at: at(25) },
+    { id: 'a1', conversation_id: 'A', sender: 'h1', recipient: 'ai1', created_at: at(26) },
+    // conv B : l'humain a le dernier mot -> pas de relance (le répondeur s'en charge)
+    { id: 'b2', conversation_id: 'B', sender: 'h2', recipient: 'ai1', created_at: at(30) },
+    // conv C : dernier mot IA mais silence trop court (5 h)
+    { id: 'c2', conversation_id: 'C', sender: 'ai2', recipient: 'h3', created_at: at(5) },
+    { id: 'c1', conversation_id: 'C', sender: 'h3', recipient: 'ai2', created_at: at(6) },
+    // conv D : l'IA a écrit seule, l'humain n'a jamais écrit -> jamais de relance
+    { id: 'd1', conversation_id: 'D', sender: 'ai1', recipient: 'h4', created_at: at(40) },
+    // conv E : trop ancienne (12 jours)
+    { id: 'e2', conversation_id: 'E', sender: 'ai1', recipient: 'h5', created_at: at(12 * 24) },
+    { id: 'e1', conversation_id: 'E', sender: 'h5', recipient: 'ai1', created_at: at(12 * 24 + 1) },
+  ];
+  const out = t.nudgeCandidates(msgs, ai, now);
+  assert.deepEqual(out.map((c) => c.conversation), ['A']);
+  assert.equal(out[0].aiId, 'ai1');
+  assert.equal(out[0].humanId, 'h1');
+});
+
+test('nudge gaps: 1st after 20-30 h, 2nd after 72-96 h, stable per conversation, max 2', () => {
+  const H = 60 * 60 * 1000;
+  for (let i = 0; i < 500; i++) {
+    const g0 = t.nudgeGapMs(`conv-${i}`, 0);
+    const g1 = t.nudgeGapMs(`conv-${i}`, 1);
+    assert.ok(g0 >= 20 * H && g0 < 30 * H, `g0 ${g0 / H}`);
+    assert.ok(g1 >= 72 * H && g1 < 96 * H, `g1 ${g1 / H}`);
+    assert.equal(g0, t.nudgeGapMs(`conv-${i}`, 0)); // stable
+  }
+  assert.equal(t.NUDGE_MAX_PER_CONV, 2);
+  assert.equal(t.NUDGE_MIN_GAP_MS, 20 * H);
+});
+
+test('nudges stay off unless AI_NUDGES=1', async () => {
+  const saved = process.env.AI_NUDGES;
+  delete process.env.AI_NUDGES;
+  try {
+    // Sans le drapeau, la fonction rend 0 sans toucher à la base (sb absent : plante si elle y touche).
+    assert.equal(await t.processNudges({ sb: null }), 0);
+  } finally {
+    if (saved !== undefined) process.env.AI_NUDGES = saved;
+  }
+});
+
 // ── Délais, fenêtre, sommeil ────────────────────────────────────────────────
 
 test('newcomer (< 48 h): replies in 3-10 min, stable; older accounts are not newcomers', () => {

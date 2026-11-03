@@ -525,12 +525,15 @@ async function generate(ctx, ai, target, history, mode, seed = '') {
   const lastUser = history.length ? history[history.length - 1].body : '';
   // Le style du message est tiré au sort ICI (même appel au modèle, pas un de
   // plus) ; stable pour un message donné.
-  const style = pickStyle(level, seed || `${ai.id}:${target.id}:${lastUser}`);
+  // Relance : toujours une petite question légère (c'est son but : donner une
+  // raison de répondre) ; sinon le style est tiré au sort.
+  const style = mode === 'nudge' ? 'question' : pickStyle(level, seed || `${ai.id}:${target.id}:${lastUser}`);
   // Demande de photo : une limite posée en une phrase, sans rancune. La
   // conversation reprend normalement si la personne passe à autre chose.
-  const extra = mode === 'reply' && isPhotoRequest(lastUser)
+  let extra = mode === 'reply' && isPhotoRequest(lastUser)
     ? ['They just asked you for a photo. Say briefly, in your own words and with a light or firm tone as fits you, that you do not send photos. Do not lecture, do not get angry, and do not hold a grudge: if they move on, carry on the conversation normally.']
     : [];
+  if (mode === 'nudge') extra = [NUDGE_PROMPT];
   const sys = systemPrompt(ai, personaRow, lang, level, { style, extra, clock: localClock(ai.country) });
   const base = [{ role: 'system', content: sys }];
 
@@ -1113,6 +1116,136 @@ async function autoWelcome(ctx) {
   }
   return queued;
 }
+// ── Relance : redonner envie de revenir ──────────────────────────────────────
+//
+// Quelqu'un a écrit à une IA, elle a répondu, puis plus rien : la personne est
+// partie. Après un moment de silence, l'IA lui renvoie UN petit message, dans la
+// conversation existante (jamais un premier message : la personne a écrit en
+// premier). La notification de ce message est ce qui la fait revenir dans l'app.
+//
+// Garde-fous : au plus 2 relances par conversation ; la 1re après 20-30 h de
+// silence, la 2e 3 à 4 jours après ; 1 relance par personne et par jour, toutes
+// IA confondues ; seulement la nuit passée (l'IA doit être « réveillée ») ; rien
+// si la conversation date de plus de 10 jours, si la personne est protégée,
+// bloquée, ou a insulté l'IA. Désactivé tant que AI_NUDGES n'est pas « 1 ».
+const NUDGE_MAX_PER_CONV = 2;
+const NUDGE_MAX_AGE_MS = 10 * DAY;
+const NUDGE_MIN_GAP_MS = 20 * HOUR; // plus petit silence qui peut déclencher
+const NUDGE_PER_USER_PER_DAY = 1;
+const NUDGE_MAX_PER_TICK = 5;
+
+const NUDGE_PROMPT =
+  'The conversation went quiet: they have not answered for a while. Write ONE short, casual message to pick it back up, like a friend who just thought of them: a light question or a small thing from your day, tied to something they said if it fits. Never mention that they stopped replying, never guilt-trip, never say you miss them, never apologise. A few words, at most two short sentences.';
+
+/** Silence nécessaire avant la relance n° `n` (0 = la 1re), stable par conversation. */
+function nudgeGapMs(conversationId, n) {
+  const h = hash(`nudge:${conversationId}:${n}`);
+  return n === 0 ? 20 * HOUR + (h % (10 * HOUR)) : 72 * HOUR + (h % (24 * HOUR));
+}
+
+/**
+ * Conversations à relancer, parmi des messages récents (du plus récent au plus
+ * ancien) : le dernier mot est à une IA, qui écrit à un humain, et cet humain a
+ * lui-même écrit au moins une fois. Pur (pas d'accès base) : les garde-fous qui
+ * demandent la base sont dans processNudges.
+ */
+function nudgeCandidates(messages, aiSet, now = Date.now()) {
+  const byConv = new Map();
+  for (const m of messages) {
+    if (!m || !m.conversation_id || !m.recipient) continue;
+    let c = byConv.get(m.conversation_id);
+    if (!c) {
+      c = { conversation: m.conversation_id, latest: m, humanMessages: 0 };
+      byConv.set(m.conversation_id, c);
+    }
+    if (!aiSet.has(m.sender) && aiSet.has(m.recipient)) c.humanMessages++;
+  }
+  const out = [];
+  for (const c of byConv.values()) {
+    const { latest } = c;
+    if (!aiSet.has(latest.sender) || aiSet.has(latest.recipient)) continue;
+    if (c.humanMessages < 1) continue;
+    const age = now - Date.parse(latest.created_at);
+    if (!Number.isFinite(age) || age < NUDGE_MIN_GAP_MS || age > NUDGE_MAX_AGE_MS) continue;
+    out.push({ conversation: c.conversation, latest, aiId: latest.sender, humanId: latest.recipient, age });
+  }
+  return out;
+}
+
+let nudging = false;
+async function processNudges(ctx) {
+  if (process.env.AI_NUDGES !== '1' || nudging) return 0;
+  nudging = true;
+  try {
+    const { sb } = ctx;
+    const now = Date.now();
+    const { data: recent } = await sb.from('messages')
+      .select('id, conversation_id, sender, recipient, body, created_at')
+      .gte('created_at', new Date(now - NUDGE_MAX_AGE_MS).toISOString())
+      .not('recipient', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(5000);
+    if (!recent || recent.length === 0) return 0;
+    const aiSet = await aiIdsAmong(sb, recent.flatMap((m) => [m.sender, m.recipient]));
+    if (aiSet.size === 0) return 0;
+
+    const prot = await protectedIds(sb);
+    const dayStart = utcDayStart();
+    let sent = 0;
+    for (const c of nudgeCandidates(recent, aiSet, now)) {
+      if (sent >= NUDGE_MAX_PER_TICK) break;
+      if (prot.has(c.humanId) || !UUID.test(String(c.humanId))) continue;
+
+      // Réduit au silence après une insulte ?
+      const { data: snub } = await sb.from('ai_actions').select('id')
+        .eq('ref', `snub:${c.conversation}`).limit(1);
+      if (snub && snub.length) continue;
+
+      // Combien de relances déjà faites dans cette conversation ?
+      const { count: done } = await sb.from('ai_actions')
+        .select('id', { count: 'exact', head: true })
+        .like('ref', `nudge:${c.conversation}:%`).in('status', ['running', 'done']);
+      const n = done || 0;
+      if (n >= NUDGE_MAX_PER_CONV) continue;
+      if (c.age < nudgeGapMs(c.conversation, n)) continue;
+
+      // Une seule relance par personne et par jour, toutes IA confondues.
+      const { count: today } = await sb.from('ai_actions')
+        .select('id', { count: 'exact', head: true })
+        .eq('target_id', c.humanId).like('ref', 'nudge:%')
+        .in('status', ['running', 'done']).gte('created_at', dayStart);
+      if ((today || 0) >= NUDGE_PER_USER_PER_DAY) continue;
+
+      const ai = await getProfile(sb, c.aiId);
+      const target = await getProfile(sb, c.humanId);
+      if (!ai || ai.is_ai !== true || !target || target.is_ai) continue;
+      if (!isAwake(ai)) continue;
+      if (await isBlocked(sb, ai.id, target.id)) continue;
+
+      const claim = await sb.from('ai_actions').insert({
+        ai_id: ai.id, target_id: target.id, kind: 'message', source: 'auto',
+        ref: `nudge:${c.conversation}:${n}`, status: 'running',
+      }).select('id').single();
+      if (claim.error) continue; // déjà pris (ref unique)
+
+      try {
+        const { data: hist } = await sb.from('messages').select('sender, body, created_at')
+          .eq('conversation_id', c.conversation).order('created_at', { ascending: false }).limit(HISTORY_MESSAGES);
+        const text = await generate(ctx, ai, target, (hist || []).reverse(), 'nudge', c.latest.id);
+        if (!text) { await finish(sb, claim.data.id, 'failed', 'empty_generation'); continue; }
+        await sendMessage(ctx, ai, target, text);
+        await finish(sb, claim.data.id, 'done', 'nudge');
+        sent++;
+      } catch (e) {
+        await finish(sb, claim.data.id, 'failed', e?.message || String(e));
+      }
+    }
+    return sent;
+  } finally {
+    nudging = false;
+  }
+}
+
 // ── Boucles ──────────────────────────────────────────────────────────────────
 
 async function tableAvailable(sb) {
@@ -1161,6 +1294,7 @@ function start({ supabase, notifyUser }) {
       try {
         await guard('auto_accept', autoAcceptLikes);
         await guard('auto_welcome', autoWelcome);
+        await guard('nudges', processNudges);
       } finally { autoRunning = false; }
     }, AUTO_TICK_MS);
     t.unref?.();
@@ -1179,5 +1313,6 @@ module.exports = {
     autoAcceptLikes, acceptRoll, ACCEPT_CHANCE, AUTO_ACCEPT_PER_USER_PER_DAY,
     protectedIds, resetProtectedCache: () => { protectedCache = { at: 0, ids: new Set() }; },
     sleepWindow, isAwakeAt, isPhotoRequest, isInsult, generate, tidyReply, cleanPersona, localClock,
+    nudgeCandidates, nudgeGapMs, processNudges, NUDGE_MAX_PER_CONV, NUDGE_MIN_GAP_MS,
   },
 };
