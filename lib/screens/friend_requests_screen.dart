@@ -283,14 +283,26 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         bottom: false,
         child: Column(
           children: [
+            // Même bande que « Messages » (chat_screen._titleBar) : mêmes marges,
+            // même hauteur (40), même titre (26 / 800 / -0,3), même trait
+            // dessous. Le titre ne bouge plus quand on passe d'un onglet à l'autre.
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
+              child: SizedBox(
+                height: 40,
+                child: Row(
                 children: [
                   Expanded(
                     child: Text(
                       AppStrings.t('demandes_title'),
-                      style: SCText.h1,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: SC.textPrimary,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                      ),
                     ),
                   ),
                   // Pastille : le nombre de likes recus, en haut a droite.
@@ -326,6 +338,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                     ),
                 ],
               ),
+              ),
+            ),
+            // Le liseré qui ferme l'en-tête, comme sur Messages : pleine largeur.
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: SC.stroke.withValues(alpha: 0.10),
             ),
             Expanded(
               child: ValueListenableBuilder<bool>(
