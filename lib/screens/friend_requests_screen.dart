@@ -297,12 +297,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                       AppStrings.t('demandes_title'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                      ),
+                      // La police d'origine de ce titre (Bricolage Grotesque,
+                      // 30 / 800), reprise à l'identique sur Messages.
+                      style: SCText.h1,
                     ),
                   ),
                   // Pastille : le nombre de likes recus, en haut a droite.

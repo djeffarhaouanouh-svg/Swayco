@@ -890,12 +890,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 AppStrings.t('messages_title'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: SC.textPrimary,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                ),
+                // Même police que le titre de Likes (Bricolage Grotesque,
+                // 30 / 800) : les deux onglets se répondent.
+                style: SCText.h1,
               ),
             ),
             // Personne en ligne = pas de pastille : un « 0 en ligne » est une
