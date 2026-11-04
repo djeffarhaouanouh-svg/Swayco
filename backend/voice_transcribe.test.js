@@ -256,3 +256,66 @@ test('auto: asks only for recent voices that the app has had time to handle', as
     ['lte', '2026-11-04T09:59:35.000Z'], // 25 s grace for the sender's own app
   ]);
 });
+
+// ── Providers: Grok first, OpenAI as the fallback ────────────────────────────
+function twoProviders({ grokOk = true, openaiOk = true, provider = '' } = {}) {
+  const urls = [];
+  const impl = async (url, init) => {
+    urls.push(String(url));
+    if (String(url).includes('api.x.ai')) {
+      const names = [...init.body.keys()];
+      return { ok: grokOk, status: grokOk ? 200 : 402, text: async () => JSON.stringify({ text: 'texte grok', _fields: names }) };
+    }
+    if (String(url).includes('openai.com')) {
+      return { ok: openaiOk, status: openaiOk ? 200 : 401, text: async () => JSON.stringify({ text: 'texte openai' }) };
+    }
+    return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer };
+  };
+  const run = async (extra = {}) => {
+    const { sb, updates } = fakeSb({ msg: mine() });
+    const out = await transcribeVoiceMessage({ ...base(sb, impl), grokKey: 'g', provider, ...extra });
+    return { out, updates, urls };
+  };
+  return { run };
+}
+
+test('providers: Grok is tried first and OpenAI is not called when it works', async () => {
+  const { out, updates, urls } = await twoProviders().run();
+  assert.equal(out.status, 200);
+  assert.equal(updates[0].body, 'texte grok');
+  assert.equal(urls.filter((u) => u.includes('openai.com')).length, 0);
+});
+
+test('providers: Grok gets ONLY the file field (anything else is rejected by xAI)', async () => {
+  let fields;
+  const impl = async (url, init) => {
+    if (String(url).includes('api.x.ai')) { fields = [...init.body.keys()]; return { ok: true, status: 200, text: async () => JSON.stringify({ text: 'x y' }) }; }
+    return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1]).buffer };
+  };
+  const { sb } = fakeSb({ msg: mine() });
+  await transcribeVoiceMessage({ ...base(sb, impl), grokKey: 'g' });
+  assert.deepEqual(fields, ['file']);
+});
+
+test('providers: Grok fails (no credit) -> OpenAI takes over', async () => {
+  const { out, updates } = await twoProviders({ grokOk: false }).run();
+  assert.equal(out.status, 200);
+  assert.equal(updates[0].body, 'texte openai');
+});
+
+test('providers: both fail -> 502, nothing written', async () => {
+  const { out, updates } = await twoProviders({ grokOk: false, openaiOk: false }).run();
+  assert.equal(out.status, 502);
+  assert.equal(updates.length, 0);
+});
+
+test('providers: VOICE_STT_PROVIDER=openai reverses the order', async () => {
+  const { updates, urls } = await twoProviders({ provider: 'openai' }).run();
+  assert.equal(updates[0].body, 'texte openai');
+  assert.equal(urls.filter((u) => u.includes('api.x.ai')).length, 0);
+});
+
+test('providers: only a Grok key (no OpenAI key) is enough', async () => {
+  const { out } = await twoProviders().run({ openaiKey: '' });
+  assert.equal(out.status, 200);
+});

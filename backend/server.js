@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 // LiveKit token API + optional Flutter web UI (folder ./web from Docker build).
 
@@ -11,7 +11,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const { AccessToken } = require('livekit-server-sdk');
 const { notifyUser, scheduleNotify } = require('./notify');
-const { transcribeVoiceMessage, startVoiceTranscriber } = require('./voice_transcribe');
+const { transcribeVoiceMessage, startVoiceTranscriber, voiceStatus } = require('./voice_transcribe');
 const { onlineNotif } = require('./nationalities');
 const { track, ingestEvents, countryFromReq } = require('./analytics');
 const {
@@ -582,7 +582,7 @@ app.post(
 app.use(express.json({ limit: '16kb' }));
 
 app.get('/health', (_req, res) => {
-  res.json({ ok: true, webUi: hasWebUi });
+  res.json({ ok: true, webUi: hasWebUi, voice: voiceStatus });
 });
 
 app.get('/api', (_req, res) => {
@@ -2384,6 +2384,9 @@ app.post('/messages/voice/transcribe', _limTight, async (req, res) => {
       supabaseUrl: SUPABASE_URL,
       openaiKey: OPENAI_API_KEY,
       model: WHISPER_MODEL,
+      grokKey: GROK_API_KEY,
+      grokBase: GROK_BASE,
+      provider: process.env.VOICE_STT_PROVIDER?.trim(),
     });
     return res.status(out.status).json(out.body);
   } catch (e) {
@@ -3148,9 +3151,14 @@ revenueCat.startExpirySweep(supabase);
 
 // Chaque vocal du chat est transcrit par le serveur (OpenAI), sans dependre de
 // l'app de l'expediteur : voir backend/voice_transcribe.js.
+// Fournisseur : Grok d'abord, OpenAI en secours (VOICE_STT_PROVIDER=openai
+// inverse l'ordre).
 startVoiceTranscriber({
   supabase,
   supabaseUrl: SUPABASE_URL,
   openaiKey: OPENAI_API_KEY,
   model: WHISPER_MODEL,
+  grokKey: GROK_API_KEY,
+  grokBase: GROK_BASE,
+  provider: process.env.VOICE_STT_PROVIDER?.trim(),
 });

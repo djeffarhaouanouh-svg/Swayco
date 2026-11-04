@@ -31,6 +31,46 @@ function ownFolderPrefix(supabaseUrl, uid) {
 }
 
 /**
+ * Dans quel ordre essayer les services. `provider` ('grok' | 'openai') passe en
+ * premier ; sans choix, Grok d'abord (le service de test du moment), OpenAI en
+ * secours. Un service sans clé est ignoré.
+ */
+function sttOrder({ provider, openaiKey, grokKey }) {
+  const first = String(provider || '').toLowerCase() === 'openai' ? ['openai', 'grok'] : ['grok', 'openai'];
+  return first.filter((p) => (p === 'openai' ? !!openaiKey : !!grokKey));
+}
+
+/** Un essai chez un fournisseur. Jamais d'exception : { ok, text } ou { ok:false, error }. */
+async function runStt({ p, audio, ext, mime, lang, openaiKey, model, grokKey, grokBase, fetchImpl }) {
+  try {
+    const form = new FormData();
+    form.append('file', new Blob([audio], { type: mime }), `voice.${ext}`);
+    let url;
+    let key;
+    if (p === 'grok') {
+      // Grok : un seul champ, `file` (la langue est détectée ; rien d'autre n'est accepté).
+      url = `${String(grokBase).replace(/\/+$/, '')}/stt`;
+      key = grokKey;
+    } else {
+      form.append('model', model);
+      if (validTag(lang)) form.append('language', lang);
+      form.append('response_format', 'json');
+      url = 'https://api.openai.com/v1/audio/transcriptions';
+      key = openaiKey;
+    }
+    const r = await fetchImpl(url, { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: form });
+    const raw = await r.text();
+    if (!r.ok) {
+      console.error(`[voice] ${p} stt error`, r.status, raw.slice(0, 200));
+      return { ok: false, error: `${p}_http_${r.status}` };
+    }
+    return { ok: true, text: String(JSON.parse(raw).text || '').trim() };
+  } catch (e) {
+    console.error(`[voice] ${p} stt throw`, e && e.message);
+    return { ok: false, error: `${p}_unreachable` };
+  }
+}
+/**
  * @returns {Promise<{status:number, body:object}>}
  *
  * `uid` vient du JWT vérifié, jamais de la requête : on ne transcrit que MES
@@ -45,6 +85,9 @@ async function transcribeVoiceMessage({
   supabaseUrl,
   openaiKey,
   model = 'whisper-1',
+  grokKey = '',
+  grokBase = 'https://api.x.ai/v1',
+  provider = '',
   fetchImpl = fetch,
   // Appel du serveur lui-même (voir startVoiceTranscriber) : pas de JWT, c'est le
   // message qui dit à qui il appartient.
@@ -53,7 +96,7 @@ async function transcribeVoiceMessage({
   if (!ID_RE.test(String(messageId || ''))) {
     return { status: 400, body: { error: 'invalid_message' } };
   }
-  if (!sb || !openaiKey) {
+  if (!sb || !(openaiKey || grokKey)) {
     return { status: 503, body: { error: 'transcription_not_configured' } };
   }
 
@@ -106,28 +149,26 @@ async function transcribeVoiceMessage({
   const ext = (/\.(m4a|webm|ogg|mp3|wav)$/i.exec(url) || [, 'm4a'])[1].toLowerCase();
   const mime = { m4a: 'audio/mp4', webm: 'audio/webm', ogg: 'audio/ogg', mp3: 'audio/mpeg', wav: 'audio/wav' }[ext];
 
+  // Fournisseurs essayés dans l'ordre : si le premier échoue (clé sans crédit,
+  // service en panne), le suivant prend le relais.
   let text = '';
-  try {
-    const form = new FormData();
-    form.append('file', new Blob([audio], { type: mime }), `voice.${ext}`);
-    form.append('model', model);
-    if (validTag(lang)) form.append('language', lang);
-    form.append('response_format', 'json');
-    const r = await fetchImpl('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${openaiKey}` },
-      body: form,
+  let failure = 'stt_error';
+  let used = '';
+  for (const p of sttOrder({ provider, openaiKey, grokKey })) {
+    const res = await runStt({
+      p, audio, ext, mime, lang, openaiKey, model, grokKey, grokBase, fetchImpl,
     });
-    const raw = await r.text();
-    if (!r.ok) {
-      console.error('[voice] stt error', r.status, raw.slice(0, 300));
-      return { status: 502, body: { error: 'stt_error' } };
+    if (res.ok) {
+      text = res.text;
+      used = p;
+      failure = '';
+      voiceStatus.provider = p;
+      break;
     }
-    text = String(JSON.parse(raw).text || '').trim();
-  } catch (e) {
-    console.error('[voice] stt throw', e && e.message);
-    return { status: 502, body: { error: 'stt_unreachable' } };
+    failure = res.error;
+    voiceStatus.lastSttError = `${p}: ${res.error}`;
   }
+  if (failure) return { status: 502, body: { error: failure } };
 
   // Du silence ou une toux : Whisper invente parfois une phrase toute faite.
   // Sans aucune lettre, il n'y a rien à garder.
@@ -143,7 +184,7 @@ async function transcribeVoiceMessage({
     .eq('body', '');
   if (upErr) return { status: 502, body: { error: 'update_failed' } };
 
-  console.log(`[voice] transcribed ${messageId} lang=${lang || '?'} chars=${text.length}`);
+  console.log(`[voice] transcribed ${messageId} via ${used} lang=${lang || '?'} chars=${text.length}`);
   return { status: 200, body: { ok: true } };
 }
 
@@ -159,11 +200,17 @@ async function transcribeVoiceMessage({
 //    texte et serait sinon repris à chaque tour : chaque essai coûte un appel
 //    OpenAI). Compteur en mémoire : un redémarrage dans la fenêtre en refait un.
 //  - `windowMs` : on ne remonte pas dans le passé (messages plus anciens ignorés).
+/** Lisible sur GET /health : de quoi voir, sans les logs, si la boucle tourne et pourquoi elle échoue. Aucun secret : seulement des compteurs et un code d'erreur. */
+const voiceStatus = { enabled: false, provider: null, lastRunAt: null, lastRows: 0, ok: 0, failed: 0, lastError: null, lastSttError: null };
+
 function createVoiceTranscriber({
   sb,
   supabaseUrl,
   openaiKey,
   model,
+  grokKey = '',
+  grokBase,
+  provider = '',
   fetchImpl = fetch,
   now = () => Date.now(),
   graceMs = 25000,
@@ -175,8 +222,9 @@ function createVoiceTranscriber({
 
   /** Un tour. Rend le nombre de vocaux traités. */
   async function tick() {
-    if (!sb || !openaiKey) return 0;
+    if (!sb || !(openaiKey || grokKey)) return 0;
     const t = now();
+    voiceStatus.lastRunAt = new Date(t).toISOString();
     const { data: rows, error } = await sb
       .from('messages')
       .select('id, sender')
@@ -186,7 +234,11 @@ function createVoiceTranscriber({
       .lte('created_at', new Date(t - graceMs).toISOString())
       .order('id', { ascending: true })
       .limit(batch);
-    if (error || !rows) return 0;
+    if (error || !rows) {
+      voiceStatus.lastError = 'query: ' + (error && (error.code || error.message) || 'no rows');
+      return 0;
+    }
+    voiceStatus.lastRows = rows.length;
     let done = 0;
     for (const m of rows) {
       const n = attempts.get(m.id) || 0;
@@ -194,11 +246,19 @@ function createVoiceTranscriber({
       attempts.set(m.id, n + 1);
       try {
         const out = await transcribeVoiceMessage({
-          sb, messageId: String(m.id), supabaseUrl, openaiKey, model, fetchImpl, trusted: true,
+          sb, messageId: String(m.id), supabaseUrl, openaiKey, model, grokKey, grokBase, provider, fetchImpl, trusted: true,
         });
-        if (out.status === 200) done += 1;
-        else console.error('[voice] auto-transcription', m.id, '->', out.status, out.body && out.body.error);
+        if (out.status === 200) {
+          done += 1;
+          voiceStatus.ok += 1;
+        } else {
+          voiceStatus.failed += 1;
+          voiceStatus.lastError = ` -> ${out.status} ${out.body && out.body.error}`;
+          console.error('[voice] auto-transcription', m.id, '->', out.status, out.body && out.body.error);
+        }
       } catch (e) {
+        voiceStatus.failed += 1;
+        voiceStatus.lastError = ` threw ${e && e.message}`;
         console.error('[voice] auto-transcription threw', m.id, e && e.message);
       }
     }
@@ -211,13 +271,14 @@ function createVoiceTranscriber({
 }
 
 /** Lance la boucle (une seule à la fois : un tour ne chevauche jamais le suivant). */
-function startVoiceTranscriber({ supabase, supabaseUrl, openaiKey, model, intervalMs = 10000 }) {
+function startVoiceTranscriber({ supabase, supabaseUrl, openaiKey, model, grokKey, grokBase, provider, intervalMs = 10000 }) {
   const sb = typeof supabase === 'function' ? supabase() : supabase;
-  if (!sb || !openaiKey) {
-    console.log('[voice] auto-transcription OFF (Supabase or OPENAI_API_KEY missing)');
+  if (!sb || !(openaiKey || grokKey)) {
+    console.log('[voice] auto-transcription OFF (Supabase, or no OPENAI_API_KEY / GROK_API_KEY)');
     return () => {};
   }
-  const tr = createVoiceTranscriber({ sb, supabaseUrl, openaiKey, model });
+  const tr = createVoiceTranscriber({ sb, supabaseUrl, openaiKey, model, grokKey, grokBase, provider });
+  voiceStatus.enabled = true;
   let running = false;
   const timer = setInterval(async () => {
     if (running) return;
@@ -240,4 +301,5 @@ module.exports = {
   ownFolderPrefix,
   createVoiceTranscriber,
   startVoiceTranscriber,
+  voiceStatus,
 };
