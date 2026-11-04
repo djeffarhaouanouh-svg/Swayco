@@ -81,6 +81,11 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
   late final List<double> _wave = voiceBars(widget.messageId, count: _bars);
 
   String get _heardKey => 'voice_heard_${widget.messageId}';
+  String get _doneKey => 'voice_done_${widget.messageId}';
+
+  /// Vocal reçu écouté JUSQU'AU BOUT : son onde est alors toute grise. Avant, elle
+  /// est blanche et grise à mesure qu'on l'écoute.
+  bool _done = false;
 
   @override
   void initState() {
@@ -93,7 +98,22 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
     try {
       final p = await SharedPreferences.getInstance();
       final heard = p.getBool(_heardKey) ?? false;
-      if (mounted && heard != _heard) setState(() => _heard = heard);
+      final done = p.getBool(_doneKey) ?? false;
+      if (mounted && (heard != _heard || done != _done)) {
+        setState(() {
+          _heard = heard;
+          _done = done;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _markDone() async {
+    if (widget.mine || _done) return;
+    if (mounted) setState(() => _done = true);
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setBool(_doneKey, true);
     } catch (_) {}
   }
 
@@ -149,6 +169,7 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
           }),
           player.completed.listen((_) {
             if (!mounted) return;
+            unawaited(_markDone());
             setState(() {
               _playing = false;
               _position = Duration.zero;
@@ -252,8 +273,24 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
         ? ''
         : voiceClock(_playing ? total - _position : total);
 
-    final played = c;
-    final rest = widget.mine ? c.withValues(alpha: 0.42) : c.withValues(alpha: 0.6);
+    // Mon vocal : la partie lue en pleine couleur, le reste atténué.
+    // Vocal REÇU : le blanc dit « pas encore écouté ». Tant qu'il ne l'est pas
+    // jusqu'au bout, ce qu'on a déjà entendu GRISE et le reste reste blanc ; une
+    // fois écouté en entier, tout est gris (on en remplit le blanc en le
+    // réécoutant).
+    final gray = c.withValues(alpha: 0.4);
+    final Color played;
+    final Color rest;
+    if (widget.mine) {
+      played = c;
+      rest = c.withValues(alpha: 0.42);
+    } else if (_done) {
+      played = c;
+      rest = gray;
+    } else {
+      played = gray;
+      rest = c;
+    }
 
     return Semantics(
       container: true,
