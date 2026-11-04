@@ -1,5 +1,7 @@
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 
+import 'swayco_sounds.dart';
 import 'voice_clip_base.dart';
 
 /// Mobile / bureau : `audioplayers`.
@@ -37,14 +39,51 @@ class _AudioPlayersClip implements VoiceClip {
   @override
   Stream<String> get errors => _p.onLog.where(isRealPlayerError);
 
+  /// Où sort le son. Sans ça le lecteur HÉRITE de la session audio de l'app : à
+  /// l'ouverture elle est réglée pour les appels (`playAndRecord`, mode
+  /// `videoChat`, AppDelegate) — le son part alors dans l'écouteur, quasi
+  /// inaudible — ou en « ambient » après un bip de l'app, qui obéit à
+  /// l'interrupteur silencieux. Un vocal se joue comme de la musique :
+  /// `playback`, haut-parleur, même en silencieux.
+  ///
+  /// Pendant un appel on ne touche à RIEN : WebRTC possède la session (voir
+  /// SwaycoSounds), la reconfigurer coupe la voix de l'appel.
+  Future<void> _routeToSpeaker() async {
+    if (SwaycoSounds.callActive) return;
+    try {
+      await _p.setAudioContext(
+        AudioContext(
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+            options: const {},
+          ),
+          android: const AudioContextAndroid(
+            contentType: AndroidContentType.speech,
+            usageType: AndroidUsageType.media,
+            audioFocus: AndroidAudioFocus.gain,
+          ),
+        ),
+      );
+      await _p.setVolume(1.0);
+    } catch (e) {
+      debugPrint('voice clip audio context failed: $e');
+    }
+  }
+
   @override
-  Future<void> play(String url) => _p.play(UrlSource(url));
+  Future<void> play(String url) async {
+    await _routeToSpeaker();
+    await _p.play(UrlSource(url));
+  }
 
   @override
   Future<void> pause() => _p.pause();
 
   @override
-  Future<void> resume() => _p.resume();
+  Future<void> resume() async {
+    await _routeToSpeaker();
+    await _p.resume();
+  }
 
   @override
   Future<void> seek(Duration to) => _p.seek(to);
