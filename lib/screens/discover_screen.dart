@@ -534,6 +534,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// d'infos) : la carte et ✕ ✉ ❤ descendent dans sa place, au-dessus de la
   /// poignée.
   bool _navAway = false;
+  final ValueNotifier<int> _popSide = ValueNotifier<int>(0);
 
   void _syncNavAway() {
     final v = NavChrome.autoHidden.value;
@@ -590,6 +591,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   @override
   void dispose() {
     NavChrome.autoHidden.removeListener(_syncNavAway);
+    _popSide.dispose();
     NavChrome.show();
     _pollTimer?.cancel();
     MatchCelebration.matchesChanged.removeListener(_refreshFriendships);
@@ -793,6 +795,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   void _onCardSwiped(bool isRight, RemoteProfile profile) {
     _closeInfo();
+    // Une fois la carte sortie (doigt ou bouton) : le bouton du côté fait son pop.
+    _popSide.value = isRight ? 1 : -1;
+    Future.delayed(const Duration(milliseconds: 260), () {
+      if (mounted) _popSide.value = 0;
+    });
     // Standard Tinder convention: dragging/flying RIGHT is the like, LEFT
     // the refuse.
     if (isRight) {
@@ -1113,6 +1120,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     onNope: _onSwipeLeft,
                     onLike: _onSwipeRight,
                     onMessage: _directMessage,
+                    popSide: _popSide,
                   )
                 : const SizedBox.shrink(),
           ),
@@ -3067,9 +3075,6 @@ class _DraggableCardState extends State<_DraggableCard>
   @override
   Widget build(BuildContext context) {
     final angle = (_pos.dx / 320.0) * 0.20;
-    // Standard Tinder convention: LIKE tracks the right drag, NOPE the left one.
-    final likeOpacity = (_pos.dx / 65.0).clamp(0.0, 1.0);
-    final nopeOpacity = (-_pos.dx / 65.0).clamp(0.0, 1.0);
 
     return Listener(
       onPointerDown: (e) {
@@ -3135,66 +3140,13 @@ class _DraggableCardState extends State<_DraggableCard>
             clipBehavior: Clip.none,
             children: [
               widget.child,
-              // LIKE à DROITE (le côté vers lequel on glisse pour matcher),
-              // NOPE à gauche — convention Tinder standard.
-              // Descendus sous la pastille filtre / le bouton retour, sinon
-              // ils passaient à moitié dessous et on ne les voyait pas.
-              if (likeOpacity > 0.02)
-                Positioned(
-                  top: 66,
-                  right: 24,
-                  child: Opacity(
-                    opacity: likeOpacity,
-                    child: const _SwipeStamp(text: 'LIKE', color: Color(0xFF3DCA72)),
-                  ),
-                ),
-              if (nopeOpacity > 0.02)
-                Positioned(
-                  top: 66,
-                  left: 24,
-                  child: Opacity(
-                    opacity: nopeOpacity,
-                    child: const _SwipeStamp(text: 'NOPE', color: Color(0xFFFF4458)),
-                  ),
-                ),
+              // Plus de tampons LIKE / NOPE pendant le glissement (retirés à
+              // la demande) : seul le « pop » du bouton ✕ / ❤ signale le choix.
               // Pastille filtre / retour — dans le transform de la carte, donc
               // elles glissent et s'inclinent avec elle.
               if (widget.topRightBadge != null)
                 Positioned(top: 12, right: 12, child: widget.topRightBadge!),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// LIKE / NOPE stamp
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _SwipeStamp extends StatelessWidget {
-  const _SwipeStamp({required this.text, required this.color});
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.rotate(
-      angle: text == 'LIKE' ? -0.26 : 0.26,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: color, width: 2.5),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: color,
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 2,
           ),
         ),
       ),
@@ -3757,11 +3709,52 @@ class _SwipeActionBar extends StatelessWidget {
     required this.onNope,
     required this.onLike,
     required this.onMessage,
+    required this.popSide,
   });
 
   final VoidCallback onNope;
   final VoidCallback onLike;
   final VoidCallback onMessage;
+
+  /// -1 = la carte vient de partir à gauche (✕ fait son pop), 1 = à droite (❤).
+  final ValueNotifier<int> popSide;
+
+  /// « Pop » : le bouton grossit à 1,4× avec une lueur, puis revient avec un
+  /// léger rebond. Aucun pop si les animations sont réduites.
+  Widget _pop(BuildContext context,
+      {required bool cross,
+      required Color glow,
+      required double glowAlpha,
+      required double glowBlur,
+      required Widget Function(double t) button}) {
+    final reduce = MediaQuery.disableAnimationsOf(context);
+    return ValueListenableBuilder<int>(
+      valueListenable: popSide,
+      builder: (context, side, _) {
+        final on = !reduce && side == (cross ? -1 : 1);
+        return TweenAnimationBuilder<double>(
+          tween: Tween(end: on ? 1.0 : 0.0),
+          duration: Duration(milliseconds: on ? 160 : 450),
+          curve: on ? Curves.easeOutCubic : Curves.easeOutBack,
+          builder: (context, t, _) => Transform.scale(
+            scale: 1 + 0.4 * t,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: glow.withValues(alpha: glowAlpha * t.clamp(0.0, 1.0)),
+                    blurRadius: glowBlur * t.clamp(0.0, 1.0),
+                  ),
+                ],
+              ),
+              child: button(t),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3771,7 +3764,15 @@ class _SwipeActionBar extends StatelessWidget {
         Semantics(
           button: true,
           label: 'Nope',
-          child: SwaycoCrossButton(size: _kFxSize, onTap: onNope),
+          child: _pop(
+            context,
+            cross: true,
+            glow: const Color(0xFFFF4D4D),
+            glowAlpha: 0.85,
+            glowBlur: 34,
+            button: (t) => SwaycoCrossButton(
+                size: _kFxSize, onTap: onNope, emphasis: t),
+          ),
         ),
         const SizedBox(width: 18),
         _DirectMessageButton(onTap: onMessage),
@@ -3779,7 +3780,15 @@ class _SwipeActionBar extends StatelessWidget {
         Semantics(
           button: true,
           label: 'Like',
-          child: SwaycoHeartButton(size: _kFxSize, onTap: onLike),
+          child: _pop(
+            context,
+            cross: false,
+            // Le ❤ de l'app est vert : la lueur reprend SA couleur.
+            glow: const Color(0xFF2FD486),
+            glowAlpha: 0.9,
+            glowBlur: 38,
+            button: (_) => SwaycoHeartButton(size: _kFxSize, onTap: onLike),
+          ),
         ),
       ],
     );

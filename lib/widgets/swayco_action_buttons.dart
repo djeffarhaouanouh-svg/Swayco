@@ -94,21 +94,43 @@ class SwaycoHeartButton extends StatelessWidget {
 
 /// Croix sombre sur rond blanc bombé.
 class SwaycoCrossButton extends StatelessWidget {
-  const SwaycoCrossButton({super.key, this.onTap, this.size = 76});
+  const SwaycoCrossButton({
+    super.key,
+    this.onTap,
+    this.size = 76,
+    this.emphasis = 0,
+  });
 
   final VoidCallback? onTap;
   final double size;
 
+  /// 0 = rendu normal. 1 = « pop » de Discover : fond rouge presque plein,
+  /// icône blanche (la carte vient de partir à gauche).
+  final double emphasis;
+
   @override
   Widget build(BuildContext context) {
+    const red = Color(0xFFFF4D4D);
+    final e = emphasis.clamp(0.0, 1.0);
+    final colors = e == 0
+        ? const [Colors.white, Color(0xFFF1F1EF), Color(0xFFB9B9B4)]
+        : [
+            for (final c in const [
+              Colors.white,
+              Color(0xFFF1F1EF),
+              Color(0xFFB9B9B4)
+            ])
+              Color.lerp(c, red, 0.9 * e)!,
+          ];
     return _DomeButton(
       size: size,
       onTap: onTap,
-      colors: const [Colors.white, Color(0xFFF1F1EF), Color(0xFFB9B9B4)],
+      colors: colors,
       shadow: const Color(0x80000000),
       icon: CustomPaint(
         size: Size.square(size * 0.40),
-        painter: _CrossPainter(const Color(0xFF1A1A1A)),
+        painter: _CrossPainter(
+            Color.lerp(const Color(0xFF1A1A1A), Colors.white, e)!),
       ),
     );
   }
