@@ -11,7 +11,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const { AccessToken } = require('livekit-server-sdk');
 const { notifyUser, scheduleNotify } = require('./notify');
-const { transcribeVoiceMessage } = require('./voice_transcribe');
+const { transcribeVoiceMessage, startVoiceTranscriber } = require('./voice_transcribe');
 const { onlineNotif } = require('./nationalities');
 const { track, ingestEvents, countryFromReq } = require('./analytics');
 const {
@@ -3145,3 +3145,12 @@ require('./ai_agents').start({ supabase, notifyUser });
 
 // Pro dont l'echeance est depassee (webhook perdu, achat test) : retour a free.
 revenueCat.startExpirySweep(supabase);
+
+// Chaque vocal du chat est transcrit par le serveur (OpenAI), sans dependre de
+// l'app de l'expediteur : voir backend/voice_transcribe.js.
+startVoiceTranscriber({
+  supabase,
+  supabaseUrl: SUPABASE_URL,
+  openaiKey: OPENAI_API_KEY,
+  model: WHISPER_MODEL,
+});

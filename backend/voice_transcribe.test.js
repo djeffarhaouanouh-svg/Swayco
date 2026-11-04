@@ -5,7 +5,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { transcribeVoiceMessage, ownFolderPrefix } = require('./voice_transcribe');
+const { transcribeVoiceMessage, ownFolderPrefix, createVoiceTranscriber } = require('./voice_transcribe');
 
 const UID = '3f2b8c1e-5d4a-4e7b-9a10-0c6d2e8f4b21';
 const MID = '9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d';
@@ -164,4 +164,95 @@ test('ownFolderPrefix ignores trailing slashes on the project url', () => {
     ownFolderPrefix('https://p.supabase.co//', UID),
     `https://p.supabase.co/storage/v1/object/public/voice-messages/${UID}/`,
   );
+});
+
+// ── Real ids are integers ────────────────────────────────────────────────────
+test('numeric message ids (436, 441…) are accepted - the real ones', async () => {
+  const { sb, updates } = fakeSb({ msg: mine({ id: 436 }) });
+  const out = await transcribeVoiceMessage({ ...base(sb, fakeFetch().impl), messageId: '436' });
+  assert.equal(out.status, 200);
+  assert.equal(updates.length, 1);
+  for (const bad of ['', 'abc', '12x', '-5', '1 or 1=1', '9'.repeat(25)]) {
+    assert.equal((await transcribeVoiceMessage({ ...base(sb, fakeFetch().impl), messageId: bad })).status, 400, bad);
+  }
+});
+
+// ── Server-side auto transcription ───────────────────────────────────────────
+/** Supabase stand-in for the tick: a list of pending messages + per-id lookup. */
+function tickSb(rows) {
+  const updates = [];
+  const sb = {
+    from(table) {
+      const q = {
+        _update: null,
+        _id: null,
+        select: () => q,
+        neq: () => q, eq: (c, v) => { if (c === 'id') q._id = v; return q; },
+        gte: () => q, lte: () => q, order: () => q, limit: () => q,
+        update: (v) => { q._update = v; return q; },
+        maybeSingle: async () => {
+          if (table === 'profiles') return { data: { language: 'en' }, error: null };
+          const m = rows.find((r) => String(r.id) === String(q._id));
+          return { data: m || null, error: null };
+        },
+        then: (res) => {
+          if (q._update) { updates.push(q._update); return Promise.resolve({ error: null }).then(res); }
+          return Promise.resolve({ data: rows.map((r) => ({ id: r.id, sender: r.sender })), error: null }).then(res);
+        },
+      };
+      return q;
+    },
+  };
+  return { sb, updates };
+}
+const AIID = '8027667b-51dc-4758-9595-f8eac620891d';
+const aiMsg = (id) => ({
+  id, sender: AIID, body: '',
+  audio_url: `${SB_URL}/storage/v1/object/public/voice-messages/${AIID}/${id}.wav`,
+});
+
+test('auto: a pending voice (even from an AI account) is transcribed with no JWT', async () => {
+  const { sb, updates } = tickSb([aiMsg(441)]);
+  const f = fakeFetch({ sttText: 'Hi! I just landed in Madrid.' });
+  const tr = createVoiceTranscriber({ sb, supabaseUrl: SB_URL, openaiKey: 'k', fetchImpl: f.impl });
+  assert.equal(await tr.tick(), 1);
+  assert.deepEqual(updates, [{ body: 'Hi! I just landed in Madrid.', language: 'en' }]);
+});
+
+test('auto: a message is tried at most twice (silence would otherwise cost every round)', async () => {
+  const { sb, updates } = tickSb([aiMsg(500)]);
+  const f = fakeFetch({ sttText: ' ... ' }); // silence: body stays empty
+  const tr = createVoiceTranscriber({ sb, supabaseUrl: SB_URL, openaiKey: 'k', fetchImpl: f.impl });
+  for (let i = 0; i < 6; i++) await tr.tick();
+  const stt = f.calls.filter((u) => u.includes('openai.com')).length;
+  assert.equal(stt, 2);
+  assert.equal(updates.length, 0);
+});
+
+test('auto: nothing happens without Supabase or the OpenAI key', async () => {
+  const { sb } = tickSb([aiMsg(1)]);
+  const f = fakeFetch();
+  assert.equal(await createVoiceTranscriber({ sb: null, supabaseUrl: SB_URL, openaiKey: 'k', fetchImpl: f.impl }).tick(), 0);
+  assert.equal(await createVoiceTranscriber({ sb, supabaseUrl: SB_URL, openaiKey: '', fetchImpl: f.impl }).tick(), 0);
+  assert.equal(f.calls.length, 0);
+});
+
+test('auto: a failing transcription never throws out of the loop', async () => {
+  const { sb } = tickSb([aiMsg(7), aiMsg(8)]);
+  const f = fakeFetch({ sttOk: false });
+  const tr = createVoiceTranscriber({ sb, supabaseUrl: SB_URL, openaiKey: 'k', fetchImpl: f.impl });
+  await assert.doesNotReject(() => tr.tick());
+});
+
+test('auto: asks only for recent voices that the app has had time to handle', async () => {
+  const seen = [];
+  const sb = { from: () => { const q = { select: () => q, neq: (c, v) => (seen.push(['neq', c, v]), q), eq: (c, v) => (seen.push(['eq', c, v]), q), gte: (c, v) => (seen.push(['gte', v]), q), lte: (c, v) => (seen.push(['lte', v]), q), order: () => q, limit: () => q, then: (r) => Promise.resolve({ data: [], error: null }).then(r) }; return q; } };
+  const NOW = Date.parse('2026-11-04T10:00:00Z');
+  await createVoiceTranscriber({ sb, supabaseUrl: SB_URL, openaiKey: 'k', fetchImpl: fakeFetch().impl, now: () => NOW }).tick();
+  assert.deepEqual(seen, [
+    ['neq', 'audio_url', ''],
+    ['eq', 'body', ''],
+    ['gte', '2026-11-04T09:45:00.000Z'], // 15 min back
+    ['lte', '2026-11-04T09:59:35.000Z'], // 25 s grace for the sender's own app
+  ]);
 });

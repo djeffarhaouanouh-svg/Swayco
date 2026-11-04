@@ -12,7 +12,8 @@
 // Rien ici n'a de rapport avec le circuit des appels.
 
 const MAX_BYTES = 3 * 1024 * 1024; // 60 s en AAC 64 kbit/s font ~480 Ko
-const UUID_RE = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+// messages.id est un entier (436, 441…) ; un UUID reste accepté.
+const ID_RE = /^(\d{1,18}|[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12})$/i;
 
 function primaryTag(v) {
   const s = typeof v === 'string' ? v.trim().toLowerCase() : '';
@@ -45,8 +46,11 @@ async function transcribeVoiceMessage({
   openaiKey,
   model = 'whisper-1',
   fetchImpl = fetch,
+  // Appel du serveur lui-même (voir startVoiceTranscriber) : pas de JWT, c'est le
+  // message qui dit à qui il appartient.
+  trusted = false,
 }) {
-  if (!UUID_RE.test(String(messageId || ''))) {
+  if (!ID_RE.test(String(messageId || ''))) {
     return { status: 400, body: { error: 'invalid_message' } };
   }
   if (!sb || !openaiKey) {
@@ -60,6 +64,7 @@ async function transcribeVoiceMessage({
     .maybeSingle();
   if (error) return { status: 502, body: { error: 'lookup_failed' } };
   if (!msg) return { status: 404, body: { error: 'not_found' } };
+  if (trusted) uid = String(msg.sender);
   if (String(msg.sender) !== String(uid)) {
     return { status: 403, body: { error: 'not_yours' } };
   }
@@ -142,4 +147,97 @@ async function transcribeVoiceMessage({
   return { status: 200, body: { ok: true } };
 }
 
-module.exports = { transcribeVoiceMessage, ownFolderPrefix };
+// ── Transcription automatique ───────────────────────────────────────────────
+// Chaque vocal est transcrit PAR LE SERVEUR, sans dépendre de l'app de
+// l'expéditeur (fermée, hors ligne, ou un compte IA : personne n'appellerait la
+// route). Toutes les `intervalMs` on cherche les vocaux récents sans texte.
+//
+//  - `graceMs` : on laisse d'abord l'app de l'expéditeur demander la
+//    transcription elle-même (avec la langue qu'elle connaît) ; ce n'est qu'au
+//    bout de ce délai qu'on prend le relais.
+//  - au plus `maxAttempts` essais par message (un vocal de silence resterait sans
+//    texte et serait sinon repris à chaque tour : chaque essai coûte un appel
+//    OpenAI). Compteur en mémoire : un redémarrage dans la fenêtre en refait un.
+//  - `windowMs` : on ne remonte pas dans le passé (messages plus anciens ignorés).
+function createVoiceTranscriber({
+  sb,
+  supabaseUrl,
+  openaiKey,
+  model,
+  fetchImpl = fetch,
+  now = () => Date.now(),
+  graceMs = 25000,
+  windowMs = 15 * 60000,
+  maxAttempts = 2,
+  batch = 10,
+}) {
+  const attempts = new Map();
+
+  /** Un tour. Rend le nombre de vocaux traités. */
+  async function tick() {
+    if (!sb || !openaiKey) return 0;
+    const t = now();
+    const { data: rows, error } = await sb
+      .from('messages')
+      .select('id, sender')
+      .neq('audio_url', '')
+      .eq('body', '')
+      .gte('created_at', new Date(t - windowMs).toISOString())
+      .lte('created_at', new Date(t - graceMs).toISOString())
+      .order('id', { ascending: true })
+      .limit(batch);
+    if (error || !rows) return 0;
+    let done = 0;
+    for (const m of rows) {
+      const n = attempts.get(m.id) || 0;
+      if (n >= maxAttempts) continue;
+      attempts.set(m.id, n + 1);
+      try {
+        const out = await transcribeVoiceMessage({
+          sb, messageId: String(m.id), supabaseUrl, openaiKey, model, fetchImpl, trusted: true,
+        });
+        if (out.status === 200) done += 1;
+        else console.error('[voice] auto-transcription', m.id, '->', out.status, out.body && out.body.error);
+      } catch (e) {
+        console.error('[voice] auto-transcription threw', m.id, e && e.message);
+      }
+    }
+    // La mémoire ne grossit pas : on oublie ce qui est sorti de la fenêtre.
+    if (attempts.size > 500) attempts.clear();
+    return done;
+  }
+
+  return { tick };
+}
+
+/** Lance la boucle (une seule à la fois : un tour ne chevauche jamais le suivant). */
+function startVoiceTranscriber({ supabase, supabaseUrl, openaiKey, model, intervalMs = 10000 }) {
+  const sb = typeof supabase === 'function' ? supabase() : supabase;
+  if (!sb || !openaiKey) {
+    console.log('[voice] auto-transcription OFF (Supabase or OPENAI_API_KEY missing)');
+    return () => {};
+  }
+  const tr = createVoiceTranscriber({ sb, supabaseUrl, openaiKey, model });
+  let running = false;
+  const timer = setInterval(async () => {
+    if (running) return;
+    running = true;
+    try {
+      await tr.tick();
+    } catch (e) {
+      console.error('[voice] auto-transcription tick failed', e && e.message);
+    } finally {
+      running = false;
+    }
+  }, intervalMs);
+  if (typeof timer.unref === 'function') timer.unref();
+  console.log('[voice] auto-transcription ON');
+  return () => clearInterval(timer);
+}
+
+module.exports = {
+  transcribeVoiceMessage,
+  ownFolderPrefix,
+  createVoiceTranscriber,
+  startVoiceTranscriber,
+};
