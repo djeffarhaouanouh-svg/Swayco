@@ -4692,12 +4692,15 @@ class _EmptyThreadState extends State<_EmptyThread>
                         ),
                 ),
               ),
+                  // La pastille « Vérifié » à sa place, comme sur les autres
+                  // photos : en bas à droite, posée sur le bord du rond (le point
+                  // à 45° d'un cercle de 132 est à ~19 px du coin du carré ; la
+                  // pastille fait ~24).
                   if (widget.verified)
-                    const Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: -12,
-                      child: Center(child: SwaycoSealCapsule()),
+                    Positioned(
+                      right: 7,
+                      bottom: 7,
+                      child: SwaycoSealCorner(ringColor: SC.bg),
                     ),
                 ],
               ),
@@ -4711,9 +4714,10 @@ class _EmptyThreadState extends State<_EmptyThread>
                   ),
                 ),
               if (mine.isNotEmpty)
+                // Sous le coin de la photo : ni sur le rond, ni sur la pastille.
                 Positioned(
-                  right: 26,
-                  bottom: 70,
+                  right: 30,
+                  bottom: 50,
                   child: Transform.rotate(
                     angle: 6 * math.pi / 180,
                     child: _HelloPill(text: mine, yellow: false),
