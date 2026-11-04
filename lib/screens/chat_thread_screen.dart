@@ -499,10 +499,55 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }();
   }
 
+  /// Un vocal arrive SANS texte : le serveur le transcrit quelques secondes plus
+  /// tard et écrit `body`. Tant qu'il en attend un (moins de 3 min), on relit le
+  /// fil toutes les 4 s : sur mobile le temps réel est la seule voie, et il peut
+  /// rater cette mise à jour d'une ligne déjà là.
+  Timer? _voiceTextTimer;
+
+  bool get _awaitingVoiceText => _messages.any(
+        (m) =>
+            m.isVoice &&
+            m.body.trim().isEmpty &&
+            DateTime.now().difference(m.createdAt) < const Duration(minutes: 3),
+      );
+
+  void _armVoiceTextRefresh() {
+    if (_voiceTextTimer != null || !_awaitingVoiceText) return;
+    _voiceTextTimer = Timer.periodic(const Duration(seconds: 4), (t) async {
+      if (!mounted || !_awaitingVoiceText) {
+        t.cancel();
+        _voiceTextTimer = null;
+        return;
+      }
+      try {
+        final rows = await ChatApi.fetchMessages(widget.conversationId);
+        if (!mounted) return;
+        final before = {for (final x in _messages) x.id: x.body};
+        final changed = rows.any(
+          (r) => before.containsKey(r.id) && before[r.id] != r.body,
+        );
+        if (!changed) return;
+        setState(() => _messages = rows);
+        if (_autoTranslate) {
+          for (final m in rows) {
+            _maybeFetchTranslation(m);
+          }
+        }
+      } catch (_) {
+        // Silencieux : le temps réel peut encore livrer le texte.
+      }
+    });
+  }
+
   void _maybeFetchTranslation(ChatMessage m) {
     if (!_autoTranslate || _myLang.isEmpty) return;
     final id = m.id;
     if (id.isEmpty) return;
+    // Pas de texte (un vocal pas encore transcrit, une image) : rien à traduire.
+    // Sans ça, « traduire du vide » était mémorisé et le texte, une fois arrivé,
+    // n'était plus jamais traduit.
+    if (m.body.trim().isEmpty) return;
     final lang = _messageLang(m);
     if (lang == _myLang) return; // already in my language
     if (_translations.containsKey(id) || _translatingIds.contains(id)) return;
@@ -728,6 +773,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           }
         }
         _refreshSuggestions();
+        _armVoiceTextRefresh();
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
       },
       onError: (e) {
@@ -799,7 +845,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         // the chat from rebuilding constantly while the user is typing.
         final last = _messages.isEmpty ? null : _messages.last.id;
         final freshLast = rows.isEmpty ? null : rows.last.id;
-        if (last == freshLast && rows.length == _messages.length) {
+        // Un texte arrivé après coup (vocal transcrit) compte aussi comme un
+        // changement : sans ça ce filet de secours l'ignorait.
+        final bodies = {for (final x in _messages) x.id: x.body};
+        final edited = rows.any(
+          (r) => bodies.containsKey(r.id) && bodies[r.id] != r.body,
+        );
+        if (last == freshLast && rows.length == _messages.length && !edited) {
           setState(() {
             _reactionsByMessage = nextReactions;
             _messagesLoaded = true;
@@ -852,6 +904,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _peerReadSub?.cancel();
     _typing?.dispose();
     _pollTimer?.cancel();
+    _voiceTextTimer?.cancel();
     _presenceTimer?.cancel();
     _clockTimer?.cancel();
     _inputCtrl.dispose();
