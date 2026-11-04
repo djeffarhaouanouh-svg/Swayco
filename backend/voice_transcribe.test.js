@@ -257,7 +257,7 @@ test('auto: asks only for recent voices that the app has had time to handle', as
   ]);
 });
 
-// ── Providers: Grok first, OpenAI as the fallback ────────────────────────────
+// ── Providers: OpenAI first, Grok as the fallback ────────────────────────────
 function twoProviders({ grokOk = true, openaiOk = true, provider = '' } = {}) {
   const urls = [];
   const impl = async (url, init) => {
@@ -279,11 +279,11 @@ function twoProviders({ grokOk = true, openaiOk = true, provider = '' } = {}) {
   return { run };
 }
 
-test('providers: Grok is tried first and OpenAI is not called when it works', async () => {
+test('providers: OpenAI is tried first and Grok is not called when it works', async () => {
   const { out, updates, urls } = await twoProviders().run();
   assert.equal(out.status, 200);
-  assert.equal(updates[0].body, 'texte grok');
-  assert.equal(urls.filter((u) => u.includes('openai.com')).length, 0);
+  assert.equal(updates[0].body, 'texte openai');
+  assert.equal(urls.filter((u) => u.includes('api.x.ai')).length, 0);
 });
 
 test('providers: Grok gets ONLY the file field (anything else is rejected by xAI)', async () => {
@@ -297,10 +297,10 @@ test('providers: Grok gets ONLY the file field (anything else is rejected by xAI
   assert.deepEqual(fields, ['file']);
 });
 
-test('providers: Grok fails (no credit) -> OpenAI takes over', async () => {
-  const { out, updates } = await twoProviders({ grokOk: false }).run();
+test('providers: OpenAI fails (no credit) -> Grok takes over', async () => {
+  const { out, updates } = await twoProviders({ openaiOk: false }).run();
   assert.equal(out.status, 200);
-  assert.equal(updates[0].body, 'texte openai');
+  assert.equal(updates[0].body, 'texte grok');
 });
 
 test('providers: both fail -> 502, nothing written', async () => {
@@ -309,15 +309,15 @@ test('providers: both fail -> 502, nothing written', async () => {
   assert.equal(updates.length, 0);
 });
 
-test('providers: VOICE_STT_PROVIDER=openai reverses the order', async () => {
-  const { updates, urls } = await twoProviders({ provider: 'openai' }).run();
-  assert.equal(updates[0].body, 'texte openai');
-  assert.equal(urls.filter((u) => u.includes('api.x.ai')).length, 0);
+test('providers: VOICE_STT_PROVIDER=grok puts Grok first', async () => {
+  const { updates, urls } = await twoProviders({ provider: 'grok' }).run();
+  assert.equal(updates[0].body, 'texte grok');
+  assert.equal(urls.filter((u) => u.includes('openai.com')).length, 0);
 });
 
-test('providers: only a Grok key (no OpenAI key) is enough', async () => {
-  const { out } = await twoProviders().run({ openaiKey: '' });
-  assert.equal(out.status, 200);
+test('providers: only one key (either) is enough', async () => {
+  assert.equal((await twoProviders().run({ openaiKey: '' })).out.status, 200);
+  assert.equal((await twoProviders().run({ grokKey: '' })).out.status, 200);
 });
 
 // ── The url check must not depend on the exact shape of SUPABASE_URL ─────────

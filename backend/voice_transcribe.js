@@ -59,12 +59,12 @@ function isOwnVoiceUrl(url, supabaseUrl, uid) {
 }
 
 /**
- * Dans quel ordre essayer les services. `provider` ('grok' | 'openai') passe en
- * premier ; sans choix, Grok d'abord (le service de test du moment), OpenAI en
- * secours. Un service sans clé est ignoré.
+ * Dans quel ordre essayer les services. OpenAI d'abord (ce qui a été convenu) ;
+ * Grok ne sert que de secours (clé OpenAI sans crédit, panne). `provider`
+ * ('grok' | 'openai') force le premier. Un service sans clé est ignoré.
  */
 function sttOrder({ provider, openaiKey, grokKey }) {
-  const first = String(provider || '').toLowerCase() === 'openai' ? ['openai', 'grok'] : ['grok', 'openai'];
+  const first = String(provider || '').toLowerCase() === 'grok' ? ['grok', 'openai'] : ['openai', 'grok'];
   return first.filter((p) => (p === 'openai' ? !!openaiKey : !!grokKey));
 }
 
