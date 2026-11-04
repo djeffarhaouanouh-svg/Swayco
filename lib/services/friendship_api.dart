@@ -282,6 +282,50 @@ abstract final class FriendshipApi {
     return Friendship.fromMap(Map<String, dynamic>.from(row));
   }
 
+  /// Les deux dates dont la page Likes a besoin pour distinguer « jamais reçu de
+  /// demande », « tout traité aujourd'hui » et « rien aujourd'hui » :
+  /// la dernière demande reçue (tous statuts) et ma dernière réponse.
+  ///
+  /// [ok] est FAUX quand la lecture a échoué : l'appelant garde alors ce qu'il
+  /// affichait. Rendre `null` sur une erreur réseau, comme « jamais rien reçu »,
+  /// aurait montré l'écran « bienvenue » à quelqu'un qui a des demandes.
+  static Future<({bool ok, DateTime? lastReceived, DateTime? lastAnswered})>
+      fetchIncomingStamps(String meId) async {
+    if (!isSupabaseReady || meId.isEmpty) {
+      return (ok: false, lastReceived: null, lastAnswered: null);
+    }
+    try {
+      final received = await _c
+          .from('friendships')
+          .select('created_at')
+          .eq('addressee', meId)
+          .order('created_at', ascending: false)
+          .limit(1);
+      final answered = await _c
+          .from('friendships')
+          .select('responded_at')
+          .eq('addressee', meId)
+          .not('responded_at', 'is', null)
+          .order('responded_at', ascending: false)
+          .limit(1);
+      DateTime? at(Object rows, String col) {
+        if ((rows as List).isEmpty) return null;
+        return DateTime.tryParse(
+          (rows.first as Map)[col]?.toString() ?? '',
+        )?.toLocal();
+      }
+
+      return (
+        ok: true,
+        lastReceived: at(received, 'created_at'),
+        lastAnswered: at(answered, 'responded_at'),
+      );
+    } catch (e) {
+      debugPrint('FriendshipApi.fetchIncomingStamps failed: $e');
+      return (ok: false, lastReceived: null, lastAnswered: null);
+    }
+  }
+
   /// My matches, newest first — the order the Messages page shows the match
   /// bubbles in. Reads my own rows (so the timestamps come along) instead of
   /// the peers RPC, then hydrates the profiles in that order.

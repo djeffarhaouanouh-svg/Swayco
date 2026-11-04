@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import '../services/device_id.dart';
 import '../services/friend_request_unread.dart';
 import '../services/friendship_api.dart';
 import '../services/languages.dart';
+import '../services/likes_empty_kind.dart';
 import '../services/locations.dart';
 import '../services/match_celebration.dart';
 import '../services/nav_tab.dart';
@@ -28,7 +30,9 @@ import '../widgets/match_overlay.dart';
 import '../widgets/popup_kit.dart' show popupDisplay;
 import '../widgets/profile_avatar.dart';
 import 'chat_thread_screen.dart';
+import 'paywall_screen.dart' show showBoostPaywall;
 import 'profile_screen.dart';
+
 
 /// Demandes — the people who liked me. Accepting is the match (the two likes
 /// meet and the conversation opens); refusing drops the like. Accepted rows
@@ -51,6 +55,12 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   LikesLock? _lock;
   bool _loading = true;
   String? _error;
+
+  /// Pourquoi la liste est vide (page Likes, 3 états vides).
+  LikesEmptyKind _emptyKind = LikesEmptyKind.never;
+
+  /// Mon profil est déjà boosté : l'état « calme aujourd'hui » n'en propose pas.
+  bool _boosted = false;
   RealtimeChannel? _channel;
   // Likes + photo-reactions have no realtime subscription (only friendships
   // do), so while the user sits on this tab we poll to pull fresh ones in.
@@ -152,10 +162,31 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         _myId,
       );
       final lock = await LikesLock.load(_myId);
+      // Liste vide : pourquoi ? Rien n'est lu quand il y a des demandes.
+      var emptyKind = _emptyKind;
+      var boosted = _boosted;
+      if (friendships.isEmpty) {
+        final stamps = await FriendshipApi.fetchIncomingStamps(_myId);
+        // Lecture ratée : on garde l'écran affiché, on ne devine pas.
+        if (stamps.ok) {
+          emptyKind = classifyLikesEmpty(
+            lastReceived: stamps.lastReceived,
+            lastAnswered: stamps.lastAnswered,
+            now: DateTime.now(),
+          );
+        }
+        if (stamps.ok && emptyKind == LikesEmptyKind.quietToday) {
+          try {
+            boosted = (await ProfileApi.fetchById(_myId))?.isBoosted ?? false;
+          } catch (_) {}
+        }
+      }
       if (!mounted) return;
       setState(() {
         _requests = friendships;
         _lock = lock;
+        _emptyKind = emptyKind;
+        _boosted = boosted;
         _loading = false;
       });
       FriendRequestUnread.setCount(friendships.length);
@@ -183,6 +214,8 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     setState(() {
       _leaving.remove(req.friendship.id);
       _requests = next;
+      // La dernière vient d'être traitée : « Tu es à jour ! » tout de suite.
+      if (next.isEmpty) _emptyKind = LikesEmptyKind.caughtUp;
     });
     FriendRequestUnread.setCount(next.length);
     try {
@@ -252,6 +285,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     setState(() {
       _leaving.remove(req.friendship.id);
       _requests = next;
+      if (next.isEmpty) _emptyKind = LikesEmptyKind.caughtUp;
     });
     FriendRequestUnread.setCount(next.length);
     try {
@@ -261,6 +295,24 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       setState(() => _requests = [..._requests, req]);
       FriendRequestUnread.setCount(_requests.length);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  /// Après l'achat d'un boost, le webhook le crédite quelques secondes plus tard :
+  /// on relit mon profil jusqu'à ce qu'il soit boosté (même principe que l'écran
+  /// profil), pour que « calme aujourd'hui » cesse de le proposer.
+  Future<void> _awaitBoostCredit() async {
+    for (var i = 0; i < 10; i++) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      try {
+        final me = await ProfileApi.fetchById(_myId);
+        if (!mounted) return;
+        if (me != null && me.isBoosted) {
+          setState(() => _boosted = true);
+          return;
+        }
+      } catch (_) {}
     }
   }
 
@@ -433,10 +485,19 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           ? ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.only(bottom: navBody),
-              children: const [
+              children: [
                 Padding(
-                  padding: EdgeInsets.symmetric(vertical: 80),
-                  child: _NoRequestsEmpty(),
+                  padding: const EdgeInsets.symmetric(vertical: 80),
+                  child: _NoRequestsEmpty(
+                    kind: _emptyKind,
+                    boosted: _boosted,
+                    onDiscover: () => NavTab.select(NavTab.discover),
+                    onProfile: () => NavTab.select(NavTab.profile),
+                    onBoost: () => showBoostPaywall(
+                      context,
+                      onPurchased: _awaitBoostCredit,
+                    ),
+                  ),
                 ),
               ],
             )
@@ -1051,56 +1112,399 @@ class _RejectButton extends StatelessWidget {
   }
 }
 
+/// La liste est vide : pourquoi ? (Likes, 3 états — maquettes 1a / 1b / 1c.)
+///   never      aucune demande reçue, jamais ;
+///   caughtUp   tout est traité, et au moins une demande est arrivée aujourd'hui ;
+///   quietToday des demandes passées, aucune aujourd'hui (on propose un boost).
 class _NoRequestsEmpty extends StatelessWidget {
-  const _NoRequestsEmpty();
+  const _NoRequestsEmpty({
+    required this.kind,
+    required this.boosted,
+    required this.onDiscover,
+    required this.onBoost,
+    required this.onProfile,
+  });
+
+  final LikesEmptyKind kind;
+
+  /// Mon profil est déjà boosté : pas de pastille d'argument ni de bouton.
+  final bool boosted;
+  final VoidCallback onDiscover;
+  final VoidCallback onBoost;
+
+  /// 1a : « Poster ma photo » renvoie sur l'onglet Profil.
+  final VoidCallback onProfile;
+
+  /// Un rond qui bat doucement : 1 → 1,06, une impulsion toutes les ~660 ms.
+  static Widget _beat(Widget child) => Breathing(
+        minScale: 1.0,
+        maxScale: 1.06,
+        period: const Duration(milliseconds: 330),
+        child: child,
+      );
+
+  Widget _iconCircle(IconData icon, {required bool beat}) {
+    final circle = Container(
+      width: 88,
+      height: 88,
+      decoration: BoxDecoration(
+        color: SC.accent.withValues(alpha: 0.13),
+        shape: BoxShape.circle,
+        border: Border.all(color: SC.accent.withValues(alpha: 0.35)),
+      ),
+      // accentFg : jaune en sombre, bleu de marque en clair (du jaune sur fond
+      // clair ne se lit pas).
+      child: Icon(icon, color: SC.accentFg, size: 40),
+    );
+    return beat ? _beat(circle) : Breathing(child: circle);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final (titleKey, bodyKey) = switch (kind) {
+      LikesEmptyKind.never => ('demandes_empty_title', 'demandes_never_body'),
+      LikesEmptyKind.caughtUp => ('demandes_caught_title', 'demandes_caught_body'),
+      LikesEmptyKind.quietToday => ('demandes_quiet_title', 'demandes_quiet_body'),
+    };
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Breathing(
-              child: Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: SC.accent.withValues(alpha: 0.14),
-                shape: BoxShape.circle,
-                border: Border.all(color: SC.accent.withValues(alpha: 0.35)),
-              ),
-              child: Icon(
-                Icons.group_outlined,
-                color: SC.accentFg,
-                size: 34,
-              ),
-            ),
-            ),
-            const SizedBox(height: 18),
+            switch (kind) {
+              LikesEmptyKind.never =>
+                _iconCircle(Icons.person_add_rounded, beat: false),
+              LikesEmptyKind.caughtUp =>
+                _iconCircle(Icons.done_all_rounded, beat: true),
+              LikesEmptyKind.quietToday => const _FlagOrbit(),
+            },
+            const SizedBox(height: 22),
             Text(
-              AppStrings.t('demandes_empty_title'),
+              AppStrings.t(titleKey),
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: SC.textPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
+                fontSize: 21,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              AppStrings.t('demandes_empty_body'),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: SC.textMuted,
-                fontSize: 13,
-                height: 1.4,
+            const SizedBox(height: 10),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: Text(
+                AppStrings.t(bodyKey),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: SC.textMuted,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
               ),
             ),
+            if (kind == LikesEmptyKind.never) ...[
+              const SizedBox(height: 24),
+              _EmptyCta(
+                icon: Icons.add_a_photo_rounded,
+                label: AppStrings.t('demandes_never_cta'),
+                onTap: onProfile,
+              ),
+            ],
+            if (kind == LikesEmptyKind.caughtUp) ...[
+              const SizedBox(height: 24),
+              _EmptyCta(
+                icon: Icons.public_rounded,
+                label: AppStrings.t('demandes_caught_cta'),
+                onTap: onDiscover,
+              ),
+            ],
+            if (kind == LikesEmptyKind.quietToday && !boosted) ...[
+              const SizedBox(height: 18),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                decoration: BoxDecoration(
+                  color: SC.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: SC.accent.withValues(alpha: 0.40)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.trending_up_rounded,
+                        size: 20, color: SC.accentFg),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        AppStrings.t('demandes_quiet_perk'),
+                        style: TextStyle(
+                          color: SC.accentFg,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _EmptyCta(
+                icon: Icons.bolt_rounded,
+                label: AppStrings.t('boost_my_profile'),
+                onTap: onBoost,
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+/// Le bouton jaune des états « à jour » et « calme aujourd'hui » : 48 de haut,
+/// pastille complète, texte foncé sur `SC.accent`, ombre jaune douce.
+class _EmptyCta extends StatelessWidget {
+  const _EmptyCta({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: PadTap(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          decoration: BoxDecoration(
+            color: SC.accent,
+            borderRadius: BorderRadius.circular(99),
+            boxShadow: [
+              BoxShadow(
+                color: SC.accent.withValues(alpha: 0.22),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 22, color: SC.onAccent),
+              const SizedBox(width: 8),
+              // Flexible : un libellé long (allemand, russe) se coupe au lieu de
+              // déborder du bouton.
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: SC.onAccent,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 1c : un cœur dans un rond de marque, et cinq drapeaux qui tournent autour sur
+/// une ellipse de 240 × 76 (9 s, sens anti-horaire). Celui de devant est un peu
+/// plus grand et opaque, ceux de derrière plus petits, à 70 %, et passent
+/// DERRIÈRE le cœur. Une ellipse pointillée marque le trajet. 230 px de haut.
+class _FlagOrbit extends StatefulWidget {
+  const _FlagOrbit();
+
+  @override
+  State<_FlagOrbit> createState() => _FlagOrbitState();
+}
+
+class _FlagOrbitState extends State<_FlagOrbit>
+    with SingleTickerProviderStateMixin {
+  static const _flags = ['jp', 'br', 'se', 'es', 'co'];
+  static const double _w = 300, _h = 230, _a = 120, _b = 38, _flag = 44;
+
+  late final AnimationController _spin = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 9),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // « Réduire les animations » : les drapeaux restent en place.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _spin.stop();
+    } else if (!_spin.isAnimating) {
+      _spin.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    super.dispose();
+  }
+
+  Widget _flagAt(int i, double t) {
+    // Décroissant : à l'écran (y vers le bas) c'est le sens anti-horaire.
+    final theta = 2 * math.pi * (i / _flags.length) - 2 * math.pi * t;
+    final depth = (math.sin(theta) + 1) / 2; // 0 = tout derrière, 1 = devant
+    final scale = 0.78 + (1.06 - 0.78) * depth;
+    final x = _w / 2 + _a * math.cos(theta) - _flag / 2;
+    final y = _h / 2 + _b * math.sin(theta) - _flag / 2;
+    return Positioned(
+      left: x,
+      top: y,
+      child: Opacity(
+        opacity: 0.7 + 0.3 * depth,
+        child: Transform.scale(
+          scale: scale,
+          child: Container(
+            width: _flag,
+            height: _flag,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: SC.menu,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.35),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.network(
+                'https://flagcdn.com/w80/${_flags[i]}.png',
+                width: _flag,
+                height: _flag,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _w,
+      height: _h,
+      child: AnimatedBuilder(
+        animation: _spin,
+        builder: (context, _) {
+          final t = _spin.value;
+          // Le profil de chaque drapeau : devant (sin >= 0, du côté du
+          // spectateur) ou derrière.
+          bool front(int i) =>
+              math.sin(2 * math.pi * (i / _flags.length) - 2 * math.pi * t) >=
+              0;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Le trajet : une ellipse pointillée, 1 px.
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _DashedEllipsePainter(
+                    a: _a,
+                    b: _b,
+                    color: SC.fg.withValues(alpha: 0.2),
+                  ),
+                ),
+              ),
+              for (var i = 0; i < _flags.length; i++)
+                if (!front(i)) _flagAt(i, t),
+              // Le cœur, qui bat.
+              Center(
+                child: _NoRequestsEmpty._beat(
+                  Container(
+                    width: 88,
+                    height: 88,
+                    decoration: BoxDecoration(
+                      gradient: SC.brandGradient,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: SC.brandBlue.withValues(alpha: 0.55),
+                          blurRadius: 40,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.favorite_rounded,
+                      size: 44,
+                      color: SC.accent,
+                    ),
+                  ),
+                ),
+              ),
+              for (var i = 0; i < _flags.length; i++)
+                if (front(i)) _flagAt(i, t),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _DashedEllipsePainter extends CustomPainter {
+  _DashedEllipsePainter({required this.a, required this.b, required this.color});
+
+  final double a;
+  final double b;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..addOval(
+        Rect.fromCenter(
+          center: Offset(size.width / 2, size.height / 2),
+          width: a * 2,
+          height: b * 2,
+        ),
+      );
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..isAntiAlias = true;
+    for (final m in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < m.length) {
+        canvas.drawPath(m.extractPath(d, math.min(d + 4, m.length)), paint);
+        d += 9; // 4 de trait, 5 d'espace
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedEllipsePainter old) =>
+      old.a != a || old.b != b || old.color != color;
 }
