@@ -31,6 +31,34 @@ function ownFolderPrefix(supabaseUrl, uid) {
 }
 
 /**
+ * Cette adresse est-elle bien un vocal de [uid] dans le bucket public ?
+ *
+ * On ne compare PLUS la chaîne à `SUPABASE_URL` : sur Railway elle n'a pas
+ * toujours la même forme que celle que les apps ont écrite dans le message (tous
+ * les vocaux étaient refusés). On exige donc, en lisant l'adresse : https, un hôte
+ * qui est celui de `SUPABASE_URL` OU un `*.supabase.co`, et le chemin exact
+ * `/storage/v1/object/public/voice-messages/<uid>/…`. Un hôte quelconque, un
+ * autre bucket ou le dossier de quelqu'un d'autre restent refusés.
+ */
+function isOwnVoiceUrl(url, supabaseUrl, uid) {
+  let u;
+  try {
+    u = new URL(String(url || ''));
+  } catch (_) {
+    return false;
+  }
+  if (u.protocol !== 'https:') return false;
+  let configured = '';
+  try {
+    configured = new URL(String(supabaseUrl || '')).host.toLowerCase();
+  } catch (_) {}
+  const host = u.host.toLowerCase();
+  const hostOk = (configured && host === configured) || host.endsWith('.supabase.co');
+  if (!hostOk) return false;
+  return u.pathname.startsWith(`/storage/v1/object/public/voice-messages/${uid}/`);
+}
+
+/**
  * Dans quel ordre essayer les services. `provider` ('grok' | 'openai') passe en
  * premier ; sans choix, Grok d'abord (le service de test du moment), OpenAI en
  * secours. Un service sans clé est ignoré.
@@ -112,7 +140,7 @@ async function transcribeVoiceMessage({
     return { status: 403, body: { error: 'not_yours' } };
   }
   const url = String(msg.audio_url || '');
-  if (!url.startsWith(ownFolderPrefix(supabaseUrl, uid))) {
+  if (!isOwnVoiceUrl(url, supabaseUrl, uid)) {
     return { status: 400, body: { error: 'not_a_voice_message' } };
   }
   if (String(msg.body || '').trim()) {

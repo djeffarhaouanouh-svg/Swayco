@@ -319,3 +319,32 @@ test('providers: only a Grok key (no OpenAI key) is enough', async () => {
   const { out } = await twoProviders().run({ openaiKey: '' });
   assert.equal(out.status, 200);
 });
+
+// ── The url check must not depend on the exact shape of SUPABASE_URL ─────────
+test('url check: Railway SUPABASE_URL in another shape still accepts the real voice', async () => {
+  for (const configured of ['', 'https://PROJ.supabase.co/', 'https://proj.supabase.co/rest/v1', 'http://proj.supabase.co', 'proj.supabase.co']) {
+    const { sb, updates } = fakeSb({ msg: mine() });
+    const out = await transcribeVoiceMessage({ ...base(sb, fakeFetch().impl), supabaseUrl: configured });
+    assert.equal(out.status, 200, `SUPABASE_URL=${JSON.stringify(configured)}`);
+    assert.equal(updates.length, 1);
+  }
+});
+
+test('url check: still refuses foreign hosts, http, other buckets and other people\'s folders', async () => {
+  const bad = [
+    `https://evil.example.com/storage/v1/object/public/voice-messages/${UID}/1.m4a`,
+    `https://proj.supabase.co.evil.com/storage/v1/object/public/voice-messages/${UID}/1.m4a`,
+    `http://proj.supabase.co/storage/v1/object/public/voice-messages/${UID}/1.m4a`,
+    `https://proj.supabase.co/storage/v1/object/public/avatars/${UID}/1.m4a`,
+    `https://proj.supabase.co/storage/v1/object/public/voice-messages/someone-else/1.m4a`,
+    `https://proj.supabase.co/storage/v1/object/public/voice-messages/${UID}evil/1.m4a`,
+    'not a url',
+  ];
+  for (const audio_url of bad) {
+    const { sb } = fakeSb({ msg: mine({ audio_url }) });
+    const f = fakeFetch();
+    const out = await transcribeVoiceMessage(base(sb, f.impl));
+    assert.equal(out.status, 400, audio_url);
+    assert.equal(f.calls.length, 0, `fetched ${audio_url}`);
+  }
+});
