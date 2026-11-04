@@ -487,7 +487,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
               padding: EdgeInsets.only(bottom: navBody),
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 80),
+                  // Remonté : 40 en haut au lieu de 80 (les trois états vides
+                  // partagent ce réglage).
+                  padding: const EdgeInsets.only(top: 40, bottom: 80),
                   child: _NoRequestsEmpty(
                     kind: _emptyKind,
                     boosted: _boosted,
