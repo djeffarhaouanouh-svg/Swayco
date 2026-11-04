@@ -19,7 +19,7 @@ class NavAutoHide extends StatelessWidget {
     super.key,
     required this.tab,
     required this.child,
-    this.returnDelay = const Duration(milliseconds: 900),
+    this.returnDelay = const Duration(milliseconds: 500),
   });
 
   /// `NavTab.chat`, `NavTab.demandes` ou `NavTab.profile`.
