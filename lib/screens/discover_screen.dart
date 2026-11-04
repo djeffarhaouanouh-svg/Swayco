@@ -3499,8 +3499,8 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
-          // ── Repère « tire vers le haut » : deux chevrons qui sautent, tout
-          //    en bas de la photo. Pas sur l'aperçu de ma carte.
+          // ── Repère « tire vers le haut » : un chevron qui saute, tout en bas
+          //    de la photo. Pas sur l'aperçu de ma carte.
           if (!widget.preview)
             const Positioned(
               left: 0,
@@ -3644,9 +3644,8 @@ class _CardPills extends StatelessWidget {
   }
 }
 
-/// Deux chevrons empilés qui SAUTENT vers le haut, puis retombent et
-/// marquent une pause : le repère « il y a des infos, tire vers le haut »,
-/// tout en bas de la carte.
+/// Un chevron qui SAUTE vers le haut, puis retombe et marque une pause : le
+/// repère « il y a des infos, tire vers le haut », tout en bas de la carte.
 class _ScrollHintChevrons extends StatefulWidget {
   const _ScrollHintChevrons();
 
@@ -3671,17 +3670,11 @@ class _ScrollHintChevronsState extends State<_ScrollHintChevrons>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _c,
-      builder: (context, _) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Le chevron du bas part une fraction de seconde après celui du
-          // haut : les deux sautent ensemble sans être collés.
-          _chevron(0.0),
-          Transform.translate(
-            offset: const Offset(0, -14),
-            child: _chevron(0.10),
-          ),
-        ],
+      // UN seul chevron (il y en avait deux). Il garde la place de l'ancien du
+      // bas, le plus près du bord de la photo.
+      builder: (context, _) => Transform.translate(
+        offset: const Offset(0, -14),
+        child: _chevron(0.0),
       ),
     );
   }
