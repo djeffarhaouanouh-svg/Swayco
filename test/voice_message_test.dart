@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:livekit_translate/services/voice_clip.dart';
 import 'package:livekit_translate/services/voice_recorder.dart';
 import 'package:livekit_translate/services/voice_wave.dart';
 import 'package:livekit_translate/widgets/voice_note_player.dart';
@@ -56,6 +59,117 @@ void main() {
   test('les limites : 1 s minimum, 60 s maximum', () {
     expect(kVoiceMinMs, 1000);
     expect(kVoiceMaxMs, 60000);
+  });
+
+  test('l\'info « prêt à lire » de l\'iPhone n\'est PAS une erreur du lecteur', () {
+    // Le message exact vu dans l'app (capture) : il passait pour un échec.
+    expect(
+      isRealPlayerError(
+        'player status: AVPlayerItemStatus(rawValue: 1), change: '
+        'NSKeyValueObservedChange<AVPlayerItemStatus>(kind: __C.NSKeyValueChange, '
+        'newValue: nil, oldValue: nil, indexes: nil, isPrior: false)',
+      ),
+      isFalse,
+    );
+    expect(isRealPlayerError('Failed to set source'), isTrue);
+    expect(isRealPlayerError('AVPlayerItem error: -11800'), isTrue);
+  });
+
+  group('VoiceNotePlayer avec un faux lecteur', () {
+    late _FakeClip clip;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      clip = _FakeClip();
+      VoiceNotePlayer.clipFactory = () => clip;
+    });
+    tearDown(() => VoiceNotePlayer.clipFactory = createVoiceClip);
+
+    Future<void> pumpPlayer(WidgetTester tester) => tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 230,
+                  child: VoiceNotePlayer(
+                    key: UniqueKey(),
+                    url: 'https://example.invalid/v.m4a',
+                    color: Colors.white,
+                    messageId: 'm1',
+                    mine: false,
+                    durationMs: 8000,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    testWidgets('toucher lecture : pause pendant la lecture, lecture à la fin',
+        (tester) async {
+      await pumpPlayer(tester);
+      await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+      await tester.pump();
+      expect(clip.played, ['https://example.invalid/v.m4a']);
+      clip.emitPlaying.add(true);
+      await tester.pump();      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
+      clip.emitCompleted.add(null);
+      clip.emitPlaying.add(false);
+      await tester.pump();      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+    });
+
+    testWidgets('un message de log banal ne met pas le bouton en erreur',
+        (tester) async {
+      await pumpPlayer(tester);
+      await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+      await tester.pump();
+      clip.emitPlaying.add(true);
+      await tester.pump();      await tester.pump(const Duration(milliseconds: 50));
+      // Le lecteur mobile filtre déjà ses logs : rien n'arrive dans `errors`.
+      expect(find.byIcon(Icons.error_outline_rounded), findsNothing);
+      expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
+    });
+
+    testWidgets('une vraie erreur : bouton en erreur, retouchable', (tester) async {
+      await pumpPlayer(tester);
+      await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+      await tester.pump();
+      clip.emitError.add('lecture impossible (code 3)');
+      await tester.pump();      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byIcon(Icons.error_outline_rounded), findsOneWidget);
+      // Un nouvel appui relance la lecture.
+      await tester.tap(find.byIcon(Icons.error_outline_rounded));
+      await tester.pump();
+      expect(clip.played.length, 2);
+    });
+
+    testWidgets('play() qui lève : bouton en erreur', (tester) async {
+      clip.failPlay = true;
+      await pumpPlayer(tester);
+      await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byIcon(Icons.error_outline_rounded), findsOneWidget);
+    });
+
+    testWidgets('lecture puis pause puis reprise', (tester) async {
+      await pumpPlayer(tester);
+      await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+      await tester.pump();
+      clip.emitPlaying.add(true);
+      clip.emitPosition.add(const Duration(seconds: 3));
+      await tester.pump();      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byIcon(Icons.pause_rounded));
+      await tester.pump();
+      expect(clip.pauses, 1);
+      clip.emitPlaying.add(false);
+      await tester.pump();      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+      await tester.pump();
+      expect(clip.resumes, 1);
+    });
   });
 
   group('VoiceNotePlayer', () {
@@ -137,4 +251,52 @@ void main() {
       expect(hit.height, greaterThanOrEqualTo(44));
     });
   });
+}
+
+/// Un faux lecteur : le test pilote lui-même ce que le vrai enverrait.
+class _FakeClip implements VoiceClip {
+  final _playing = StreamController<bool>.broadcast();
+  final _position = StreamController<Duration>.broadcast();
+  final _duration = StreamController<Duration>.broadcast();
+  final _completed = StreamController<void>.broadcast();
+  final _errors = StreamController<String>.broadcast();
+
+  /// Ce que le test « fait émettre » au lecteur.
+  StreamSink<bool> get emitPlaying => _playing.sink;
+  StreamSink<Duration> get emitPosition => _position.sink;
+  StreamSink<void> get emitCompleted => _completed.sink;
+  StreamSink<String> get emitError => _errors.sink;
+
+  @override
+  Stream<bool> get playing => _playing.stream;
+  @override
+  Stream<Duration> get position => _position.stream;
+  @override
+  Stream<Duration> get duration => _duration.stream;
+  @override
+  Stream<void> get completed => _completed.stream;
+  @override
+  Stream<String> get errors => _errors.stream;
+
+  final played = <String>[];
+  int pauses = 0;
+  int resumes = 0;
+  bool failPlay = false;
+
+  @override
+  Future<void> play(String url) async {
+    played.add(url);
+    if (failPlay) throw StateError('refusé');
+  }
+
+  @override
+  Future<void> pause() async => pauses++;
+  @override
+  Future<void> resume() async => resumes++;
+  @override
+  Future<void> seek(Duration to) async {}
+  @override
+  Future<void> stop() async {}
+  @override
+  Future<void> dispose() async {}
 }

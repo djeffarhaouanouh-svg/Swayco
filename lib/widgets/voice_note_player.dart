@@ -46,6 +46,10 @@ class VoiceNotePlayer extends StatefulWidget {
   /// inconnue : elle apparaît quand le fichier s'ouvre.
   final int durationMs;
 
+  /// Fabrique du lecteur audio. Les tests y mettent un faux lecteur.
+  @visibleForTesting
+  static VoiceClip Function() clipFactory = createVoiceClip;
+
   @override
   State<VoiceNotePlayer> createState() => _VoiceNotePlayerState();
 }
@@ -131,7 +135,7 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
       unawaited(_markHeard());
       var player = _player;
       if (player == null) {
-        player = createVoiceClip();
+        player = VoiceNotePlayer.clipFactory();
         _player = player;
         _subs.addAll([
           player.playing.listen((p) {

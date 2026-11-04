@@ -5,6 +5,15 @@ import 'voice_clip_base.dart';
 /// Mobile / bureau : `audioplayers`.
 VoiceClip createVoiceClip() => _AudioPlayersClip();
 
+/// `onLog` mélange infos et erreurs : sur iPhone il émet à chaque changement
+/// d'état (« player status: AVPlayerItemStatus(rawValue: 1), change: … » =
+/// prêt à lire). Seuls les vrais messages d'erreur comptent ; un échec de
+/// `play()` lui-même est attrapé par le widget.
+bool isRealPlayerError(String m) => RegExp(
+      r'error|fail|exception|invalid|unsupported|cannot|could not',
+      caseSensitive: false,
+    ).hasMatch(m);
+
 class _AudioPlayersClip implements VoiceClip {
   final AudioPlayer _p = AudioPlayer();
 
@@ -26,11 +35,7 @@ class _AudioPlayersClip implements VoiceClip {
   /// Seuls les vrais messages d'erreur passent ; un échec de `play()` lui-même
   /// est déjà attrapé par le widget.
   @override
-  Stream<String> get errors => _p.onLog.where(
-        (m) => RegExp(r'error|fail|exception|invalid|unsupported|cannot|could not',
-                caseSensitive: false)
-            .hasMatch(m),
-      );
+  Stream<String> get errors => _p.onLog.where(isRealPlayerError);
 
   @override
   Future<void> play(String url) => _p.play(UrlSource(url));
