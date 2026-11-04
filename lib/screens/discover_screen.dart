@@ -542,7 +542,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   void _onCardDragEngaged() => NavChrome.hideAuto();
   void _onCardDragReleased() =>
-      NavChrome.showAfter(const Duration(milliseconds: 1500));
+      NavChrome.showAfter(const Duration(milliseconds: 1700));
 
   @override
   void initState() {
