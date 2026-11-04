@@ -2,10 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../services/app_strings.dart';
 import '../services/voice_clip.dart';
+import '../services/voice_heard.dart';
 import '../services/voice_wave.dart';
 
 /// Le point « pas encore écouté » d'un vocal reçu.
@@ -80,13 +79,6 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
 
   late final List<double> _wave = voiceBars(widget.messageId, count: _bars);
 
-  String get _heardKey => 'voice_heard_${widget.messageId}';
-  String get _doneKey => 'voice_done_${widget.messageId}';
-
-  /// Vocal reçu écouté JUSQU'AU BOUT : son onde est alors toute grise. Avant, elle
-  /// est blanche et grise à mesure qu'on l'écoute.
-  bool _done = false;
-
   @override
   void initState() {
     super.initState();
@@ -95,35 +87,16 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
   }
 
   Future<void> _loadHeard() async {
-    try {
-      final p = await SharedPreferences.getInstance();
-      final heard = p.getBool(_heardKey) ?? false;
-      final done = p.getBool(_doneKey) ?? false;
-      if (mounted && (heard != _heard || done != _done)) {
-        setState(() {
-          _heard = heard;
-          _done = done;
-        });
-      }
-    } catch (_) {}
+    final heard = await VoiceHeard.isHeard(widget.messageId);
+    if (mounted && heard != _heard) setState(() => _heard = heard);
   }
 
-  Future<void> _markDone() async {
-    if (widget.mine || _done) return;
-    if (mounted) setState(() => _done = true);
-    try {
-      final p = await SharedPreferences.getInstance();
-      await p.setBool(_doneKey, true);
-    } catch (_) {}
-  }
-
+  /// Première lecture : le point cyan part, et la bulle (qui écoute VoiceHeard)
+  /// passe du blanc au gris.
   Future<void> _markHeard() async {
     if (widget.mine || _heard) return;
     setState(() => _heard = true);
-    try {
-      final p = await SharedPreferences.getInstance();
-      await p.setBool(_heardKey, true);
-    } catch (_) {}
+    await VoiceHeard.mark(widget.messageId);
   }
 
   @override
@@ -169,7 +142,6 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
           }),
           player.completed.listen((_) {
             if (!mounted) return;
-            unawaited(_markDone());
             setState(() {
               _playing = false;
               _position = Duration.zero;
@@ -273,24 +245,8 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
         ? ''
         : voiceClock(_playing ? total - _position : total);
 
-    // Mon vocal : la partie lue en pleine couleur, le reste atténué.
-    // Vocal REÇU : le blanc dit « pas encore écouté ». Tant qu'il ne l'est pas
-    // jusqu'au bout, ce qu'on a déjà entendu GRISE et le reste reste blanc ; une
-    // fois écouté en entier, tout est gris (on en remplit le blanc en le
-    // réécoutant).
-    final gray = c.withValues(alpha: 0.4);
-    final Color played;
-    final Color rest;
-    if (widget.mine) {
-      played = c;
-      rest = c.withValues(alpha: 0.42);
-    } else if (_done) {
-      played = c;
-      rest = gray;
-    } else {
-      played = gray;
-      rest = c;
-    }
+    final played = c;
+    final rest = widget.mine ? c.withValues(alpha: 0.42) : c.withValues(alpha: 0.6);
 
     return Semantics(
       container: true,

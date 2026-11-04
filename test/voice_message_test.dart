@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:livekit_translate/services/voice_clip.dart';
+import 'package:livekit_translate/services/voice_heard.dart';
 import 'package:livekit_translate/services/voice_recorder.dart';
 import 'package:livekit_translate/services/voice_wave.dart';
 import 'package:livekit_translate/widgets/voice_note_player.dart';
@@ -80,6 +81,7 @@ void main() {
 
     setUp(() {
       SharedPreferences.setMockInitialValues({});
+      VoiceHeard.resetForTest();
       clip = _FakeClip();
       VoiceNotePlayer.clipFactory = () => clip;
     });
@@ -202,6 +204,7 @@ void main() {
 
     testWidgets('affiche la durée du message avant toute lecture', (tester) async {
       SharedPreferences.setMockInitialValues({});
+      VoiceHeard.resetForTest();
       await pump(tester, mine: true);
       await tester.pump();
       expect(find.text('0:27'), findsOneWidget);
@@ -220,16 +223,19 @@ void main() {
           .isNotEmpty;
 
       SharedPreferences.setMockInitialValues({});
+      VoiceHeard.resetForTest();
       await pump(tester, mine: false);
       await tester.pumpAndSettle();
       expect(hasDot(), isTrue);
 
       SharedPreferences.setMockInitialValues({'voice_heard_msg-123': true});
+      VoiceHeard.resetForTest();
       await pump(tester, mine: false);
       await tester.pumpAndSettle();
       expect(hasDot(), isFalse);
 
       SharedPreferences.setMockInitialValues({});
+      VoiceHeard.resetForTest();
       await pump(tester, mine: true);
       await tester.pumpAndSettle();
       expect(hasDot(), isFalse);
@@ -237,6 +243,7 @@ void main() {
 
     testWidgets('zone tactile du bouton lecture : 44 px au moins', (tester) async {
       SharedPreferences.setMockInitialValues({});
+      VoiceHeard.resetForTest();
       await pump(tester, mine: false);
       await tester.pump();
       final btn = tester.getSize(find.byIcon(Icons.play_arrow_rounded).first);

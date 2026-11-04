@@ -35,6 +35,7 @@ import '../services/translation_api.dart';
 import '../services/translation_cache.dart';
 import '../services/typing_signal.dart';
 import '../services/user_prefs.dart';
+import '../services/voice_heard.dart';
 import '../services/voice_recorder.dart';
 import '../services/voice_wave.dart';
 import '../services/web_poll.dart';
@@ -1971,6 +1972,33 @@ class _MessageBubbleState extends State<_MessageBubble> {
   /// « voir l'original » touché : cette bulle montre le texte tel qu'écrit.
   bool _showOriginal = false;
 
+  /// Vocal reçu déjà écouté ? Vrai par défaut (le temps de lire le stockage
+  /// local) : une bulle ne passe pas du gris au blanc pour rien.
+  bool _voiceHeard = true;
+
+  void _syncVoiceHeard() {
+    final h = VoiceHeard.cached(message.id);
+    if (h != null && h != _voiceHeard && mounted) {
+      setState(() => _voiceHeard = h);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.message.isVoice && !widget.mine) {
+      _voiceHeard = VoiceHeard.cached(widget.message.id) ?? true;
+      VoiceHeard.changed.addListener(_syncVoiceHeard);
+      unawaited(VoiceHeard.isHeard(widget.message.id));
+    }
+  }
+
+  @override
+  void dispose() {
+    VoiceHeard.changed.removeListener(_syncVoiceHeard);
+    super.dispose();
+  }
+
   ChatMessage get message => widget.message;
   bool get mine => widget.mine;
   String get displayBody => widget.translated && _showOriginal
@@ -2208,7 +2236,13 @@ class _MessageBubbleState extends State<_MessageBubble> {
     final align = mine ? Alignment.centerRight : Alignment.centerLeft;
     // Envoyé = cyan plein, texte encre ; reçu = gris ardoise liseré, texte
     // blanc. Le petit coin (6) pointe vers l'auteur (maquette 8c).
-    final bubbleText = mine ? SC.outBubbleText : SC.msgInText;
+    // Un vocal reçu pas encore écouté : bulle BLANCHE, texte foncé. Dès qu'on
+    // l'écoute elle passe au gris habituel (en thème clair, le gris de réception
+    // est déjà blanc : rien ne change).
+    final unheardVoice = message.isVoice && !mine && !_voiceHeard;
+    final bubbleText = unheardVoice
+        ? SC.onAccent
+        : (mine ? SC.outBubbleText : SC.msgInText);
     final radius = mine
         ? const BorderRadius.only(
             topLeft: Radius.circular(20),
@@ -2476,7 +2510,9 @@ class _MessageBubbleState extends State<_MessageBubble> {
               behavior: HitTestBehavior.opaque,
               onDoubleTap: _thumbsUp,
               onLongPress: _openPicker,
-              child: Container(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOut,
                 padding: bareMedia
                     ? EdgeInsets.zero
                     : message.isVoice
@@ -2503,10 +2539,18 @@ class _MessageBubbleState extends State<_MessageBubble> {
                     : BoxDecoration(
                         // Envoyé : dégradé de marque ; reçu : blanc (clair) /
                         // gris ardoise (sombre).
-                        color: mine ? null : SC.msgInBg,
+                        color: mine
+                            ? null
+                            : (unheardVoice ? Colors.white : SC.msgInBg),
                         gradient: mine ? SC.outBubbleGradient : null,
                         borderRadius: radius,
-                        border: mine ? null : Border.all(color: SC.msgInBorder),
+                        border: mine
+                            ? null
+                            : Border.all(
+                                color: unheardVoice
+                                    ? Colors.white
+                                    : SC.msgInBorder,
+                              ),
                         boxShadow: mine ? SC.msgOutShadow : SC.msgInShadow,
                       ),
                 child: message.isVoice
