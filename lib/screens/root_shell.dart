@@ -858,6 +858,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                           // les animations » : instantané.
                           final auto = NavChrome.autoHidden.value;
                           final still = MediaQuery.disableAnimationsOf(context);
+                          final slideMs = auto ? 420 : 260;
                           return IgnorePointer(
                             ignoring: hidden,
                             child: AnimatedSlide(
@@ -865,14 +866,30 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                                   hidden ? const Offset(0, 1.8) : Offset.zero,
                               duration: still
                                   ? Duration.zero
-                                  : Duration(milliseconds: auto ? 420 : 260),
+                                  : Duration(milliseconds: slideMs),
                               curve: Curves.easeOutCubic,
-                              child: AnimatedOpacity(
-                                opacity: hidden ? 0 : 1,
+                              // Rangée par le défilement : elle se RESSERRE de
+                              // 45 % en descendant (largeur et icônes à 55 %,
+                              // ancrée en bas au centre) et se rouvre à 100 %
+                              // en remontant. Pas pour le panneau d'infos de
+                              // Discover (autoHidden faux) : elle y glisse comme
+                              // avant.
+                              child: AnimatedScale(
+                                scale: auto && hidden ? 0.55 : 1.0,
+                                alignment: Alignment.bottomCenter,
                                 duration: still
                                     ? Duration.zero
-                                    : Duration(milliseconds: auto ? 300 : 200),
-                                child: child,
+                                    : Duration(milliseconds: slideMs),
+                                curve: Curves.easeOutCubic,
+                                child: AnimatedOpacity(
+                                  opacity: hidden ? 0 : 1,
+                                  duration: still
+                                      ? Duration.zero
+                                      : Duration(
+                                          milliseconds: auto ? 300 : 200,
+                                        ),
+                                  child: child,
+                                ),
                               ),
                             ),
                           );
