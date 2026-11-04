@@ -32,6 +32,7 @@ import '../theme/swayco_palette.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/match_overlay.dart';
+import '../widgets/nav_auto_hide.dart';
 import '../widgets/sway_tip_dialog.dart';
 import '../widgets/swayco_popups_extra.dart';
 import 'call_screen.dart';
@@ -831,6 +832,16 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                       children: [
                         for (final p in pages) _KeepAlivePage(child: p),
                       ],
+                    ),
+                    // Barre rangée par le défilement / une carte : un tap
+                    // n'importe où la rappelle (sans bloquer ce qu'il touche).
+                    Positioned.fill(
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: NavChrome.autoHidden,
+                        builder: (context, auto, _) => auto
+                            ? const NavTapRestore()
+                            : const SizedBox.shrink(),
+                      ),
                     ),
                     Positioned(
                       left: GlassNavBar.floatSide,

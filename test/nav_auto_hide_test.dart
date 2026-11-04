@@ -67,6 +67,69 @@ void main() {
     });
   });
 
+  group('NavTapRestore', () {
+    Future<List<String>> pumpStack(WidgetTester tester) async {
+      final events = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Stack(
+              children: [
+                // La page dessous : un bouton ET une liste.
+                Column(
+                  children: [
+                    TextButton(
+                      onPressed: () => events.add('bouton'),
+                      child: const Text('OK'),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: 50,
+                        itemBuilder: (_, i) =>
+                            SizedBox(height: 60, child: Text('ligne $i')),
+                      ),
+                    ),
+                  ],
+                ),
+                const Positioned.fill(child: NavTapRestore()),
+              ],
+            ),
+          ),
+        ),
+      );
+      return events;
+    }
+
+    testWidgets('un tap rappelle la barre ET atteint le bouton dessous',
+        (tester) async {
+      final events = await pumpStack(tester);
+      NavChrome.hideAuto();
+      expect(NavChrome.hidden.value, isTrue);
+      await tester.tap(find.text('OK'));
+      await tester.pump();
+      expect(NavChrome.hidden.value, isFalse);
+      expect(events, ['bouton']); // le tap n'est pas avalé
+    });
+
+    testWidgets('un défilement ne la rappelle pas', (tester) async {
+      await pumpStack(tester);
+      NavChrome.hideAuto();
+      await tester.drag(find.byType(ListView), const Offset(0, -200));
+      await tester.pump();
+      expect(NavChrome.hidden.value, isTrue);
+    });
+
+    testWidgets('un appui long ne la rappelle pas', (tester) async {
+      await pumpStack(tester);
+      NavChrome.hideAuto();
+      final g = await tester.startGesture(const Offset(200, 300));
+      await tester.pump(const Duration(milliseconds: 600));
+      await g.up();
+      await tester.pump();
+      expect(NavChrome.hidden.value, isTrue);
+    });
+  });
+
   group('NavAutoHide', () {
     Future<ScrollController> pump(WidgetTester tester, {int tab = NavTab.chat}) async {
       final ctl = ScrollController();

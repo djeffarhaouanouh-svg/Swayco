@@ -1,4 +1,6 @@
 // lib/widgets/nav_auto_hide.dart  — NOUVEAU fichier.
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import '../services/nav_chrome.dart';
@@ -47,6 +49,61 @@ class NavAutoHide extends StatelessWidget {
         return false;
       },
       child: child,
+    );
+  }
+}
+
+/// Un tap n'importe où sur l'écran rappelle la barre quand elle est rangée
+/// (par le défilement ou le glissement d'une carte). À poser au-dessus des pages
+/// et au-dessous de la barre : il ÉCOUTE les doigts sans les bloquer, le bouton
+/// ou la carte dessous reçoit son tap comme d'habitude.
+///
+/// Un « tap » = doigt levé à moins de 12 px d'où il s'est posé, en moins de
+/// 350 ms : un défilement ou un glissement de carte ne la rappelle donc pas.
+class NavTapRestore extends StatefulWidget {
+  const NavTapRestore({super.key});
+
+  @override
+  State<NavTapRestore> createState() => _NavTapRestoreState();
+}
+
+class _NavTapRestoreState extends State<NavTapRestore> {
+  Offset? _down;
+  Timer? _tooLong;
+  bool _stillATap = false;
+
+  @override
+  void dispose() {
+    _tooLong?.cancel();
+    super.dispose();
+  }
+
+  void _reset() {
+    _tooLong?.cancel();
+    _down = null;
+    _stillATap = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (e) {
+        _tooLong?.cancel();
+        _down = e.position;
+        _stillATap = true;
+        // Au-delà de 350 ms ce n'est plus un tap (appui long, début de geste).
+        _tooLong = Timer(const Duration(milliseconds: 350), () {
+          _stillATap = false;
+        });
+      },
+      onPointerUp: (e) {
+        final d = _down;
+        final tap = _stillATap && d != null && (e.position - d).distance < 12;
+        _reset();
+        if (tap) NavChrome.show();
+      },
+      onPointerCancel: (_) => _reset(),
     );
   }
 }
