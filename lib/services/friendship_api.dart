@@ -284,7 +284,8 @@ abstract final class FriendshipApi {
 
   /// Les deux dates dont la page Likes a besoin pour distinguer « jamais reçu de
   /// demande », « tout traité aujourd'hui » et « rien aujourd'hui » :
-  /// la dernière demande reçue (tous statuts) et ma dernière réponse.
+  /// la dernière amitié me concernant (reçue ou envoyée, tous statuts) et la
+  /// dernière réponse donnée ou reçue.
   ///
   /// [ok] est FAUX quand la lecture a échoué : l'appelant garde alors ce qu'il
   /// affichait. Rendre `null` sur une erreur réseau, comme « jamais rien reçu »,
@@ -295,16 +296,20 @@ abstract final class FriendshipApi {
       return (ok: false, lastReceived: null, lastAnswered: null);
     }
     try {
+      // Toute amitié où JE figure compte (demande reçue OU envoyée par moi) :
+      // un compte avec 8 amis qu'il a lui-même ajoutés n'est pas un « nouvel
+      // arrivant » (ça lui montrait l'écran « Poster ma photo »).
+      final mine = 'requester.eq.$meId,addressee.eq.$meId';
       final received = await _c
           .from('friendships')
           .select('created_at')
-          .eq('addressee', meId)
+          .or(mine)
           .order('created_at', ascending: false)
           .limit(1);
       final answered = await _c
           .from('friendships')
           .select('responded_at')
-          .eq('addressee', meId)
+          .or(mine)
           .not('responded_at', 'is', null)
           .order('responded_at', ascending: false)
           .limit(1);
