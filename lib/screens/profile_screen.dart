@@ -2523,12 +2523,18 @@ class _PhotoViewerState extends State<_PhotoViewer> {
     // Une carte PORTRAIT, comme une photo de la grille (3 : 4), et plus étroite
     // que le cadre des photos : les flèches latérales (44 px) ne passent pas
     // dessus. Jamais plus étroite que 0,6 (large / haut) sur un petit écran.
-    final screenH = MediaQuery.sizeOf(context).height;
-    final maxH = frameH > screenH * 0.80 ? frameH : screenH * 0.80;
+    // Le plus haut possible (toute la hauteur utile) : le passeport tient sans
+    // défiler.
+    final mq = MediaQuery.of(context);
+    final screenH = mq.size.height;
+    final maxH = math.max(
+      frameH,
+      screenH - mq.padding.top - mq.padding.bottom - 24,
+    );
     final maxW = frameWide - 56;
     // 2 px de moins de chaque côté.
     final frameW = (maxH * 0.8 < maxW ? maxH * 0.8 : maxW) - 4;
-    final h = frameW / 0.58 < maxH ? frameW / 0.58 : maxH;
+    final h = maxH;
     return Center(
       child: Stack(
         clipBehavior: Clip.none,
@@ -2545,6 +2551,11 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                   profile: p,
                   open: true,
                   hideFlag: false,
+                  // L'animation du Discover (couverture, blocs, tampon), et
+                  // une marge basse réduite : ici pas de boutons ✕ / ❤.
+                  animateOnMount: true,
+                  bottomPadding: 28,
+                  alwaysScrollable: false,
                   // La place du ✕ du visionneur, à droite du bandeau.
                   bandInsetRight: 58,
                   onClose: () => Navigator.of(context).pop(),
