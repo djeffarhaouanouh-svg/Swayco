@@ -3536,9 +3536,9 @@ class _TinderCardState extends State<_TinderCard> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 22,
+                            fontSize: 26,
                             fontWeight: FontWeight.w900,
-                            letterSpacing: -0.3,
+                            letterSpacing: -0.4,
                             height: 1.1,
                             shadows: [
                               Shadow(color: Color(0x66000000), blurRadius: 10),
@@ -3552,7 +3552,7 @@ class _TinderCardState extends State<_TinderCard> {
                 ),
                 // Pays seul (la ville n'est plus affichée sur la carte).
                 if (country.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 2),
                   Text.rich(
                     TextSpan(
                       children: [
