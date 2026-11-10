@@ -80,21 +80,28 @@ const List<AppLanguage> allLanguages = <AppLanguage>[
 
 /// Les langues réellement PROPOSÉES : onboarding, réglages, roues de l'appel.
 ///
-/// Volontairement court. Un menu de seize langues fait choisir alors que le seul
-/// choix qui compte est « la mienne », et il promet seize couloirs de traduction
-/// alors que le produit se lance sur trois marchés. Trois entrées tiennent sans
-/// défilement, se lisent d'un coup d'œil, et chaque paire possible est testée.
+/// Les 12 langues de l'interface (celles qui ont leur map dans `app_strings`),
+/// remises à la demande : elles avaient été réduites à fr / en / de (puis pt)
+/// pour un lancement sur trois marchés. Chacune a son texte complet, ses
+/// reconnaissances vocales (`apple_asr_engine`, `android_asr_engine`) et sa voix
+/// (`call_screen`). Les quatre autres de [allLanguages] (pl, tr, uk, hi) n'ont
+/// pas de traduction d'interface : elles restent seulement AFFICHÉES.
 ///
 /// [allLanguages] reste la table de correspondance pour tout ce qui n'est
-/// qu'affiché — élargir l'offre, c'est rallonger cette liste-ci.
+/// qu'affiché ; élargir ou resserrer l'offre, c'est modifier cette liste-ci.
 const List<AppLanguage> supportedLanguages = <AppLanguage>[
   AppLanguage(code: 'fr', flag: '🇫🇷', label: 'Français'),
   AppLanguage(code: 'en', flag: '🇬🇧', label: 'English'),
+  AppLanguage(code: 'es', flag: '🇪🇸', label: 'Español'),
   AppLanguage(code: 'de', flag: '🇩🇪', label: 'Deutsch'),
-  // Portugais : la voix et la reconnaissance sont déjà en `pt-BR`
-  // (apple_asr_engine, android_asr_engine, call_screen), l'interface est
-  // traduite (app_strings, map `pt`) : seul le menu ne le proposait pas.
+  AppLanguage(code: 'it', flag: '🇮🇹', label: 'Italiano'),
   AppLanguage(code: 'pt', flag: '🇵🇹', label: 'Português'),
+  AppLanguage(code: 'nl', flag: '🇳🇱', label: 'Nederlands'),
+  AppLanguage(code: 'ar', flag: '🇸🇦', label: 'العربية الفصحى'),
+  AppLanguage(code: 'ru', flag: '🇷🇺', label: 'Русский'),
+  AppLanguage(code: 'zh', flag: '🇨🇳', label: '中文'),
+  AppLanguage(code: 'ja', flag: '🇯🇵', label: '日本語'),
+  AppLanguage(code: 'ko', flag: '🇰🇷', label: '한국어'),
 ];
 
 /// The phone's own language, when we OFFER it — used to pre-select the
