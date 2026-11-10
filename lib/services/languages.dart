@@ -58,7 +58,7 @@ const List<AppLanguage> allLanguages = <AppLanguage>[
   AppLanguage(code: 'es', flag: '🇪🇸', label: 'Español'),
   AppLanguage(code: 'de', flag: '🇩🇪', label: 'Deutsch'),
   AppLanguage(code: 'it', flag: '🇮🇹', label: 'Italiano'),
-  AppLanguage(code: 'pt', flag: '🇵🇹', label: 'Português'),
+  AppLanguage(code: 'pt', flag: '🇧🇷', label: 'Português'),
   AppLanguage(code: 'nl', flag: '🇳🇱', label: 'Nederlands'),
   // Standard Arabic, explicitly. Both models are fus'ha-centric: the neural ar
   // training mix is Egyptian + Gulf + MSA with ZERO Maghrebi hours, and the
@@ -91,6 +91,10 @@ const List<AppLanguage> supportedLanguages = <AppLanguage>[
   AppLanguage(code: 'fr', flag: '🇫🇷', label: 'Français'),
   AppLanguage(code: 'en', flag: '🇬🇧', label: 'English'),
   AppLanguage(code: 'de', flag: '🇩🇪', label: 'Deutsch'),
+  // Portugais du Brésil : la voix et la reconnaissance sont déjà en `pt-BR`
+  // (apple_asr_engine, android_asr_engine, call_screen), l'interface est
+  // traduite (app_strings, map `pt`) : seul le menu ne le proposait pas.
+  AppLanguage(code: 'pt', flag: '🇧🇷', label: 'Português'),
 ];
 
 /// The phone's own language, when we OFFER it — used to pre-select the
