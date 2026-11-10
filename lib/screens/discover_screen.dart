@@ -2365,7 +2365,19 @@ class ProfileInfoPanel extends StatefulWidget {
     this.animateOnMount = false,
     this.bottomPadding = 96,
     this.alwaysScrollable = true,
+    this.onContentHeight,
+    this.fillFreeSpace = true,
   });
+
+  /// Sans bio, la carte d'infos s'étire pour remplir la place libre du panneau.
+  /// Faux dans la visionneuse du profil d'un pair : étirer ne sert à rien chez
+  /// quelqu'un qui n'a presque rien.
+  final bool fillFreeSpace;
+
+  /// Hauteur dont le panneau a besoin pour montrer tout son contenu sans
+  /// défiler (chrome compris). La visionneuse s'en sert pour n'agrandir le
+  /// passeport que s'il y a beaucoup à afficher.
+  final ValueChanged<double>? onContentHeight;
 
   /// Joue la mise en scène du Discover (couverture qui s'ouvre, blocs qui
   /// apparaissent, tampon) dès que le panneau est monté, même s'il est déjà
@@ -2421,6 +2433,27 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
   /// quand on croit scroller, mourait à zéro de vélocité et le panneau
   /// restait planté là.
   double _dragDy = 0;
+
+  final GlobalKey _contentKey = GlobalKey();
+  double _lastReported = 0;
+
+  /// Mesure le contenu (hauteur naturelle de la colonne) après chaque image et
+  /// rapporte la hauteur totale nécessaire : poignée + bandeau + marges + contenu.
+  void _reportContentHeight() {
+    final cb = widget.onContentHeight;
+    if (cb == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final h = _contentKey.currentContext?.size?.height;
+      if (h == null) return;
+      // 22 (poignée) + 30 (bandeau) + 14 (marge haute) + marge basse.
+      final needed = h + 22 + 30 + 14 + widget.bottomPadding;
+      if ((needed - _lastReported).abs() > 1) {
+        _lastReported = needed;
+        cb(needed);
+      }
+    });
+  }
 
   /// Vrai depuis l'instant où le débord a demandé la fermeture jusqu'au retour
   /// de la liste à sa position haute : sans lui, chaque image du geste
@@ -2520,6 +2553,7 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
       );
 
   Widget _panel(BuildContext context, double panelHeight) {
+    _reportContentHeight();
     final p = widget.profile;
     // Couleur du persona : halo du bas et bord haut du passeport.
     final accent =
@@ -2581,8 +2615,9 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
           signReveal: _at(1000, 700),
           // Sans bio, la carte prend la place libre : poignée, bandeau, marges
           // et en-tête (~226) retirés de la hauteur du panneau.
-          fillHeight:
-              p.bio.trim().isEmpty ? math.max(0.0, panelHeight - 226) : null,
+          fillHeight: widget.fillFreeSpace && p.bio.trim().isEmpty
+              ? math.max(0.0, panelHeight - 226)
+              : null,
           interestsBody: p.interests.isEmpty
               ? null
               : Column(
@@ -2728,6 +2763,7 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
                               padding: EdgeInsets.fromLTRB(
                                   20, 14, 20, widget.bottomPadding),
                               child: Column(
+                                key: _contentKey,
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: content,
                               ),

@@ -2465,6 +2465,10 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   late bool _animatePassport =
       widget.passportProfile != null && widget.initialIndex == 0;
 
+  /// Hauteur dont le passeport a besoin pour tout montrer sans défiler (mesurée
+  /// par le panneau) ; null tant qu'elle n'est pas connue.
+  double? _passportNeed;
+
   @override
   void dispose() {
     _pc.dispose();
@@ -2529,18 +2533,23 @@ class _PhotoViewerState extends State<_PhotoViewer> {
     // Une carte PORTRAIT, comme une photo de la grille (3 : 4), et plus étroite
     // que le cadre des photos : les flèches latérales (44 px) ne passent pas
     // dessus. Jamais plus étroite que 0,6 (large / haut) sur un petit écran.
-    // Le plus haut possible (toute la hauteur utile) : le passeport tient sans
-    // défiler.
     final mq = MediaQuery.of(context);
     final screenH = mq.size.height;
-    final maxH = math.max(
-      frameH,
+    final maxH = frameH > screenH * 0.80 ? frameH : screenH * 0.80;
+    // Le plus haut que la carte puisse aller (toute la hauteur utile) : elle ne
+    // l'atteint que s'il y a trop d'éléments pour tenir à la taille normale.
+    final fullH = math.max(
+      maxH,
       screenH - mq.padding.top - mq.padding.bottom - 24,
     );
     final maxW = frameWide - 56;
     // 2 px de moins de chaque côté.
     final frameW = (maxH * 0.8 < maxW ? maxH * 0.8 : maxW) - 4;
-    final h = maxH;
+    final h0 = frameW / 0.58 < maxH ? frameW / 0.58 : maxH;
+    // Taille normale ; plus haute seulement si le contenu l'exige (jamais plus
+    // que l'écran). Quelqu'un qui a peu d'éléments garde la taille normale.
+    final need = _passportNeed;
+    final h = need == null ? h0 : need.clamp(h0, math.max(h0, fullH)).toDouble();
     return Center(
       child: Stack(
         clipBehavior: Clip.none,
@@ -2560,8 +2569,14 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                   // L'animation du Discover (couverture, blocs, tampon), et
                   // une marge basse réduite : ici pas de boutons ✕ / ❤.
                   animateOnMount: _animatePassport,
+                  onContentHeight: (v) {
+                    if (mounted && _passportNeed != v) {
+                      setState(() => _passportNeed = v);
+                    }
+                  },
                   bottomPadding: 28,
                   alwaysScrollable: false,
+                  fillFreeSpace: false,
                   // La place du ✕ du visionneur, à droite du bandeau.
                   bandInsetRight: 58,
                   onClose: () => Navigator.of(context).pop(),
