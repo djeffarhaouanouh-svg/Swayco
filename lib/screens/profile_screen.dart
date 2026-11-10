@@ -2459,12 +2459,6 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   );
   late int _index = widget.initialIndex;
 
-  /// L'animation du Discover ne se joue qu'à l'OUVERTURE par un tap sur la
-  /// tuile passeport — pas quand on revient dessus en feuilletant les photos
-  /// (flèches, glissement gauche / droite).
-  late bool _animatePassport =
-      widget.passportProfile != null && widget.initialIndex == 0;
-
   @override
   void dispose() {
     _pc.dispose();
@@ -2559,7 +2553,7 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                   hideFlag: false,
                   // L'animation du Discover (couverture, blocs, tampon), et
                   // une marge basse réduite : ici pas de boutons ✕ / ❤.
-                  animateOnMount: _animatePassport,
+                  animateOnMount: true,
                   bottomPadding: 28,
                   alwaysScrollable: false,
                   // La place du ✕ du visionneur, à droite du bandeau.
@@ -2652,10 +2646,7 @@ class _PhotoViewerState extends State<_PhotoViewer> {
           PageView.builder(
             controller: _pc,
             itemCount: _pageCount,
-            onPageChanged: (i) => setState(() {
-              _index = i;
-              _animatePassport = false;
-            }),
+            onPageChanged: (i) => setState(() => _index = i),
             itemBuilder: (ctx, pi) => pi < _passportOffset
                 ? _passportPage(frameW, frameH)
                 : _photoPage(pi - _passportOffset, frameW, frameH),
