@@ -2812,6 +2812,11 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
                         passNo: passNo,
                         title: AppStrings.t('passport_title'),
                         sub: AppStrings.t('passport_sub'),
+                        // Carte de Découvrir : 100 (boutons flottants). Dans la
+                        // visionneuse (marge basse réduite) : le texte se pose
+                        // au bas du cadre, et la pastille évite le ✕.
+                        bottomInset: widget.bottomPadding + 4,
+                        rightInset: widget.bandInsetRight,
                       ),
                     ),
                   );
@@ -2832,7 +2837,17 @@ class _PassportCover extends StatelessWidget {
     required this.passNo,
     required this.title,
     required this.sub,
+    this.bottomInset = 100,
+    this.rightInset = 0,
   });
+
+  /// Distance du bloc de texte au bas du cadre : 100 sur la carte (au-dessus des
+  /// boutons ✕ / ❤ flottants), beaucoup moins dans la visionneuse qui n'en a pas.
+  final double bottomInset;
+
+  /// Place réservée à droite en haut (le ✕ de la visionneuse) : la pastille
+  /// globe se décale pour ne pas passer dessous.
+  final double rightInset;
 
   final String passNo;
   final String title;
@@ -2840,6 +2855,11 @@ class _PassportCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, box) {
+    // Le filigrane suit la LARGEUR du cadre (≈ 400 px sur une carte de 360) au
+    // lieu d'une taille fixe : dans un cadre plus étroit il ne déborde pas trop.
+    final w = box.maxWidth.isFinite ? box.maxWidth : 360.0;
+    final mark = w * 1.1;
     return ClipRRect(
       borderRadius: _kPassportRadius,
       child: DecoratedBox(
@@ -2853,17 +2873,17 @@ class _PassportCover extends StatelessWidget {
         child: Stack(
           children: [
             Positioned(
-              right: -150,
-              top: -50,
-              width: 400,
-              height: 400,
+              right: -w * 0.42,
+              top: -w * 0.14,
+              width: mark,
+              height: mark,
               child: Opacity(
                 opacity: 0.16,
                 child: Image.asset('assets/glyph-white.png', fit: BoxFit.contain),
               ),
             ),
             Positioned(
-              right: 20,
+              right: 20 + rightInset,
               top: 20,
               child: Container(
                 width: 36,
@@ -2883,7 +2903,7 @@ class _PassportCover extends StatelessWidget {
             // panneau) : a 28 du bas, ils cachaient le titre.
             Positioned(
               left: 24,
-              bottom: 100,
+              bottom: bottomInset,
               right: 24,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2924,6 +2944,7 @@ class _PassportCover extends StatelessWidget {
         ),
       ),
     );
+    });
   }
 }
 

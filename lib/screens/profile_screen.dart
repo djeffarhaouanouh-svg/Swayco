@@ -1638,18 +1638,8 @@ class _IdentitySection extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Pair en ligne : le point vert qui était sur la PDP ronde.
-            if (!editableName && online) ...[
-              Container(
-                width: 9,
-                height: 9,
-                decoration: const BoxDecoration(
-                  color: SC.online,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-            ],
+            // Le point vert « en ligne » est retiré à la demande : on n'affiche
+            // plus si le pair est connecté (le paramètre [online] reste, inutilisé).
             Flexible(
               child: Text(
                 handle,
