@@ -130,7 +130,7 @@ const Map<String, FlagCountry> kFlagCountryForLanguage = {
   'es': FlagCountry.spain,
   'de': FlagCountry.germany,
   'it': FlagCountry.italy,
-  'pt': FlagCountry.brazil,
+  'pt': FlagCountry.portugal,
   'nl': FlagCountry.netherlands,
   'ar': FlagCountry.arabic,
   'ru': FlagCountry.russia,
