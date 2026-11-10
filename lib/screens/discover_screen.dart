@@ -3552,7 +3552,7 @@ class _TinderCardState extends State<_TinderCard> {
                 ),
                 // Pays seul (la ville n'est plus affichée sur la carte).
                 if (country.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 6),
                   Text.rich(
                     TextSpan(
                       children: [
