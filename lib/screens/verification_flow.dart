@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../widgets/failure_sheet.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -117,12 +118,7 @@ class _VerificationFlowState extends State<VerificationFlow> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _stage = _Stage.intro);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
-          duration: const Duration(seconds: 8),
-        ),
-      );
+      showUploadFailedSheet(context, error: e, photoBytes: shot.bytes, onRetry: _start);
     }
   }
 
@@ -582,12 +578,7 @@ class _VerificationCaptureScreenState extends State<VerificationCaptureScreen> {
   }
 
   void _fail(Object e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
-        duration: const Duration(seconds: 8),
-      ),
-    );
+    showUploadFailedSheet(context, error: e, onRetry: _shoot);
   }
 
   @override

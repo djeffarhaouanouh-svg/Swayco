@@ -16,6 +16,7 @@ import '../services/revenue_cat.dart';
 import '../services/stripe_api.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/fade_scale_route.dart';
+import '../widgets/purchase_failure_sheets.dart';
 import '../widgets/likes_lock.dart' show BlurredAvatar;
 import '../widgets/popup_kit.dart';
 import '../widgets/sparkles.dart';
@@ -142,24 +143,31 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
         SnackBar(content: Text(AppStrings.t('paywall_snack_activated'))),
       );
       Navigator.of(context).maybePop();
-    } else if (outcome == PurchaseOutcome.unavailable) {
-      final why = RevenueCat.lastUnavailableReason;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 8),
-          content: Text(
-            why.isEmpty
-                ? AppStrings.t('paywall_snack_unavailable')
-                : '${AppStrings.t('paywall_snack_unavailable')}\n($why)',
-          ),
-        ),
-      );
-    } else if (outcome == PurchaseOutcome.error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('paywall_snack_error'))),
-      );
+      return;
     }
-    // PurchaseOutcome.cancelled → the user backed out; say nothing.
+    // Échecs : une feuille qui dit ce qui s'est passé, si de l'argent a été
+    // débité, et quoi faire (handoff « Échecs »). `cancelled` reste SILENCIEUX :
+    // la personne a fermé la fenêtre du store.
+    await showPurchaseFailure(
+      context,
+      outcome,
+      onRetry: () {
+        if (outcome == PurchaseOutcome.unavailable) {
+          _loadPrice();
+        }
+        _subscribe();
+      },
+      onRestore: _restore,
+      onActivated: () {
+        if (!mounted) return;
+        HapticFeedback.heavyImpact();
+        SwaycoSounds.play(SwSound.purchase);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.t('paywall_snack_activated'))),
+        );
+        Navigator.of(context).maybePop();
+      },
+    );
   }
 
   Future<void> _subscribeViaStripe() async {
@@ -203,9 +211,8 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
         );
         Navigator.of(context).maybePop();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppStrings.t('paywall_snack_nothing_restore'))),
-        );
+        // 1d — « Aucun abonnement trouvé » (le chemin web garde son snackbar).
+        await showNothingToRestoreSheet(context);
       }
       return;
     }
@@ -932,25 +939,21 @@ class _BoostPaywallState extends State<_BoostPaywall> {
     );
     if (!mounted) return;
     setState(() => _busy = false);
-    final key = switch (outcome) {
-      PurchaseOutcome.success => 'boost_snack_success',
-      PurchaseOutcome.unavailable => 'paywall_snack_unavailable',
-      PurchaseOutcome.error => 'paywall_snack_error',
-      PurchaseOutcome.cancelled => null,
-    };
-    final messenger = ScaffoldMessenger.of(context);
-    if (key != null) {
-      final why = outcome == PurchaseOutcome.unavailable
-          ? RevenueCat.lastUnavailableReason
-          : '';
-      messenger.showSnackBar(
+    // Succès : le snackbar du Boost (et `pendingActivation`, ici sans objet :
+    // le Boost est un achat à l'unité crédité par le webhook, pas un droit).
+    if (outcome == PurchaseOutcome.success ||
+        outcome == PurchaseOutcome.pendingActivation) {
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          duration: Duration(seconds: why.isEmpty ? 4 : 8),
-          content: Text(
-            why.isEmpty ? AppStrings.t(key) : '${AppStrings.t(key)}\n($why)',
-          ),
+          duration: const Duration(seconds: 4),
+          content: Text(AppStrings.t('boost_snack_success')),
         ),
       );
+    } else {
+      // Échecs (1a, 1b, réseau) : la même feuille que le paywall Pro.
+      // `cancelled` ne montre rien.
+      await showPurchaseFailure(context, outcome, onRetry: _buy);
+      return;
     }
     if (outcome == PurchaseOutcome.success) {
       HapticFeedback.heavyImpact();

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import '../widgets/failure_sheet.dart';
 import '../widgets/tap_pad.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -25,6 +26,7 @@ import '../services/job_sectors.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/match_celebration.dart';
+import '../services/nav_chrome.dart';
 import '../services/nav_tab.dart';
 import '../services/persona_categories.dart';
 import '../services/profile_api.dart';
@@ -145,6 +147,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     WidgetsBinding.instance.removeObserver(this);
     NavTab.addPhotoTick.removeListener(_onAddPhotoRequest);
     _pollTimer?.cancel();
+    // Quitter le profil d'un pair avec la barre rangée : elle doit être là pour
+    // la page dessous (après l'image, pas pendant que l'arbre se démonte).
+    if (widget.userId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => NavChrome.show());
+    }
     super.dispose();
   }
 
@@ -500,12 +507,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       bytes = await file.readAsBytes();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
-          duration: const Duration(seconds: 8),
-        ),
-      );
+      showUploadFailedSheet(context, error: e, onRetry: _pickAndAddPhoto);
       return;
     }
     if (!mounted) return;
@@ -522,6 +524,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     final ext = (bytes.length > 1 && bytes[0] == 0x89 && bytes[1] == 0x50)
         ? 'png'
         : 'jpg';
+    Future<void> attempt() async {
     try {
       await ProfileApi.addProfilePhoto(
         deviceId: _deviceId,
@@ -536,13 +539,10 @@ class _ProfileScreenState extends State<ProfileScreen>
       await _reload();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
-          duration: const Duration(seconds: 8),
-        ),
-      );
+      showUploadFailedSheet(context, error: e, photoBytes: bytes, onRetry: attempt, onPickOther: _pickAndAddPhoto);
     }
+    }
+    await attempt();
   }
 
   /// PDP bubble â pick an image and set it as the (independent) profile
@@ -572,12 +572,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       bytes = await file.readAsBytes();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
-          duration: const Duration(seconds: 8),
-        ),
-      );
+      showUploadFailedSheet(context, error: e, onRetry: _pickAndSetAvatar);
       return;
     }
     if (!mounted) return;
@@ -593,6 +588,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     final ext = (bytes.length > 1 && bytes[0] == 0x89 && bytes[1] == 0x50)
         ? 'png'
         : 'jpg';
+    Future<void> attempt() async {
     try {
       await ProfileApi.uploadAvatar(
         deviceId: _deviceId,
@@ -605,13 +601,10 @@ class _ProfileScreenState extends State<ProfileScreen>
       await _reload();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
-          duration: const Duration(seconds: 8),
-        ),
-      );
+      showUploadFailedSheet(context, error: e, photoBytes: bytes, onRetry: attempt, onPickOther: _pickAndSetAvatar);
     }
+    }
+    await attempt();
   }
 
   /// Clear the dedicated PDP (the ✕ on the edit-account sheet's bubble). The
@@ -624,11 +617,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       await _reload();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
-        ),
-      );
+      showUploadFailedSheet(context, error: e, onRetry: _clearAvatar);
     }
   }
 
@@ -1021,7 +1010,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     final page = _buildPage(context);
     // Seulement l'onglet Profil : la page d'un pair ou l'aperçu de ma carte sont
     // poussés par-dessus, avec leur propre barre, qu'ils ne doivent pas ranger.
-    return _isViewingOther
+    // Le profil d'un PAIR (userId != null) règle sa propre barre comme Messages :
+    // elle se range au défilement, revient 0,5 s après. L'aperçu de ma carte
+    // garde sa barre fixe.
+    if (widget.userId != null) return NavAutoHide(child: page);
+    return widget.preview
         ? page
         : NavAutoHide(tab: NavTab.profile, child: page);
   }
@@ -1253,13 +1246,22 @@ class _ProfileScreenState extends State<ProfileScreen>
             // When viewing someone else's profile this screen is a route
             // pushed on top of [RootShell], so the shell's floating nav bar
             // is hidden. Re-render it here and route taps back to the shell.
+            // Pair : un tap n'importe où rappelle la barre rangée.
+            if (widget.userId != null)
+              Positioned.fill(
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: NavChrome.autoHidden,
+                  builder: (context, auto, _) =>
+                      auto ? const NavTapRestore() : const SizedBox.shrink(),
+                ),
+              ),
             if (_isViewingOther)
               Positioned(
                 left: GlassNavBar.floatSide,
                 right: GlassNavBar.floatSide,
                 bottom: MediaQuery.paddingOf(context).bottom +
                     GlassNavBar.floatBottom,
-                child: ValueListenableBuilder<int>(
+                child: _tuckForPeer(ValueListenableBuilder<int>(
                   valueListenable: NavTab.index,
                   builder: (context, navIndex, _) => ValueListenableBuilder<int>(
                     valueListenable: ChatUnread.count,
@@ -1279,6 +1281,19 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                         ),
                   ),
+                )),
+              ),
+            // La poignée que laisse la barre rangée (profil d'un pair).
+            if (widget.userId != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: NavChrome.handleZone,
+                child: NavHandle(
+                  color: SC.light
+                      ? SC.brandBlueDeep.withValues(alpha: 0.35)
+                      : Colors.white.withValues(alpha: 0.55),
                 ),
               ),
           ],
@@ -1286,6 +1301,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
     );
   }
+
+  /// La barre du profil d'un pair glisse / se resserre comme celle du shell ;
+  /// celle de l'aperçu reste fixe.
+  Widget _tuckForPeer(Widget bar) =>
+      widget.userId != null ? NavTuckAway(child: bar) : bar;
 }
 
 /// Insta-style identity section: avatar with camera badge on the left,

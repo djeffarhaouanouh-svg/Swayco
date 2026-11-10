@@ -1509,12 +1509,18 @@ abstract final class ProfileApi {
   /// The composite scoring lives client-side: it carries a random
   /// jitter between refreshes and only affects display order, so
   /// keeping it here doesn't weaken any privacy guarantee.
+  /// Vrai quand le DERNIER chargement du flux a ÉCHOUÉ (réseau, serveur), par
+  /// opposition à « il n'y a personne » : l'écran « Impossible de charger les
+  /// profils » ne doit pas dire qu'il n'y a plus de monde.
+  static bool lastDiscoverFeedFailed = false;
+
   static Future<List<RemoteProfile>> fetchDiscoverFeed({
     required String myId,
     int limit = kDiscoverDailySwipes,
     List<String>? languages,
     List<String>? countries,
   }) async {
+    lastDiscoverFeedFailed = false;
     if (!isSupabaseReady || myId.isEmpty) return const [];
     try {
       final langs = (languages ?? const <String>[])
@@ -1551,7 +1557,10 @@ abstract final class ProfileApi {
           if (countryList.isNotEmpty) 'p_countries': countryList,
         },
       );
-      if (result is! List) return const [];
+      if (result is! List) {
+        lastDiscoverFeedFailed = true;
+        return const [];
+      }
 
       // Client-side belt: hide matches / my pending likes even if the
       // DB hasn't applied migration 0050 yet. Queried inline (not via
@@ -1612,6 +1621,7 @@ abstract final class ProfileApi {
       return List<RemoteProfile>.unmodifiable(scored.map((s) => s.$1));
     } catch (e) {
       debugPrint('ProfileApi.fetchDiscoverFeed failed: $e');
+      lastDiscoverFeedFailed = true;
       return const [];
     }
   }

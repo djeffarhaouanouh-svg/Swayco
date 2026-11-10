@@ -33,6 +33,7 @@ import '../swayco/realtime_translation_port.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/nav_auto_hide.dart';
+import '../widgets/offline_screen.dart';
 import '../widgets/sway_tip_dialog.dart';
 import '../widgets/swayco_popups_extra.dart';
 import 'call_screen.dart';
@@ -958,6 +959,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                         ),
                       ),
                     ),
+                    // « Pas de connexion » : plein écran, par-dessus tout, quand
+                    // il n'y a aucun réseau depuis plus de 2 s. Un appel est une
+                    // route poussée au-dessus : il n'est jamais touché.
+                    const Positioned.fill(child: OfflineOverlay()),
                   ],
                 );
               },

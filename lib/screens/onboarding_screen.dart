@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../widgets/failure_sheet.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -470,12 +471,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         bytes = await file.readAsBytes();
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
-            duration: const Duration(seconds: 8),
-          ),
-        );
+        showUploadFailedSheet(context, error: e, onRetry: _pickPhoto);
         return;
       }
       if (!mounted) return;
@@ -540,12 +536,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     } catch (e) {
       debugPrint('onboarding photo upload failed: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
-          duration: const Duration(seconds: 8),
-        ),
-      );
+      showUploadFailedSheet(context, error: e, photoBytes: bytes, onRetry: () => _uploadOnboardingPhoto(deviceId), onPickOther: _pickPhoto);
     }
   }
 

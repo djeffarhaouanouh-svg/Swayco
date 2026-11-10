@@ -5,6 +5,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import '../widgets/tap_pad.dart';
+import '../widgets/load_failed_view.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -129,7 +130,23 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen> {
   List<RemoteProfile> _profiles = const [];
   bool _feedLoading = true;
+
+  /// Le chargement des profils a ÉCHOUÉ (réseau / serveur) — à ne pas confondre
+  /// avec « il n'y a personne » (écran « Impossible de charger les profils »).
+  bool _loadFailed = false;
   final List<({RemoteProfile profile, List<String> photos})> _cards = [];
+
+  void _retryLoad() {
+    setState(() {
+      _loadFailed = false;
+      _feedLoading = true;
+    });
+    if (_filtered) {
+      _loadFeed(countries: _filterCountries);
+    } else {
+      _bootstrap();
+    }
+  }
 
   /// People I'm already matched with: they never belong in the deck, whether
   /// it came from the live feed, today's cached deck, or was loaded before the
@@ -491,13 +508,19 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         _profiles = feed;
         _rebuildCards();
         _feedLoading = false;
+        _loadFailed = _cards.isEmpty && ProfileApi.lastDiscoverFeedFailed;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_deckDone) _precacheAround(0);
       });
     } catch (e) {
       debugPrint('discover: _loadFeed(countries=$countries) failed: $e');
-      if (mounted) setState(() => _feedLoading = false);
+      if (mounted) {
+        setState(() {
+          _feedLoading = false;
+          _loadFailed = _cards.isEmpty;
+        });
+      }
     }
   }
 
@@ -661,6 +684,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           }
         }
         _feedLoading = false;
+        _loadFailed = _cards.isEmpty && ProfileApi.lastDiscoverFeedFailed;
       });
       debugPrint(
         'discover: feed=${feed.length} cards=${_cards.length} '
@@ -682,6 +706,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             _currentIndex = 0;
           }
           _feedLoading = false;
+          _loadFailed = _cards.isEmpty;
         });
       }
       AppBoot.markHomeReady();
@@ -924,6 +949,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         _currentIndex = 0;
         _deckDone = false;
         _feedLoading = false;
+        _loadFailed = _cards.isEmpty && ProfileApi.lastDiscoverFeedFailed;
       });
       if (_cards.isNotEmpty) {
         UserPrefs.saveDiscoverCursor(_cards.first.profile.id);
@@ -937,6 +963,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         _currentIndex = 0;
         _deckDone = false;
         _feedLoading = false;
+        _loadFailed = _cards.isEmpty;
       });
       if (ok && _cards.isNotEmpty) {
         UserPrefs.saveDiscoverCursor(_cards.first.profile.id);
@@ -1027,6 +1054,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                               ],
                         onReset: () => setState(() => _limitReached = false),
                       )
+                : _loadFailed && _cards.isEmpty
+                    ? LoadFailedView(onRetry: _retryLoad)
                 : _cards.isEmpty
                     ? _Empty(
                         onReset: _filtered ? _clearCountryFilter : _reset,
@@ -3180,14 +3209,27 @@ class _TinderCard extends StatefulWidget {
 class _TinderCardState extends State<_TinderCard> {
   int _photoIndex = 0;
 
+  /// Feuilleter les photos range la barre de navigation comme un glissement de
+  /// carte (elle revient 1,9 s après le dernier tap). Pas sur l'aperçu de ma
+  /// propre carte : il n'a pas de barre à ranger.
+  void _tuckNav() {
+    if (widget.preview) return;
+    NavChrome.hideAuto();
+    NavChrome.showAfter(const Duration(milliseconds: 1900));
+  }
+
   void _nextPhoto() {
     if (_photoIndex < widget.photos.length - 1) {
       setState(() => _photoIndex++);
+      _tuckNav();
     }
   }
 
   void _prevPhoto() {
-    if (_photoIndex > 0) setState(() => _photoIndex--);
+    if (_photoIndex > 0) {
+      setState(() => _photoIndex--);
+      _tuckNav();
+    }
   }
 
   @override

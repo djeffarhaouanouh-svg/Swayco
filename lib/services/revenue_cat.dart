@@ -6,7 +6,17 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 
 /// Outcome of a store purchase attempt — plain enum so callers (the paywall)
 /// never need to import `purchases_flutter` types directly.
-enum PurchaseOutcome { success, cancelled, unavailable, error }
+/// - [pendingActivation] : le store a bien débité mais le droit n'est pas encore
+///   actif (on ne le traite PAS comme un refus de paiement).
+/// - [network] : pas de connexion pendant l'achat.
+enum PurchaseOutcome {
+  success,
+  cancelled,
+  unavailable,
+  error,
+  pendingActivation,
+  network,
+}
 
 /// RevenueCat wrapper for in-app subscriptions on **iOS / Android**.
 ///
@@ -364,13 +374,14 @@ abstract final class RevenueCat {
       _onCustomerInfo(result.customerInfo);
       return result.customerInfo.entitlements.active.containsKey(entitlementId)
           ? PurchaseOutcome.success
-          : PurchaseOutcome.error;
+          : PurchaseOutcome.pendingActivation;
     } on PlatformException catch (e) {
-      if (PurchasesErrorHelper.getErrorCode(e) ==
-          PurchasesErrorCode.purchaseCancelledError) {
+      final code = PurchasesErrorHelper.getErrorCode(e);
+      if (code == PurchasesErrorCode.purchaseCancelledError) {
         return PurchaseOutcome.cancelled;
       }
       debugPrint('RevenueCat purchase error: ${e.message}');
+      if (code == PurchasesErrorCode.networkError) return PurchaseOutcome.network;
       return PurchaseOutcome.error;
     } catch (e) {
       debugPrint('RevenueCat purchase error: $e');
@@ -387,11 +398,12 @@ abstract final class RevenueCat {
       await Purchases.purchase(params);
       return PurchaseOutcome.success;
     } on PlatformException catch (e) {
-      if (PurchasesErrorHelper.getErrorCode(e) ==
-          PurchasesErrorCode.purchaseCancelledError) {
+      final code = PurchasesErrorHelper.getErrorCode(e);
+      if (code == PurchasesErrorCode.purchaseCancelledError) {
         return PurchaseOutcome.cancelled;
       }
       debugPrint('RevenueCat consumable error: ${e.message}');
+      if (code == PurchasesErrorCode.networkError) return PurchaseOutcome.network;
       return PurchaseOutcome.error;
     } catch (e) {
       debugPrint('RevenueCat consumable error: $e');
