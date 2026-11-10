@@ -3493,6 +3493,26 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
+          // ── Éventail de photos (1a) : « il y a plus à voir », sans chiffre.
+          //    Un tap ouvre la page profil. Rien à 1 photo, ni sur l'aperçu de
+          //    ma carte ; le glisser de la carte passe par-dessus.
+          if (!widget.preview && photos.length > 1)
+            Positioned(
+              right: 14,
+              bottom: 18,
+              child: _PhotoFan(
+                photos: photos,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ProfileScreen(userId: p.id),
+                    ),
+                  );
+                },
+              ),
+            ),
+
           // ── Repère « tire vers le haut » : un chevron qui saute, tout en bas
           //    de la photo. Pas sur l'aperçu de ma carte.
           if (!widget.preview)
@@ -3703,6 +3723,204 @@ class _ScrollHintChevronsState extends State<_ScrollHintChevrons>
 // ══════════════════════════════════════════════════════════════════════════════
 // Photo dots (Tinder-style thin lines)
 // ══════════════════════════════════════════════════════════════════════════════
+
+/// L'éventail de photos au bas de la carte (handoff « Éventail » 1a) : de 2 à 5
+/// photos selon le nombre réel (jamais plus de 5), celle de devant en jaune avec
+/// une pastille ↗. Il ne montre PAS le nombre. Flotte 3,2 s en boucle (coupé si
+/// « réduire les animations »).
+class _PhotoFan extends StatefulWidget {
+  const _PhotoFan({required this.photos, required this.onTap});
+
+  final List<String> photos;
+  final VoidCallback onTap;
+
+  @override
+  State<_PhotoFan> createState() => _PhotoFanState();
+}
+
+class _PhotoFanState extends State<_PhotoFan>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _float = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3200),
+  );
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final still = MediaQuery.disableAnimationsOf(context);
+    if (still) {
+      _float.stop();
+      _started = false;
+    } else if (!_started) {
+      _started = true;
+      _float.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _float.dispose();
+    super.dispose();
+  }
+
+  Widget _img(String url) => Image.network(
+        url,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFF222222)),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final photos = widget.photos;
+    final shown = math.min(photos.length, 5);
+    final behind = shown - 1;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      child: AnimatedBuilder(
+        animation: _float,
+        builder: (context, child) {
+          final t = Curves.easeInOut.transform(_float.value);
+          return Transform.translate(
+            offset: Offset(0, -6 * t),
+            child: Transform.rotate(angle: 2 * t * math.pi / 180, child: child),
+          );
+        },
+        child: SizedBox(
+          width: 66,
+          height: 78,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomRight,
+            children: [
+              // Lueur derrière.
+              Positioned(
+                right: -4,
+                bottom: -2,
+                child: ImageFiltered(
+                  imageFilter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          Color(0x61F4FF1F),
+                          Color(0x2E18DDEA),
+                          Color(0x0018DDEA),
+                        ],
+                        stops: [0, 0.55, 0.72],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Les photos du dessous : photos[0..behind-1], de -30° à +10°.
+              for (var i = 0; i < behind; i++)
+                Positioned(
+                  right: ((6 + i * 3) * 0.55).round() + 4.0,
+                  bottom: 4,
+                  child: Transform.rotate(
+                    angle: (behind == 1 ? -12 : -30 + i * (40 / (behind - 1))) *
+                        math.pi /
+                        180,
+                    alignment: const Alignment(0.8, 1.0),
+                    child: Container(
+                      width: 38,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(
+                          color: Colors.white
+                              .withValues(alpha: (0.5 + 0.1 * i).clamp(0.0, 1.0)),
+                          width: 2,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x73000000),
+                            blurRadius: 20,
+                            offset: Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: _img(photos[i]),
+                    ),
+                  ),
+                ),
+              // Celle de devant : la 2e photo, en jaune, tournée de +14°.
+              Positioned(
+                right: 2,
+                bottom: 0,
+                child: Transform.rotate(
+                  angle: 14 * math.pi / 180,
+                  alignment: Alignment.bottomRight,
+                  child: SizedBox(
+                    width: 44,
+                    height: 58,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 54,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: SC.accent, width: 2.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFF4FF1F)
+                                    .withValues(alpha: 0.25),
+                                spreadRadius: 3,
+                              ),
+                              const BoxShadow(
+                                color: Color(0x8C000000),
+                                blurRadius: 26,
+                                offset: Offset(0, 12),
+                              ),
+                              BoxShadow(
+                                color: const Color(0xFFF4FF1F)
+                                    .withValues(alpha: 0.4),
+                                blurRadius: 24,
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: _img(photos[1]),
+                        ),
+                        Positioned(
+                          right: -4,
+                          bottom: -4,
+                          child: Container(
+                            width: 15,
+                            height: 15,
+                            decoration: BoxDecoration(
+                              color: SC.accent,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.arrow_outward_rounded,
+                              size: 11,
+                              color: SC.onAccent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _PhotoDots extends StatelessWidget {
   const _PhotoDots({required this.count, required this.active});

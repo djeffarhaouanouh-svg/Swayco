@@ -39,7 +39,7 @@ Future<void> showFailureSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    barrierColor: SC.light ? const Color(0x4D04123A) : const Color(0x99040A1E),
+    barrierColor: SC.light ? const Color(0x6104123A) : const Color(0x9E020610),
     builder: (ctx) => _FailureSheet(
       icon: icon,
       tone: tone,
@@ -117,9 +117,11 @@ class _PhotoThumb extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: PopupTokens.danger,
+                color: SC.light ? const Color(0xFFD92D20) : PopupTokens.danger,
                 shape: BoxShape.circle,
-                border: Border.all(color: PopupTokens.surface, width: 3),
+                border: Border.all(
+                    color: SC.light ? Colors.white : PopupTokens.surface,
+                    width: 3),
               ),
               child: const Icon(Icons.priority_high_rounded,
                   color: Colors.white, size: 20),
@@ -171,6 +173,9 @@ class _FailureSheet extends StatefulWidget {
 class _FailureSheetState extends State<_FailureSheet> {
   bool _showDetail = false;
 
+  static Color get _green =>
+      SC.light ? const Color(0xFF16A34A) : const Color(0xFF4ADE80);
+
   ({Color fill, Color border, Color icon}) get _ring {
     final light = SC.light;
     switch (widget.tone) {
@@ -189,9 +194,9 @@ class _FailureSheetState extends State<_FailureSheet> {
       case FailureTone.blue:
         return light
             ? (
-                fill: const Color(0xFF2B7FFF).withValues(alpha: 0.10),
+                fill: const Color(0xFF1F5EFF).withValues(alpha: 0.10),
                 border: const Color(0xFF1F5EFF).withValues(alpha: 0.4),
-                icon: SC.brandBlue,
+                icon: const Color(0xFF1F5EFF),
               )
             : (
                 fill: const Color(0xFF1F5EFF).withValues(alpha: 0.2),
@@ -200,7 +205,11 @@ class _FailureSheetState extends State<_FailureSheet> {
               );
       case FailureTone.yellow:
         return light
-            ? (fill: SC.accent, border: SC.accent, icon: SC.onAccent)
+            ? (
+                fill: SC.accent,
+                border: const Color(0xFF04123A).withValues(alpha: 0.15),
+                icon: const Color(0xFF04123A),
+              )
             : (
                 fill: const Color(0xFFF4FF1F).withValues(alpha: 0.12),
                 border: const Color(0xFFF4FF1F).withValues(alpha: 0.45),
@@ -209,9 +218,9 @@ class _FailureSheetState extends State<_FailureSheet> {
       case FailureTone.grey:
         return light
             ? (
-                fill: PopupTokens.ghost,
-                border: PopupTokens.ghostBorder,
-                icon: PopupTokens.ink,
+                fill: const Color(0xFF04123A).withValues(alpha: 0.05),
+                border: const Color(0xFF04123A).withValues(alpha: 0.14),
+                icon: const Color(0xFF04123A),
               )
             : (
                 fill: Colors.white.withValues(alpha: 0.06),
@@ -260,21 +269,20 @@ class _FailureSheetState extends State<_FailureSheet> {
                     height: 30,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4ADE80).withValues(alpha: 0.14),
+                      color: _green.withValues(alpha: SC.light ? 0.10 : 0.14),
                       borderRadius: BorderRadius.circular(99),
                       border: Border.all(
-                          color: const Color(0xFF4ADE80).withValues(alpha: 0.4)),
+                          color: _green.withValues(alpha: SC.light ? 0.35 : 0.4)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.check_circle_rounded,
-                            size: 16, color: Color(0xFF4ADE80)),
+                        Icon(Icons.check_circle_rounded, size: 16, color: _green),
                         const SizedBox(width: 6),
                         Text(
                           widget.chipLabel!,
-                          style: const TextStyle(
-                            color: Color(0xFF4ADE80),
+                          style: TextStyle(
+                            color: _green,
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                           ),
@@ -334,7 +342,14 @@ class _FailureSheetState extends State<_FailureSheet> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(99),
                       boxShadow: SC.light
-                          ? null
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF04123A)
+                                    .withValues(alpha: 0.18),
+                                blurRadius: 24,
+                                offset: const Offset(0, 8),
+                              ),
+                            ]
                           : [
                               BoxShadow(
                                 color: const Color(0xFFF4FF1F)

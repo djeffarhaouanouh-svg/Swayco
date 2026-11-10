@@ -132,9 +132,9 @@ class _OfflineScreen extends StatelessWidget {
     final safe = MediaQuery.paddingOf(context);
     final ring = SC.light
         ? (
-            fill: PopupTokens.ghost,
-            border: PopupTokens.ghostBorder,
-            icon: PopupTokens.ink,
+            fill: const Color(0xFF04123A).withValues(alpha: 0.05),
+            border: const Color(0xFF04123A).withValues(alpha: 0.14),
+            icon: const Color(0xFF04123A),
           )
         : (
             fill: Colors.white.withValues(alpha: 0.06),
@@ -142,7 +142,7 @@ class _OfflineScreen extends StatelessWidget {
             icon: Colors.white.withValues(alpha: 0.92),
           );
     return Material(
-      color: SC.light ? Colors.white : SC.dBg,
+      color: SC.light ? const Color(0xFFF5F7FF) : SC.dBg,
       child: Stack(
         children: [
           // Le halo bleu du haut, comme les autres écrans.
@@ -157,7 +157,7 @@ class _OfflineScreen extends StatelessWidget {
                   center: Alignment.topCenter,
                   radius: 1.1,
                   colors: [
-                    SC.brandBlue.withValues(alpha: SC.light ? 0.18 : 0.5),
+                    SC.brandBlue.withValues(alpha: SC.light ? 0.18 : 0.42),
                     SC.brandCyan.withValues(alpha: SC.light ? 0.08 : 0.12),
                     SC.brandBlueDeep.withValues(alpha: 0),
                   ],
