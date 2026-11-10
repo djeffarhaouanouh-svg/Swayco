@@ -2362,7 +2362,23 @@ class ProfileInfoPanel extends StatefulWidget {
     required this.open,
     this.hideFlag = false,
     this.bandInsetRight = 0,
+    this.animateOnMount = false,
+    this.bottomPadding = 96,
+    this.alwaysScrollable = true,
   });
+
+  /// Joue la mise en scène du Discover (couverture qui s'ouvre, blocs qui
+  /// apparaissent, tampon) dès que le panneau est monté, même s'il est déjà
+  /// `open` : le passeport du profil d'un pair.
+  final bool animateOnMount;
+
+  /// Marge sous le contenu : 96 sur la carte (la place des boutons ✕ / ❤), moins
+  /// dans la visionneuse qui n'en a pas.
+  final double bottomPadding;
+
+  /// Faux : le contenu ne défile que s'il dépasse (le passeport du profil d'un
+  /// pair est assez haut pour tenir sans défiler).
+  final bool alwaysScrollable;
 
   /// Place laissée libre à droite du bandeau « SWAYCØ · PASSEPORT » (la
   /// visionneuse y pose son bouton ✕).
@@ -2414,7 +2430,22 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
   @override
   void initState() {
     super.initState();
-    if (widget.open) _ctl.value = 1;
+    if (widget.open) {
+      if (widget.animateOnMount) {
+        // Après la 1re image : l'animation ne démarre pas pendant la
+        // transition d'ouverture de la visionneuse.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (MediaQuery.disableAnimationsOf(context)) {
+            _ctl.value = 1;
+          } else {
+            _ctl.forward(from: 0);
+          }
+        });
+      } else {
+        _ctl.value = 1;
+      }
+    }
   }
 
   @override
@@ -2689,11 +2720,13 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
                           child: NotificationListener<ScrollNotification>(
                             onNotification: _onPanelScroll,
                             child: SingleChildScrollView(
-                              physics: const BouncingScrollPhysics(
-                                parent: AlwaysScrollableScrollPhysics(),
+                              physics: BouncingScrollPhysics(
+                                parent: widget.alwaysScrollable
+                                    ? const AlwaysScrollableScrollPhysics()
+                                    : null,
                               ),
-                              padding:
-                                  const EdgeInsets.fromLTRB(20, 14, 20, 96),
+                              padding: EdgeInsets.fromLTRB(
+                                  20, 14, 20, widget.bottomPadding),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: content,
