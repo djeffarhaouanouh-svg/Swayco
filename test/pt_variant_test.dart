@@ -96,4 +96,28 @@ void main() {
     expect(AppStrings.ptBrazilian.value, isFalse);
     expect(AppStrings.currentBcp47.value, 'pt');
   });
+
+  test('ordre exact : interface ET appel, Portugal puis Brésil juste dessous', () {
+    String row(AppLanguage l) => '${l.code}:${l.label}';
+    final ui = interfaceLanguages.map(row).toList();
+    expect(ui, [
+      'fr:Français',
+      'en:English',
+      'es:Español',
+      'de:Deutsch',
+      'it:Italiano',
+      'pt:Português (Portugal)',
+      'pt-BR:Português (Brasil)',
+      'nl:Nederlands',
+      'ar:العربية الفصحى',
+      'ru:Русский',
+      'zh:中文',
+      'ja:日本語',
+      'ko:한국어',
+    ]);
+    final call = callLanguages.map((l) => l.code).toList();
+    expect(call, [
+      'fr', 'en', 'es', 'de', 'it', 'pt-PT', 'pt-BR', 'nl', 'ar', 'ru', 'zh', 'ja', 'ko',
+    ]);
+  });
 }
