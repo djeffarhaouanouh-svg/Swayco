@@ -1,5 +1,7 @@
 import 'dart:ui' show PlatformDispatcher;
 
+import 'app_strings.dart';
+
 /// Small curated list of UI-facing languages (BCP-47 primary subtag).
 class AppLanguage {
   const AppLanguage({
@@ -103,6 +105,42 @@ const List<AppLanguage> supportedLanguages = <AppLanguage>[
   AppLanguage(code: 'ja', flag: '🇯🇵', label: '日本語'),
   AppLanguage(code: 'ko', flag: '🇰🇷', label: '한국어'),
 ];
+
+/// Les sélecteurs de langue de l'INTERFACE (inscription, réglages) : comme
+/// [supportedLanguages], mais le portugais y compte DEUX entrées — « Português
+/// (Portugal) » et « Português (Brasil) », chacune avec son interface. Les deux
+/// ont le même code de langue `pt` : seul l'affichage diffère (voir `UiVariant`).
+/// Les roues de langue de l'appel gardent [supportedLanguages] : une seule
+/// entrée portugaise (la langue parlée est la même).
+const AppLanguage _ptPortugal =
+    AppLanguage(code: 'pt', flag: '🇵🇹', label: 'Português (Portugal)');
+const AppLanguage _ptBrazil =
+    AppLanguage(code: 'pt-BR', flag: '🇧🇷', label: 'Português (Brasil)');
+
+List<AppLanguage> get interfaceLanguages => <AppLanguage>[
+      for (final l in supportedLanguages)
+        if (l.code == 'pt') ...[_ptPortugal, _ptBrazil] else l,
+    ];
+
+/// Le code de la LIGNE à cocher dans un sélecteur d'interface pour la langue
+/// [lang] du compte : `pt` devient `pt-BR` quand l'interface brésilienne est active.
+String interfacePickerCode(String lang) {
+  final primary = lang.trim().toLowerCase().split(RegExp('[-_]')).first;
+  return (primary == 'pt' && AppStrings.ptBrazilian.value) ? 'pt-BR' : lang;
+}
+
+/// L'inverse : la langue du COMPTE derrière une ligne du sélecteur (`pt-BR` → `pt`).
+String interfaceLanguageOf(String pickerCode) =>
+    pickerCode == 'pt-BR' ? 'pt' : pickerCode;
+
+/// Le nom à afficher pour la langue d'interface active (avec la variante).
+String interfaceLanguageLabel(String lang) {
+  final code = interfacePickerCode(lang);
+  for (final l in interfaceLanguages) {
+    if (l.code == code) return l.label;
+  }
+  return findLanguageByCode(lang)?.label ?? lang.toUpperCase();
+}
 
 /// The phone's own language, when we OFFER it — used to pre-select the
 /// onboarding picker so a first-run user confirms instead of choosing.

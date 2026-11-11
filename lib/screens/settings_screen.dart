@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/app_theme.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
+import '../services/ui_variant.dart';
 import '../services/presence_service.dart';
 import '../services/swayco_sounds.dart';
 import '../services/auth_service.dart';
@@ -423,8 +424,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Interface-language picker — la même roulette que la taille : une liste
   /// à format imposé, drapeau + nom dans la langue elle-même.
   Future<void> _openLanguagePicker() async {
-    final current = AppStrings.currentBcp47.value;
-    final langs = supportedLanguages;
+    final current = interfacePickerCode(AppStrings.currentBcp47.value);
+    final langs = interfaceLanguages;
     final start = langs.indexWhere((l) => l.code == current);
     final picked = await showWheelPicker(
       context: context,
@@ -441,7 +442,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Apply + persist the chosen UI language. The app's locale follows the
   /// profile's `language`, so we set it live, cache it locally and push it to
   /// Supabase so it sticks across cold boots.
-  Future<void> _setInterfaceLanguage(String code) async {
+  Future<void> _setInterfaceLanguage(String pickerCode) async {
+    // « pt-BR » = ligne du sélecteur : le compte reste en `pt`, seule
+    // l'interface (Brésil / Portugal) change.
+    final code = interfaceLanguageOf(pickerCode);
+    if (code == 'pt') {
+      await UiVariant.setPortugueseBrazilian(pickerCode == 'pt-BR');
+    }
     AppStrings.setFromCode(code);
     await UserPrefs.setSourceLang(code);
     final profile = _profile;
@@ -577,9 +584,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: Icons.language,
                       label: AppStrings.t('settings_lang_interface'),
                       trailing: _SubtleText(
-                        findLanguageByCode(AppStrings.currentBcp47.value)
-                                ?.label ??
-                            AppStrings.currentBcp47.value.toUpperCase(),
+                        interfaceLanguageLabel(AppStrings.currentBcp47.value),
                       ),
                       onTap: _openLanguagePicker,
                     ),

@@ -767,7 +767,7 @@ class SwayStepLanguage extends StatelessWidget {
                   subtitleKey: 'onb_language_subtitle',
                 ),
                 const SizedBox(height: 30),
-                for (final lang in supportedLanguages) ...[
+                for (final lang in interfaceLanguages) ...[
                   SwayPickRow(
                     leading: Text(lang.flag, style: const TextStyle(fontSize: 24)),
                     label: lang.label,

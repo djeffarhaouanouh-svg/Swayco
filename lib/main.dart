@@ -43,6 +43,7 @@ import 'swayco/speech/speech_service.dart';
 import 'services/revenue_cat.dart';
 import 'services/supabase_service.dart';
 import 'services/user_prefs.dart';
+import 'services/ui_variant.dart';
 import 'theme/swayco_theme.dart';
 // Streamed realtime translation (web + native). The live engine and chunk pipelines are
 // left intact in the tree for store builds / revert.
@@ -426,6 +427,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       // it doesn't have a map for, so an unsupported OS locale just keeps
       // the English default.
       try {
+        await UiVariant.load();
         final localProfile = await UserPrefs.loadProfile()
             .timeout(const Duration(seconds: 3), onTimeout: () => null);
         if (localProfile != null && localProfile.sourceLang.isNotEmpty) {
@@ -705,9 +707,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<String>(
-      valueListenable: AppStrings.currentBcp47,
-      builder: (context, _, _) {
+    return ListenableBuilder(
+      // La langue ET la variante portugaise (Brésil / Portugal) redessinent l'app.
+      listenable:
+          Listenable.merge([AppStrings.currentBcp47, AppStrings.ptBrazilian]),
+      builder: (context, _) {
         return ValueListenableBuilder<Appearance>(
           valueListenable: AppTheme.appearance,
           builder: (context, appearance, _) => MaterialApp(

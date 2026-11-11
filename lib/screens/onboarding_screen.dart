@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import '../swayco/asr/asr_service.dart';
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
+import '../services/ui_variant.dart';
 import '../services/swayco_sounds.dart';
 import '../services/attribution.dart';
 import '../services/auth_service.dart';
@@ -269,7 +270,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// Flip the UI to the newly chosen language immediately, even while the
   /// user is still on the language picker, so the "Save / Get started"
   /// button label updates in real time.
-  void _onLanguageSelected(String code) {
+  void _onLanguageSelected(String pickerCode) {
+    // « pt-BR » est une ligne du sélecteur : la langue du compte reste `pt`,
+    // seule l'interface (Brésil / Portugal) change.
+    final code = interfaceLanguageOf(pickerCode);
+    if (code == 'pt') {
+      unawaited(UiVariant.setPortugueseBrazilian(pickerCode == 'pt-BR'));
+    }
     AppStrings.setFromCode(code);
     setState(() => _selectedLang = code);
   }
@@ -640,7 +647,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       ),
                       const SizedBox(height: 12),
                       _LanguageGrid(
-                        selected: _selectedLang,
+                        selected: _selectedLang == null
+                            ? null
+                            : interfacePickerCode(_selectedLang!),
                         onSelect: _onLanguageSelected,
                       ),
                       const SizedBox(height: 28),
@@ -726,7 +735,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           },
         ),
         _StepLanguageKeepPicker(
-          selected: _selectedLang,
+          selected: _selectedLang == null
+              ? null
+              : interfacePickerCode(_selectedLang!),
           onSelect: _onLanguageSelected,
           onBack: _back,
           onFinish: _goFromLanguage,
@@ -963,7 +974,7 @@ class _LanguageGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final value =
-        (selected != null && supportedLanguages.any((l) => l.code == selected))
+        (selected != null && interfaceLanguages.any((l) => l.code == selected))
         ? selected
         : null;
     final fill = onBlue ? Colors.white : SC.dMenu;
@@ -993,7 +1004,7 @@ class _LanguageGrid extends StatelessWidget {
             ),
           ),
           items: [
-            for (final lang in supportedLanguages)
+            for (final lang in interfaceLanguages)
               DropdownMenuItem<String>(
                 value: lang.code,
                 child: Row(
