@@ -539,6 +539,106 @@ class _VerificationCaptureScreenState extends State<VerificationCaptureScreen> {
   bool _busy = false;
   bool _denied = false;
 
+  /// Le selfie pris, en attente de confirmation (null = pas encore pris).
+  Uint8List? _photo;
+
+  void _confirm() {
+    final bytes = _photo;
+    if (bytes == null) return;
+    Navigator.of(context).pop(VerificationShot(bytes, _gesture));
+  }
+
+  /// Écran de confirmation : la photo, le MÊME geste, « Envoyer » ou « Refaire ».
+  Widget _buildReview(Uint8List bytes) {
+    return Scaffold(
+      backgroundColor: SC.brandBlueDeep,
+      body: DecoratedBox(
+        decoration: const BoxDecoration(gradient: SwayOnb.stepGradient),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 14, 22, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _GlassCloseButton(onTap: () => Navigator.of(context).pop()),
+                    Text(
+                      AppStrings.t('verif_gesture'),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        letterSpacing: 1,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 40),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              _GesturePill(gesture: _gesture),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(40, 16, 40, 8),
+                  child: Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: Image.memory(bytes, fit: BoxFit.contain),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 0, 22, 30),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      AppStrings.t('verif_review_q'),
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SwayCta(
+                      label: AppStrings.t('verif_review_send'),
+                      onPressed: _confirm,
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 48,
+                      child: FilledButton(
+                        onPressed: () => setState(() => _photo = null),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: SC.accent,
+                          foregroundColor: SC.onAccent,
+                          shape: const StadiumBorder(),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          AppStrings.t('verif_retake'),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _shoot() async {
     if (_busy) return;
     _busy = true;
@@ -561,7 +661,9 @@ class _VerificationCaptureScreenState extends State<VerificationCaptureScreen> {
       if (file == null) return;
       final bytes = await file.readAsBytes();
       if (!mounted) return;
-      Navigator.of(context).pop(VerificationShot(bytes, _gesture));
+      // L'appareil natif ne montre pas le geste : on le remet sous les yeux,
+      // avec la photo, avant d'envoyer. Si le geste manque, « Refaire ».
+      setState(() => _photo = bytes);
     } on PlatformException catch (e) {
       if (!mounted) return;
       // Les deux plateformes remontent un refus de caméra sous ce code.
@@ -583,6 +685,8 @@ class _VerificationCaptureScreenState extends State<VerificationCaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final photo = _photo;
+    if (photo != null) return _buildReview(photo);
     return Scaffold(
       backgroundColor: SC.brandBlueDeep,
       body: DecoratedBox(

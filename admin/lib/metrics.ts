@@ -261,6 +261,48 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
     entry.langTo ??= str(s.lang_to);
   }
 
+  // Appels fantômes : une app fermée ou coupée en plein appel n'envoie jamais
+  // `call_ended`, et l'appel restait « en cours » toute la fenêtre de 6 h. On
+  // écarte une salle dont TOUS les participants identifiés ont un dernier signe
+  // de vie (`last_seen`) vieux de plus de 15 min. Prudent : un compte qui masque
+  // son statut en ligne (`last_seen` vide) ou un invité garde l'appel compté.
+  const GHOST_AFTER_MS = 15 * 60_000;
+  const userIds = new Set<string>();
+  for (const s of starts) {
+    const room = str(s.room_name);
+    const uid = str(s.user_id);
+    if (room && uid && byRoom.has(room)) userIds.add(uid);
+  }
+  const lastSeen = new Map<string, number | null>();
+  if (userIds.size) {
+    const profs = await safeRows("profiles", "id, last_seen", (q) =>
+      q.in("id", [...userIds]),
+    );
+    for (const p of profs) {
+      const id = str(p.id);
+      const seen = str(p.last_seen);
+      if (id) lastSeen.set(id, seen ? new Date(seen).getTime() : null);
+    }
+  }
+  const nowMs = Date.now();
+  const staleUser = (id: string) => {
+    const t = lastSeen.get(id);
+    return typeof t === "number" && nowMs - t > GHOST_AFTER_MS;
+  };
+  for (const [room] of [...byRoom.entries()]) {
+    const ids = new Set<string>();
+    let hasOther = false; // invité (session) : on ne sait pas, on garde
+    for (const s of starts) {
+      if (str(s.room_name) !== room) continue;
+      const uid = str(s.user_id);
+      if (uid) ids.add(uid);
+      else hasOther = true;
+    }
+    if (!hasOther && ids.size > 0 && [...ids].every(staleUser)) {
+      byRoom.delete(room);
+    }
+  }
+
   const now = Date.now();
   const calls: LiveCall[] = [...byRoom.entries()]
     .map(([room, e]) => ({
