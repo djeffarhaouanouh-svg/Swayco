@@ -154,7 +154,13 @@ class _CallScreenState extends State<CallScreen> {
   /// caller's Supabase email regardless.
   String? _egressId;
   bool _egressBusy = false;
+  /// Réponse de la liste d'autorisation DU SERVEUR (`EGRESS_ADMIN_EMAILS`,
+  /// plusieurs adresses). Donner l'accès à quelqu'un = ajouter son e-mail dans
+  /// Railway : pas de nouvelle version de l'app. Le serveur revérifie de toute
+  /// façon à chaque démarrage / arrêt.
+  bool _egressAllowedByServer = false;
   bool get _isEgressAdmin {
+    if (_egressAllowedByServer) return true;
     final admin = resolvedEgressAdminEmail();
     return admin.isNotEmpty &&
         AuthService.currentEmail.toLowerCase() == admin.toLowerCase();
@@ -1695,6 +1701,11 @@ class _CallScreenState extends State<CallScreen> {
     super.initState();
     widget.translation.localTranscript?.addListener(_onMyTranscript);
     Analytics.track('screen_view', props: {'screen': 'live'});
+    // Le bouton REC : autorisé par la liste du serveur (en plus de l'e-mail
+    // compilé). Silencieux en cas d'erreur : le bouton reste simplement caché.
+    unawaited(EgressApi.checkAllowed().then((ok) {
+      if (ok && mounted) setState(() => _egressAllowedByServer = true);
+    }));
     _start();
     // Hold the connecting splash for a minimum of 5s so it is actually
     // readable even when the room connects almost instantly.
