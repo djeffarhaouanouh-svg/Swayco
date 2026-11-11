@@ -61,4 +61,17 @@ void main() {
     AppStrings.ptBrazilian.value = true;
     expect(interfaceLanguageLabel('pt'), 'Português (Brasil)');
   });
+
+  test('appel : une seule ligne portugaise, « Português (Brasil) », code pt', () {
+    final pt = callLanguages.where((l) => l.code == 'pt').toList();
+    expect(pt.length, 1);
+    expect(pt.single.label, 'Português (Brasil)');
+    expect(pt.single.flag, '🇧🇷');
+    expect(callLanguages.length, supportedLanguages.length);
+    expect(findCallLanguageByCode('pt')?.countryCode, 'BR');
+    expect(findCallLanguageByCode('pt-BR')?.code, 'pt');
+    expect(findCallLanguageByCode('fr')?.code, 'fr');
+    // Le catalogue d'affichage (profil des autres) garde « Português ».
+    expect(findLanguageByCode('pt')?.label, 'Português');
+  });
 }

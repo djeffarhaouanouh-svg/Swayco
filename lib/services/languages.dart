@@ -122,6 +122,25 @@ List<AppLanguage> get interfaceLanguages => <AppLanguage>[
         if (l.code == 'pt') ...[_ptPortugal, _ptBrazil] else l,
     ];
 
+/// Les langues parlées en APPEL (roues de langue, réglage de la langue d'appel,
+/// invité) : comme [supportedLanguages], mais le portugais s'y appelle
+/// « Português (Brasil) » avec le drapeau du Brésil — la voix et la
+/// reconnaissance de l'appel sont déjà en `pt-BR`. Le code reste `pt` : rien
+/// ne change pour les moteurs, la traduction ni les filtres.
+const AppLanguage _ptBrazilCall =
+    AppLanguage(code: 'pt', flag: '🇧🇷', label: 'Português (Brasil)');
+
+List<AppLanguage> get callLanguages => <AppLanguage>[
+      for (final l in supportedLanguages) l.code == 'pt' ? _ptBrazilCall : l,
+    ];
+
+/// [findLanguageByCode], vu depuis l'appel : `pt` rend « Português (Brasil) ».
+AppLanguage? findCallLanguageByCode(String code) {
+  final primary = code.trim().toLowerCase().split(RegExp('[-_]')).first;
+  if (primary == 'pt') return _ptBrazilCall;
+  return findLanguageByCode(code);
+}
+
 /// Le code de la LIGNE à cocher dans un sélecteur d'interface pour la langue
 /// [lang] du compte : `pt` devient `pt-BR` quand l'interface brésilienne est active.
 String interfacePickerCode(String lang) {

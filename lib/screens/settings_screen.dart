@@ -477,7 +477,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     final current =
         saved.lang.isNotEmpty ? saved.lang : AppStrings.currentBcp47.value;
-    final langs = supportedLanguages;
+    final langs = callLanguages;
     final start = langs.indexWhere((l) => l.code == current);
     final picked = await showWheelPicker(
       context: context,

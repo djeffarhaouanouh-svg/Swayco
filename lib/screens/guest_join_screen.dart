@@ -160,7 +160,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
                     spacing: 10,
                     runSpacing: 10,
                     children: [
-                      for (final lang in supportedLanguages)
+                      for (final lang in callLanguages)
                         _LangChip(
                           language: lang,
                           selected: lang.code == _selectedLang,

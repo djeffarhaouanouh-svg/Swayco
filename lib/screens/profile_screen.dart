@@ -990,7 +990,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         : (_languageCode.isNotEmpty
             ? _languageCode
             : AppStrings.currentBcp47.value);
-    final langs = supportedLanguages;
+    final langs = callLanguages;
     final start = langs.indexWhere((l) => l.code == current);
     final picked = await showWheelPicker(
       context: ctx,

@@ -3860,7 +3860,7 @@ class _CallScreenState extends State<CallScreen> {
                                           // sert à changer. Repli sur la langue
                                           // du compte tant que rien n'a été
                                           // choisi.
-                                          flagCountry: findLanguageByCode(
+                                          flagCountry: findCallLanguageByCode(
                                                 _myOutputLang.isNotEmpty
                                                     ? _myOutputLang
                                                     : AppStrings
@@ -5818,7 +5818,7 @@ class _LanguageWheelsState extends State<_LanguageWheels> {
   /// se fait dans le nuage et arrive écrite quoi qu'il arrive. Une phrase lue
   /// avec un accent qui n'est pas le bon vaut mieux qu'une langue absente du
   /// menu sans une ligne d'explication.
-  late final List<AppLanguage> _langs = supportedLanguages;
+  late final List<AppLanguage> _langs = callLanguages;
   late int _spoken = _indexOf(_langs, widget.spokenCode);
   late int _heard = _indexOf(_langs, widget.heardCode);
 
