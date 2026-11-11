@@ -154,8 +154,11 @@ abstract final class RevenueCat {
   /// Detach the user on sign-out (reverts to an anonymous RevenueCat id).
   static Future<void> logOut() async {
     _pendingUserId = null;
-    if (!_configured) return;
+    // Déconnexion : plus rien n'est accordé, ni par le store ni par le serveur.
+    _storePro = false;
+    _serverGrantedPro = false;
     proActive.value = false;
+    if (!_configured) return;
     try {
       await Purchases.logOut();
     } catch (e) {
@@ -448,7 +451,25 @@ abstract final class RevenueCat {
     }
   }
 
+  /// Abonnement du STORE (l'entitlement RevenueCat de cet appareil).
+  static bool _storePro = false;
+
+  /// Pro accordé par le SERVEUR sur le compte (`profiles.is_pro` / palier) :
+  /// un compte donné à la main, ou payé sur le web (Stripe). Sans ça, un compte
+  /// Pro en base mais sans achat sur ce téléphone restait « gratuit » partout
+  /// dans l'app (pubs, swipes, likes, réglages).
+  static bool _serverGrantedPro = false;
+
+  /// À appeler quand MON profil est lu : `isPro || isPlus`. Le colonne est
+  /// protégée côté base (seul le serveur l'écrit), donc on peut s'y fier.
+  static void setServerGrantedPro(bool granted) {
+    if (_serverGrantedPro == granted) return;
+    _serverGrantedPro = granted;
+    proActive.value = _storePro || _serverGrantedPro;
+  }
+
   static void _onCustomerInfo(CustomerInfo info) {
-    proActive.value = info.entitlements.active.containsKey(proEntitlementId);
+    _storePro = info.entitlements.active.containsKey(proEntitlementId);
+    proActive.value = _storePro || _serverGrantedPro;
   }
 }

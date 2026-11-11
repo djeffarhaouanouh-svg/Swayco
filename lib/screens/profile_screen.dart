@@ -208,6 +208,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     final blockerIds = results[3] as Set<String>;
     final rel = results[4] as ({bool matched, bool iLiked, bool peerLikedMe})?;
 
+    // Mon propre profil : son Pro en base compte aussi côté app.
+    if (!_isViewingOther && remote != null) {
+      RevenueCat.setServerGrantedPro(remote.isPro || remote.isPlus);
+    }
     setState(() {
       _deviceId = deviceId;
       _local = local;

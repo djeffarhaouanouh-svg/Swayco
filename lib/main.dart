@@ -598,6 +598,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     try {
       remote = await ProfileApi.fetchById(uid);
       remoteOk = true;
+      // Compte Pro en base (donné à la main ou payé sur le web) : l'app doit le
+      // savoir même sans achat sur ce téléphone.
+      if (remote != null) {
+        RevenueCat.setServerGrantedPro(remote.isPro || remote.isPlus);
+      }
     } catch (e) {
       debugPrint('hydrate fetch remote profile failed: $e');
     }
