@@ -20,10 +20,11 @@ import '../services/user_prefs.dart';
 /// recogniser embarqué.
 Future<String> resolveSpokenLanguage({required String preselect}) async {
   final saved = await UserPrefs.loadCallSpokenLang();
-  final wanted = saved.lang.isNotEmpty ? saved.lang : preselect;
+  // `pt` nu → `pt-BR` ou `pt-PT` (la ligne de la roue) selon l'interface.
+  final wanted = callLanguageCode(saved.lang.isNotEmpty ? saved.lang : preselect);
   // Toujours une langue du catalogue : le reste de la chaîne (recogniser, voix)
   // n'en connaît pas d'autres.
-  return supportedLanguages.any((l) => l.code == wanted)
+  return callLanguages.any((l) => l.code == wanted)
       ? wanted
-      : supportedLanguages.first.code;
+      : callLanguages.first.code;
 }

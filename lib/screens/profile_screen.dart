@@ -991,7 +991,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ? _languageCode
             : AppStrings.currentBcp47.value);
     final langs = callLanguages;
-    final start = langs.indexWhere((l) => l.code == current);
+    final start = langs.indexWhere((l) => l.code == callLanguageCode(current));
     final picked = await showWheelPicker(
       context: ctx,
       title: AppStrings.t('settings_live_translation'),
@@ -3929,7 +3929,8 @@ class _EditAccountSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lang = findLanguageByCode(languageCode);
+    // La langue d'APPEL : « Português (Brasil) » ou « (Portugal) », pas « Português ».
+    final lang = findCallLanguageByCode(languageCode);
     final langLabel = lang == null ? '—' : '${lang.flag}  ${lang.label}';
     final name = displayName.isEmpty
         ? AppStrings.t('profile_anonymous')

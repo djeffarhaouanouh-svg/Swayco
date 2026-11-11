@@ -62,16 +62,38 @@ void main() {
     expect(interfaceLanguageLabel('pt'), 'Português (Brasil)');
   });
 
-  test('appel : une seule ligne portugaise, « Português (Brasil) », code pt', () {
-    final pt = callLanguages.where((l) => l.code == 'pt').toList();
-    expect(pt.length, 1);
-    expect(pt.single.label, 'Português (Brasil)');
-    expect(pt.single.flag, '🇧🇷');
-    expect(callLanguages.length, supportedLanguages.length);
-    expect(findCallLanguageByCode('pt')?.countryCode, 'BR');
-    expect(findCallLanguageByCode('pt-BR')?.code, 'pt');
+  test('appel : deux lignes portugaises, Portugal puis Brésil dessous', () {
+    final codes = callLanguages.map((l) => l.code).toList();
+    final ip = codes.indexOf('pt-PT');
+    final ib = codes.indexOf('pt-BR');
+    expect(ip, greaterThanOrEqualTo(0));
+    expect(ib, ip + 1, reason: 'Brasil juste sous Portugal, pas en premier');
+    expect(callLanguages[ip].label, 'Português (Portugal)');
+    expect(callLanguages[ib].label, 'Português (Brasil)');
+    expect(callLanguages[ib].flag, '🇧🇷');
+    expect(callLanguages.length, supportedLanguages.length + 1);
+    expect(codes.contains('pt'), isFalse);
+  });
+
+  test('appel : un pt nu prend la variante de l\'interface, les régionaux restent', () {
+    AppStrings.ptBrazilian.value = false;
+    expect(callLanguageCode('pt'), 'pt-PT');
+    AppStrings.ptBrazilian.value = true;
+    expect(callLanguageCode('pt'), 'pt-BR');
+    expect(callLanguageCode('pt_br'), 'pt-BR');
+    expect(callLanguageCode('pt-PT'), 'pt-PT');
+    expect(callLanguageCode('fr'), 'fr');
+    expect(findCallLanguageByCode('pt-PT')?.label, 'Português (Portugal)');
+    expect(findCallLanguageByCode('pt-BR')?.countryCode, 'BR');
     expect(findCallLanguageByCode('fr')?.code, 'fr');
     // Le catalogue d'affichage (profil des autres) garde « Português ».
     expect(findLanguageByCode('pt')?.label, 'Português');
+  });
+
+  test('« pt-PT » choisit l\'interface du Portugal', () {
+    AppStrings.ptBrazilian.value = true;
+    AppStrings.setFromCode('pt-PT');
+    expect(AppStrings.ptBrazilian.value, isFalse);
+    expect(AppStrings.currentBcp47.value, 'pt');
   });
 }

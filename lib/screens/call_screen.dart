@@ -1020,6 +1020,11 @@ class _CallScreenState extends State<CallScreen> {
   /// the base code we derived from it.
   Map<String, String> _deviceVoiceTags = const {};
 
+  /// TOUS les tags de voix de l'appareil, par langue de base (`pt` → [`pt-BR`,
+  /// `pt-PT`]). [_deviceVoiceTags] n'en garde qu'un par langue ; celui-ci sert
+  /// quand l'appel demande une région précise (`pt-PT`, `pt-BR`).
+  Map<String, List<String>> _deviceVoiceAll = const {};
+
   /// Ask the OS which languages it can speak. `getLanguages` returns BCP-47 tags
   /// (`fr-FR`, `en-US`, …); the picker works in base codes.
   /// Les régions qu'on veut voir gagner quand l'appareil en propose plusieurs
@@ -1216,7 +1221,10 @@ class _CallScreenState extends State<CallScreen> {
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
         unawaited(_logAndroidTtsEngine());
       }
-      setState(() => _deviceVoiceTags = tags);
+      setState(() {
+        _deviceVoiceTags = tags;
+        _deviceVoiceAll = all;
+      });
       return true;
     } catch (e) {
       DebugOverlay.log('device voices: getLanguages failed: $e');
@@ -1344,6 +1352,14 @@ class _CallScreenState extends State<CallScreen> {
       DebugOverlay.log('no voice list yet — asking again');
       unawaited(_loadDeviceVoiceLangs());
       return '';
+    }
+    // Une région demandée (pt-PT, pt-BR) : SA voix si l'appareil l'a — la ligne
+    // « Português (Portugal) » parle alors avec une voix du Portugal.
+    if (lang.contains(RegExp(r'[-_]'))) {
+      final want = lang.toLowerCase().replaceAll('_', '-');
+      for (final t in _deviceVoiceAll[base] ?? const <String>[]) {
+        if (t.toLowerCase().replaceAll('_', '-') == want) return t;
+      }
     }
     final tag = _deviceVoiceTags[base];
     if (tag == null) {
@@ -5830,8 +5846,14 @@ class _LanguageWheelsState extends State<_LanguageWheels> {
   /// Une langue hors catalogue (ou vide) retombe sur la première : la roue doit
   /// toujours montrer quelque chose.
   static int _indexOf(List<AppLanguage> langs, String code) {
-    final base = code.split('-').first.toLowerCase();
-    final i = langs.indexWhere((l) => l.code == base);
+    // Le portugais a deux lignes régionales (pt-PT, pt-BR) : un `pt` nu prend
+    // celle de l'interface active.
+    final wanted = callLanguageCode(code).toLowerCase();
+    var i = langs.indexWhere((l) => l.code.toLowerCase() == wanted);
+    if (i < 0) {
+      final base = code.split(RegExp(r'[-_]')).first.toLowerCase();
+      i = langs.indexWhere((l) => l.code.toLowerCase() == base);
+    }
     return i < 0 ? 0 : i;
   }
 

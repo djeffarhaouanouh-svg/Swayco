@@ -123,21 +123,40 @@ List<AppLanguage> get interfaceLanguages => <AppLanguage>[
     ];
 
 /// Les langues parlées en APPEL (roues de langue, réglage de la langue d'appel,
-/// invité) : comme [supportedLanguages], mais le portugais s'y appelle
-/// « Português (Brasil) » avec le drapeau du Brésil — la voix et la
-/// reconnaissance de l'appel sont déjà en `pt-BR`. Le code reste `pt` : rien
-/// ne change pour les moteurs, la traduction ni les filtres.
+/// invité) : comme [supportedLanguages], mais le portugais y a DEUX lignes,
+/// « Português (Portugal) » puis « Português (Brasil) » dessous. Ce sont deux
+/// codes régionaux (`pt-PT`, `pt-BR`) : la reconnaissance vocale et la voix de
+/// l'appel prennent la région du code d'abord (voir `apple_asr_engine`). Le
+/// serveur, lui, ne regarde que la langue principale (`pt`) : aucune traduction
+/// n'est lancée entre les deux variantes, ni avec un `pt` nu.
+const AppLanguage _ptPortugalCall =
+    AppLanguage(code: 'pt-PT', flag: '🇵🇹', label: 'Português (Portugal)');
 const AppLanguage _ptBrazilCall =
-    AppLanguage(code: 'pt', flag: '🇧🇷', label: 'Português (Brasil)');
+    AppLanguage(code: 'pt-BR', flag: '🇧🇷', label: 'Português (Brasil)');
 
 List<AppLanguage> get callLanguages => <AppLanguage>[
-      for (final l in supportedLanguages) l.code == 'pt' ? _ptBrazilCall : l,
+      for (final l in supportedLanguages)
+        if (l.code == 'pt') ...[_ptPortugalCall, _ptBrazilCall] else l,
     ];
 
-/// [findLanguageByCode], vu depuis l'appel : `pt` rend « Português (Brasil) ».
+/// Le code d'APPEL d'une langue : `pt` nu devient `pt-BR` ou `pt-PT` selon
+/// l'interface portugaise active ; `pt-BR` / `pt-PT` sont gardés ; le reste
+/// est inchangé.
+String callLanguageCode(String lang) {
+  final lower = lang.trim().toLowerCase().replaceAll('_', '-');
+  if (lower == 'pt-br') return 'pt-BR';
+  if (lower == 'pt-pt') return 'pt-PT';
+  if (lower == 'pt') return AppStrings.ptBrazilian.value ? 'pt-BR' : 'pt-PT';
+  return lang;
+}
+
+/// [findLanguageByCode], vu depuis l'appel : `pt-BR` rend « Português (Brasil) »,
+/// `pt-PT` « Português (Portugal) », `pt` nu la variante de l'interface.
 AppLanguage? findCallLanguageByCode(String code) {
   final primary = code.trim().toLowerCase().split(RegExp('[-_]')).first;
-  if (primary == 'pt') return _ptBrazilCall;
+  if (primary == 'pt') {
+    return callLanguageCode(code) == 'pt-BR' ? _ptBrazilCall : _ptPortugalCall;
+  }
   return findLanguageByCode(code);
 }
 

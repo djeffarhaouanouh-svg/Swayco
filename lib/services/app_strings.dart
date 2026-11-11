@@ -21,6 +21,7 @@ abstract final class AppStrings {
     // « pt-BR » explicite : l'interface brésilienne, sous le code `pt`.
     final lower = bcp47.trim().toLowerCase().replaceAll('_', '-');
     if (lower == 'pt-br') ptBrazilian.value = true;
+    if (lower == 'pt-pt') ptBrazilian.value = false;
     final code = _normalize(bcp47);
     if (code.isEmpty) return;
     if (!_maps.containsKey(code)) return;

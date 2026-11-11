@@ -67,7 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _callLang = '';
   String get _callLangLabel {
     if (_callLang.isEmpty) return AppStrings.t('settings_call_lang_default');
-    return findLanguageByCode(_callLang)?.label ?? _callLang.toUpperCase();
+    return findCallLanguageByCode(_callLang)?.label ?? _callLang.toUpperCase();
   }
 
   String get _email => AuthService.currentEmail;
@@ -478,7 +478,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final current =
         saved.lang.isNotEmpty ? saved.lang : AppStrings.currentBcp47.value;
     final langs = callLanguages;
-    final start = langs.indexWhere((l) => l.code == current);
+    final start = langs.indexWhere((l) => l.code == callLanguageCode(current));
     final picked = await showWheelPicker(
       context: context,
       title: AppStrings.t('settings_section_call_lang'),
