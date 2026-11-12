@@ -256,6 +256,7 @@ extension _GlobeZoomLayer on _GlobeViewState {
       );
     }
     if (cities.isNotEmpty && focus != null) {
+      final countryKey = focus;
       final from = shown.firstWhere((c) => c.key == focus).at;
       for (final c in cities) {
         final at = Offset.lerp(from, c.at, t)!;
@@ -274,8 +275,14 @@ extension _GlobeZoomLayer on _GlobeViewState {
               scale: bounce,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                // Une ville ne se choisit pas : elle montre où sont les gens.
-                onTap: () => _bounce(c.city.name),
+                // Toucher une ville (ses profils) choisit son PAYS : la bulle
+                // saute, et le pays est sélectionné s'il ne l'était pas. Il
+                // n'est jamais DÉSÉLECTIONNÉ d'un toucher sur une ville (ce que
+                // ferait `_select` sur un pays déjà choisi).
+                onTap: () {
+                  if (!widget.selected.contains(countryKey)) _select(countryKey);
+                  _bounce(c.city.name);
+                },
                 child: _ZoomBubble(
                   diameter: d,
                   photoUrl: c.city.photoUrl,
