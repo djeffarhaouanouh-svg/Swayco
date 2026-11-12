@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../widgets/tap_pad.dart';
@@ -1235,18 +1236,70 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   }
 
   /// Pick an image from the gallery and send it as an image message.
+  /// La petite feuille « Prendre une photo / Choisir dans la galerie ».
+  /// Null = fermée sans choisir.
+  Future<ImageSource?> _askPhotoSource() {
+    Widget row(IconData icon, String label, ImageSource source) => ListTile(
+          leading: Icon(icon, color: SC.accentFg),
+          title: Text(
+            label,
+            style: TextStyle(
+              color: SC.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          onTap: () => Navigator.of(context).pop(source),
+        );
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: SC.menu,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              row(Icons.photo_camera_rounded, AppStrings.t('chat_photo_take'),
+                  ImageSource.camera),
+              row(Icons.photo_library_rounded,
+                  AppStrings.t('chat_photo_gallery'), ImageSource.gallery),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _sendImage() async {
     if (_myId.isEmpty || _sending) return;
     if (!isSupabaseReady) {
       setState(() => _error = AppStrings.t('chat_send_failed'));
       return;
     }
+    // Appareil photo ou galerie : on propose (un selfie se prend sur place).
+    final source = await _askPhotoSource();
+    if (source == null || !mounted) return;
     final XFile? file;
     final Uint8List bytes;
     try {
+      if (source == ImageSource.camera && !kIsWeb) {
+        // Le web demande lui-même la permission à l'ouverture de la caméra.
+        final cam = await Permission.camera.request();
+        if (!cam.isGranted) {
+          if (mounted) {
+            setState(() => _error = AppStrings.t('verif_camera_denied'));
+          }
+          return;
+        }
+      }
       final picker = ImagePicker();
       file = await picker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
+        // Le selfie : caméra frontale d'abord.
+        preferredCameraDevice: CameraDevice.front,
         maxWidth: 1600,
         maxHeight: 1600,
         imageQuality: 85,
