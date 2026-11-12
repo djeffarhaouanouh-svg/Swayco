@@ -24,6 +24,7 @@ import '../services/nav_tab.dart';
 import '../services/notification_router.dart';
 import '../services/profile_api.dart';
 import '../services/received_activity_unread.dart';
+import '../services/screen_time.dart';
 import '../services/supabase_service.dart';
 import '../services/token_api.dart';
 import '../services/web_poll.dart';
@@ -98,6 +99,14 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// Discover ne se déclenchaient. Au retour dans l'app, on relit mes matchs.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Le temps passé sur un écran ne compte que l'app au premier plan.
+    if (state == AppLifecycleState.resumed) {
+      ScreenTime.resume();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      ScreenTime.pause();
+    }
     if (state == AppLifecycleState.resumed &&
         _matchWatchPrimed &&
         _matchMyId.isNotEmpty) {
@@ -130,6 +139,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     NotificationRouter.pending.addListener(_onNotificationIntent);
     // Show the first-visit hint when the user opens their Profile tab.
     NavTab.index.addListener(_onNavTabChanged);
+    ScreenTime.setTab(_tabName(NavTab.index.value));
     // A cold launch from a notification tap may have set an intent
     // before this shell mounted — handle it once after the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -709,6 +719,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     NotificationRouter.pending.removeListener(_onNotificationIntent);
     MatchCelebration.pendingPeerId.removeListener(_onMatchPending);
     NavTab.index.removeListener(_onNavTabChanged);
+    ScreenTime.pause();
     _matchPollTimer?.cancel();
     final matchCh = _matchChannel;
     if (matchCh != null) {
@@ -721,10 +732,20 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  /// Le nom d'un onglet dans les statistiques de temps passé.
+  static String _tabName(int i) => switch (i) {
+        NavTab.chat => 'chat',
+        NavTab.discover => 'discover',
+        NavTab.demandes => 'requests',
+        NavTab.profile => 'profile',
+        _ => 'tab_$i',
+      };
+
   void _onNavTabChanged() {
     // Changer d'onglet remet la barre, rangée par le défilement ou non.
     NavChrome.show();
     final i = NavTab.index.value;
+    ScreenTime.setTab(_tabName(i));
     // Keep the swipeable pager in sync with programmatic tab changes
     // (nav-bar taps, notification routing, pop-to-tab). Guarded so the
     // round-trip from a swipe (onPageChanged → NavTab.select → here) doesn't

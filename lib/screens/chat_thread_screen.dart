@@ -30,6 +30,7 @@ import '../services/open_thread.dart';
 import '../services/peer_local_time.dart';
 import '../services/profile_api.dart';
 import '../services/presence_service.dart';
+import '../services/screen_time.dart';
 import '../services/supabase_service.dart';
 import '../services/translation_api.dart';
 import '../services/translation_cache.dart';
@@ -578,6 +579,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   @override
   void initState() {
     super.initState();
+    // Le temps passé DANS une conversation, à part de la liste des messages.
+    ScreenTime.push('thread');
     // So the in-app "new message" banner (MessageBanner) can suppress
     // itself for this exact conversation — a message that's already
     // appearing live in the list below doesn't need a banner on top of it.
@@ -1126,6 +1129,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     if (OpenThread.conversationId.value == widget.conversationId) {
       OpenThread.conversationId.value = '';
     }
+    ScreenTime.pop('thread');
     _scrollCtrl.removeListener(_MessageBubble.dismissActivePicker);
     _MessageBubble.dismissActivePicker();
     _sub?.cancel();
