@@ -282,6 +282,215 @@ class ReplyBar extends StatelessWidget {
   }
 }
 
+/// Bandeau « MODIFIER LE MESSAGE » : même gabarit que [ReplyBar], posé au même
+/// endroit (jamais les deux ensemble). Le texte d'origine du message est en
+/// ligne 2 ; la croix annule la modification.
+class EditBar extends StatelessWidget {
+  const EditBar({
+    super.key,
+    required this.originalText,
+    required this.onCancel,
+  });
+
+  /// Ce que j'avais écrit (jamais la version traduite).
+  final String originalText;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final light = SC.light;
+    final accent = SC.accentFg;
+    return GlassPanel(
+      borderRadius: 22,
+      color: light ? const Color(0xB3FFFFFF) : null,
+      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+      child: Row(
+        children: [
+          Icon(Icons.edit_rounded, size: 21, color: accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  AppStrings.t('chat_editing').toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.ibmPlexMono(
+                    fontSize: 11,
+                    letterSpacing: 0.5,
+                    color: accent,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  originalText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.3,
+                    color: SC.fg.withValues(alpha: light ? 0.8 : 0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onCancel,
+            child: Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: light
+                    ? SC.bgDeep.withValues(alpha: 0.08)
+                    : Colors.white.withValues(alpha: 0.14),
+              ),
+              child: Icon(Icons.close_rounded, size: 18, color: SC.fg),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// La trace d'un message supprimé : une pastille SANS fond, bordée de
+/// pointillés, avec « Tu as supprimé ce message » en italique, et l'heure
+/// dessous. Même queue que les vraies bulles.
+class DeletedBubble extends StatelessWidget {
+  const DeletedBubble({
+    super.key,
+    required this.mine,
+    required this.text,
+    required this.time,
+  });
+
+  final bool mine;
+  final String text;
+  final String time;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = mine
+        ? const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(6),
+          )
+        : const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+            bottomLeft: Radius.circular(6),
+            bottomRight: Radius.circular(20),
+          );
+    final content = SC.textPrimary.withValues(alpha: SC.light ? 0.5 : 0.55);
+    return LayoutBuilder(
+      builder: (context, c) => Align(
+        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: c.maxWidth * 0.82),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment:
+                  mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                CustomPaint(
+                  painter: _DashedBorderPainter(
+                    radius: radius,
+                    color: SC.textPrimary.withValues(alpha: 0.28),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 15,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.block_rounded, size: 17, color: content),
+                        const SizedBox(width: 7),
+                        Flexible(
+                          child: Text(
+                            text,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                              color: content,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.only(
+                    top: 4,
+                    left: mine ? 0 : 6,
+                    right: mine ? 6 : 0,
+                  ),
+                  child: Text(
+                    time,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: SC.textPrimary.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bordure en pointillés (traits de 5 px, écarts de 4, épaisseur 1,4) : Flutter
+/// n'a pas de bordure pointillée native.
+class _DashedBorderPainter extends CustomPainter {
+  _DashedBorderPainter({required this.radius, required this.color});
+
+  final BorderRadius radius;
+  final Color color;
+
+  static const double _stroke = 1.4;
+  static const double _dash = 5;
+  static const double _gap = 4;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rrect = radius
+        .toRRect(Offset.zero & size)
+        .deflate(_stroke / 2);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = _stroke;
+    final path = Path()..addRRect(rrect);
+    for (final metric in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < metric.length) {
+        final end = math.min(d + _dash, metric.length);
+        canvas.drawPath(metric.extractPath(d, end), paint);
+        d += _dash + _gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter old) =>
+      old.color != color || old.radius != radius;
+}
+
 /// La citation DANS une bulle : prénom (+ drapeau), puis le message cité.
 /// Envoyée = fond bleu foncé translucide, prénom en jaune ; reçue = fond neutre.
 class QuoteBlock extends StatelessWidget {

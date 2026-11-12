@@ -1450,13 +1450,18 @@ class _SpecialChatRow extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        lastMessage.body,
+                        lastMessage.isDeleted
+                            ? AppStrings.t('chat_preview_deleted_peer')
+                            : lastMessage.body,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: textColor,
                           fontSize: 13.5,
                           fontWeight: FontWeight.w600,
+                          fontStyle: lastMessage.isDeleted
+                              ? FontStyle.italic
+                              : FontStyle.normal,
                         ),
                       ),
                     ],
@@ -1697,8 +1702,11 @@ class _FriendChatRow extends StatelessWidget {
     } else if (lastMessage != null &&
         (lastMessage!.body.isNotEmpty ||
             lastMessage!.isImage ||
-            lastMessage!.isVoice)) {
-      if (isMine) {
+            lastMessage!.isVoice ||
+            // Un message supprimé a un corps vide : sans cette ligne il
+            // tomberait dans « jamais un mot échangé ».
+            lastMessage!.isDeleted)) {
+      if (isMine && !lastMessage!.isDeleted) {
         subtitleParts.add(TextSpan(
           text: 'Vous : ',
           style: TextStyle(
@@ -1707,7 +1715,16 @@ class _FriendChatRow extends StatelessWidget {
           ),
         ));
       }
-      if (lastMessage!.isVoice) {
+      if (lastMessage!.isDeleted) {
+        // « Tu as supprimé un message » / « Message supprimé » : en italique,
+        // atténué ; l'heure reste.
+        subtitleParts.add(TextSpan(
+          text: AppStrings.t(isMine
+              ? 'chat_preview_deleted_mine'
+              : 'chat_preview_deleted_peer'),
+          style: const TextStyle(fontStyle: FontStyle.italic),
+        ));
+      } else if (lastMessage!.isVoice) {
         // Un vocal : l'icône micro et sa durée (« 0:27 »), sans emoji.
         subtitleParts.add(WidgetSpan(
           alignment: PlaceholderAlignment.middle,

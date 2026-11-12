@@ -25,6 +25,8 @@ class ChatMessage {
     this.discoverPhoto = '',
     this.special = false,
     this.replyToId = '',
+    this.editedAt,
+    this.deletedAt,
   });
 
   final String id;
@@ -74,6 +76,48 @@ class ChatMessage {
   /// Ce message est une réponse (il cite un autre message).
   bool get isReply => replyToId.isNotEmpty;
 
+  /// Quand son auteur l'a modifié (`edited_at`, migration 0083), sinon null.
+  final DateTime? editedAt;
+
+  /// Quand son auteur l'a supprimé (`deleted_at`, migration 0083), sinon null.
+  /// Le contenu est alors vide en base : il ne reste que la trace.
+  final DateTime? deletedAt;
+
+  /// Supprimé : la bulle devient une trace « message supprimé ».
+  bool get isDeleted => deletedAt != null;
+
+  /// Modifié (et pas supprimé depuis) : « ✎ modifié » sous la bulle.
+  bool get isEdited => editedAt != null && !isDeleted;
+
+  /// Copie, avec [body] / [editedAt] / [deletedAt] remplacés. [clearMedia]
+  /// vide le texte, l'image, le vocal et la photo Discover (la trace d'une
+  /// suppression n'a plus aucun contenu).
+  ChatMessage copyWith({
+    String? body,
+    DateTime? editedAt,
+    DateTime? deletedAt,
+    bool clearMedia = false,
+  }) {
+    return ChatMessage(
+      id: id,
+      conversationId: conversationId,
+      senderId: senderId,
+      recipientId: recipientId,
+      senderName: senderName,
+      body: clearMedia ? '' : (body ?? this.body),
+      createdAt: createdAt,
+      language: language,
+      imageUrl: clearMedia ? '' : imageUrl,
+      audioUrl: clearMedia ? '' : audioUrl,
+      audioDurationMs: clearMedia ? 0 : audioDurationMs,
+      discoverPhoto: clearMedia ? '' : discoverPhoto,
+      special: special,
+      replyToId: replyToId,
+      editedAt: editedAt ?? this.editedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+    );
+  }
+
   /// Un message special recu : carte speciale + demande Accepter / Refuser.
   bool get isSpecial => special;
 
@@ -108,6 +152,9 @@ class ChatMessage {
       discoverPhoto: m['discover_photo']?.toString() ?? '',
       special: m['special'] == true,
       replyToId: m['reply_to_id']?.toString() ?? '',
+      editedAt: DateTime.tryParse(m['edited_at']?.toString() ?? '')?.toLocal(),
+      deletedAt:
+          DateTime.tryParse(m['deleted_at']?.toString() ?? '')?.toLocal(),
     );
   }
 }
@@ -578,14 +625,55 @@ abstract final class ChatApi {
     ));
   }
 
-  /// Delete a single message by id. Used by "long-press → delete" on a
-  /// message the user sent — it removes the row, so the message is gone
-  /// for both sides (an "unsend"). RLS decides what the caller may
-  /// actually delete: a row the user isn't allowed to touch is simply
-  /// left untouched.
+  /// Modifie le texte de MON message [messageId] et le marque `edited_at`.
+  /// Si la colonne n'existe pas encore (migration 0083 pas appliquée), on lève :
+  /// mieux vaut refuser que modifier sans le marquer. Un message déjà supprimé
+  /// ne se modifie pas.
+  static Future<void> editMessage(String messageId, String newBody) async {
+    if (messageId.isEmpty || newBody.trim().isEmpty) {
+      throw ArgumentError('modification vide');
+    }
+    try {
+      await _client
+          .from('messages')
+          .update({
+            'body': newBody,
+            'edited_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', messageId)
+          .isFilter('deleted_at', null);
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST204' ||
+          e.message.contains('edited_at') ||
+          e.message.contains('deleted_at')) {
+        throw StateError('modification indisponible');
+      }
+      rethrow;
+    }
+  }
+
+  /// Supprime MON message [messageId] : suppression DOUCE. Le contenu (texte,
+  /// image, vocal, photo Discover) est réellement effacé en base ; la ligne
+  /// reste, marquée `deleted_at`, pour que chacun voie la trace « message
+  /// supprimé ». Si la colonne n'existe pas encore (migration 0083), on retombe
+  /// sur l'ancienne suppression : la ligne disparaît pour les deux côtés.
   static Future<void> deleteMessage(String messageId) async {
     if (messageId.isEmpty) return;
-    await _client.from('messages').delete().eq('id', messageId);
+    try {
+      await _client.from('messages').update({
+        'deleted_at': DateTime.now().toUtc().toIso8601String(),
+        // Vides, pas nuls : ces colonnes sont `not null default ''` (un message
+        // texte porte '' dans image_url / discover_photo), un null serait refusé.
+        'body': '',
+        'image_url': '',
+        'audio_url': '',
+        'audio_duration_ms': 0,
+        'discover_photo': '',
+      }).eq('id', messageId);
+    } on PostgrestException catch (e) {
+      if (e.code != 'PGRST204' && !e.message.contains('deleted_at')) rethrow;
+      await _client.from('messages').delete().eq('id', messageId);
+    }
   }
 
   /// Latest message per conversation that involves [meId]. Used by the

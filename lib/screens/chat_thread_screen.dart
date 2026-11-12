@@ -256,10 +256,119 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// Ce que JE lis du message cité (traduit s'il est étranger).
   String _quoteText(ChatMessage q) => _displayBodyFor(q).trim();
 
+  // ── Modifier un message ──────────────────────────────────────────────────
+  /// Le message que je modifie (bandeau + champ pré-rempli), ou null.
+  ChatMessage? _editing;
+
+  /// Combien de temps après l'envoi un message reste modifiable. Une seule
+  /// constante : à changer ici (ou à retirer de [_canEdit] pour « illimité »).
+  static const Duration kMessageEditWindow = Duration(minutes: 15);
+
+  /// Seuls MES messages TEXTE, récents, se modifient : pas un vocal (son
+  /// `body` est la transcription), ni une image / un GIF, ni un message
+  /// spécial, ni une photo Discover.
+  bool _canEdit(ChatMessage m) =>
+      m.senderId == _myId &&
+      !m.isDeleted &&
+      !m.isVoice &&
+      !m.isImage &&
+      !m.isSpecial &&
+      !m.hasDiscoverPhoto &&
+      m.body.trim().isNotEmpty &&
+      DateTime.now().difference(m.createdAt) < kMessageEditWindow;
+
+  void _startEdit(ChatMessage m) {
+    if (!_canEdit(m)) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _editing = m;
+      _replyTo = null;
+    });
+    // Ce que J'AI écrit, jamais la version traduite.
+    _inputCtrl.value = TextEditingValue(
+      text: m.body,
+      selection: TextSelection.collapsed(offset: m.body.length),
+    );
+    Analytics.track('message_edit_start');
+  }
+
+  void _cancelEdit() {
+    if (_editing == null) return;
+    setState(() => _editing = null);
+    _inputCtrl.clear();
+  }
+
+  /// Valide la modification : jamais de suppression par un champ vide, rien ne
+  /// part si le texte n'a pas changé. En cas d'échec le mode « modifier »
+  /// reste actif.
+  Future<void> _submitEdit() async {
+    final m = _editing;
+    if (m == null) return;
+    final body = _inputCtrl.text.trim();
+    if (body.isEmpty || _sending) return;
+    if (body == m.body.trim()) {
+      _cancelEdit();
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      await ChatApi.editMessage(m.id, body);
+      if (!mounted) return;
+      setState(() {
+        _messages = [
+          for (final x in _messages)
+            x.id == m.id ? x.copyWith(body: body, editedAt: DateTime.now()) : x,
+        ];
+        _editing = null;
+      });
+      _inputCtrl.clear();
+      HapticFeedback.lightImpact();
+      SwaycoSounds.play(SwSound.msgSent);
+      Analytics.track('message_edited');
+      // Le corps a changé : l'ancienne traduction est fausse.
+      if (_autoTranslate) {
+        for (final x in _messages) {
+          if (x.id == m.id) _maybeFetchTranslation(x);
+        }
+      }
+    } catch (e) {
+      HapticFeedback.vibrate();
+      SwaycoSounds.play(SwSound.error);
+      if (mounted) setState(() => _error = AppStrings.t('chat_send_failed'));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  /// Le pair vient de supprimer le message auquel je réponds ou que je
+  /// modifie : le bandeau se ferme.
+  void _dropDeadTargets(List<ChatMessage> rows) {
+    final r = _replyTo;
+    final e = _editing;
+    if (r == null && e == null) return;
+    bool dead(ChatMessage? t) =>
+        t != null && rows.any((x) => x.id == t.id && x.isDeleted);
+    final dropReply = dead(r);
+    final dropEdit = dead(e);
+    if (!dropReply && !dropEdit) return;
+    setState(() {
+      if (dropReply) _replyTo = null;
+      if (dropEdit) _editing = null;
+    });
+    if (dropEdit) _inputCtrl.clear();
+  }
+
   void _startReply(ChatMessage m, {required String via}) {
+    if (m.isDeleted) return;
     if (m.isSpecial && m.senderId != _myId) return;
     HapticFeedback.selectionClick();
-    setState(() => _replyTo = m);
+    final wasEditing = _editing != null;
+    setState(() {
+      _replyTo = m;
+      _editing = null;
+    });
+    // Le champ contenait le texte à modifier : on le vide.
+    if (wasEditing) _inputCtrl.clear();
     Analytics.track(
       'message_reply',
       props: {'via': via, 'type': _typeOf(m)},
@@ -362,7 +471,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       !_peerBlockedMe &&
       !_matchedWithPeer &&
       !_specialHandled.contains(widget.peerDeviceId) &&
-      _messages.any((m) => m.isSpecial && m.senderId != _myId) &&
+      _messages.any((m) => m.isSpecial && !m.isDeleted && m.senderId != _myId) &&
       !_messages.any((m) => m.senderId == _myId);
 
   /// Accepter : on ecrit a l'expediteur (le champ revient) et une demande
@@ -373,6 +482,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     setState(() {
       _specialBusy = true;
       _replyTo = null;
+      _editing = null;
       _specialHandled = {..._specialHandled, widget.peerDeviceId};
     });
     await SpecialRequest.markHandled(_myId, widget.peerDeviceId);
@@ -647,10 +757,19 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     });
   }
 
+  /// Clé du cache de traduction d'un message : son id, et la date de sa
+  /// dernière modification quand il a été modifié. Le corps change, donc la
+  /// traduction d'avant (en mémoire comme sur le disque) n'est plus la bonne :
+  /// une nouvelle clé en force une nouvelle.
+  String _tKey(ChatMessage m) => m.editedAt == null
+      ? m.id
+      : '${m.id}:${m.editedAt!.millisecondsSinceEpoch}';
+
   void _maybeFetchTranslation(ChatMessage m) {
     if (!_autoTranslate || _myLang.isEmpty) return;
-    final id = m.id;
-    if (id.isEmpty) return;
+    if (m.isDeleted) return;
+    final id = _tKey(m);
+    if (m.id.isEmpty) return;
     // Pas de texte (un vocal pas encore transcrit, une image) : rien à traduire.
     // Sans ça, « traduire du vide » était mémorisé et le texte, une fois arrivé,
     // n'était plus jamais traduit.
@@ -659,7 +778,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     if (lang == _myLang) return; // already in my language
     if (_translations.containsKey(id) || _translatingIds.contains(id)) return;
     _translatingIds.add(id);
-    final history = _historyBefore(id);
+    final history = _historyBefore(m.id);
     final ctx = _buildContext();
     () async {
       try {
@@ -685,7 +804,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         if (out.isNotEmpty &&
             out != m.body &&
             _messages.isNotEmpty &&
-            _messages.last.id == id) {
+            _messages.last.id == m.id) {
           SwaycoSounds.play(SwSound.translation);
         }
         if (out.isNotEmpty && out != m.body) {
@@ -715,7 +834,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
 
   String _displayBodyFor(ChatMessage m) {
     if (!_autoTranslate) return m.body;
-    final translated = _translations[m.id];
+    final translated = _translations[_tKey(m)];
     if (translated != null && translated.isNotEmpty) return translated;
     return m.body;
   }
@@ -867,6 +986,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           // banner (never cleared before) would otherwise sit there forever.
           _error = null;
         });
+        // Le pair a supprimé le message auquel je réponds / que je modifie.
+        _dropDeadTargets(rows);
         // Lu, puisque le fil est SOUS LES YEUX. Le point de lecture n'était
         // posé qu'à l'ouverture : un message reçu pendant qu'on lisait
         // rallumait le badge de la barre de nav derrière l'écran ouvert, et il
@@ -970,6 +1091,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           _messagesLoaded = true;
           _reactionsByMessage = nextReactions;
         });
+        _dropDeadTargets(rows);
         if (_autoTranslate) {
           for (final m in rows) {
             _maybeFetchTranslation(m);
@@ -1070,6 +1192,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   }
 
   Future<void> _send() async {
+    // Mode « modifier » : le rond d'envoi valide la modification.
+    if (_editing != null) {
+      await _submitEdit();
+      return;
+    }
     final body = _inputCtrl.text.trim();
     if (body.isEmpty || _sending) return;
     if (_myId.isEmpty) return;
@@ -1464,6 +1591,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             replyPreview:
                                 _replyTo == null ? '' : _quoteText(_replyTo!),
                             onCancelReply: _cancelReply,
+                            editing: _editing,
+                            onCancelEdit: _cancelEdit,
                           ),
                         ],
                       ),
@@ -1495,13 +1624,25 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     try {
       await ChatApi.deleteMessage(m.id);
       if (!mounted) return;
+      // Le message ne disparaît plus : il devient une trace « supprimé », pour
+      // moi et pour le pair (le contenu, lui, est vraiment effacé en base).
       setState(() {
-        _messages = _messages.where((x) => x.id != m.id).toList();
+        _messages = [
+          for (final x in _messages)
+            x.id == m.id
+                ? x.copyWith(deletedAt: DateTime.now(), clearMedia: true)
+                : x,
+        ];
         final next = Map<String, List<MessageReaction>>.from(
           _reactionsByMessage,
         );
         next.remove(m.id);
         _reactionsByMessage = next;
+        if (_replyTo?.id == m.id) _replyTo = null;
+        if (_editing?.id == m.id) {
+          _editing = null;
+          _inputCtrl.clear();
+        }
       });
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.deleted);
@@ -1645,7 +1786,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       final last = _messages.last;
       final reacted = (_reactionsByMessage[last.id] ?? const [])
           .any((r) => r.userId == _myId);
-      if (!reacted && last.id.isNotEmpty) quickReactId = last.id;
+      if (!reacted && !last.isDeleted && last.id.isNotEmpty) {
+        quickReactId = last.id;
+      }
     }
 
     // Local TTS is local — no cloud cost, available to all tiers.
@@ -1696,7 +1839,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         final mine = m.senderId == _myId;
         final display = _displayBodyFor(m);
         // Une carte spéciale reçue a ses propres boutons : on n'y répond pas.
-        final replyable = !(m.isSpecial && !mine);
+        // Un message supprimé n'est plus une cible : ni réponse, ni menu.
+        final replyable = !(m.isSpecial && !mine) && !m.isDeleted;
         // Le message cité : dans la fenêtre chargée, sinon lu une fois.
         ChatMessage? quoted;
         var quotedMissing = false;
@@ -1710,15 +1854,19 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
               _loadQuote(m.replyToId);
             }
           }
+          // Le message cité a été supprimé depuis : « Message supprimé », et
+          // toucher la citation ne mène plus nulle part.
+          if (quoted?.isDeleted == true) quotedMissing = true;
         }
         final bubble = _MessageBubble(
           onReply: replyable ? () => _startReply(m, via: 'menu') : null,
+          onEdit: _canEdit(m) ? () => _startEdit(m) : null,
           onReport: mine ? null : _reportPeer,
           quoted: quoted,
           quotedMissing: quotedMissing,
           quotedName: quoted == null ? '' : _quoteAuthor(quoted),
           quotedText: quoted == null ? '' : _quoteText(quoted),
-          onTapQuote: quoted == null
+          onTapQuote: quoted == null || quotedMissing
               ? null
               : () => _scrollToMessage(quoted!.id),
           flash: m.id == _flashId,
@@ -1731,7 +1879,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
               display.trim().isNotEmpty &&
               display.trim() != m.body.trim(),
           showQuickReactions: m.id == quickReactId,
-          translating: _translatingIds.contains(m.id),
+          translating: _translatingIds.contains(_tKey(m)),
           reactions: _reactionsByMessage[m.id] ?? const [],
           myId: _myId,
           onReact: (emoji) => _react(m, emoji),
@@ -1745,10 +1893,39 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
             key: ValueKey(m.id),
             mine: mine,
             animate: _entrance.take(m.id),
-            child: SwipeToReply(
-              enabled: replyable,
-              onReply: () => _startReply(m, via: 'swipe'),
-              child: bubble,
+            // Normal → supprimé : un fondu de 220 ms plutôt qu'un changement sec
+            // (le premier affichage d'une trace déjà là ne s'anime pas).
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SizeTransition(
+                  sizeFactor: anim,
+                  axisAlignment: -1,
+                  child: child,
+                ),
+              ),
+              child: m.isDeleted
+                  ? DeletedBubble(
+                      key: const ValueKey('deleted'),
+                      mine: mine,
+                      text: mine
+                          ? AppStrings.t('msg_deleted_mine')
+                          : (_peerFirstName.isEmpty
+                              ? AppStrings.t('msg_deleted_peer_anon')
+                              : AppStrings.t(
+                                  'msg_deleted_peer',
+                                  args: {'name': _peerFirstName},
+                                )),
+                      time: '${m.createdAt.hour.toString().padLeft(2, '0')}:'
+                          '${m.createdAt.minute.toString().padLeft(2, '0')}',
+                    )
+                  : SwipeToReply(
+                      key: const ValueKey('live'),
+                      enabled: replyable,
+                      onReply: () => _startReply(m, via: 'swipe'),
+                      child: bubble,
+                    ),
             ),
           ),
         );
@@ -2141,6 +2318,7 @@ class _MessageBubble extends StatefulWidget {
     this.showQuickReactions = false,
     this.read = false,
     this.onReply,
+    this.onEdit,
     this.onReport,
     this.quoted,
     this.quotedMissing = false,
@@ -2155,6 +2333,9 @@ class _MessageBubble extends StatefulWidget {
   /// « Répondre » du menu de l'appui long (null = pas de réponse possible, ex.
   /// une carte spéciale reçue).
   final VoidCallback? onReply;
+
+  /// « Modifier » du menu : mes messages texte récents seulement.
+  final VoidCallback? onEdit;
 
   /// « Signaler » du menu — messages REÇUS seulement.
   final VoidCallback? onReport;
@@ -2274,11 +2455,23 @@ class _MessageBubbleState extends State<_MessageBubble> {
   List<ChatMenuItem> _menuItems() {
     void close() => _MessageBubble.dismissActivePicker();
     return [
+      // « Modifier » en tête, et c'est lui qui prend le style mis en avant ;
+      // « Répondre » repasse alors en ligne neutre.
+      if (widget.onEdit != null)
+        ChatMenuItem(
+          label: AppStrings.t('chat_edit'),
+          icon: Icons.edit_rounded,
+          kind: ChatMenuKind.reply,
+          onTap: () {
+            close();
+            widget.onEdit!();
+          },
+        ),
       if (widget.onReply != null)
         ChatMenuItem(
           label: AppStrings.t('chat_reply'),
           icon: Icons.reply_rounded,
-          kind: ChatMenuKind.reply,
+          kind: widget.onEdit != null ? ChatMenuKind.normal : ChatMenuKind.reply,
           onTap: () {
             close();
             widget.onReply!();
@@ -2796,6 +2989,14 @@ class _MessageBubbleState extends State<_MessageBubble> {
     // l'heure seule sinon. Le lien bascule la bulle entre la traduction et
     // le texte tel qu'il a été écrit.
     final metaColor = SC.textPrimary.withValues(alpha: 0.5);
+    // « ✎ modifié · » en tête de la ligne d'heure d'un message modifié.
+    final editedMark = message.isEdited
+        ? <Widget>[
+            Icon(Icons.edit_rounded, size: 13, color: metaColor),
+            const SizedBox(width: 4),
+            Text('${AppStrings.t('msg_edited')} · '),
+          ]
+        : const <Widget>[];
     final meta = Padding(
       padding: EdgeInsets.only(
         top: 4,
@@ -2808,6 +3009,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  ...editedMark,
                   Text('${AppStrings.t('msg_translated')} · '),
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -2828,10 +3030,16 @@ class _MessageBubbleState extends State<_MessageBubble> {
                   Text(' · $time'),
                 ],
               )
-            : Text(
-                widget.read
-                    ? '$time · ${AppStrings.t('chat_read').toLowerCase()}'
-                    : time,
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ...editedMark,
+                  Text(
+                    widget.read
+                        ? '$time · ${AppStrings.t('chat_read').toLowerCase()}'
+                        : time,
+                  ),
+                ],
               ),
       ),
     );
@@ -3484,7 +3692,16 @@ class _Composer extends StatefulWidget {
     this.replyLabel = '',
     this.replyPreview = '',
     this.onCancelReply,
+    this.editing,
+    this.onCancelEdit,
   });
+
+  /// Le message que je modifie : un bandeau « MODIFIER LE MESSAGE » remplace
+  /// celui de la citation, le rond d'envoi devient une coche, et la pastille
+  /// GIF / le bouton photo se masquent (un texte ne se remplace pas par une
+  /// image).
+  final ChatMessage? editing;
+  final VoidCallback? onCancelEdit;
 
   /// Le message auquel je réponds : un bandeau « RÉPONDRE À… » se pose
   /// au-dessus du champ (et y reste pendant un enregistrement vocal).
@@ -3595,8 +3812,9 @@ class _ComposerState extends State<_Composer>
   bool _gestureDone = false;
   bool _finishing = false;
 
-  /// Le rond jaune montre le micro : champ vide.
-  bool get _micMode => !_hasText;
+  /// Le rond jaune montre le micro : champ vide, et pas en train de modifier un
+  /// message (là, c'est la coche, jamais le micro).
+  bool get _micMode => !_hasText && widget.editing == null;
 
   void _onVoiceChanged() {
     final s = _voice.state;
@@ -3781,8 +3999,8 @@ class _ComposerState extends State<_Composer>
     }
     // Une réponse vient d'être lancée : le clavier s'ouvre (pas pendant un
     // enregistrement vocal, où le champ n'est pas à l'écran).
-    if (old.replyTo == null &&
-        widget.replyTo != null &&
+    if (((old.replyTo == null && widget.replyTo != null) ||
+            (old.editing == null && widget.editing != null)) &&
         _voice.state == VoiceRecState.idle) {
       _focus.requestFocus();
     }
@@ -3863,6 +4081,7 @@ class _ComposerState extends State<_Composer>
         ? _buildLockedPanel()
         : _buildIdleBar();
     final reply = widget.replyTo;
+    final editing = widget.editing;
     // Le bandeau de citation, au-dessus de la barre (champ, enregistrement ou
     // verrouillé : il reste affiché, on peut répondre PAR un vocal). L'AnimatedSize
     // est toujours là : la barre garde sa place dans l'arbre, donc son geste
@@ -3875,17 +4094,26 @@ class _ComposerState extends State<_Composer>
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
           alignment: Alignment.bottomCenter,
-          child: reply == null
-              ? const SizedBox(width: double.infinity)
-              : Padding(
+          // Jamais les deux : modifier prime (il vide la citation).
+          child: editing != null
+              ? Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
-                  child: ReplyBar(
-                    message: reply,
-                    label: widget.replyLabel,
-                    text: widget.replyPreview,
-                    onCancel: widget.onCancelReply ?? () {},
+                  child: EditBar(
+                    originalText: editing.body,
+                    onCancel: widget.onCancelEdit ?? () {},
                   ),
-                ),
+                )
+              : reply == null
+                  ? const SizedBox(width: double.infinity)
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                      child: ReplyBar(
+                        message: reply,
+                        label: widget.replyLabel,
+                        text: widget.replyPreview,
+                        onCancel: widget.onCancelReply ?? () {},
+                      ),
+                    ),
         ),
         bar,
       ],
@@ -4064,7 +4292,9 @@ class _ComposerState extends State<_Composer>
                     ),
                     // La photo, à droite DANS le champ — la place de l'emoji
                     // de la maquette 1b (le chat n'a pas de sélecteur
-                    // d'emoji ; il a l'envoi de photo).
+                    // d'emoji ; il a l'envoi de photo). Masquée pendant une
+                    // modification : un texte ne se remplace pas par une image.
+                    if (widget.editing == null)
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: widget.sending ? null : widget.onSendImage,
@@ -4103,10 +4333,14 @@ class _ComposerState extends State<_Composer>
             else
               _CircleActionButton(
                 send: _hasText,
+                check: widget.editing != null,
                 busy: widget.sending,
+                // Modifier : coche, jamais le GIF ; champ vide = rien ne part.
                 onTap: widget.sending
                     ? null
-                    : (_hasText ? widget.onSend : widget.onSendGif),
+                    : (_hasText
+                        ? widget.onSend
+                        : (widget.editing != null ? null : widget.onSendGif)),
               ),
           ],
         ),
@@ -4623,6 +4857,7 @@ class _CircleActionButton extends StatelessWidget {
     required this.send,
     required this.busy,
     required this.onTap,
+    this.check = false,
   });
 
   /// Text typed → the send arrow; empty field → « GIF ».
@@ -4630,10 +4865,21 @@ class _CircleActionButton extends StatelessWidget {
   final bool busy;
   final VoidCallback? onTap;
 
+  /// Mode « modifier » : la coche (taille 30) remplace la flèche, et le rond
+  /// s'éteint (40 %) tant que le champ est vide.
+  final bool check;
+
   @override
   Widget build(BuildContext context) {
     // Le rond d'origine : jaune plein 46, icône GIF (flèche d'envoi dès
     // qu'il y a du texte).
+    return Opacity(
+      opacity: check && !send ? 0.4 : 1,
+      child: _circle(),
+    );
+  }
+
+  Widget _circle() {
     return Material(
       color: SC.accent,
       shape: const CircleBorder(),
@@ -4662,7 +4908,14 @@ class _CircleActionButton extends StatelessWidget {
                       scale: anim,
                       child: FadeTransition(opacity: anim, child: child),
                     ),
-                    child: send
+                    child: check
+                        ? Icon(
+                            Icons.check_rounded,
+                            key: const ValueKey('check'),
+                            color: SC.onAccent,
+                            size: 30,
+                          )
+                        : send
                         ? Icon(
                             Icons.send_rounded,
                             key: const ValueKey('send'),
