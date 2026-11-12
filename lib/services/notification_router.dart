@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'analytics.dart';
+
 /// One tapped-notification routing intent — the FCM `type`
 /// (e.g. 'live_call', 'message', 'incoming_call') plus its data payload.
 class NotificationIntent {
@@ -29,6 +31,12 @@ abstract final class NotificationRouter {
     if (data == null) return;
     final type = data['type']?.toString().trim() ?? '';
     if (type.isEmpty) return;
+    // « L'app a été ouverte depuis une notification » : seulement son TYPE
+    // (message, demande d'ami…), jamais le contenu ni la personne. Sert à savoir
+    // ce qui fait revenir les gens.
+    try {
+      Analytics.track('notification_open', props: {'type': type});
+    } catch (_) {}
     pending.value = NotificationIntent(type: type, data: data);
   }
 
