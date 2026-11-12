@@ -22,9 +22,7 @@ import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/debug_overlay.dart';
 import '../services/device_id.dart';
-import '../services/languages.dart';
 import '../services/last_interaction.dart';
-import '../services/locations.dart';
 import '../services/muted_calls.dart';
 import '../services/friendship_api.dart';
 import '../services/guest_invite_api.dart';
@@ -1322,9 +1320,6 @@ class _SpecialChatRow extends StatelessWidget {
         : (profile.handle.isNotEmpty
             ? '@${profile.handle}'
             : AppStrings.t('chat_no_name'));
-    final flag = countryFlagFor(profile.country) ??
-        findLanguageByCode(profile.language)?.flag ??
-        '';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: GestureDetector(
@@ -1369,8 +1364,11 @@ class _SpecialChatRow extends StatelessWidget {
                           avatarUrl: profile.avatarUrl,
                           fallbackUrl: profile.fallbackPhotoUrl,
                           size: 50,
-                          showSeal: profile.isVerified,
-                          sealRingColor: fill,
+                          // Le drapeau du pays, à la place de la pastille.
+                          flagIso: profileFlagIso(
+                            country: profile.country,
+                            language: profile.language,
+                          ),
                         ),
                       ),
                       Positioned(
@@ -1418,14 +1416,6 @@ class _SpecialChatRow extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (flag.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 5),
-                              child: Text(
-                                flag,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ),
                           const SizedBox(width: 7),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -1789,7 +1779,10 @@ class _FriendChatRow extends StatelessWidget {
                     avatarUrl: profile.avatarUrl,
                     fallbackUrl: profile.fallbackPhotoUrl,
                     size: 52,
-                    showSeal: profile.isVerified,
+                    flagIso: profileFlagIso(
+                      country: profile.country,
+                      language: profile.language,
+                    ),
                   ),
                   if (_peerOnline)
                     Positioned(
@@ -1835,16 +1828,6 @@ class _FriendChatRow extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Builder(builder: (context) {
-                        final flag = countryFlagFor(profile.country) ??
-                            findLanguageByCode(profile.language)?.flag ??
-                            '';
-                        if (flag.isEmpty) return const SizedBox.shrink();
-                        return Padding(
-                          padding: const EdgeInsets.only(left: 5),
-                          child: Text(flag, style: const TextStyle(fontSize: 14)),
-                        );
-                      }),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -1981,9 +1964,6 @@ class _SearchResultRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final flag = countryFlagFor(profile.country) ??
-        findLanguageByCode(profile.language)?.flag ??
-        '';
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -1995,7 +1975,10 @@ class _SearchResultRow extends StatelessWidget {
               avatarUrl: profile.avatarUrl,
               fallbackUrl: profile.fallbackPhotoUrl,
               size: 46,
-              showSeal: profile.isVerified,
+              flagIso: profileFlagIso(
+                country: profile.country,
+                language: profile.language,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -2019,10 +2002,6 @@ class _SearchResultRow extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (flag.isNotEmpty) ...[
-                        const SizedBox(width: 5),
-                        Text(flag, style: const TextStyle(fontSize: 14)),
-                      ],
                     ],
                   ),
                   if (profile.handle.isNotEmpty)

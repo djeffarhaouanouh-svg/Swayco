@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../services/languages.dart';
+import '../services/locations.dart';
 import '../theme/swayco_theme.dart';
 import 'swayco_seal.dart';
+
+/// Code ISO du drapeau à poser sur la photo de quelqu'un : celui de son PAYS ;
+/// à défaut de pays connu, celui de sa langue. Vide si rien ne s'applique.
+String profileFlagIso({required String country, required String language}) {
+  final iso = countryIso2For(country);
+  if (iso.isNotEmpty) return iso;
+  return findLanguageByCode(language)?.countryCode ?? '';
+}
 
 /// Reusable circular avatar: shows the network photo when [avatarUrl] is
 /// provided, falls back to the first letter of [displayName] on a colored
@@ -18,7 +28,13 @@ class ProfileAvatar extends StatelessWidget {
     this.onTap,
     this.showSeal = false,
     this.sealRingColor,
+    this.flagIso = '',
   });
+
+  /// Code ISO d'un pays (`jp`) : pose son drapeau rond, cerclé de blanc, sur le
+  /// coin bas-droit de la photo. Il prend la place de la pastille [showSeal]
+  /// (jamais les deux). Vide = pas de drapeau.
+  final String flagIso;
 
   /// Public URL of the uploaded avatar. Null / empty → fall back to the
   /// colored-letter placeholder.
@@ -135,7 +151,36 @@ class ProfileAvatar extends StatelessWidget {
 
     // La pastille déborde de la photo (-12, -3) : le cercle rogne ses enfants,
     // donc elle vit dans une pile à part qui, elle, ne rogne pas.
-    final Widget avatar = !showSeal
+    final flagD = (size * 0.42).clamp(18.0, 30.0);
+    final Widget avatar = flagIso.isNotEmpty
+        ? Stack(
+            clipBehavior: Clip.none,
+            children: [
+              circle,
+              Positioned(
+                right: -3,
+                bottom: -3,
+                child: Container(
+                  width: flagD,
+                  height: flagD,
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: ClipOval(
+                    child: Image.network(
+                      'https://flagcdn.com/w80/${flagIso.toLowerCase()}.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) =>
+                          const ColoredBox(color: Color(0xFFE5E7EB)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          )
+        : !showSeal
         ? circle
         : Stack(
             clipBehavior: Clip.none,

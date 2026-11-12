@@ -26,7 +26,6 @@ import '../services/special_request.dart';
 import '../services/message_reactions.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
-import '../services/locations.dart';
 import '../services/open_thread.dart';
 import '../services/peer_local_time.dart';
 import '../services/profile_api.dart';
@@ -2146,8 +2145,11 @@ class _ThreadHeader extends StatelessWidget {
                     avatarUrl: peer?.avatarUrl,
                     fallbackUrl: peer?.fallbackPhotoUrl,
                     size: 44,
-                    showSeal: peer?.isVerified ?? false,
-                    sealRingColor: SC.bgDeep,
+                    // Le drapeau du pays, à la place de la pastille certifiée.
+                    flagIso: profileFlagIso(
+                      country: peer?.country ?? '',
+                      language: peer?.language ?? '',
+                    ),
                   ),
                   // En haut à droite : le coin du bas est à la pastille.
                   if (_peerOnline)
@@ -2189,14 +2191,7 @@ class _ThreadHeader extends StatelessWidget {
                   );
                   // Local copy so the null check promotes (field `clock` cannot).
                   final peerClock = clock;
-                  // Country flag once the peer's country is known (the spoken
-                  // language doesn't always match the country); language
-                  // flag otherwise.
-                  final flag = countryFlagFor(peer?.country ?? '') ??
-                      (peer?.language.trim().isNotEmpty ?? false
-                          ? findLanguageByCode(peer!.language)?.flag
-                          : null) ??
-                      '';
+                  // Le drapeau n'est plus à côté du nom : il est sur la photo.
                   return GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: onViewProfile,
@@ -2215,10 +2210,6 @@ class _ThreadHeader extends StatelessWidget {
                                 style: nameStyle,
                               ),
                             ),
-                            if (flag.isNotEmpty) ...[
-                              const SizedBox(width: 6),
-                              Text(flag, style: const TextStyle(fontSize: 15)),
-                            ],
                           ],
                         ),
                         if (peerClock != null)
