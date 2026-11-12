@@ -24,6 +24,7 @@ class ChatMessage {
     this.audioDurationMs = 0,
     this.discoverPhoto = '',
     this.special = false,
+    this.replyToId = '',
   });
 
   final String id;
@@ -66,6 +67,13 @@ class ChatMessage {
   /// `special`, migration 0065).
   final bool special;
 
+  /// Id du message auquel celui-ci répond (`reply_to_id`, migration 0082).
+  /// Vide si ce n'est pas une réponse, ou si la colonne n'existe pas encore.
+  final String replyToId;
+
+  /// Ce message est une réponse (il cite un autre message).
+  bool get isReply => replyToId.isNotEmpty;
+
   /// Un message special recu : carte speciale + demande Accepter / Refuser.
   bool get isSpecial => special;
 
@@ -99,6 +107,7 @@ class ChatMessage {
       audioDurationMs: (m['audio_duration_ms'] as num?)?.toInt() ?? 0,
       discoverPhoto: m['discover_photo']?.toString() ?? '',
       special: m['special'] == true,
+      replyToId: m['reply_to_id']?.toString() ?? '',
     );
   }
 }
@@ -233,6 +242,57 @@ abstract final class ChatApi {
         .toList(growable: false);
   }
 
+  /// Un message cité tel qu'on le relit : `null` quand il n'existe plus
+  /// (supprimé). Une lecture qui ÉCHOUE (réseau) lève, pour ne pas la prendre
+  /// pour un message supprimé. Sert quand la cible d'une réponse est plus
+  /// ancienne que la fenêtre chargée par [fetchMessages].
+  static Future<ChatMessage?> fetchMessage(String id) async {
+    if (id.isEmpty) return null;
+    final row = await _client
+        .from('messages')
+        .select()
+        .eq('id', id)
+        .maybeSingle();
+    if (row == null) return null;
+    return ChatMessage.fromMap(Map<String, dynamic>.from(row));
+  }
+
+  /// Insère [row] dans `messages`. Si une colonne de [optional] n'existe pas
+  /// encore en base (migration pas appliquée : `PGRST204` ou son nom dans le
+  /// message), elle est retirée et l'envoi est retenté : le message part sans
+  /// ce marquage plutôt que d'échouer. Rend l'id inséré si [returnId].
+  static Future<String> _insertRow(
+    Map<String, dynamic> row, {
+    List<String> optional = const [],
+    bool returnId = false,
+  }) async {
+    while (true) {
+      try {
+        if (returnId) {
+          final inserted =
+              await _client.from('messages').insert(row).select('id').single();
+          return inserted['id']?.toString() ?? '';
+        }
+        await _client.from('messages').insert(row);
+        return '';
+      } on PostgrestException catch (e) {
+        final present = [for (final c in optional) if (row.containsKey(c)) c];
+        String? culprit;
+        for (final c in present) {
+          if (e.message.contains(c)) {
+            culprit = c;
+            break;
+          }
+        }
+        if (culprit == null && e.code == 'PGRST204' && present.isNotEmpty) {
+          culprit = present.first;
+        }
+        if (culprit == null) rethrow;
+        row.remove(culprit);
+      }
+    }
+  }
+
   static Future<void> sendMessage({
     required String conversationId,
     required String senderId,
@@ -245,6 +305,8 @@ abstract final class ChatApi {
     // Discover direct message (no friendship): the push is a generic
     // "special message" teaser (under the sender's name) instead of the text.
     bool special = false,
+    // Message auquel on répond (`reply_to_id`) ; vide = message ordinaire.
+    String replyToId = '',
   }) async {
     // The insert FK-references my profiles row (messages_sender_fkey); make
     // sure it exists first, else a launch that skipped the profile sync
@@ -261,18 +323,11 @@ abstract final class ChatApi {
       // so the "one message per photo" rule survives restarts.
       if (discoverPhoto.isNotEmpty) 'discover_photo': discoverPhoto,
       if (special) 'special': true,
+      if (replyToId.isNotEmpty) 'reply_to_id': replyToId,
     };
-    try {
-      await _client.from('messages').insert(row);
-    } on PostgrestException catch (e) {
-      // Colonne `special` absente (migration 0065 pas encore appliquee) : on
-      // envoie quand meme, sans le marquage.
-      if (!special || !(e.message.contains('special') || e.code == 'PGRST204')) {
-        rethrow;
-      }
-      row.remove('special');
-      await _client.from('messages').insert(row);
-    }
+    // Colonne `special` (migration 0065) ou `reply_to_id` (0082) absente : on
+    // envoie quand même, sans le marquage / sans la citation.
+    await _insertRow(row, optional: const ['special', 'reply_to_id']);
     // Fire-and-forget push to the recipient, localised into THEIR language.
     // Best-effort; never block or fail the send on a notification hiccup.
     // [recipientLang] is passed by the chat thread (peer profile already in
@@ -338,6 +393,7 @@ abstract final class ChatApi {
     required Uint8List bytes,
     String contentType = 'image/jpeg',
     String recipientLang = '',
+    String replyToId = '',
   }) async {
     if (bytes.isEmpty) throw ArgumentError('image vide');
     final ext = contentType.endsWith('png') ? 'png' : 'jpg';
@@ -355,17 +411,21 @@ abstract final class ChatApi {
     final url = _client.storage.from('avatars').getPublicUrl(path);
     // Self-heal my profiles row before the FK-bound insert (see sendMessage).
     await ProfileApi.ensureMyProfileRow();
-    await _client.from('messages').insert({
-      'conversation_id': conversationId,
-      'sender': senderId,
-      'recipient': recipientId,
-      'sender_name': senderName,
-      'body': '',
-      // `language` is NOT NULL with no default — an image carries no language,
-      // so stamp it empty (omitting it threw a 23502 not-null violation).
-      'language': '',
-      'image_url': url,
-    });
+    await _insertRow(
+      {
+        'conversation_id': conversationId,
+        'sender': senderId,
+        'recipient': recipientId,
+        'sender_name': senderName,
+        'body': '',
+        // `language` is NOT NULL with no default — an image carries no language,
+        // so stamp it empty (omitting it threw a 23502 not-null violation).
+        'language': '',
+        'image_url': url,
+        if (replyToId.isNotEmpty) 'reply_to_id': replyToId,
+      },
+      optional: const ['reply_to_id'],
+    );
     unawaited(_notifyMessage(
       recipientId: recipientId,
       recipientLang: recipientLang,
@@ -392,6 +452,7 @@ abstract final class ChatApi {
     String contentType = 'audio/mp4',
     String senderLang = '',
     String recipientLang = '',
+    String replyToId = '',
   }) async {
     if (bytes.isEmpty || durationMs <= 0) throw ArgumentError('vocal vide');
     final path = '$senderId/${DateTime.now().millisecondsSinceEpoch}.$ext';
@@ -416,22 +477,19 @@ abstract final class ChatApi {
       'language': '',
       'audio_url': url,
       'audio_duration_ms': durationMs,
+      if (replyToId.isNotEmpty) 'reply_to_id': replyToId,
     };
-    Map<String, dynamic> inserted;
-    try {
-      inserted = await _client.from('messages').insert(row).select('id').single();
-    } on PostgrestException catch (e) {
-      // Colonne de durée absente (migration 0081 pas encore appliquée) : le
-      // vocal part quand même, la bulle lira la durée dans le fichier.
-      if (!(e.message.contains('audio_duration_ms') || e.code == 'PGRST204')) {
-        rethrow;
-      }
-      row.remove('audio_duration_ms');
-      inserted = await _client.from('messages').insert(row).select('id').single();
-    }
+    // Colonne de durée absente (migration 0081) ou de citation (0082) pas encore
+    // appliquée : le vocal part quand même (la bulle lira la durée dans le
+    // fichier ; la réponse part sans citation).
+    final insertedId = await _insertRow(
+      row,
+      optional: const ['audio_duration_ms', 'reply_to_id'],
+      returnId: true,
+    );
     // Le texte arrive après coup : le backend transcrit, écrit `body`, et le
     // temps réel le pousse aux deux bulles.
-    unawaited(_transcribeVoice(inserted['id']?.toString() ?? '', senderLang));
+    unawaited(_transcribeVoice(insertedId, senderLang));
     unawaited(_notifyMessage(
       recipientId: recipientId,
       recipientLang: recipientLang,
@@ -487,20 +545,25 @@ abstract final class ChatApi {
     required String recipientId,
     required String gifUrl,
     String recipientLang = '',
+    String replyToId = '',
   }) async {
     if (gifUrl.isEmpty) throw ArgumentError('GIF sans URL');
     // Self-heal my profiles row before the FK-bound insert (see sendMessage).
     await ProfileApi.ensureMyProfileRow();
-    await _client.from('messages').insert({
-      'conversation_id': conversationId,
-      'sender': senderId,
-      'recipient': recipientId,
-      'sender_name': senderName,
-      'body': '',
-      // `language` est NOT NULL sans défaut : un GIF n'a pas de langue.
-      'language': '',
-      'image_url': gifUrl,
-    });
+    await _insertRow(
+      {
+        'conversation_id': conversationId,
+        'sender': senderId,
+        'recipient': recipientId,
+        'sender_name': senderName,
+        'body': '',
+        // `language` est NOT NULL sans défaut : un GIF n'a pas de langue.
+        'language': '',
+        'image_url': gifUrl,
+        if (replyToId.isNotEmpty) 'reply_to_id': replyToId,
+      },
+      optional: const ['reply_to_id'],
+    );
     unawaited(_notifyMessage(
       recipientId: recipientId,
       recipientLang: recipientLang,

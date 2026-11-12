@@ -41,6 +41,7 @@ import '../services/voice_wave.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
+import '../widgets/chat_reply_widgets.dart';
 import '../widgets/gif_picker_sheet.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/liquid_glass_button.dart';
@@ -213,6 +214,111 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   bool _sending = false;
   String? _error;
 
+  // ── Répondre à un message ────────────────────────────────────────────────
+  /// Le message auquel je réponds (bandeau au-dessus du champ), ou null.
+  ChatMessage? _replyTo;
+
+  /// Une clé par bulle, pour remonter à l'original quand on touche une citation.
+  final Map<String, GlobalKey> _msgKeys = {};
+
+  /// Messages cités hors de la fenêtre chargée (null = supprimé depuis).
+  final Map<String, ChatMessage?> _quoteCache = {};
+  final Set<String> _quoteLoading = {};
+
+  /// Bulle surlignée 900 ms après un saut vers l'original.
+  String? _flashId;
+  Timer? _flashTimer;
+
+  String _typeOf(ChatMessage m) =>
+      m.isVoice ? 'voice' : (m.isImage ? 'image' : 'text');
+
+  String get _peerFirstName =>
+      (_peer?.displayName.isNotEmpty == true ? _peer!.displayName : widget.title)
+          .trim()
+          .split(RegExp(r'\s+'))
+          .first;
+
+  /// Prénom + drapeau de la langue du pair (« AIKO 🇯🇵 »), ou « MOI » pour
+  /// mes propres messages.
+  String _quoteAuthor(ChatMessage q) {
+    if (q.senderId == _myId) return AppStrings.t('chat_reply_me').toUpperCase();
+    final flag = findLanguageByCode(_peer?.language ?? '')?.flag ?? '';
+    final name = _peerFirstName.toUpperCase();
+    return flag.isEmpty ? name : '$name $flag';
+  }
+
+  /// « 🇯🇵 » précédé d'une espace, ou rien si la langue du pair est inconnue.
+  String _flagSuffix() {
+    final flag = findLanguageByCode(_peer?.language ?? '')?.flag ?? '';
+    return flag.isEmpty ? '' : ' $flag';
+  }
+
+  /// Ce que JE lis du message cité (traduit s'il est étranger).
+  String _quoteText(ChatMessage q) => _displayBodyFor(q).trim();
+
+  void _startReply(ChatMessage m, {required String via}) {
+    if (m.isSpecial && m.senderId != _myId) return;
+    HapticFeedback.selectionClick();
+    setState(() => _replyTo = m);
+    Analytics.track(
+      'message_reply',
+      props: {'via': via, 'type': _typeOf(m)},
+    );
+  }
+
+  void _cancelReply() {
+    if (_replyTo != null) setState(() => _replyTo = null);
+  }
+
+  ChatMessage? _messageById(String id) {
+    for (final m in _messages) {
+      if (m.id == id) return m;
+    }
+    return null;
+  }
+
+  /// Lit UNE fois un message cité plus ancien que la fenêtre chargée.
+  void _loadQuote(String id) {
+    if (!_quoteLoading.add(id)) return;
+    ChatApi.fetchMessage(id).then((q) {
+      if (!mounted) return;
+      setState(() => _quoteCache[id] = q);
+    }).catchError((Object e) {
+      // Réseau : on ne conclut pas « supprimé » ; la citation reste en attente.
+      debugPrint('quote load failed: $e');
+    });
+  }
+
+  /// Toucher une citation : remonte au message d'origine, puis le surligne.
+  Future<void> _scrollToMessage(String id) async {
+    if (!_messages.any((m) => m.id == id)) return;
+    BuildContext? ctx = _msgKeys[id]?.currentContext;
+    // Hors de la zone construite : on remonte par pas jusqu'à ce que la bulle
+    // existe (liste inversée : un offset plus grand = plus ancien).
+    var tries = 0;
+    while (ctx == null && tries < 40 && mounted && _scrollCtrl.hasClients) {
+      final pos = _scrollCtrl.position;
+      if (pos.pixels >= pos.maxScrollExtent) break;
+      _scrollCtrl.jumpTo(math.min(pos.pixels + 700, pos.maxScrollExtent));
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+      ctx = _msgKeys[id]?.currentContext;
+      tries++;
+    }
+    if (!mounted || ctx == null || !ctx.mounted) return;
+    await Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      alignment: 0.35,
+    );
+    if (!mounted) return;
+    _flashTimer?.cancel();
+    setState(() => _flashId = id);
+    _flashTimer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _flashId = null);
+    });
+  }
+
   /// Jusqu'où le pair a lu. Null tant qu'il n'a jamais ouvert le fil — ou tant
   /// que la migration 0054 n'est pas passée, auquel cas aucun « Lu » ne
   /// s'affiche et rien d'autre ne change.
@@ -266,6 +372,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     HapticFeedback.lightImpact();
     setState(() {
       _specialBusy = true;
+      _replyTo = null;
       _specialHandled = {..._specialHandled, widget.peerDeviceId};
     });
     await SpecialRequest.markHandled(_myId, widget.peerDeviceId);
@@ -907,6 +1014,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _voiceTextTimer?.cancel();
     _presenceTimer?.cancel();
     _clockTimer?.cancel();
+    _flashTimer?.cancel();
     _inputCtrl.dispose();
     _scrollCtrl.dispose();
     _activationWave.dispose();
@@ -979,6 +1087,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         body: body,
         language: _myLang,
         recipientLang: _peer?.language ?? '',
+        replyToId: _replyTo?.id ?? '',
       );
       Analytics.track(
         'message_sent',
@@ -987,6 +1096,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.msgSent);
       _inputCtrl.clear();
+      // Envoyé : le bandeau se vide (en cas d'échec il reste).
+      if (mounted) setState(() => _replyTo = null);
     } catch (e) {
       HapticFeedback.vibrate();
       SwaycoSounds.play(SwSound.error);
@@ -1031,6 +1142,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         bytes: bytes,
         contentType: isPng ? 'image/png' : 'image/jpeg',
         recipientLang: _peer?.language ?? '',
+        replyToId: _replyTo?.id ?? '',
       );
       Analytics.track(
         'message_sent',
@@ -1038,6 +1150,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       );
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.msgSent);
+      if (mounted) setState(() => _replyTo = null);
     } catch (e) {
       HapticFeedback.vibrate();
       SwaycoSounds.play(SwSound.error);
@@ -1083,6 +1196,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         recipientId: widget.peerDeviceId,
         gifUrl: gif.sendUrl,
         recipientLang: _peer?.language ?? '',
+        replyToId: _replyTo?.id ?? '',
       );
       Analytics.track(
         'message_sent',
@@ -1090,6 +1204,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       );
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.msgSent);
+      if (mounted) setState(() => _replyTo = null);
     } catch (e) {
       HapticFeedback.vibrate();
       SwaycoSounds.play(SwSound.error);
@@ -1119,6 +1234,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         contentType: rec.contentType,
         senderLang: _myLang,
         recipientLang: _peer?.language ?? '',
+        replyToId: _replyTo?.id ?? '',
       );
       Analytics.track(
         'message_sent',
@@ -1126,6 +1242,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       );
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.msgSent);
+      if (mounted) setState(() => _replyTo = null);
     } catch (e) {
       HapticFeedback.vibrate();
       SwaycoSounds.play(SwSound.error);
@@ -1329,12 +1446,24 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             onTypingChanged: (t) => _typing?.setTyping(t),
                             myLang: _myLang,
                             peerLang: _peer?.language ?? '',
-                            peerFirstName: (_peer?.displayName.isNotEmpty == true
-                                    ? _peer!.displayName
-                                    : widget.title)
-                                .trim()
-                                .split(RegExp(r'\s+'))
-                                .first,
+                            peerFirstName: _peerFirstName,
+                            replyTo: _replyTo,
+                            replyLabel: _replyTo == null
+                                ? ''
+                                : (_replyTo!.senderId == _myId
+                                    ? AppStrings.t('chat_reply_self')
+                                        .toUpperCase()
+                                    : AppStrings.t(
+                                        'chat_reply_to',
+                                        args: {
+                                          'name':
+                                              _peerFirstName.toUpperCase(),
+                                        },
+                                      ).toUpperCase() +
+                                        _flagSuffix()),
+                            replyPreview:
+                                _replyTo == null ? '' : _quoteText(_replyTo!),
+                            onCancelReply: _cancelReply,
                           ),
                         ],
                       ),
@@ -1566,7 +1695,33 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         final m = item.message!;
         final mine = m.senderId == _myId;
         final display = _displayBodyFor(m);
+        // Une carte spéciale reçue a ses propres boutons : on n'y répond pas.
+        final replyable = !(m.isSpecial && !mine);
+        // Le message cité : dans la fenêtre chargée, sinon lu une fois.
+        ChatMessage? quoted;
+        var quotedMissing = false;
+        if (m.replyToId.isNotEmpty) {
+          quoted = _messageById(m.replyToId);
+          if (quoted == null) {
+            if (_quoteCache.containsKey(m.replyToId)) {
+              quoted = _quoteCache[m.replyToId];
+              quotedMissing = quoted == null;
+            } else {
+              _loadQuote(m.replyToId);
+            }
+          }
+        }
         final bubble = _MessageBubble(
+          onReply: replyable ? () => _startReply(m, via: 'menu') : null,
+          onReport: mine ? null : _reportPeer,
+          quoted: quoted,
+          quotedMissing: quotedMissing,
+          quotedName: quoted == null ? '' : _quoteAuthor(quoted),
+          quotedText: quoted == null ? '' : _quoteText(quoted),
+          onTapQuote: quoted == null
+              ? null
+              : () => _scrollToMessage(quoted!.id),
+          flash: m.id == _flashId,
           message: m,
           mine: mine,
           displayBody: display,
@@ -1584,11 +1739,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           // « 14:35 · lu » sous le dernier de mes messages que le pair a lus.
           read: m.id == lastReadMineId,
         );
-        return MessageEntrance(
-          key: ValueKey(m.id),
-          mine: mine,
-          animate: _entrance.take(m.id),
-          child: bubble,
+        return KeyedSubtree(
+          key: _msgKeys.putIfAbsent(m.id, GlobalKey.new),
+          child: MessageEntrance(
+            key: ValueKey(m.id),
+            mine: mine,
+            animate: _entrance.take(m.id),
+            child: SwipeToReply(
+              enabled: replyable,
+              onReply: () => _startReply(m, via: 'swipe'),
+              child: bubble,
+            ),
+          ),
         );
       },
     );
@@ -1978,9 +2140,37 @@ class _MessageBubble extends StatefulWidget {
     this.translated = false,
     this.showQuickReactions = false,
     this.read = false,
+    this.onReply,
+    this.onReport,
+    this.quoted,
+    this.quotedMissing = false,
+    this.quotedName = '',
+    this.quotedText = '',
+    this.onTapQuote,
+    this.flash = false,
   });
   final ChatMessage message;
   final bool mine;
+
+  /// « Répondre » du menu de l'appui long (null = pas de réponse possible, ex.
+  /// une carte spéciale reçue).
+  final VoidCallback? onReply;
+
+  /// « Signaler » du menu — messages REÇUS seulement.
+  final VoidCallback? onReport;
+
+  /// Le message que celui-ci cite, déjà résolu. Null + [quotedMissing] faux =
+  /// encore en chargement ; [quotedMissing] vrai = « Message supprimé ».
+  final ChatMessage? quoted;
+  final bool quotedMissing;
+  final String quotedName;
+  final String quotedText;
+
+  /// Toucher la citation : remonter à l'original.
+  final VoidCallback? onTapQuote;
+
+  /// Halo de 900 ms après un saut vers cette bulle.
+  final bool flash;
 
   /// Mine and the last one the peer has read: « 14:35 · lu » under it.
   final bool read;
@@ -2021,6 +2211,10 @@ class _MessageBubble extends StatefulWidget {
 
 class _MessageBubbleState extends State<_MessageBubble> {
   String? _burstEmoji;
+
+  /// La bulle elle-même (sans la ligne d'heure) : le menu de l'appui long s'y
+  /// ancre et la laisse nette au-dessus du flou.
+  final GlobalKey _bubbleKey = GlobalKey();
 
   /// « voir l'original » touché : cette bulle montre le texte tel qu'écrit.
   bool _showOriginal = false;
@@ -2073,6 +2267,73 @@ class _MessageBubbleState extends State<_MessageBubble> {
     widget.onReact(kThumbsUpEmoji);
   }
 
+  static String _cap(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+  /// Les lignes du menu de l'appui long (voir `ChatActionMenu`).
+  List<ChatMenuItem> _menuItems() {
+    void close() => _MessageBubble.dismissActivePicker();
+    return [
+      if (widget.onReply != null)
+        ChatMenuItem(
+          label: AppStrings.t('chat_reply'),
+          icon: Icons.reply_rounded,
+          kind: ChatMenuKind.reply,
+          onTap: () {
+            close();
+            widget.onReply!();
+          },
+        ),
+      if (widget.translated)
+        ChatMenuItem(
+          label: _cap(AppStrings.t(
+            _showOriginal ? 'msg_see_translation' : 'msg_see_original',
+          )),
+          icon: Icons.translate_rounded,
+          onTap: () {
+            close();
+            if (mounted) setState(() => _showOriginal = !_showOriginal);
+          },
+        ),
+      if (displayBody.trim().isNotEmpty)
+        ChatMenuItem(
+          label: AppStrings.t('chat_copy'),
+          icon: Icons.content_copy_rounded,
+          onTap: () {
+            close();
+            Clipboard.setData(ClipboardData(text: displayBody));
+            if (!mounted) return;
+            ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+              SnackBar(
+                content: Text(AppStrings.t('chat_copied')),
+                duration: const Duration(milliseconds: 1400),
+              ),
+            );
+          },
+        ),
+      if (onLongPressDelete != null)
+        ChatMenuItem(
+          label: AppStrings.t('delete'),
+          icon: Icons.delete_outline_rounded,
+          kind: ChatMenuKind.danger,
+          onTap: () {
+            close();
+            onLongPressDelete!();
+          },
+        ),
+      if (widget.onReport != null && !mine)
+        ChatMenuItem(
+          label: AppStrings.t('report'),
+          icon: Icons.flag_outlined,
+          kind: ChatMenuKind.danger,
+          onTap: () {
+            close();
+            widget.onReport!();
+          },
+        ),
+    ];
+  }
+
   void _openPicker() {
     HapticFeedback.mediumImpact();
     _MessageBubble.dismissActivePicker();
@@ -2080,28 +2341,51 @@ class _MessageBubbleState extends State<_MessageBubble> {
     if (box == null || !box.hasSize) return;
     final origin = box.localToGlobal(Offset.zero);
     final size = box.size;
-    final pickerWidth = onLongPressDelete == null ? 236.0 : 286.0;
+    // La bulle seule (sans la ligne d'heure) : le menu s'y ancre, et le voile
+    // flouté la laisse nette.
+    var bubble = origin & size;
+    final bubbleBox = _bubbleKey.currentContext?.findRenderObject();
+    if (bubbleBox is RenderBox && bubbleBox.hasSize) {
+      bubble = bubbleBox.localToGlobal(Offset.zero) & bubbleBox.size;
+    }
+    const pickerWidth = 236.0;
     final screen = MediaQuery.sizeOf(context);
     final pad = MediaQuery.paddingOf(context);
     var left = origin.dx + size.width / 2 - pickerWidth / 2;
     left = left.clamp(12.0, screen.width - pickerWidth - 12);
     var top = origin.dy - 58;
-    if (top < pad.top + 8) top = origin.dy + size.height + 8;
+    final pickerAbove = top >= pad.top + 8;
+    if (!pickerAbove) top = origin.dy + size.height + 8;
+
+    // Le menu : sous la bulle ; s'il déborde au-dessus du clavier / du champ,
+    // au-dessus de la pastille d'emojis.
+    final items = _menuItems();
+    final menuH = ChatActionMenu.heightFor(items.length);
+    var menuTop = pickerAbove ? origin.dy + size.height + 12 : top + 50 + 8;
+    final bottomLimit = screen.height -
+        MediaQuery.viewInsetsOf(context).bottom -
+        pad.bottom -
+        96;
+    if (menuTop + menuH > bottomLimit) {
+      menuTop = (pickerAbove ? top : origin.dy) - menuH - 8;
+    }
+    menuTop = menuTop.clamp(pad.top + 8, math.max(pad.top + 8, screen.height - menuH - 8));
+    final menuLeft = (mine ? bubble.right - ChatActionMenu.width : bubble.left)
+        .clamp(12.0, screen.width - ChatActionMenu.width - 12);
 
     final selected = _myEmoji;
     final entry = OverlayEntry(
       builder: (ctx) {
         return Stack(
           children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: _MessageBubble.dismissActivePicker,
-              ),
+            MenuVeil(
+              hole: bubble,
+              onTap: _MessageBubble.dismissActivePicker,
             ),
             Positioned(
               top: top,
               left: left,
+              // La corbeille de la pastille est partie : Supprimer est dans le menu.
               child: _ReactionPicker(
                 selected: selected,
                 onPick: (emoji) {
@@ -2110,13 +2394,12 @@ class _MessageBubbleState extends State<_MessageBubble> {
                   if (mounted) setState(() => _burstEmoji = emoji);
                   widget.onReact(emoji);
                 },
-                onDelete: onLongPressDelete == null
-                    ? null
-                    : () {
-                        _MessageBubble.dismissActivePicker();
-                        onLongPressDelete!();
-                      },
               ),
+            ),
+            Positioned(
+              top: menuTop,
+              left: menuLeft,
+              child: ChatActionMenu(items: items),
             ),
           ],
         );
@@ -2337,7 +2620,10 @@ class _MessageBubbleState extends State<_MessageBubble> {
     // cadre, pas de fond. L'image est déjà un objet à elle seule — l'enfermer
     // dans un rectangle coloré ne fait que l'entourer de bord perdu. Il ne
     // reste que l'heure, posée dessous.
-    final bareMedia = message.isImage && displayBody.trim().isEmpty;
+    // Une réponse a toujours sa bulle (la citation s'y pose).
+    final hasQuote = message.isReply;
+    final bareMedia =
+        message.isImage && displayBody.trim().isEmpty && !hasQuote;
     // Sans bulle, la colonne doit épouser l'image. Sinon l'heure, qui est un
     // Align, s'étire sur toute la largeur offerte (78 % de l'écran) et emporte
     // la colonne avec elle : l'image se retrouvait calée à gauche d'un bloc
@@ -2552,6 +2838,38 @@ class _MessageBubbleState extends State<_MessageBubble> {
 
     final chips = reactionChipEmojis(widget.reactions);
 
+    // Citation en tête de bulle, puis le contenu habituel (avec 7 px de plus de
+    // chaque côté : le bloc de citation affleure la bulle, le texte non).
+    final Widget inner = hasQuote
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: QuoteBlock(
+                        mine: mine,
+                        name: widget.quotedName,
+                        quoted: widget.quoted,
+                        missing: widget.quotedMissing,
+                        text: widget.quotedText,
+                        onTap: widget.onTapQuote,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 7),
+                child: content,
+              ),
+            ],
+          )
+        : content;
+
     final bubbleStack = Padding(
         // La puce de réaction déborde SOUS la bulle (1b) : on lui garde la
         // place en bas, plus en haut.
@@ -2564,10 +2882,22 @@ class _MessageBubbleState extends State<_MessageBubble> {
               onDoubleTap: _thumbsUp,
               onLongPress: _openPicker,
               child: AnimatedContainer(
+                key: _bubbleKey,
                 duration: const Duration(milliseconds: 350),
                 curve: Curves.easeOut,
                 padding: bareMedia
                     ? EdgeInsets.zero
+                    : hasQuote
+                    ? EdgeInsets.fromLTRB(
+                        8,
+                        8,
+                        8,
+                        message.isVoice &&
+                                !mine &&
+                                (displayBody.isNotEmpty || voiceSkeleton)
+                            ? 11
+                            : 9,
+                      )
                     : message.isVoice
                         // La ligne du lecteur fait 44 (zone tactile) pour 36
                         // dessinés : 4 px de moins en haut et en bas.
@@ -2607,12 +2937,44 @@ class _MessageBubbleState extends State<_MessageBubble> {
                         boxShadow: mine ? SC.msgOutShadow : SC.msgInShadow,
                       ),
                 child: message.isVoice
-                    ? SizedBox(width: voiceInnerW, child: content)
+                    // Avec citation : 8 de chaque côté + 7 de marge interne =
+                    // les 15 d'avant, le lecteur garde sa largeur [voiceInnerW].
+                    ? SizedBox(
+                        width: voiceInnerW + (hasQuote ? 14 : 0),
+                        child: inner,
+                      )
                     : hugContent
-                        ? IntrinsicWidth(child: content)
-                        : content,
+                        ? IntrinsicWidth(child: inner)
+                        : inner,
               ),
             ),
+            // Après un saut vers l'original : un halo jaune de 900 ms qui
+            // s'efface.
+            if (widget.flash)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 1, end: 0),
+                    duration: const Duration(milliseconds: 900),
+                    curve: Curves.easeOut,
+                    builder: (_, v, _) => DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: radius,
+                        border: Border.all(
+                          color: SC.accent.withValues(alpha: 0.35 * v),
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: SC.accent.withValues(alpha: 0.35 * v),
+                            blurRadius: 16,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             if (chips.isNotEmpty)
               Positioned(
                 // À cheval sur le bord BAS de la bulle, côté début (1b).
@@ -2686,12 +3048,10 @@ class _ReactionPicker extends StatelessWidget {
   const _ReactionPicker({
     required this.selected,
     required this.onPick,
-    this.onDelete,
   });
 
   final String? selected;
   final ValueChanged<String> onPick;
-  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -2722,26 +3082,6 @@ class _ReactionPicker extends StatelessWidget {
                   child: Text(emoji, style: const TextStyle(fontSize: 26)),
                 ),
               ),
-            if (onDelete != null) ...[
-              Container(
-                width: 1,
-                height: 22,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                color: const Color(0x22000000),
-              ),
-              Pressable(
-                onTap: onDelete,
-                child: const SizedBox(
-                  width: 42,
-                  height: 42,
-                  child: Icon(
-                    Icons.delete_outline_rounded,
-                    color: Color(0xFF3A3A3C),
-                    size: 22,
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -3140,7 +3480,18 @@ class _Composer extends StatefulWidget {
     this.onTypingChanged,
     this.peerLang = '',
     this.peerFirstName = '',
+    this.replyTo,
+    this.replyLabel = '',
+    this.replyPreview = '',
+    this.onCancelReply,
   });
+
+  /// Le message auquel je réponds : un bandeau « RÉPONDRE À… » se pose
+  /// au-dessus du champ (et y reste pendant un enregistrement vocal).
+  final ChatMessage? replyTo;
+  final String replyLabel;
+  final String replyPreview;
+  final VoidCallback? onCancelReply;
 
   /// The field just opened (`true`) or closed (`false`) — drives the
   /// "writing…" bubble on the peer's side.
@@ -3428,6 +3779,13 @@ class _ComposerState extends State<_Composer>
     if (_hintReady && !_waitingForLangs && _composerHint != _typingFor) {
       _animateHint();
     }
+    // Une réponse vient d'être lancée : le clavier s'ouvre (pas pendant un
+    // enregistrement vocal, où le champ n'est pas à l'écran).
+    if (old.replyTo == null &&
+        widget.replyTo != null &&
+        _voice.state == VoiceRecState.idle) {
+      _focus.requestFocus();
+    }
   }
 
   /// Ce que la machine à écrire tape (ou a fini de taper).
@@ -3501,10 +3859,37 @@ class _ComposerState extends State<_Composer>
   @override
   Widget build(BuildContext context) {
     final s = _voice.state;
-    if (s == VoiceRecState.locked || s == VoiceRecState.paused) {
-      return _buildLockedPanel();
-    }
-    return _buildIdleBar();
+    final bar = (s == VoiceRecState.locked || s == VoiceRecState.paused)
+        ? _buildLockedPanel()
+        : _buildIdleBar();
+    final reply = widget.replyTo;
+    // Le bandeau de citation, au-dessus de la barre (champ, enregistrement ou
+    // verrouillé : il reste affiché, on peut répondre PAR un vocal). L'AnimatedSize
+    // est toujours là : la barre garde sa place dans l'arbre, donc son geste
+    // d'enregistrement en cours n'est pas coupé quand le bandeau apparaît.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AnimatedSize(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          alignment: Alignment.bottomCenter,
+          child: reply == null
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                  child: ReplyBar(
+                    message: reply,
+                    label: widget.replyLabel,
+                    text: widget.replyPreview,
+                    onCancel: widget.onCancelReply ?? () {},
+                  ),
+                ),
+        ),
+        bar,
+      ],
+    );
   }
 
   /// Placeholder shown in the empty input. Adapts to the user's spoken
