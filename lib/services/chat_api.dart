@@ -257,6 +257,10 @@ abstract final class ChatApi {
     return ChatMessage.fromMap(Map<String, dynamic>.from(row));
   }
 
+  /// `messages.id` est un bigint : la clé d'une réponse part en nombre (un id
+  /// uuid, si la table change un jour, part tel quel).
+  static Object _replyValue(String id) => int.tryParse(id) ?? id;
+
   /// Insère [row] dans `messages`. Si une colonne de [optional] n'existe pas
   /// encore en base (migration pas appliquée : `PGRST204` ou son nom dans le
   /// message), elle est retirée et l'envoi est retenté : le message part sans
@@ -323,7 +327,7 @@ abstract final class ChatApi {
       // so the "one message per photo" rule survives restarts.
       if (discoverPhoto.isNotEmpty) 'discover_photo': discoverPhoto,
       if (special) 'special': true,
-      if (replyToId.isNotEmpty) 'reply_to_id': replyToId,
+      if (replyToId.isNotEmpty) 'reply_to_id': _replyValue(replyToId),
     };
     // Colonne `special` (migration 0065) ou `reply_to_id` (0082) absente : on
     // envoie quand même, sans le marquage / sans la citation.
@@ -422,7 +426,7 @@ abstract final class ChatApi {
         // so stamp it empty (omitting it threw a 23502 not-null violation).
         'language': '',
         'image_url': url,
-        if (replyToId.isNotEmpty) 'reply_to_id': replyToId,
+        if (replyToId.isNotEmpty) 'reply_to_id': _replyValue(replyToId),
       },
       optional: const ['reply_to_id'],
     );
@@ -477,7 +481,7 @@ abstract final class ChatApi {
       'language': '',
       'audio_url': url,
       'audio_duration_ms': durationMs,
-      if (replyToId.isNotEmpty) 'reply_to_id': replyToId,
+      if (replyToId.isNotEmpty) 'reply_to_id': _replyValue(replyToId),
     };
     // Colonne de durée absente (migration 0081) ou de citation (0082) pas encore
     // appliquée : le vocal part quand même (la bulle lira la durée dans le
@@ -560,7 +564,7 @@ abstract final class ChatApi {
         // `language` est NOT NULL sans défaut : un GIF n'a pas de langue.
         'language': '',
         'image_url': gifUrl,
-        if (replyToId.isNotEmpty) 'reply_to_id': replyToId,
+        if (replyToId.isNotEmpty) 'reply_to_id': _replyValue(replyToId),
       },
       optional: const ['reply_to_id'],
     );
