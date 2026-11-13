@@ -812,17 +812,56 @@ class _CallScreenState extends State<CallScreen> {
   /// tourne donc pendant que la précédente se lit ET pendant qu'on attend que
   /// le pair se taise — deux attentes qu'on ne payait jusqu'ici qu'à la suite,
   /// et c'est ce qui rend les 40 ms possibles.
-  Future<void> _enqueueSpeak(String text, String lang) {
+  ///
+  /// [onVoiceStart] : appelé UNE fois, au moment où la voix démarre. Le texte de
+  /// la traduction s'y écrit, pour qu'on le lise EN MÊME TEMPS qu'on l'entend :
+  /// il s'écrivait dès l'arrivée du message, et la voix, derrière la file et
+  /// l'attente du silence du pair, venait plusieurs secondes après — ce qui
+  /// ressemblait à une panne. Il est aussi appelé si la phrase est abandonnée
+  /// (traduction coupée, appel quitté) et, au pire, après [_kTextHoldCap] : le
+  /// texte ne reste jamais caché.
+  Future<void> _enqueueSpeak(String text, String lang,
+      {VoidCallback? onVoiceStart}) {
     final generation = _ttsGeneration;
+    final enqueuedAt = DateTime.now();
+    var revealed = false;
+    Timer? holdCap;
+    void reveal({required bool capped}) {
+      if (revealed) return;
+      revealed = true;
+      holdCap?.cancel();
+      if (onVoiceStart == null) return;
+      // Combien de temps la voix a fait attendre le texte : la mesure du
+      // décalage que les gens voient, pour décider quoi en faire.
+      try {
+        Analytics.track('translation_voice_wait', props: {
+          'ms': DateTime.now().difference(enqueuedAt).inMilliseconds,
+          'capped': capped,
+        });
+      } catch (_) {}
+      onVoiceStart();
+    }
+
+    if (onVoiceStart != null) {
+      holdCap = Timer(_kTextHoldCap, () => reveal(capped: true));
+    }
     final Future<String?>? synth = _premiumReadyFor(lang)
         ? SpeechService.instance.synthesise(text: text, languageCode: lang)
         : null;
     _ttsQueue = _ttsQueue.then((_) async {
-      if (!mounted || generation != _ttsGeneration) return;
+      if (!mounted || generation != _ttsGeneration) {
+        reveal(capped: false);
+        return;
+      }
       await _awaitPeerSilence();
       // Couper la traduction PENDANT l'attente doit la faire tomber : sans ce
       // second contrôle, elle se dirait quand même à la fin du silence.
-      if (!mounted || generation != _ttsGeneration) return;
+      if (!mounted || generation != _ttsGeneration) {
+        reveal(capped: false);
+        return;
+      }
+      // La voix part : le texte s'écrit maintenant.
+      reveal(capped: false);
       if (synth == null) {
         await _speakOsVoice(text, lang);
         return;
@@ -834,9 +873,16 @@ class _CallScreenState extends State<CallScreen> {
       await _speakPremium(path, text, lang);
     }).catchError((Object e) {
       DebugOverlay.log('tts queue error: $e');
+      reveal(capped: false);
     });
     return _ttsQueue;
   }
+
+  /// Le plus longtemps que le texte d'une traduction attend le début de sa voix
+  /// avant de s'écrire quand même. Plus long que l'attente du silence du pair
+  /// ([_kPeerSilenceMaxWait], 5 s) pour ne pas couper court à un décalage
+  /// normal, mais borné : une file bloquée ne doit pas cacher le texte.
+  static const Duration _kTextHoldCap = Duration(seconds: 7);
 
   /// Premium on-device voice, but ONLY for the one language whose bundle is
   /// already installed — the account language, downloaded at boot. A language
@@ -2248,15 +2294,14 @@ class _CallScreenState extends State<CallScreen> {
         final lang = m['lang']?.toString() ?? '';
         DebugOverlay.log('caption typed trans="$trans" lang=$lang');
         if (trans.isEmpty) return;
-        _addTurn(_SpokenTurn(mine: false, text: trans));
+        final turn = _SpokenTurn(mine: false, text: trans);
         // Le même interrupteur que pour la voix : couper la traduction, c'est
-        // en couper LE SON — la phrase s'écrit toujours.
+        // en couper LE SON — la phrase s'écrit toujours. Avec le son, elle
+        // s'écrit quand la voix démarre (voir [_enqueueSpeak]).
         if (_translationEnabled) {
-          if (kIsWeb) {
-            unawaited(_speakDeviceTts(trans, lang));
-          } else {
-            unawaited(_playWithLocalTts(trans, lang));
-          }
+          unawaited(_enqueueSpeak(trans, lang, onVoiceStart: () => _addTurn(turn)));
+        } else {
+          _addTurn(turn);
         }
         return;
       }
@@ -2269,14 +2314,15 @@ class _CallScreenState extends State<CallScreen> {
         // its own request, so without this it has no idea what it replies to —
         // and reusing their exact wording keeps terms consistent both ways.
         widget.translation.notePeerUtterance(m['orig']?.toString() ?? '');
-        _addTurn(_SpokenTurn(mine: false, text: trans));
-        // Son coupé : la phrase s'écrit, elle ne se dit pas.
+        final turn = _SpokenTurn(mine: false, text: trans);
+        // Avec le son, la phrase s'écrit AU MOMENT où la voix démarre, pas à
+        // l'arrivée du message : sinon le texte précède la voix de plusieurs
+        // secondes (file d'attente, silence du pair) et on croit à une panne.
+        // Son coupé : la phrase s'écrit tout de suite, elle ne se dit pas.
         if (trans.isNotEmpty && _translationEnabled) {
-          if (kIsWeb) {
-            unawaited(_speakDeviceTts(trans, lang));
-          } else {
-            unawaited(_playWithLocalTts(trans, lang));
-          }
+          unawaited(_enqueueSpeak(trans, lang, onVoiceStart: () => _addTurn(turn)));
+        } else {
+          _addTurn(turn);
         }
         return;
       }
@@ -2358,19 +2404,11 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// Speak [text] with the device's own OS voice (`flutter_tts`).
-  ///
-  /// The premium on-device voice, when one is loaded for this language; downloaded
-  /// per language (~60–110 MB a bundle) and kept in sync with a catalogue. That
-  /// whole machinery is gone: the phone already ships dozens of languages, they
-  /// need no download, and they start speaking instantly. `ttsSpeaking` is now
-  /// driven entirely by flutter_tts's own start/completion handlers.
-  ///
-  /// flutter_tts's speak() can return without playing (missing voice), so no
-  /// completion event is ever guaranteed — the mic gate's own safety timer is
-  /// what reopens the mic, never an awaited event.
-  Future<void> _playWithLocalTts(String text, String lang) =>
-      _enqueueSpeak(text, lang);
+  // NB : la voix de l'appareil (`flutter_tts`) se dit par [_enqueueSpeak].
+  // `ttsSpeaking` est piloté par les événements de début / fin de flutter_tts ;
+  // son speak() peut revenir sans rien jouer (voix absente), donc aucune fin
+  // n'est garantie — c'est le minuteur de sûreté de la porte du micro qui le
+  // rouvre, jamais un événement attendu.
 
   /// The "translated voice volume" slider used to reach only the audioplayers
   /// element that plays a cloud mp3 — a path neither the device voice nor the
@@ -2391,9 +2429,6 @@ class _CallScreenState extends State<CallScreen> {
       await _deviceTts.setVolume(v);
     } catch (_) {}
   }
-
-  Future<void> _speakDeviceTts(String text, String lang) =>
-      _enqueueSpeak(text, lang);
 
   /// Loudspeaker ⇄ earpiece. Calls start on the earpiece (see AudioController's
   /// default): against the ear the loudspeaker cannot reach the mic, so the
