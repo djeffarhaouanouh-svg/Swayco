@@ -137,6 +137,31 @@ test('silence or a stock phrase without letters: body stays empty', async () => 
   assert.equal(updates.length, 0);
 });
 
+test('Whisper ghost phrases (real ones received) are dropped, real speech is kept', async () => {
+  const { isWhisperGhost } = require('./voice_transcribe');
+  for (const g of [
+    'Sous-titrage Société Radio-Canada',
+    "Merci d'avoir regardé cette vidéo, n'hésitez pas à vous abonner à la chaine pour d'autres vidéos.",
+    "Voilà, c'est tout pour aujourd'hui, je vous souhaite une bonne soirée et à la prochaine !",
+    '보시 horaires de présentation. Merci. ' + '3 '.repeat(27),
+    'Thanks for watching!',
+    '...',
+  ]) assert.equal(isWhisperGhost(g), true, g);
+  for (const ok of [
+    "d'accord d'accord y'a pas de soucis et aujourd'hui tu vas finir à quelle heure ?",
+    'Tu peux publier la vidéo',
+    'Hoje eu trabalho até as 5, 6 horas da tarde, tô no trabalho aqui',
+    'non non non, je ne veux pas',
+  ]) assert.equal(isWhisperGhost(ok), false, ok);
+
+  const { sb, updates } = fakeSb({ msg: mine() });
+  const out = await transcribeVoiceMessage(
+    base(sb, fakeFetch({ sttText: 'Sous-titrage Société Radio-Canada' }).impl),
+  );
+  assert.equal(out.body.empty, true);
+  assert.equal(updates.length, 0);
+});
+
 test('bad ids, unknown messages, missing config', async () => {
   const { sb } = fakeSb({ msg: null });
   assert.equal((await transcribeVoiceMessage({ ...base(sb, fakeFetch().impl), messageId: 'x' })).status, 400);

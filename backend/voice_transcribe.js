@@ -98,6 +98,51 @@ async function runStt({ p, audio, ext, mime, lang, openaiKey, model, grokKey, gr
     return { ok: false, error: `${p}_unreachable` };
   }
 }
+// ── Phrases fantômes de Whisper ─────────────────────────────────────────────
+// Sur du silence, du bruit ou un souffle, Whisper n'écrit pas « rien » : il
+// invente ce qu'il a le plus vu dans ses données d'entraînement (sous-titres de
+// vidéos). Exemples réels reçus : « Sous-titrage Société Radio-Canada »,
+// « Merci d'avoir regardé cette vidéo… abonnez-vous », « 3 3 3 3 3 3… ».
+const GHOST_PHRASES = [
+  'sous-titrage', 'sous-titres', 'sous titres realises', 'merci d\'avoir regarde',
+  'n\'hesitez pas a vous abonner', 'abonnez-vous', 'a la prochaine video',
+  'c\'est tout pour aujourd\'hui', 'je vous souhaite une bonne soiree',
+  'thanks for watching', 'thank you for watching', 'subtitles by', 'amara.org',
+  'please subscribe', 'like and subscribe', 'subtitulos', 'gracias por ver',
+  'legendas pela comunidade', 'obrigado por assistir', 'untertitel',
+  'vielen dank fürs zuschauen', 'ご視聴ありがとうございました', '字幕', '시청해 주셔서',
+];
+
+function plain(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[’‘`]/g, "'");
+}
+
+/**
+ * Ce texte est-il une invention de Whisper plutôt que ce que la personne a dit ?
+ * Trois signes : une phrase de fin de vidéo connue (et courte : un vrai vocal
+ * long qui la contiendrait par hasard passe), un même mot répété en boucle, ou
+ * un texte sans aucune lettre.
+ */
+function isWhisperGhost(text) {
+  const t = String(text || '').trim();
+  if (!t || !/\p{L}/u.test(t)) return true;
+  if (t.length <= 160) {
+    const p = plain(t);
+    if (GHOST_PHRASES.some((g) => p.includes(plain(g)))) return true;
+  }
+  const words = t.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length >= 8) {
+    const count = new Map();
+    for (const w of words) count.set(w, (count.get(w) || 0) + 1);
+    if (Math.max(...count.values()) / words.length >= 0.6) return true;
+  }
+  return false;
+}
+
 /**
  * @returns {Promise<{status:number, body:object}>}
  *
@@ -200,7 +245,8 @@ async function transcribeVoiceMessage({
 
   // Du silence ou une toux : Whisper invente parfois une phrase toute faite.
   // Sans aucune lettre, il n'y a rien à garder.
-  if (!text || !/\p{L}/u.test(text)) {
+  if (isWhisperGhost(text)) {
+    if (text) console.log(`[voice] ghost dropped ${messageId}: ${JSON.stringify(text.slice(0, 60))}`);
     return { status: 200, body: { ok: true, empty: true } };
   }
 
@@ -325,6 +371,7 @@ function startVoiceTranscriber({ supabase, supabaseUrl, openaiKey, model, grokKe
 }
 
 module.exports = {
+  isWhisperGhost,
   transcribeVoiceMessage,
   ownFolderPrefix,
   createVoiceTranscriber,
