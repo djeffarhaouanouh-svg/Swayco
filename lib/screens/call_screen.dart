@@ -1889,9 +1889,9 @@ class _CallScreenState extends State<CallScreen> {
     _chatFocus.addListener(_onChatFocusChanged);
     // Les textes d'explication sous le galet : tant qu'on n'a jamais vu une
     // phrase partir (voir [TranslationStepCaption]).
-    unawaited(TranslationStepCaption.shouldShow().then((v) {
-      if (v && mounted) setState(() => _trCaptions = true);
-    }));
+    // Toujours affichés : ils ne s'effacent plus après la première phrase
+    // envoyée (c'était un réglage que personne n'avait demandé).
+    _trCaptions = true;
     // Le bouton REC : autorisé par la liste du serveur (en plus de l'e-mail
     // compilé). Silencieux en cas d'erreur : le bouton reste simplement caché.
     unawaited(EgressApi.checkAllowed().then((ok) {
