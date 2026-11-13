@@ -49,7 +49,7 @@ import '../widgets/call_loader.dart';
 import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
-import '../widgets/translation_tutorial.dart';
+import '../widgets/translation_step_caption.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_popups_extra.dart';
@@ -1586,10 +1586,10 @@ class _CallScreenState extends State<CallScreen> {
   /// metadata) and is overridden the moment they tap their own language button.
   String _peerListenLang = '';
 
-  /// L'explication de la traduction (jamais vue sur cet appareil) : à montrer
-  /// une fois l'appel connecté, puis fermée pour de bon.
-  bool _trTutoPending = false;
-  bool _trTutoDismissed = false;
+  /// Les textes d'explication sous le galet : affichés tant qu'aucune de mes
+  /// phrases n'est jamais partie sur cet appareil (puis pour le reste de cet
+  /// appel-là).
+  bool _trCaptions = false;
 
   /// The output language we last announced to the peer, so a re-announce on
   /// their (re)connect doesn't republish on every metadata event.
@@ -1874,9 +1874,10 @@ class _CallScreenState extends State<CallScreen> {
     // Zone messages : côté choisi, démonstration déjà vue, repli de la saisie.
     unawaited(_loadMessagesPrefs());
     _chatFocus.addListener(_onChatFocusChanged);
-    // L'explication de la traduction : seulement si elle n'a jamais été vue.
-    unawaited(TranslationTutorial.shouldShow().then((v) {
-      if (v && mounted) setState(() => _trTutoPending = true);
+    // Les textes d'explication sous le galet : tant qu'on n'a jamais vu une
+    // phrase partir (voir [TranslationStepCaption]).
+    unawaited(TranslationStepCaption.shouldShow().then((v) {
+      if (v && mounted) setState(() => _trCaptions = true);
     }));
     // Le bouton REC : autorisé par la liste du serveur (en plus de l'e-mail
     // compilé). Silencieux en cas d'erreur : le bouton reste simplement caché.
@@ -3868,6 +3869,19 @@ class _CallScreenState extends State<CallScreen> {
                                 ],
                               ),
                             ),
+                          )
+                        // Les textes d'explication, SOUS le galet : « Parle
+                        // normalement », « Patiente… », « X a reçu ta
+                        // traduction », « À toi… ». Pas pendant une
+                        // conversation ouverte ni sous un panneau.
+                        else if (_trCaptions && !_sheetOpen && !_turnsOpen)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: TranslationStepCaption(
+                              peerName: peerFirstName ?? '',
+                              myVoice: _myVoiceLevel,
+                              myLines: widget.translation.localTranscript,
+                            ),
                           ),
                       ],
                     ),
@@ -4285,32 +4299,6 @@ class _CallScreenState extends State<CallScreen> {
           ),
         ),
     ),
-        // L'explication de la traduction, UNE fois : par-dessus l'appel, qui
-        // continue dessous (l'overlay ne touche ni au micro ni à la voix).
-        // Fermable d'un geste ; ne revient plus une fois vue.
-        if (_trTutoPending && !_trTutoDismissed)
-          Positioned.fill(
-            child: TranslationTutorial(
-              peerName: peerFirstName ?? '',
-              peerLang: _peerProfile?.language ?? '',
-              peerPhotoUrl: _peerProfile?.bestAvatarUrl ?? '',
-              // Branché sur l'appel : les étapes suivent ce que je fais vraiment.
-              myVoice: _myVoiceLevel,
-              myLines: widget.translation.localTranscript,
-              orbBuilder: (tts, level) => TranslationOrb(
-                on: true,
-                micOn: true,
-                ttsSpeaking: tts,
-                voiceLevel: level,
-                onTap: () {},
-                onLongPress: () {},
-              ),
-              onClose: () {
-                setState(() => _trTutoDismissed = true);
-                unawaited(TranslationTutorial.markSeen());
-              },
-            ),
-          ),
       ],
     );
   }
