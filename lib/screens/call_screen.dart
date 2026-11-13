@@ -46,11 +46,11 @@ import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../swayco/translation_route.dart';
 import '../widgets/call_loader.dart';
-import '../widgets/glass_panel.dart';
 import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/translation_tutorial.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_popups_extra.dart';
 import '../widgets/swayco_wordmark.dart';
@@ -227,6 +227,100 @@ class _CallScreenState extends State<CallScreen> {
   static const Duration _kRestTtl = Duration(seconds: 10);
   Timer? _restTimer;
 
+  // ── Zone messages : côté, saisie repliée, démonstration ────────────────
+  /// Les messages sont rangés EN HAUT de l'écran (sinon en bas, par défaut).
+  /// Choisi en glissant (ou touchant) la languette, mémorisé sur l'appareil.
+  bool _msgTop = false;
+  static const String _kMsgSideKey = 'call_messages_side';
+
+  /// La saisie est dépliée (sinon : un rond crayon).
+  bool _composerOpen = false;
+  Timer? _composerIdle;
+
+  /// Combien la saisie dépliée reste ouverte sans focus ni geste.
+  static const Duration _kComposerIdle = Duration(seconds: 4);
+
+  /// La démonstration de la languette tourne (première ouverture seulement).
+  bool _tabHint = false;
+  bool _tabHintSeen = true;
+  static const String _kTabHintKey = 'seen_messages_tab_hint';
+
+  /// De combien la vignette caméra descend quand les messages sont en haut.
+  static const double _kPipDropForMessages = 56;
+
+  /// Des bulles (au repos ou la zone ouverte) sont affichées EN HAUT.
+  bool get _topMessagesShown =>
+      _msgTop && (_turnsOpen || (!_turnsHidden && _turns.isNotEmpty));
+
+  Future<void> _loadMessagesPrefs() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final top = p.getString(_kMsgSideKey) == 'top';
+      final seen = p.getBool(_kTabHintKey) ?? false;
+      if (!mounted) return;
+      setState(() {
+        _msgTop = top;
+        _tabHintSeen = seen;
+      });
+    } catch (_) {}
+  }
+
+  void _setMessagesSide(bool top) {
+    if (top == _msgTop) return;
+    setState(() => _msgTop = top);
+    unawaited(() async {
+      try {
+        final p = await SharedPreferences.getInstance();
+        await p.setString(_kMsgSideKey, top ? 'top' : 'bottom');
+      } catch (_) {}
+    }());
+  }
+
+  void _endTabHint() {
+    if (!_tabHint) return;
+    setState(() => _tabHint = false);
+    _tabHintSeen = true;
+    unawaited(() async {
+      try {
+        final p = await SharedPreferences.getInstance();
+        await p.setBool(_kTabHintKey, true);
+      } catch (_) {}
+    }());
+  }
+
+  /// Déplie la saisie (le rond crayon touché) et monte le clavier.
+  void _openComposer() {
+    _composerIdle?.cancel();
+    setState(() => _composerOpen = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _composerOpen) _chatFocus.requestFocus();
+    });
+  }
+
+  /// La saisie se replie d'elle-même : sans focus, sans envoi en cours, après
+  /// [_kComposerIdle] sans geste. Un texte resté dans le champ se replie aussi,
+  /// mais le rond porte alors un point jaune (brouillon).
+  void _armComposerIdle() {
+    _composerIdle?.cancel();
+    if (!_composerOpen) return;
+    _composerIdle = Timer(_kComposerIdle, () {
+      if (!mounted || !_composerOpen) return;
+      if (_chatFocus.hasFocus || _chatSending) {
+        _armComposerIdle();
+        return;
+      }
+      setState(() => _composerOpen = false);
+    });
+  }
+
+  void _onChatFocusChanged() {
+    if (_chatFocus.hasFocus) {
+      _composerIdle?.cancel();
+    } else {
+      _armComposerIdle();
+    }
+  }
+
   /// Le temps a passé : on retire, et la phrase suivante ramènera tout.
   void _hideTurns() {
     _restTimer?.cancel();
@@ -255,12 +349,15 @@ class _CallScreenState extends State<CallScreen> {
   void _closeTurns() {
     _chatFocus.unfocus();
     _restTimer?.cancel();
+    _composerIdle?.cancel();
     if (!mounted) return;
+    if (_tabHint) _endTabHint();
     if (!_turnsOpen && _turnsMuted) return;
     setState(() {
       _turnsOpen = false;
       _turnsHidden = true;
       _turnsMuted = true;
+      _composerOpen = false;
     });
   }
 
@@ -1761,6 +1858,9 @@ class _CallScreenState extends State<CallScreen> {
     super.initState();
     widget.translation.localTranscript?.addListener(_onMyTranscript);
     Analytics.track('screen_view', props: {'screen': 'live'});
+    // Zone messages : côté choisi, démonstration déjà vue, repli de la saisie.
+    unawaited(_loadMessagesPrefs());
+    _chatFocus.addListener(_onChatFocusChanged);
     // L'explication de la traduction : seulement si elle n'a jamais été vue.
     unawaited(TranslationTutorial.shouldShow().then((v) {
       if (v && mounted) setState(() => _trTutoPending = true);
@@ -3269,6 +3369,7 @@ class _CallScreenState extends State<CallScreen> {
     widget.translation.localTranscript?.removeListener(_onMyTranscript);
     AsrService.osRefusedKey.removeListener(_onSttRefused);
     _chatCtrl.dispose();
+    _chatFocus.removeListener(_onChatFocusChanged);
     _chatFocus.dispose();
     _restTimer?.cancel();
     _splashTimer?.cancel();
@@ -3305,6 +3406,7 @@ class _CallScreenState extends State<CallScreen> {
     ttsSpeaking.dispose();
     _voiceLevel.dispose();
     _myVoiceLevel.dispose();
+    _composerIdle?.cancel();
     _dockIdleTimer?.cancel();
     _micProbe?.cancel();
     final declineCh = _declineChannel;
@@ -3520,8 +3622,15 @@ class _CallScreenState extends State<CallScreen> {
                 // tiny "camera off" tile so the layout doesn't pop.
                 if (_pipFeedAvailable(
                     local: local, remote: remote, hasRemote: remoteCount > 0))
-                  Positioned(
-                    top: MediaQuery.paddingOf(context).top + 52,
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    // Messages rangés EN HAUT : la vignette descend un peu,
+                    // pour laisser les bulles se poser à sa gauche sans la
+                    // coller.
+                    top: MediaQuery.paddingOf(context).top +
+                        52 +
+                        (_topMessagesShown ? _kPipDropForMessages : 0),
                     right: 12,
                     width: 118,
                     height: 176,
@@ -3601,7 +3710,9 @@ class _CallScreenState extends State<CallScreen> {
                     key: const ValueKey('turns_dismiss'),
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: _closeTurns,
+                      // Pendant la démonstration de la languette, le premier
+                      // tap n'arrête QUE la démonstration.
+                      onTap: _tabHint ? _endTabHint : _closeTurns,
                     ),
                   ),
                 // Le panneau effacé : l'écran ENTIER le rappelle. C'est ce qui
@@ -3685,9 +3796,11 @@ class _CallScreenState extends State<CallScreen> {
                   // redescend tout en bas quand il ne reste que l'appel. Les
                   // cas sont testés du plus haut au plus bas : un panneau
                   // recouvre le rail, qui recouvre la conversation.
+                  // Messages rangés EN HAUT : le galet reste où il est — rien
+                  // ne vient occuper sa place en bas.
                   alignment: _sheetOpen
                       ? const Alignment(0, -0.52)
-                      : _turnsOpen
+                      : (_turnsOpen && !_msgTop)
                           ? Alignment(0, turnsY.toDouble())
                           : _controlsOpen
                               ? const Alignment(0, 0.34)
@@ -3702,7 +3815,7 @@ class _CallScreenState extends State<CallScreen> {
                     // par une transformation plutôt qu'en repeignant le galet
                     // à chaque image d'une taille qui change. La conversation
                     // le réduit pareil : sous elle il n'est plus le sujet.
-                    scale: (_sheetOpen || _turnsOpen)
+                    scale: (_sheetOpen || (_turnsOpen && !_msgTop))
                         ? 56 / TranslationOrb.kSize
                         : 1,
                     child: Column(
@@ -3799,8 +3912,14 @@ class _CallScreenState extends State<CallScreen> {
                             duration: const Duration(milliseconds: 240),
                             curve: Curves.easeOutCubic,
                             alignment: Alignment.bottomLeft,
-                            child: (!_turnsOpen &&
-                                    (_turns.isEmpty || _turnsHidden))
+                            // Ici ne restent que les phrases AU REPOS rangées en
+                            // bas. La zone ouverte est sa propre couche, sur
+                            // toute la largeur (la languette colle au bord) ;
+                            // et rangées en haut, les phrases vivent en haut.
+                            child: (_turnsOpen ||
+                                    _msgTop ||
+                                    _turns.isEmpty ||
+                                    _turnsHidden)
                                 ? const SizedBox(width: double.infinity)
                                 : Align(
                                     alignment: Alignment.centerLeft,
@@ -3815,24 +3934,7 @@ class _CallScreenState extends State<CallScreen> {
                                         padding: const EdgeInsets.only(
                                           bottom: 10,
                                         ),
-                                        child: _turnsOpen
-                                            ? _SpokenTurnsPanel(
-                                                turns: _turns,
-                                                myName: widget.displayName,
-                                                myAvatarUrl: '',
-                                                peerName: _peerProfile
-                                                        ?.displayName ??
-                                                    '',
-                                                peerAvatarUrl:
-                                                    _peerProfile?.bestAvatarUrl ??
-                                                        '',
-                                                onToggle: _closeTurns,
-                                                chatController: _chatCtrl,
-                                                chatFocus: _chatFocus,
-                                                sending: _chatSending,
-                                                onSend: _sendCaption,
-                                              )
-                                            : _RestingTurns(
+                                        child: _RestingTurns(
                                                 turns: _turns,
                                                 myName: widget.displayName,
                                                 myAvatarUrl: '',
@@ -3919,6 +4021,11 @@ class _CallScreenState extends State<CallScreen> {
                                               _turnsHidden = false;
                                               _turnsMuted = false;
                                               _restTimer?.cancel();
+                                              // La saisie s'ouvre repliée en
+                                              // rond crayon ; la languette se
+                                              // présente à la première fois.
+                                              _composerOpen = false;
+                                              _tabHint = !_tabHintSeen;
                                               // Le rail se replie en même
                                               // temps : les deux se déplient
                                               // au MÊME endroit, l'un sur
@@ -4061,6 +4168,75 @@ class _CallScreenState extends State<CallScreen> {
                     ),
                   ),
                 ),
+                // La conversation OUVERTE : sa propre couche, sur toute la
+                // largeur, au ras du bas (le clavier la soulève). Rangée en
+                // haut, il n'y reste que la saisie. Clé stable : le champ ne
+                // doit jamais être re-mappé (b2f3293).
+                if (_turnsOpen)
+                  Positioned(
+                    key: const ValueKey('turns_panel'),
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+                        ),
+                        child: _SpokenTurnsPanel(
+                          turns: _turns,
+                          myName: widget.displayName,
+                          myAvatarUrl: '',
+                          peerName: _peerProfile?.displayName ?? '',
+                          peerAvatarUrl: _peerProfile?.bestAvatarUrl ?? '',
+                          chatController: _chatCtrl,
+                          chatFocus: _chatFocus,
+                          sending: _chatSending,
+                          onSend: _sendCaption,
+                          top: _msgTop,
+                          composerOpen: _composerOpen,
+                          onOpenComposer: _openComposer,
+                          onToggleSide: () => _setMessagesSide(!_msgTop),
+                          hint: _tabHint,
+                          onHintDone: _endTabHint,
+                        ),
+                      ),
+                    ),
+                  ),
+                // Messages rangés EN HAUT : sous la barre d'état, à gauche de
+                // la vignette caméra (qui descend un peu pour leur laisser de
+                // l'air). Au repos comme ouverte.
+                if (_topMessagesShown)
+                  Positioned(
+                    key: const ValueKey('turns_top'),
+                    top: 4,
+                    left: 0,
+                    right: 118 + 12 + 10,
+                    child: _turnsOpen
+                        ? _TurnsBlock(
+                            turns: _turns,
+                            myName: widget.displayName,
+                            myAvatarUrl: '',
+                            peerName: _peerProfile?.displayName ?? '',
+                            peerAvatarUrl: _peerProfile?.bestAvatarUrl ?? '',
+                            top: true,
+                            onToggleSide: () => _setMessagesSide(false),
+                            hint: _tabHint,
+                            onHintDone: _endTabHint,
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.only(left: 28),
+                            child: _RestingTurns(
+                              turns: _turns,
+                              myName: widget.displayName,
+                              myAvatarUrl: '',
+                              peerName: _peerProfile?.displayName ?? '',
+                              peerAvatarUrl: _peerProfile?.bestAvatarUrl ?? '',
+                              onTap: _muteTurns,
+                            ),
+                          ),
+                  ),
                 // Brand watermark — top-centre, always on top of whatever
                 // call layout is showing (full-screen, PiP, split…).
                 Align(
@@ -4230,14 +4406,16 @@ class _RestingTurns extends StatelessWidget {
   }
 }
 
-/// La conversation de l'appel, rangée en bas à GAUCHE : les deux derniers tours
-/// en bulles de verre, la saisie dessous. On remonte le fil en faisant défiler.
-/// Tout le reste de l'appel s'efface le temps qu'elle est là, et un tap
-/// n'importe où la referme.
-class _SpokenTurnsPanel extends StatefulWidget {
+/// La conversation de l'appel, OUVERTE par la touche Messages, rangée EN BAS :
+/// le bloc de bulles (avec sa languette et sa pastille « N plus tôt ») et la
+/// saisie repliée en rond crayon. Posée sur toute la largeur de l'écran : la
+/// languette colle au bord gauche.
+///
+/// Rangée EN HAUT ([top]), le bloc est dessiné ailleurs (sous la barre d'état,
+/// à gauche de la vignette caméra) et il ne reste ici que la saisie.
+class _SpokenTurnsPanel extends StatelessWidget {
   const _SpokenTurnsPanel({
     required this.turns,
-    required this.onToggle,
     required this.myName,
     required this.myAvatarUrl,
     required this.peerName,
@@ -4246,10 +4424,15 @@ class _SpokenTurnsPanel extends StatefulWidget {
     required this.chatFocus,
     required this.sending,
     required this.onSend,
+    required this.top,
+    required this.composerOpen,
+    required this.onOpenComposer,
+    required this.onToggleSide,
+    required this.hint,
+    required this.onHintDone,
   });
 
   final List<_SpokenTurn> turns;
-  final VoidCallback onToggle;
   final String myName;
   final String myAvatarUrl;
   final String peerName;
@@ -4262,205 +4445,611 @@ class _SpokenTurnsPanel extends StatefulWidget {
   final bool sending;
   final Future<void> Function() onSend;
 
-  /// La hauteur qu'on laisse aux bulles : DEUX, et la troisième se devine
-  /// au-dessus — c'est ce qui invite à faire défiler. Au-delà on ne relit plus,
-  /// on subit, et la vidéo est ce qu'on est venu regarder. Les plus anciennes
-  /// ne sont pas jetées pour autant : on remonte le fil en faisant défiler.
-  ///
-  /// 132 et pas 90 : une bulle courte fait 45 avec son air, mais une phrase de
-  /// deux lignes en fait 64 — à 90 la seconde aurait été rognée dès qu'elle
-  /// dépasse une ligne, ce qui est le cas courant.
-  static const double maxHeight = 132;
+  final bool top;
+  final bool composerOpen;
+  final VoidCallback onOpenComposer;
+  final VoidCallback onToggleSide;
+  final bool hint;
+  final VoidCallback onHintDone;
 
-  /// Ce que la zone occupe en bas de l'écran, bulles pleines : les deux bulles,
-  /// l'en-tête, la saisie et l'air entre les trois. C'est ce dont le galet a
-  /// besoin pour savoir où se poser sans recouvrir quoi que ce soit.
-  static const double zoneHeight = maxHeight + 27 + 8 + 46 + 10;
+  /// Deux bulles d'une ligne (~38 chacune) et l'air entre elles. Au-delà on
+  /// remonte le fil en faisant défiler ; aucune troisième bulle estompée.
+  static const double maxHeight = 84;
 
-  @override
-  State<_SpokenTurnsPanel> createState() => _SpokenTurnsPanelState();
-}
+  /// Ce que la zone occupe en bas de l'écran (pastille, bulles, saisie et
+  /// air) : le galet en a besoin pour se poser au-dessus.
+  static const double zoneHeight = 30 + maxHeight + 58 + 10;
 
-class _SpokenTurnsPanelState extends State<_SpokenTurnsPanel> {
+  /// La saisie dépliée fait remonter les bulles d'autant.
+  static const double _composerLift = 58;
+
   @override
   Widget build(BuildContext context) {
-    final turns = widget.turns;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // L'en-tête : ce que c'est à gauche, comment s'en débarrasser à
-        // droite. Le geste de fermeture ne se devine pas — un panneau qui
-        // recouvre un visage doit dire lui-même comment on le retire.
-        //
-        // Le tap de fermeture est posé ICI et pas sur tout le panneau : plus
-        // bas il y a un champ de saisie, et un panneau qui se referme quand on
-        // touche son propre champ ne se remplirait jamais. Ailleurs sur
-        // l'écran, c'est la couche plein écran qui referme.
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: widget.onToggle,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // La pastille du direct : le même point qu'on met devant un
-                    // « en cours » partout ailleurs. C'est elle qui fait lire
-                    // « live » plutôt que « journal ».
-                    Container(
-                      width: 6,
-                      height: 6,
-                      margin: const EdgeInsets.only(right: 7),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        // Le cyan bleu de l'app, pas le turquoise de l'accent :
-                        // plus bleu, moins vert.
-                        color: SC.meshCyan,
-                      ),
-                    ),
-                    Text(
-                      AppStrings.t('call_turns_title'),
-                      style: const TextStyle(
-                        color: SC.meshCyan,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  AppStrings.t('call_turns_close'),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    fontSize: 10.5,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ],
+    final composer = Positioned(
+      left: 28,
+      right: 14,
+      bottom: 0,
+      height: 46,
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: _ComposerPill(
+          controller: chatController,
+          focusNode: chatFocus,
+          sending: sending,
+          onSend: onSend,
+          open: composerOpen,
+          onOpen: onOpenComposer,
+        ),
+      ),
+    );
+    if (top) {
+      return SizedBox(
+        height: 46,
+        width: double.infinity,
+        child: Stack(clipBehavior: Clip.none, children: [composer]),
+      );
+    }
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 84 + 10),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Crayon fermé : les bulles à la hauteur du rond, à sa gauche.
+          // Saisie ouverte : elles remontent au-dessus du champ.
+          AnimatedPadding(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.only(
+              right: composerOpen ? 14 : 70,
+              bottom: composerOpen ? _composerLift : 0,
+            ),
+            child: _TurnsBlock(
+              turns: turns,
+              myName: myName,
+              myAvatarUrl: myAvatarUrl,
+              peerName: peerName,
+              peerAvatarUrl: peerAvatarUrl,
+              top: false,
+              onToggleSide: onToggleSide,
+              hint: hint,
+              onHintDone: onHintDone,
             ),
           ),
-        ),
-        if (turns.isNotEmpty)
-          ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxHeight: _SpokenTurnsPanel.maxHeight,
-            ),
-            child: ListView.builder(
-              // À l'envers : la plus récente en bas, collée à la saisie, et on
-              // remonte le temps en faisant défiler. C'est aussi ce qui garde
-              // la vue calée sur la dernière quand une phrase arrive.
-              reverse: true,
-              // Sous la hauteur maximale, la liste épouse ses bulles : une
-              // phrase n'occupe pas la place de deux.
-              shrinkWrap: true,
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.zero,
-              itemCount: turns.length,
-              itemBuilder: (ctx, i) {
-                final turn = turns[turns.length - 1 - i];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _TurnBubble(
-                    turn: turn,
-                    name: turn.mine ? widget.myName : widget.peerName,
-                    avatarUrl:
-                        turn.mine ? widget.myAvatarUrl : widget.peerAvatarUrl,
-                  ),
-                );
-              },
-            ),
-          ),
-        // La saisie, sous les bulles : ce qu'on tape part traduit chez le pair
-        // et se dit chez lui à voix haute, exactement comme une phrase parlée.
-        _ChatComposer(
-          controller: widget.chatController,
-          focusNode: widget.chatFocus,
-          sending: widget.sending,
-          onSend: widget.onSend,
-        ),
-      ],
+          composer,
+        ],
+      ),
     );
   }
 }
 
-/// La saisie de l'appel : un champ de verre et un rond d'envoi.
+/// Le bloc de bulles de la conversation ouverte : la pastille « N plus tôt »,
+/// les deux dernières bulles (on remonte le fil en faisant défiler), et la
+/// languette collée au bord gauche qui le fait passer du bas au haut de
+/// l'écran — en la glissant ou d'un simple tap.
 ///
-/// Verre en nuance (GlassPanel), pas la vue native — celle-là avale vraiment
-/// les touches. Sans danger ici : le bug du clavier qui retombait n'était pas
-/// le verre mais des voisins non clés (b2f3293).
-class _ChatComposer extends StatelessWidget {
-  const _ChatComposer({
+/// Il entre en scène : les bulles montent, la languette glisse depuis le bord,
+/// la pastille apparaît. À la première ouverture, une démonstration montre que
+/// la languette se glisse.
+class _TurnsBlock extends StatefulWidget {
+  const _TurnsBlock({
+    required this.turns,
+    required this.myName,
+    required this.myAvatarUrl,
+    required this.peerName,
+    required this.peerAvatarUrl,
+    required this.top,
+    required this.onToggleSide,
+    required this.hint,
+    required this.onHintDone,
+  });
+
+  final List<_SpokenTurn> turns;
+  final String myName;
+  final String myAvatarUrl;
+  final String peerName;
+  final String peerAvatarUrl;
+  final bool top;
+  final VoidCallback onToggleSide;
+  final bool hint;
+  final VoidCallback onHintDone;
+
+  @override
+  State<_TurnsBlock> createState() => _TurnsBlockState();
+}
+
+class _TurnsBlockState extends State<_TurnsBlock>
+    with TickerProviderStateMixin {
+  static const _yellow = Color(0xFFF4FF1F);
+
+  /// L'entrée en scène, ~1,3 s.
+  late final AnimationController _enter = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1300),
+  );
+
+  /// La démonstration de la languette, après l'entrée.
+  late final AnimationController _demo = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3200),
+  );
+
+  /// Ce que le doigt a tiré la languette (vertical).
+  double _drag = 0;
+
+  /// Assez tiré pour changer de côté au lâcher.
+  static const double _switchAt = 70;
+
+  /// Le trajet montré par la démonstration.
+  static const double _demoTravel = 110;
+
+  @override
+  void initState() {
+    super.initState();
+    _enter.forward();
+    _enter.addStatusListener((s) {
+      if (s == AnimationStatus.completed && widget.hint && mounted) {
+        _demo.forward(from: 0);
+      }
+    });
+    _demo.addStatusListener((s) {
+      if (s == AnimationStatus.completed) widget.onHintDone();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _TurnsBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Un tap sur l'écran a arrêté la démonstration.
+    if (oldWidget.hint && !widget.hint) {
+      _demo.stop();
+      _demo.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _enter.dispose();
+    _demo.dispose();
+    super.dispose();
+  }
+
+  double _interval(double from, double to, Curve curve) {
+    final t = ((_enter.value - from) / (to - from)).clamp(0.0, 1.0);
+    return curve.transform(t);
+  }
+
+  /// Démonstration : deux petits sauts, puis le rond-doigt tire la languette
+  /// jusqu'à l'autre bord et la ramène.
+  ({double hop, double travel, double finger}) get _demoState {
+    final v = _demo.value;
+    if (!widget.hint || v == 0) return (hop: 0, travel: 0, finger: 0);
+    double hop = 0;
+    if (v < 0.22) hop = -7 * math.sin(math.pi * ((v / 0.11) % 1.0)).abs();
+    double travel = 0;
+    double finger = 0;
+    if (v >= 0.25 && v < 0.95) {
+      finger = 1;
+      final go = v < 0.6
+          ? Curves.easeInOut.transform((v - 0.25) / 0.35)
+          : 1 - Curves.easeInOut.transform((v - 0.6) / 0.35);
+      travel = (widget.top ? 1 : -1) * _demoTravel * go;
+    }
+    return (hop: hop, travel: travel, finger: finger);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_enter, _demo]),
+      builder: (context, _) {
+        final demo = _demoState;
+        final shift = _drag + demo.travel;
+        final bubblesIn = _interval(0.08, 0.55, Curves.easeOutCubic);
+        final tabIn = _interval(0.23, 0.6, Curves.easeOutCubic);
+        final pillIn = _interval(0.46, 0.7, Curves.easeOut);
+
+        final earlier = widget.turns.length - 2;
+        final Widget? pill = widget.hint && _demo.value > 0
+            ? _pill(AppStrings.t('call_tab_hint'), highlighted: true)
+            : (earlier > 0
+                ? _pill(
+                    AppStrings.t('call_earlier', args: {'n': '$earlier'}),
+                    highlighted: false,
+                  )
+                : null);
+        final pillBox = pill == null
+            ? const SizedBox.shrink()
+            : Opacity(
+                opacity: pillIn,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: widget.top ? 8 : 0,
+                    bottom: widget.top ? 0 : 8,
+                  ),
+                  child: pill,
+                ),
+              );
+
+        final list = Opacity(
+          opacity: bubblesIn,
+          child: Transform.translate(
+            offset: Offset(0, 70 * (1 - bubblesIn) * (widget.top ? -1 : 1)),
+            child: Transform.scale(
+              scale: 0.9 + 0.1 * bubblesIn,
+              alignment: widget.top ? Alignment.topLeft : Alignment.bottomLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxHeight: _SpokenTurnsPanel.maxHeight,
+                ),
+                child: ListView.builder(
+                  // À l'envers : la plus récente en bas, et on remonte le
+                  // temps en faisant défiler.
+                  reverse: true,
+                  shrinkWrap: true,
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  itemCount: widget.turns.length,
+                  itemBuilder: (ctx, i) {
+                    final turn = widget.turns[widget.turns.length - 1 - i];
+                    return Padding(
+                      padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
+                      child: _TurnBubble(
+                        turn: turn,
+                        name: turn.mine ? widget.myName : widget.peerName,
+                        avatarUrl: turn.mine
+                            ? widget.myAvatarUrl
+                            : widget.peerAvatarUrl,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final column = Padding(
+          // La place de la languette, sur le bord gauche.
+          padding: const EdgeInsets.only(left: 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: widget.top ? [list, pillBox] : [pillBox, list],
+          ),
+        );
+
+        final tab = Transform.translate(
+          offset: Offset(-22 * (1 - tabIn), demo.hop),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onToggleSide,
+            onVerticalDragUpdate: (d) => setState(() {
+              _drag = (_drag + d.delta.dy).clamp(-160.0, 160.0);
+            }),
+            onVerticalDragEnd: (_) {
+              final go = widget.top ? _drag > _switchAt : _drag < -_switchAt;
+              setState(() => _drag = 0);
+              if (go) widget.onToggleSide();
+            },
+            onVerticalDragCancel: () => setState(() => _drag = 0),
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topRight: Radius.circular(14),
+                    bottomRight: Radius.circular(14),
+                  ),
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                    child: Container(
+                      width: 20,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        borderRadius: const BorderRadius.only(
+                          topRight: Radius.circular(14),
+                          bottomRight: Radius.circular(14),
+                        ),
+                        border: Border(
+                          top: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.18),
+                          ),
+                          right: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.18),
+                          ),
+                          bottom: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.18),
+                          ),
+                        ),
+                      ),
+                      child: Icon(
+                        widget.top
+                            ? Icons.keyboard_double_arrow_down_rounded
+                            : Icons.keyboard_double_arrow_up_rounded,
+                        size: 18,
+                        color: _yellow,
+                      ),
+                    ),
+                  ),
+                ),
+                // Le rond-doigt de la démonstration, posé sur la languette.
+                if (demo.finger > 0)
+                  IgnorePointer(
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+
+        return Transform.translate(
+          offset: Offset(0, shift),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 64 + 20),
+                child: column,
+              ),
+              Positioned(
+                left: 0,
+                top: widget.top ? 10 : null,
+                bottom: widget.top ? null : 10,
+                child: tab,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _pill(String text, {required bool highlighted}) {
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!highlighted) ...[
+          const Icon(Icons.keyboard_arrow_up_rounded, size: 16, color: _yellow),
+          const SizedBox(width: 4),
+        ],
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: highlighted ? SC.onAccent : Colors.white,
+          ),
+        ),
+      ],
+    );
+    if (highlighted) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: _yellow,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: content,
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.42),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          ),
+          child: content,
+        ),
+      ),
+    );
+  }
+}
+
+/// La saisie de l'appel, REPLIÉE en rond crayon : un tap la déplie en champ
+/// (250 ms), le clavier monte. Elle se replie seule (voir l'écran d'appel) ;
+/// un texte resté dans le champ se signale alors par un point jaune.
+///
+/// Le champ reste dans l'arbre même replié ([Visibility] garde son état) : le
+/// retirer puis le remettre re-mapperait ses voisins, et le clavier y perdrait
+/// son focus — c'est le bug de b2f3293.
+class _ComposerPill extends StatefulWidget {
+  const _ComposerPill({
     required this.controller,
     required this.focusNode,
     required this.sending,
     required this.onSend,
+    required this.open,
+    required this.onOpen,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool sending;
   final Future<void> Function() onSend;
+  final bool open;
+  final VoidCallback onOpen;
+
+  @override
+  State<_ComposerPill> createState() => _ComposerPillState();
+}
+
+class _ComposerPillState extends State<_ComposerPill>
+    with SingleTickerProviderStateMixin {
+  static const _yellow = Color(0xFFF4FF1F);
+
+  /// Le rond apparaît avec un petit dépassement, ~0,45 s après l'ouverture.
+  late final AnimationController _appear = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 380),
+  );
+  Timer? _delay;
+
+  @override
+  void initState() {
+    super.initState();
+    _delay = Timer(const Duration(milliseconds: 450), () {
+      if (mounted) _appear.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _delay?.cancel();
+    _appear.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      borderRadius: 22,
-      color: Colors.black.withValues(alpha: 0.35),
-      padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              focusNode: focusNode,
-              minLines: 1,
-              maxLines: 3,
-              textCapitalization: TextCapitalization.sentences,
-              textInputAction: TextInputAction.send,
-              cursorColor: SC.accent,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              decoration: InputDecoration(
-                isDense: true,
-                filled: false,
-                hintText: AppStrings.t('call_chat_hint'),
-                hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 14,
+    return LayoutBuilder(
+      builder: (context, c) {
+        final full = c.maxWidth.isFinite ? c.maxWidth : 300.0;
+        return ScaleTransition(
+          scale: CurvedAnimation(
+            parent: _appear,
+            curve: Curves.easeOutBack,
+          ).drive(Tween(begin: 0.5, end: 1.0)),
+          child: FadeTransition(
+            opacity: _appear,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+              width: widget.open ? full : 46,
+              height: 46,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(23),
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(23),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: Stack(
+                      children: [
+                        Visibility(
+                          visible: widget.open,
+                          maintainState: true,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 0, 7, 0),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: widget.controller,
+                                    focusNode: widget.focusNode,
+                                    maxLines: 1,
+                                    textCapitalization:
+                                        TextCapitalization.sentences,
+                                    textInputAction: TextInputAction.send,
+                                    cursorColor: SC.accent,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                    ),
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      filled: false,
+                                      hintText: AppStrings.t('call_chat_hint'),
+                                      hintStyle: TextStyle(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.6),
+                                        fontSize: 14,
+                                      ),
+                                      border: InputBorder.none,
+                                      contentPadding:
+                                          const EdgeInsets.fromLTRB(8, 8, 0, 8),
+                                    ),
+                                    onSubmitted: (_) => widget.onSend(),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                PadTap(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: widget.sending ? null : widget.onSend,
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      // Bleu de marque ; grisé pendant
+                                      // l'envoi — un second tap enverrait deux
+                                      // fois.
+                                      color: widget.sending
+                                          ? Colors.white24
+                                          : const Color(0xFF1F5EFF),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.arrow_upward_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (!widget.open)
+                          Positioned.fill(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: widget.onOpen,
+                              child: ValueListenableBuilder<TextEditingValue>(
+                                valueListenable: widget.controller,
+                                builder: (_, v, _) => Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.edit,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                    // Un brouillon attend dans le champ.
+                                    if (v.text.trim().isNotEmpty)
+                                      Positioned(
+                                        top: 9,
+                                        right: 9,
+                                        child: Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: const BoxDecoration(
+                                            color: _yellow,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.fromLTRB(10, 8, 0, 8),
-              ),
-              onSubmitted: (_) => onSend(),
-            ),
-          ),
-          const SizedBox(width: 4),
-          PadTap(
-            behavior: HitTestBehavior.opaque,
-            onTap: sending ? null : onSend,
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                // Grisé pendant la traduction : la phrase est partie chercher
-                // ses mots, un second tap l'enverrait deux fois.
-                color: sending ? Colors.white24 : SC.accent,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.arrow_upward_rounded,
-                color: Colors.white,
-                size: 18,
               ),
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -4494,10 +5083,18 @@ class _TurnBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final avatar = ProfileAvatar(
-      displayName: name,
-      avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
-      size: 26,
+    // Liseré blanc 1,5 px à 50 % : la PDP se détache de la vidéo derrière.
+    final avatar = Container(
+      padding: const EdgeInsets.all(1.5),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: 0.5),
+      ),
+      child: ProfileAvatar(
+        displayName: name,
+        avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
+        size: 23,
+      ),
     );
 
     // UNE seule teinte, transparente, pour tout le monde : le verre sombre qui
@@ -4519,7 +5116,7 @@ class _TurnBubble extends StatelessWidget {
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
               color: fill,
               borderRadius: BorderRadius.circular(18),
@@ -4540,7 +5137,7 @@ class _TurnBubble extends StatelessWidget {
                 // doit pouvoir la relire pour la redire, mais on voit d'un
                 // coup d'œil qu'elle n'est pas partie.
                 color: turn.delivered ? ink : ink.withValues(alpha: 0.4),
-                fontSize: 14.5,
+                fontSize: 15.5,
                 height: 1.3,
                 fontWeight: FontWeight.w400,
                 fontStyle:
