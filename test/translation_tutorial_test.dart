@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:livekit_translate/services/app_strings.dart';
+import 'package:livekit_translate/swayco/realtime_translation_port.dart';
 import 'package:livekit_translate/widgets/translation_tutorial.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -70,6 +71,74 @@ void main() {
     await tester.tap(find.byIcon(Icons.close_rounded));
     await tester.tap(find.text("J'ai compris"));
     expect(closed, 2);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('branché sur l\'appel : les étapes suivent ce que je fais',
+      (tester) async {
+    final voice = ValueNotifier<double>(0);
+    final lines = ValueNotifier<SpokenLine>(const SpokenLine(seq: 0, text: ''));
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 400,
+          height: 800,
+          child: TranslationTutorial(
+            peerName: 'Aiko',
+            peerLang: 'ja',
+            peerPhotoUrl: '',
+            myVoice: voice,
+            myLines: lines,
+            orbBuilder: (tts, level) => const SizedBox(width: 10, height: 10),
+            onClose: () {},
+          ),
+        ),
+      ),
+    ));
+    // Au repos : on m'invite à parler, rien ne bouge tout seul.
+    expect(find.text('Parle normalement'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.text('Parle normalement'), findsOneWidget);
+    expect(find.text('Patiente 2 à 3 secondes…'), findsNothing);
+
+    // Je parle : badge « Tu parles » sur ma vignette.
+    voice.value = 0.3;
+    await tester.pump();
+    expect(find.text('Tu parles'), findsWidgets);
+
+    // Je me tais : après un court silence, « Patiente ».
+    voice.value = 0;
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(find.text('Patiente 2 à 3 secondes…'), findsOneWidget);
+    expect(find.text('La traduction arrive…'), findsOneWidget);
+
+    // Ma phrase part : MA vraie phrase chez moi, SA traduction chez l'autre.
+    lines.value = const SpokenLine(
+      seq: 1,
+      text: 'Je suis à Nantes',
+      translated: 'ナントにいます',
+    );
+    await tester.pump();
+    expect(find.text('Aiko a reçu ta traduction'), findsOneWidget);
+    expect(find.text('Je suis à Nantes'), findsOneWidget);
+    expect(find.text('ナントにいます'), findsOneWidget);
+
+    // Puis « à toi ».
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('À toi, tu peux reparler'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.text('Parle normalement'), findsOneWidget);
+
+    // Une phrase qui n'a pas pu partir ne fait pas croire qu'elle est arrivée.
+    voice.value = 0.3;
+    await tester.pump();
+    voice.value = 0;
+    await tester.pump(const Duration(milliseconds: 450));
+    lines.value = const SpokenLine(seq: 2, text: 'euh', delivered: false);
+    await tester.pump();
+    expect(find.text('Aiko a reçu ta traduction'), findsNothing);
+    expect(find.text('Parle normalement'), findsOneWidget);
+
     await tester.pumpWidget(const SizedBox());
   });
 

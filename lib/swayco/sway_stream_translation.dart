@@ -47,11 +47,19 @@ class SwayStreamTranslation extends ChangeNotifier
   ValueListenable<SpokenLine> get localTranscript => _localTranscript;
 
   /// Appelé par le pipeline dès qu'une phrase est reconnue au micro.
-  void _emitLocalTranscript(String text, {bool delivered = true}) {
+  void _emitLocalTranscript(
+    String text, {
+    bool delivered = true,
+    String translated = '',
+  }) {
     final t = text.trim();
     if (t.isEmpty) return;
-    _localTranscript.value =
-        SpokenLine(seq: ++_transcriptSeq, text: t, delivered: delivered);
+    _localTranscript.value = SpokenLine(
+      seq: ++_transcriptSeq,
+      text: t,
+      delivered: delivered,
+      translated: translated,
+    );
   }
 
   static const String _captionTopic = 'swayco-chat';
@@ -298,7 +306,7 @@ class SwayStreamTranslation extends ChangeNotifier
 
     // Mes propres mots, dans MA langue → la légende locale les affiche (le pair,
     // lui, reçoit déjà 'trans' par le canal de données).
-    _emitLocalTranscript(orig);
+    _emitLocalTranscript(orig, translated: transToSend);
 
     final room = _room;
     final route = _route;

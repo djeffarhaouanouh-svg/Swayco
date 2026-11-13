@@ -24,9 +24,15 @@ class SpokenLine {
     required this.seq,
     required this.text,
     this.delivered = true,
+    this.translated = '',
   });
   final int seq;
   final String text;
+
+  /// La traduction de [text] telle qu'elle vient de partir vers le pair (vide si
+  /// rien n'est parti). Sert à l'explication de la traduction, qui montre ce que
+  /// l'autre reçoit ; le pipeline lui-même ne la relit pas.
+  final String translated;
 
   /// False when the phrase was heard but never reached the peer — the repair
   /// route declined it. The caption still shows it, dimmed, so the speaker can

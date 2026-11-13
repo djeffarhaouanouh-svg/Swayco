@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,20 +8,30 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/app_strings.dart';
 import '../services/languages.dart';
+import '../swayco/realtime_translation_port.dart';
 import '../theme/swayco_theme.dart';
 
 /// « Animation d'explication de la traduction en appel » : deux écrans d'appel
-/// côte à côte (le tien, celui de l'autre) qui rejouent en boucle ce qui se
-/// passe quand tu parles — tu parles, tu patientes un instant, l'autre reçoit
-/// la traduction, tu peux reparler.
+/// côte à côte (le tien, celui de l'autre) et quatre étapes — tu parles, tu
+/// patientes, l'autre reçoit la traduction, tu peux reparler.
 ///
-/// C'est une DÉMO scriptée (montrée avant qu'on ait réellement parlé), pas le
-/// reflet de l'état de l'appel : les étapes tournent sur un minuteur. Le délai
-/// annoncé (« 2 à 3 secondes ») est une estimation, pas une mesure de bout en
-/// bout — voir `tuto_tr_title`.
+/// BRANCHÉ SUR L'APPEL quand [myVoice] et [myLines] sont fournis (c'est le cas
+/// dans l'appel) : les étapes suivent ce que tu fais vraiment.
+///   1. Tu parles     — ton micro capte de la vraie parole ([myVoice] > 0).
+///   2. Patiente      — tu t'es tu, ta phrase n'est pas encore partie.
+///   3. Reçu          — ta phrase reconnue vient de partir vers l'autre
+///                      ([myLines] change, `delivered`) : ta phrase s'affiche
+///                      chez toi, sa traduction chez lui.
+///   4. Reparle       — un instant après l'envoi.
+/// LiveKit ne renvoie aucun accusé de réception : « a reçu » veut dire
+/// « envoyée », comme le dit le dossier. Une phrase qui n'a pas pu partir
+/// ramène simplement à l'étape 1.
 ///
-/// Le galet est celui de la vraie page d'appel : l'appelant le fournit par
-/// [orbBuilder] (le widget vit dans `call_screen.dart`).
+/// Sans ces signaux (aperçu, tests), la même animation tourne en boucle sur un
+/// minuteur, avec une phrase d'exemple.
+///
+/// Le délai annoncé (« 2 à 3 secondes ») est une estimation, pas une mesure.
+/// Le galet est celui de la vraie page d'appel, fourni par [orbBuilder].
 class TranslationTutorial extends StatefulWidget {
   const TranslationTutorial({
     super.key,
@@ -29,12 +40,14 @@ class TranslationTutorial extends StatefulWidget {
     required this.peerPhotoUrl,
     required this.orbBuilder,
     required this.onClose,
+    this.myVoice,
+    this.myLines,
   });
 
   /// Le prénom de la personne en appel ; vide = un exemple (« Aiko »).
   final String peerName;
 
-  /// Sa langue (`ja`, `fr`…) : le texte d'exemple est lu dans cette langue.
+  /// Sa langue (`ja`, `fr`…).
   final String peerLang;
 
   /// Sa photo, ou vide : un fond de marque à la place.
@@ -49,6 +62,12 @@ class TranslationTutorial extends StatefulWidget {
 
   final VoidCallback onClose;
 
+  /// Ma voix au micro, 0..1 (0 quand je ne parle pas vraiment).
+  final ValueListenable<double>? myVoice;
+
+  /// Mes phrases reconnues, au moment où elles partent vers l'autre.
+  final ValueListenable<SpokenLine>? myLines;
+
   static const String _seenKey = 'seen_translation_tuto';
 
   /// Le tuto n'a jamais été montré sur cet appareil.
@@ -61,7 +80,7 @@ class TranslationTutorial extends StatefulWidget {
     }
   }
 
-  /// Ne revient plus : posé dès qu'il a été vu (ou fermé).
+  /// Ne revient plus : posé dès qu'il a été fermé.
   static Future<void> markSeen() async {
     try {
       final p = await SharedPreferences.getInstance();
@@ -75,10 +94,32 @@ class TranslationTutorial extends StatefulWidget {
 
 class _TranslationTutorialState extends State<TranslationTutorial> {
   static const _yellow = Color(0xFFF4FF1F);
-  static const _durations = [2400, 2200, 2200, 2200];
+
+  /// Démo : durée de chaque étape.
+  static const _demoDurations = [2400, 2200, 2200, 2200];
+
+  /// Branché : silence qui marque la fin de ma phrase (le pipeline ferme une
+  /// phrase après 300 ms de silence ; un peu plus pour ne pas clignoter).
+  static const _endOfSpeech = Duration(milliseconds: 400);
+
+  /// Branché : sans phrase partie après ce délai, on revient à « Parle ».
+  static const _waitGiveUp = Duration(seconds: 12);
+
+  /// Branché : « à toi » s'affiche ce temps-là, puis on attend la phrase suivante.
+  static const _yourTurnFor = Duration(milliseconds: 2500);
 
   int _step = 0;
+
+  /// Je suis en train de parler (cadre jaune, badge). En démo : à l'étape 1.
+  bool _speakingNow = false;
+
+  /// Branché : ma dernière phrase partie, et sa traduction.
+  String _myText = '';
+  String _peerText = '';
+  int _lastSeq = 0;
+
   Timer? _timer;
+  Timer? _quiet;
 
   // Deux galets, un par écran : chacun a ses propres signaux.
   final _myTts = ValueNotifier<bool>(false);
@@ -86,44 +127,27 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
   final _peerTts = ValueNotifier<bool>(false);
   final _peerLevel = ValueNotifier<double>(0.05);
 
+  bool get _live => widget.myVoice != null && widget.myLines != null;
+
   @override
   void initState() {
     super.initState();
-    _apply(0);
-  }
-
-  /// Pose l'étape [s] : met les galets dans l'état de cette étape, puis
-  /// programme la suivante.
-  void _apply(int s) {
-    _step = s;
-    switch (s) {
-      case 0: // Tu parles.
-        _myLevel.value = 1;
-        _myTts.value = false;
-        _peerLevel.value = 0.05;
-        _peerTts.value = false;
-      case 1: // Patiente.
-        _myLevel.value = 0.05;
-        _peerLevel.value = 0.12;
-      case 2: // L'autre reçoit : sa traduction est dite chez lui.
-        _myLevel.value = 0.05;
-        _peerTts.value = true;
-        _peerLevel.value = 0.9;
-      default: // Tu peux reparler.
-        _peerTts.value = false;
-        _peerLevel.value = 0.05;
-        _myLevel.value = 0.35;
+    if (_live) {
+      _lastSeq = widget.myLines!.value.seq;
+      widget.myVoice!.addListener(_onVoice);
+      widget.myLines!.addListener(_onLine);
+      _goLive(0);
+    } else {
+      _demo(0);
     }
-    if (mounted) setState(() {});
-    _timer?.cancel();
-    _timer = Timer(Duration(milliseconds: _durations[s]), () {
-      if (mounted) _apply((s + 1) % 4);
-    });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _quiet?.cancel();
+    widget.myVoice?.removeListener(_onVoice);
+    widget.myLines?.removeListener(_onLine);
     _myTts.dispose();
     _myLevel.dispose();
     _peerTts.dispose();
@@ -131,18 +155,141 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
     super.dispose();
   }
 
-  String get _name => widget.peerName.trim().isEmpty ? 'Aiko' : widget.peerName.trim();
+  // ── Branché sur l'appel ─────────────────────────────────────────────────
+
+  void _onVoice() {
+    final v = widget.myVoice!.value;
+    if (v > 0) {
+      _quiet?.cancel();
+      _quiet = null;
+      _myLevel.value = (0.4 + v * 2).clamp(0.0, 1.0);
+      if (_step != 0 || !_speakingNow) _goLive(0, speaking: true);
+    } else {
+      _myLevel.value = 0.05;
+      // Je me tais : passé un court silence, ma phrase est en route.
+      if (_speakingNow && _quiet == null) {
+        _quiet = Timer(_endOfSpeech, () {
+          _quiet = null;
+          if (mounted) _goLive(1);
+        });
+      }
+    }
+  }
+
+  void _onLine() {
+    final line = widget.myLines!.value;
+    if (line.seq == _lastSeq) return;
+    _lastSeq = line.seq;
+    if (!line.delivered || line.text.trim().isEmpty) {
+      // Pas partie : on ne prétend pas qu'elle est arrivée.
+      _goLive(0);
+      return;
+    }
+    _myText = line.text.trim();
+    _peerText = line.translated.trim();
+    _goLive(2);
+  }
+
+  void _goLive(int s, {bool speaking = false}) {
+    _timer?.cancel();
+    _step = s;
+    _speakingNow = s == 0 && speaking;
+    switch (s) {
+      case 0:
+        if (speaking) {
+          // Une nouvelle phrase commence : l'ancienne s'efface.
+          _myText = '';
+          _peerText = '';
+        }
+        _peerTts.value = false;
+        _peerLevel.value = 0.05;
+      case 1:
+        _myLevel.value = 0.05;
+        _peerLevel.value = 0.12;
+        _timer = Timer(_waitGiveUp, () {
+          if (mounted) _goLive(0);
+        });
+      case 2:
+        _peerTts.value = true;
+        _peerLevel.value = 0.9;
+        // Le temps de lire (et pour lui, d'entendre) la phrase.
+        final int ms = (60 * math.max(_myText.length, _peerText.length))
+            .clamp(1500, 6000)
+            .toInt();
+        _timer = Timer(Duration(milliseconds: ms), () {
+          if (mounted) _goLive(3);
+        });
+      default:
+        _peerTts.value = false;
+        _peerLevel.value = 0.05;
+        _myLevel.value = 0.35;
+        _timer = Timer(_yourTurnFor, () {
+          if (mounted) _goLive(0);
+        });
+    }
+    if (mounted) setState(() {});
+  }
+
+  // ── Démo (sans appel) ───────────────────────────────────────────────────
+
+  void _demo(int s) {
+    _step = s;
+    _speakingNow = s == 0;
+    switch (s) {
+      case 0:
+        _myLevel.value = 1;
+        _peerLevel.value = 0.05;
+        _peerTts.value = false;
+      case 1:
+        _myLevel.value = 0.05;
+        _peerLevel.value = 0.12;
+      case 2:
+        _peerTts.value = true;
+        _peerLevel.value = 0.9;
+      default:
+        _peerTts.value = false;
+        _peerLevel.value = 0.05;
+        _myLevel.value = 0.35;
+    }
+    if (mounted) setState(() {});
+    _timer?.cancel();
+    _timer = Timer(Duration(milliseconds: _demoDurations[s]), () {
+      if (mounted) _demo((s + 1) % 4);
+    });
+  }
+
+  // ── Rendu ────────────────────────────────────────────────────────────────
+
+  String get _name =>
+      widget.peerName.trim().isEmpty ? 'Aiko' : widget.peerName.trim();
 
   String _t(String key, {Map<String, String> args = const {}}) =>
       AppStrings.t(key, args: {'name': _name, ...args});
 
   /// Le nom de la langue de l'autre, dans MA langue (« japonais »).
   String get _peerLangName {
-    final code = widget.peerLang.trim().split(RegExp(r'[-_]')).first.toLowerCase();
+    final code =
+        widget.peerLang.trim().split(RegExp(r'[-_]')).first.toLowerCase();
     if (code.isEmpty) return '';
     final n = AppStrings.t('lang_name_$code');
     if (n != 'lang_name_$code') return n;
     return findLanguageByCode(code)?.label ?? code.toUpperCase();
+  }
+
+  /// Ma bulle : en démo, la phrase d'exemple pendant que je parle ; branché,
+  /// ma vraie phrase, une fois partie.
+  String? get _myBubble {
+    if (_live) return _step == 2 && _myText.isNotEmpty ? _myText : null;
+    return _step <= 1
+        ? AppStrings.tIn(AppStrings.currentBcp47.value, 'tuto_tr_sample')
+        : null;
+  }
+
+  /// La bulle de l'autre : ce qu'il reçoit, dans sa langue.
+  String? get _peerBubble {
+    if (_step != 2) return null;
+    if (_live) return _peerText.isNotEmpty ? _peerText : null;
+    return AppStrings.tIn(widget.peerLang, 'tuto_tr_sample');
   }
 
   @override
@@ -182,17 +329,11 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: _screen(
-                        title: _t('tuto_tr_you'),
-                        mine: true,
-                      ),
+                      child: _screen(title: _t('tuto_tr_you'), mine: true),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: _screen(
-                        title: _t('tuto_tr_peer'),
-                        mine: false,
-                      ),
+                      child: _screen(title: _t('tuto_tr_peer'), mine: false),
                     ),
                   ],
                 ),
@@ -282,11 +423,7 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
   }
 
   Widget _canvas(bool mine) {
-    final speaking = mine && _step == 0;
-    final sample = AppStrings.tIn(
-      mine ? AppStrings.currentBcp47.value : widget.peerLang,
-      'tuto_tr_sample',
-    );
+    final speaking = mine && _speakingNow;
     // Les libellés sous le galet, par écran et par étape.
     String? label;
     var labelYellow = false;
@@ -306,8 +443,7 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
       };
       labelYellow = _step == 2;
     }
-    final showMyBubble = mine && _step <= 1;
-    final showPeerBubble = !mine && _step == 2;
+    final bubble = mine ? _myBubble : _peerBubble;
     const orbY = 540.0;
     return ClipRRect(
       borderRadius: BorderRadius.circular(52),
@@ -366,40 +502,26 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
             ),
           ),
           if (speaking)
-            Positioned(
-              top: 240,
-              right: 12,
-              child: _badge(_t('tuto_tr_s1')),
-            ),
-          // Les bulles.
-          if (showMyBubble)
+            Positioned(top: 240, right: 12, child: _badge(_t('tuto_tr_s1'))),
+          if (bubble != null)
             Positioned(
               top: 300,
-              right: 18,
-              left: 80,
+              left: mine ? 80 : 18,
+              right: mine ? 18 : 80,
               child: Align(
-                alignment: Alignment.centerRight,
-                child: _bubble(sample, mine: true),
-              ),
-            ),
-          if (showPeerBubble)
-            Positioned(
-              top: 300,
-              left: 18,
-              right: 80,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: _bubble(sample, mine: false),
+                alignment:
+                    mine ? Alignment.centerRight : Alignment.centerLeft,
+                child: _bubble(bubble, mine: mine),
               ),
             ),
           // L'anneau d'attente, autour du galet, à l'étape « Patiente ».
           if (mine && _step == 1)
-            Positioned(
+            const Positioned(
               top: orbY - 48,
               left: 195 - 48,
               width: 96,
               height: 96,
-              child: const CircularProgressIndicator(
+              child: CircularProgressIndicator(
                 strokeWidth: 4,
                 color: _yellow,
                 backgroundColor: Color(0x24FFFFFF),
@@ -487,7 +609,11 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
               ? const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFF1F5EFF), Color(0xFF2B7FFF), Color(0xFF18DDEA)],
+                  colors: [
+                    Color(0xFF1F5EFF),
+                    Color(0xFF2B7FFF),
+                    Color(0xFF18DDEA),
+                  ],
                 )
               : null,
           color: mine ? null : Colors.white.withValues(alpha: 0.16),
@@ -503,7 +629,10 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
         ),
         child: Text(
           text,
-          style: const TextStyle(color: Colors.white, fontSize: 17, height: 1.35),
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+          style:
+              const TextStyle(color: Colors.white, fontSize: 17, height: 1.35),
         ),
       );
 

@@ -494,7 +494,15 @@ class _CallScreenState extends State<CallScreen> {
   void _publishVoiceLevel() {
     final v = _localVoice > _remoteVoice ? _localVoice : _remoteVoice;
     if ((v - _voiceLevel.value).abs() > 0.005) _voiceLevel.value = v;
+    // MA voix seule (vraie parole au micro, 0 sinon) : l'explication de la
+    // traduction s'en sert pour savoir quand je parle et quand je me tais.
+    if ((_localVoice - _myVoiceLevel.value).abs() > 0.005) {
+      _myVoiceLevel.value = _localVoice;
+    }
   }
+
+  /// Ma voix seule, 0..1 — voir [_publishVoiceLevel].
+  final ValueNotifier<double> _myVoiceLevel = ValueNotifier<double>(0);
 
   /// Niveau de voix courant (0..1), toutes voix humaines confondues : le max
   /// des [Participant.audioLevel] que LiveKit publie à chaque changement de
@@ -3296,6 +3304,7 @@ class _CallScreenState extends State<CallScreen> {
     ttsSpeaking.removeListener(_syncTranslationSpeaking);
     ttsSpeaking.dispose();
     _voiceLevel.dispose();
+    _myVoiceLevel.dispose();
     _dockIdleTimer?.cancel();
     _micProbe?.cancel();
     final declineCh = _declineChannel;
@@ -4093,6 +4102,9 @@ class _CallScreenState extends State<CallScreen> {
               peerName: peerFirstName ?? '',
               peerLang: _peerProfile?.language ?? '',
               peerPhotoUrl: _peerProfile?.bestAvatarUrl ?? '',
+              // Branché sur l'appel : les étapes suivent ce que je fais vraiment.
+              myVoice: _myVoiceLevel,
+              myLines: widget.translation.localTranscript,
               orbBuilder: (tts, level) => TranslationOrb(
                 on: true,
                 micOn: true,
