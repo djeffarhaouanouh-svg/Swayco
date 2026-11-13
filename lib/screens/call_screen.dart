@@ -50,6 +50,7 @@ import '../widgets/glass_panel.dart';
 import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/translation_tutorial.dart';
 import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_popups_extra.dart';
 import '../widgets/swayco_wordmark.dart';
@@ -1421,6 +1422,11 @@ class _CallScreenState extends State<CallScreen> {
   /// metadata) and is overridden the moment they tap their own language button.
   String _peerListenLang = '';
 
+  /// L'explication de la traduction (jamais vue sur cet appareil) : à montrer
+  /// une fois l'appel connecté, puis fermée pour de bon.
+  bool _trTutoPending = false;
+  bool _trTutoDismissed = false;
+
   /// The output language we last announced to the peer, so a re-announce on
   /// their (re)connect doesn't republish on every metadata event.
   String _announcedOutputLang = '';
@@ -1701,6 +1707,10 @@ class _CallScreenState extends State<CallScreen> {
     super.initState();
     widget.translation.localTranscript?.addListener(_onMyTranscript);
     Analytics.track('screen_view', props: {'screen': 'live'});
+    // L'explication de la traduction : seulement si elle n'a jamais été vue.
+    unawaited(TranslationTutorial.shouldShow().then((v) {
+      if (v && mounted) setState(() => _trTutoPending = true);
+    }));
     // Le bouton REC : autorisé par la liste du serveur (en plus de l'e-mail
     // compilé). Silencieux en cas d'erreur : le bouton reste simplement caché.
     unawaited(EgressApi.checkAllowed().then((ok) {
@@ -3344,7 +3354,10 @@ class _CallScreenState extends State<CallScreen> {
         ? null
         : widget.displayName.trim().split(' ').first;
 
-    return PopScope(
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+    PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
@@ -3646,12 +3659,12 @@ class _CallScreenState extends State<CallScreen> {
                     // à chaque image d'une taille qui change. La conversation
                     // le réduit pareil : sous elle il n'est plus le sujet.
                     scale: (_sheetOpen || _turnsOpen)
-                        ? 56 / _TranslationOrb.kSize
+                        ? 56 / TranslationOrb.kSize
                         : 1,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _TranslationOrb(
+                        TranslationOrb(
                           // Sous un panneau, les ondes iraient chercher l'œil
                           // pour rien.
                           ripples: !_sheetOpen,
@@ -4035,6 +4048,31 @@ class _CallScreenState extends State<CallScreen> {
             ),
           ),
         ),
+    ),
+        // L'explication de la traduction, UNE fois : par-dessus l'appel, qui
+        // continue dessous (l'overlay ne touche ni au micro ni à la voix).
+        // Fermable d'un geste ; ne revient plus une fois vue.
+        if (_trTutoPending && !_trTutoDismissed)
+          Positioned.fill(
+            child: TranslationTutorial(
+              peerName: peerFirstName ?? '',
+              peerLang: _peerProfile?.language ?? '',
+              peerPhotoUrl: _peerProfile?.bestAvatarUrl ?? '',
+              orbBuilder: (tts, level) => TranslationOrb(
+                on: true,
+                micOn: true,
+                ttsSpeaking: tts,
+                voiceLevel: level,
+                onTap: () {},
+                onLongPress: () {},
+              ),
+              onClose: () {
+                setState(() => _trTutoDismissed = true);
+                unawaited(TranslationTutorial.markSeen());
+              },
+            ),
+          ),
+      ],
     );
   }
 
@@ -4811,8 +4849,9 @@ class _DockKeyButton extends StatelessWidget {
 /// pointillé, un simple triangle de lecture. Rien ne bouge, et les tickers sont
 /// arrêtés — pas d'animation qui brûle la batterie pour dire « je ne fais
 /// rien ».
-class _TranslationOrb extends StatefulWidget {
-  const _TranslationOrb({
+class TranslationOrb extends StatefulWidget {
+  const TranslationOrb({
+    super.key,
     required this.on,
     required this.ttsSpeaking,
     required this.voiceLevel,
@@ -4865,10 +4904,10 @@ class _TranslationOrb extends StatefulWidget {
   static const double box = kSize * boxFactor;
 
   @override
-  State<_TranslationOrb> createState() => _TranslationOrbState();
+  State<TranslationOrb> createState() => TranslationOrbState();
 }
 
-class _TranslationOrbState extends State<_TranslationOrb>
+class TranslationOrbState extends State<TranslationOrb>
     with TickerProviderStateMixin {
   /// Six mouvements, six périodes sans rapport entre elles (9 s, 5 s, 6,5 s,
   /// 3,8 s, 3,4 s, 1 s). Les faire dériver d'une seule horloge demanderait une
@@ -4966,20 +5005,20 @@ class _TranslationOrbState extends State<_TranslationOrb>
   }
 
   @override
-  void didUpdateWidget(covariant _TranslationOrb old) {
-    super.didUpdateWidget(old);
-    if (old.ttsSpeaking != widget.ttsSpeaking) {
-      old.ttsSpeaking.removeListener(_retarget);
+  void didUpdateWidget(covariant TranslationOrb oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.ttsSpeaking != widget.ttsSpeaking) {
+      oldWidget.ttsSpeaking.removeListener(_retarget);
       widget.ttsSpeaking.addListener(_retarget);
     }
-    if (old.voiceLevel != widget.voiceLevel) {
-      old.voiceLevel.removeListener(_retarget);
+    if (oldWidget.voiceLevel != widget.voiceLevel) {
+      oldWidget.voiceLevel.removeListener(_retarget);
       widget.voiceLevel.addListener(_retarget);
     }
-    if (old.on != widget.on) _syncRunning();
+    if (oldWidget.on != widget.on) _syncRunning();
     // Le micro vient de se couper : le galet doit retomber tout de suite, pas
     // attendre le prochain changement de niveau — muet, il n'en viendra plus.
-    if (old.micOn != widget.micOn) _retarget();
+    if (oldWidget.micOn != widget.micOn) _retarget();
   }
 
   /// Endormie, la pierre ne bouge pas : on arrête les six tickers plutôt que de
@@ -5078,8 +5117,8 @@ class _TranslationOrbState extends State<_TranslationOrb>
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
         child: SizedBox(
-          width: _TranslationOrb.box,
-          height: _TranslationOrb.box,
+          width: TranslationOrb.box,
+          height: TranslationOrb.box,
           child: widget.on ? _live() : _dormant(),
         ),
       ),
@@ -5133,8 +5172,8 @@ class _TranslationOrbState extends State<_TranslationOrb>
   Widget _dormant() {
     return Center(
       child: SizedBox(
-        width: _TranslationOrb.kSize * _TranslationOrb.dormantRatio,
-        height: _TranslationOrb.kSize * _TranslationOrb.dormantRatio,
+        width: TranslationOrb.kSize * TranslationOrb.dormantRatio,
+        height: TranslationOrb.kSize * TranslationOrb.dormantRatio,
         child: ClipOval(
           child: BackdropFilter(
             filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
@@ -5143,9 +5182,9 @@ class _TranslationOrbState extends State<_TranslationOrb>
               child: Center(
                 child: Icon(
                   Icons.play_arrow_rounded,
-                  size: _TranslationOrb.kSize *
-                      _TranslationOrb.dormantRatio *
-                      _TranslationOrb.dormantIconRatio,
+                  size: TranslationOrb.kSize *
+                      TranslationOrb.dormantRatio *
+                      TranslationOrb.dormantIconRatio,
                   color: Colors.white.withValues(alpha: 0.5),
                 ),
               ),
@@ -5252,7 +5291,7 @@ class _OrbPainter extends CustomPainter {
     // les ondes. Le galet, lui, se dessine au CENTRE, à sa taille propre.
     // k rapporte les cotes, toutes données pour un galet de 130, à la taille
     // réelle ; r est le rayon du galet dans la toile élargie.
-    final k = size.width / (_TranslationOrb.boxFactor * 130);
+    final k = size.width / (TranslationOrb.boxFactor * 130);
     final r = 130 * k / 2;
 
     // Le flottement : tout le galet monte de 13 px et redescend.
