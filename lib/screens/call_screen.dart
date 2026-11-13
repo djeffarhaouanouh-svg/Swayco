@@ -227,6 +227,12 @@ class _CallScreenState extends State<CallScreen> {
   static const Duration _kRestTtl = Duration(seconds: 10);
   Timer? _restTimer;
 
+  /// Au repos, la plus ANCIENNE des deux bulles part plus tôt que la récente :
+  /// elle a déjà été lue, la récente est celle qu'on suit.
+  static const Duration _kRestOlderTtl = Duration(seconds: 5);
+  Timer? _restOlderTimer;
+  bool _restShowOlder = true;
+
   // ── Zone messages : côté, saisie repliée, démonstration ────────────────
   /// Les messages sont rangés EN HAUT de l'écran (sinon en bas, par défaut).
   /// Choisi en glissant (ou touchant) la languette, mémorisé sur l'appareil.
@@ -625,6 +631,13 @@ class _CallScreenState extends State<CallScreen> {
       _turnsHidden = false;
       _restTimer?.cancel();
       _restTimer = Timer(_kRestTtl, _hideTurns);
+      // La plus ancienne des deux revient avec la nouvelle phrase, puis part
+      // seule au bout de [_kRestOlderTtl].
+      _restShowOlder = true;
+      _restOlderTimer?.cancel();
+      _restOlderTimer = Timer(_kRestOlderTtl, () {
+        if (mounted) setState(() => _restShowOlder = false);
+      });
     }
     setState(() {
       _turns.add(turn);
@@ -3372,6 +3385,7 @@ class _CallScreenState extends State<CallScreen> {
     _chatFocus.removeListener(_onChatFocusChanged);
     _chatFocus.dispose();
     _restTimer?.cancel();
+    _restOlderTimer?.cancel();
     _splashTimer?.cancel();
     _ringTimeout?.cancel();
     // call_ended is emitted here, not in _hangUp(), because dispose()
@@ -3959,6 +3973,7 @@ class _CallScreenState extends State<CallScreen> {
                                                 // qui est aussi le seul geste
                                                 // qui les fait revenir.
                                                 onTap: _muteTurns,
+                                                showOlder: _restShowOlder,
                                               ),
                                       ),
                                     ),
@@ -4234,6 +4249,7 @@ class _CallScreenState extends State<CallScreen> {
                               peerName: _peerProfile?.displayName ?? '',
                               peerAvatarUrl: _peerProfile?.bestAvatarUrl ?? '',
                               onTap: _muteTurns,
+                              showOlder: _restShowOlder,
                             ),
                           ),
                   ),
@@ -4335,10 +4351,14 @@ class _RestingTurns extends StatelessWidget {
     required this.myAvatarUrl,
     required this.peerName,
     required this.peerAvatarUrl,
+    this.showOlder = true,
   });
 
   final List<_SpokenTurn> turns;
   final VoidCallback onTap;
+
+  /// Faux : seule la plus récente reste (la plus ancienne est partie plus tôt).
+  final bool showOlder;
   final String myName;
   final String myAvatarUrl;
   final String peerName;
@@ -4356,9 +4376,9 @@ class _RestingTurns extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shown = turns.length > _kRestCount
-        ? turns.sublist(turns.length - _kRestCount)
-        : turns;
+    final count = showOlder ? _kRestCount : 1;
+    final shown =
+        turns.length > count ? turns.sublist(turns.length - count) : turns;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
