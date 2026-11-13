@@ -4294,8 +4294,11 @@ class _CallScreenState extends State<CallScreen> {
                   child: IgnorePointer(
                     child: Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Opacity(
-                        opacity: 0.7,
+                      // Les messages rangés en haut prennent sa place : le logo
+                      // s'efface pendant qu'ils sont là, et revient ensuite.
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 250),
+                        opacity: _topMessagesShown ? 0.0 : 0.7,
                         child: SwaycoWordmark(
                           fontSize: 29,
                           letterSpacing: 0.5,
