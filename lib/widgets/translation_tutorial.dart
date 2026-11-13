@@ -121,6 +121,10 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
   Timer? _timer;
   Timer? _quiet;
 
+  /// Ma dernière phrase n'est pas partie : « Traduction non envoyée », en rouge.
+  bool _failed = false;
+  Timer? _failTimer;
+
   // Deux galets, un par écran : chacun a ses propres signaux.
   final _myTts = ValueNotifier<bool>(false);
   final _myLevel = ValueNotifier<double>(0.05);
@@ -146,6 +150,7 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
   void dispose() {
     _timer?.cancel();
     _quiet?.cancel();
+    _failTimer?.cancel();
     widget.myVoice?.removeListener(_onVoice);
     widget.myLines?.removeListener(_onLine);
     _myTts.dispose();
@@ -181,8 +186,13 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
     if (line.seq == _lastSeq) return;
     _lastSeq = line.seq;
     if (!line.delivered || line.text.trim().isEmpty) {
-      // Pas partie : on ne prétend pas qu'elle est arrivée.
+      // Pas partie : on ne prétend pas qu'elle est arrivée, on le dit en rouge.
       _goLive(0);
+      _failTimer?.cancel();
+      if (mounted) setState(() => _failed = true);
+      _failTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _failed = false);
+      });
       return;
     }
     _myText = line.text.trim();
@@ -194,6 +204,10 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
     _timer?.cancel();
     _step = s;
     _speakingNow = s == 0 && speaking;
+    if (s != 0 || speaking) {
+      _failTimer?.cancel();
+      _failed = false;
+    }
     switch (s) {
       case 0:
         if (speaking) {
@@ -435,6 +449,7 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
         _ => _t('tuto_tr_l4'),
       };
       labelYellow = _step == 3;
+      if (_failed) label = _t('tuto_tr_fail');
     } else {
       label = switch (_step) {
         1 => _t('tuto_tr_p2'),
@@ -551,7 +566,9 @@ class _TranslationTutorialState extends State<TranslationTutorial> {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  color: labelYellow ? _yellow : Colors.white,
+                  color: (mine && _failed)
+                      ? const Color(0xFFFF4D4D)
+                      : (labelYellow ? _yellow : Colors.white),
                   shadows: const [Shadow(color: Colors.black87, blurRadius: 6)],
                 ),
               ),

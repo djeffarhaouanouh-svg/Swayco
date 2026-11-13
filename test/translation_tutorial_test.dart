@@ -137,6 +137,12 @@ void main() {
     lines.value = const SpokenLine(seq: 2, text: 'euh', delivered: false);
     await tester.pump();
     expect(find.text('Aiko a reçu ta traduction'), findsNothing);
+    // Dit en rouge, puis retour à l'invitation à parler.
+    expect(find.text('Traduction non envoyée'), findsOneWidget);
+    final red = tester.widget<Text>(find.text('Traduction non envoyée'));
+    expect(red.style?.color, const Color(0xFFFF4D4D));
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.text('Traduction non envoyée'), findsNothing);
     expect(find.text('Parle normalement'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
@@ -153,6 +159,7 @@ void main() {
       'tuto_tr_title', 'tuto_tr_you', 'tuto_tr_peer', 'tuto_tr_s1', 'tuto_tr_s2',
       'tuto_tr_s3', 'tuto_tr_s4', 'tuto_tr_l1', 'tuto_tr_l2', 'tuto_tr_l3',
       'tuto_tr_l4', 'tuto_tr_p2', 'tuto_tr_p3', 'tuto_tr_sample', 'tuto_tr_ok',
+      'tuto_tr_fail',
     ];
     for (final code in ['fr', 'en', 'es', 'de', 'it', 'pt', 'pt-BR', 'nl', 'ar', 'ru', 'zh', 'ja', 'ko']) {
       for (final k in keys) {
