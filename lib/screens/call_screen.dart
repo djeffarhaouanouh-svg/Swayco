@@ -303,6 +303,19 @@ class _CallScreenState extends State<CallScreen> {
     });
   }
 
+  /// À l'ouverture de la conversation, la saisie se montre dépliée un instant
+  /// (sans clavier) puis se referme en rond crayon : c'est la démonstration
+  /// qu'elle se ferme et qu'un tap sur le crayon la rouvre. Un tap dessus entre
+  /// temps (focus) annule le repli.
+  void _foldComposerSoon() {
+    _composerIdle?.cancel();
+    _composerIdle = Timer(const Duration(milliseconds: 1400), () {
+      if (!mounted || !_composerOpen) return;
+      if (_chatFocus.hasFocus || _chatSending) return;
+      setState(() => _composerOpen = false);
+    });
+  }
+
   /// La saisie se replie d'elle-même : sans focus, sans envoi en cours, après
   /// [_kComposerIdle] sans geste. Un texte resté dans le champ se replie aussi,
   /// mais le rond porte alors un point jaune (brouillon).
@@ -4053,10 +4066,13 @@ class _CallScreenState extends State<CallScreen> {
                                               _turnsHidden = false;
                                               _turnsMuted = false;
                                               _restTimer?.cancel();
-                                              // La saisie s'ouvre repliée en
-                                              // rond crayon ; la languette se
+                                              // La saisie apparaît DÉPLIÉE puis se
+                                              // replie d'elle-même en rond crayon
+                                              // (voir _foldComposerSoon) : on voit
+                                              // qu'elle se ferme et où la
+                                              // retrouver. La languette se
                                               // présente à la première fois.
-                                              _composerOpen = false;
+                                              _composerOpen = true;
                                               _tabHint = !_tabHintSeen;
                                               // Le rail se replie en même
                                               // temps : les deux se déplient
@@ -4069,6 +4085,7 @@ class _CallScreenState extends State<CallScreen> {
                                               // fait son office.
                                               _controlsOpen = false;
                                             });
+                                            _foldComposerSoon();
                                           },
                                         ),
                                         // Les langues reviennent ici : la barre
@@ -4590,8 +4607,32 @@ class _TurnsBlockState extends State<_TurnsBlock>
   /// Assez tiré pour changer de côté au lâcher.
   static const double _switchAt = 70;
 
-  /// Le trajet montré par la démonstration.
+  /// Le trajet MINIMUM montré par la démonstration (repli si on ne peut pas
+  /// mesurer l'écran).
   static const double _demoTravel = 110;
+
+  /// Le trajet réellement montré : de la place actuelle de la zone jusqu'à
+  /// l'autre bord de l'écran. Avant, la zone ne bougeait que de 110 px : ça
+  /// ressemblait à un petit rebond, pas à « la zone monte tout en haut ».
+  double _travelPx = _demoTravel;
+
+  final GlobalKey _boxKey = GlobalKey();
+
+  void _measureTravel() {
+    try {
+      final box = _boxKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.attached) return;
+      final mq = MediaQuery.of(context);
+      final y = box.localToGlobal(Offset.zero).dy;
+      final h = box.size.height;
+      final topLimit = mq.padding.top + 4;
+      final bottomLimit = mq.size.height - (16 + mq.padding.bottom) - h;
+      final d = widget.top ? bottomLimit - y : y - topLimit;
+      _travelPx = d.clamp(_demoTravel, mq.size.height).toDouble();
+    } catch (_) {
+      _travelPx = _demoTravel;
+    }
+  }
 
   @override
   void initState() {
@@ -4599,6 +4640,7 @@ class _TurnsBlockState extends State<_TurnsBlock>
     _enter.forward();
     _enter.addStatusListener((s) {
       if (s == AnimationStatus.completed && widget.hint && mounted) {
+        _measureTravel();
         _demo.forward(from: 0);
       }
     });
@@ -4643,7 +4685,7 @@ class _TurnsBlockState extends State<_TurnsBlock>
       final go = v < 0.6
           ? Curves.easeInOut.transform((v - 0.25) / 0.35)
           : 1 - Curves.easeInOut.transform((v - 0.6) / 0.35);
-      travel = (widget.top ? 1 : -1) * _demoTravel * go;
+      travel = (widget.top ? 1 : -1) * _travelPx * go;
     }
     return (hop: hop, travel: travel, finger: finger);
   }
@@ -4805,6 +4847,7 @@ class _TurnsBlockState extends State<_TurnsBlock>
         return Transform.translate(
           offset: Offset(0, shift),
           child: Stack(
+            key: _boxKey,
             clipBehavior: Clip.none,
             children: [
               ConstrainedBox(
@@ -4949,8 +4992,14 @@ class _ComposerPillState extends State<_ComposerPill>
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(23),
+                      // Fermé : le bouton crayon est cerclé de jaune (le même
+                      // jaune que « À toi, tu peux reparler ») pour qu'on le
+                      // repère ; ouvert, le champ garde son filet blanc discret.
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.18),
+                        color: widget.open
+                            ? Colors.white.withValues(alpha: 0.18)
+                            : const Color(0xFFF4FF1F),
+                        width: widget.open ? 1 : 1.8,
                       ),
                     ),
                     child: Stack(

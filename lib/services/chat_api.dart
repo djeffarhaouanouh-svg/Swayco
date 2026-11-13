@@ -667,7 +667,10 @@ abstract final class ChatApi {
         'body': '',
         'image_url': '',
         'audio_url': '',
-        'audio_duration_ms': 0,
+        // La durée, elle, est NULLABLE et la base refuse 0 (`messages_audio_
+        // duration_ms_chk` : null, ou entre 1 et 120000). Un 0 faisait échouer
+        // la suppression d'un vocal avec « violates check constraint ».
+        'audio_duration_ms': null,
         'discover_photo': '',
       }).eq('id', messageId);
     } on PostgrestException catch (e) {
