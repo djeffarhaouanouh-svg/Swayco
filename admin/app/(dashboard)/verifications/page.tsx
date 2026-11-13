@@ -79,7 +79,10 @@ export default async function VerificationsPage() {
       .from(BUCKET)
       .createSignedUrls(
         rows.map((r) => r.selfie_path),
-        600,
+        // 1 h (c'était 10 min : une image qui ne s'affichait plus donnait
+        // l'impression que la demande avait disparu). Le selfie reste privé :
+        // le lien n'est montré qu'à l'admin connecté.
+        3600,
       );
     for (const s of signed ?? []) {
       if (s.path && s.signedUrl) selfieUrl.set(s.path, s.signedUrl);
@@ -116,7 +119,7 @@ export default async function VerificationsPage() {
 
       <Section
         title="Demandes"
-        hint="Les plus anciennes d'abord. Les liens des selfies expirent au bout de 10 minutes : recharge la page si une image ne s'affiche plus."
+        hint="Les plus anciennes d'abord. Les liens des selfies expirent au bout d'une heure : recharge la page si une image ne s'affiche plus. La demande, elle, reste là tant que tu n'as pas décidé."
       >
         <div className="flex flex-col gap-5">
           {rows.map((r) => {
