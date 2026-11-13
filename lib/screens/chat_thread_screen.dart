@@ -2575,8 +2575,16 @@ class _MessageBubbleState extends State<_MessageBubble> {
     ];
   }
 
-  void _openPicker() {
-    HapticFeedback.mediumImpact();
+  /// Affiche, sur un voile flouté, les emojis ([emojis]) et/ou le menu d'actions
+  /// ([menu]). Le tap rapide sur une bulle ne montre que les emojis ; l'appui
+  /// long ne montre que le menu (Modifier, Répondre, Copier, Supprimer…). Sans
+  /// argument : les deux (les photos, dont le tap ouvre déjà le plein écran).
+  void _openPicker({bool emojis = true, bool menu = true}) {
+    if (emojis) {
+      HapticFeedback.selectionClick();
+    } else {
+      HapticFeedback.mediumImpact();
+    }
     _MessageBubble.dismissActivePicker();
     final box = context.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return;
@@ -2600,15 +2608,18 @@ class _MessageBubbleState extends State<_MessageBubble> {
 
     // Le menu : sous la bulle ; s'il déborde au-dessus du clavier / du champ,
     // au-dessus de la pastille d'emojis.
-    final items = _menuItems();
+    final items = menu ? _menuItems() : const <ChatMenuItem>[];
     final menuH = ChatActionMenu.heightFor(items.length);
-    var menuTop = pickerAbove ? origin.dy + size.height + 12 : top + 50 + 8;
+    // Sans la pastille d'emojis, le menu se pose directement sous la bulle.
+    var menuTop = !emojis
+        ? origin.dy + size.height + 12
+        : (pickerAbove ? origin.dy + size.height + 12 : top + 50 + 8);
     final bottomLimit = screen.height -
         MediaQuery.viewInsetsOf(context).bottom -
         pad.bottom -
         96;
     if (menuTop + menuH > bottomLimit) {
-      menuTop = (pickerAbove ? top : origin.dy) - menuH - 8;
+      menuTop = (emojis && pickerAbove ? top : origin.dy) - menuH - 8;
     }
     menuTop = menuTop.clamp(pad.top + 8, math.max(pad.top + 8, screen.height - menuH - 8));
     final menuLeft = (mine ? bubble.right - ChatActionMenu.width : bubble.left)
@@ -2623,25 +2634,27 @@ class _MessageBubbleState extends State<_MessageBubble> {
               hole: bubble,
               onTap: _MessageBubble.dismissActivePicker,
             ),
-            Positioned(
-              top: top,
-              left: left,
-              // La corbeille de la pastille est partie : Supprimer est dans le menu.
-              child: _ReactionPicker(
-                selected: selected,
-                onPick: (emoji) {
-                  _MessageBubble.dismissActivePicker();
-                  HapticFeedback.lightImpact();
-                  if (mounted) setState(() => _burstEmoji = emoji);
-                  widget.onReact(emoji);
-                },
+            if (emojis)
+              Positioned(
+                top: top,
+                left: left,
+                // La corbeille de la pastille est partie : Supprimer est dans le menu.
+                child: _ReactionPicker(
+                  selected: selected,
+                  onPick: (emoji) {
+                    _MessageBubble.dismissActivePicker();
+                    HapticFeedback.lightImpact();
+                    if (mounted) setState(() => _burstEmoji = emoji);
+                    widget.onReact(emoji);
+                  },
+                ),
               ),
-            ),
-            Positioned(
-              top: menuTop,
-              left: menuLeft,
-              child: ChatActionMenu(items: items),
-            ),
+            if (menu && items.isNotEmpty)
+              Positioned(
+                top: menuTop,
+                left: menuLeft,
+                child: ChatActionMenu(items: items),
+              ),
           ],
         );
       },
@@ -2745,8 +2758,9 @@ class _MessageBubbleState extends State<_MessageBubble> {
       padding: const EdgeInsets.fromLTRB(16, 22, 16, 8),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
+        onTap: () => _openPicker(menu: false),
         onDoubleTap: _thumbsUp,
-        onLongPress: _openPicker,
+        onLongPress: () => _openPicker(emojis: false),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -3135,8 +3149,10 @@ class _MessageBubbleState extends State<_MessageBubble> {
           children: [
             GestureDetector(
               behavior: HitTestBehavior.opaque,
+              // Tap rapide : les emojis. Appui long : le panneau d'actions.
+              onTap: () => _openPicker(menu: false),
               onDoubleTap: _thumbsUp,
-              onLongPress: _openPicker,
+              onLongPress: () => _openPicker(emojis: false),
               child: AnimatedContainer(
                 key: _bubbleKey,
                 duration: const Duration(milliseconds: 350),
