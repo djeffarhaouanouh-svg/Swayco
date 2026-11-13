@@ -3875,8 +3875,11 @@ class _CallScreenState extends State<CallScreen> {
                         // traduction », « À toi… ». Pas pendant une
                         // conversation ouverte ni sous un panneau.
                         else if (_trCaptions && !_sheetOpen && !_turnsOpen)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
+                          // Remonté contre le galet : sa boîte garde ~38 px de
+                          // marge sous le disque pour les ondes, le texte s'y
+                          // pose plutôt que dessous.
+                          Transform.translate(
+                            offset: const Offset(0, -30),
                             child: TranslationStepCaption(
                               peerName: peerFirstName ?? '',
                               myVoice: _myVoiceLevel,

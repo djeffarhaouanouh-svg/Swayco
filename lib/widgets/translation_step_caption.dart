@@ -177,17 +177,25 @@ class _TranslationStepCaptionState extends State<TranslationStepCaption> {
           text = AppStrings.t('tuto_tr_l1');
       }
     }
+    // Sur un fond sombre arrondi : le texte blanc reste lisible quelle que
+    // soit la vidéo derrière.
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 180),
-      child: Text(
-        text,
+      child: Container(
         key: ValueKey('$_step-$_failed'),
-        textAlign: TextAlign.center,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-          color: color,
-          shadows: const [Shadow(color: Colors.black, blurRadius: 8)],
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
         ),
       ),
     );
