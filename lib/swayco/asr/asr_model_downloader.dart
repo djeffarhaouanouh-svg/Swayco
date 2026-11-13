@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
@@ -105,40 +106,78 @@ class AsrModelDownloader {
         continue;
       }
       final tmp = File('${dest.path}.tmp');
+      final base = receivedTotal;
       receivedTotal += await _downloadTo(
         spec.urlFor(file),
         tmp,
         onBytes: (n) => onProgress?.call(
-          ((receivedTotal + n) / totalBytes).clamp(0.0, 0.99),
+          ((base + n) / totalBytes).clamp(0.0, 0.99),
         ),
       );
       await tmp.rename(dest.path);
     }
   }
 
-  /// Streams [url] into [dest]. Returns the number of bytes written.
+  @visibleForTesting
+  Future<int> downloadForTest(String url, File dest) => _downloadTo(url, dest);
+
+  /// Nombre d'essais par fichier : une coupure réseau en cours de route ne fait
+  /// plus tout recommencer, on reprend là où le fichier s'est arrêté.
+  static const _maxAttempts = 4;
+
+  /// Streams [url] into [dest]. Returns the size of the finished file.
+  ///
+  /// REPRISE : si [dest] (le `.tmp`) contient déjà le début du fichier — app
+  /// fermée, réseau coupé, téléphone en veille —, on redemande seulement la suite
+  /// (en-tête `Range`). Avant, chaque interruption repartait de zéro : sur un
+  /// modèle de 244 Mo et une connexion mobile lente, certains n'y arrivaient
+  /// jamais. Si le serveur ignore `Range` (réponse 200), on repart du début.
   Future<int> _downloadTo(
     String url,
     File dest, {
     void Function(int received)? onBytes,
   }) async {
-    final req = http.Request('GET', Uri.parse(url));
-    final resp = await http.Client().send(req);
-    if (resp.statusCode != 200) {
-      throw Exception('STT download HTTP ${resp.statusCode}: $url');
-    }
-    var received = 0;
-    final sink = dest.openWrite();
-    try {
-      await for (final chunk in resp.stream) {
-        sink.add(chunk);
-        received += chunk.length;
-        onBytes?.call(received);
+    Object? lastError;
+    for (var attempt = 0; attempt < _maxAttempts; attempt++) {
+      final client = http.Client();
+      try {
+        final have = await dest.exists() ? await dest.length() : 0;
+        final req = http.Request('GET', Uri.parse(url));
+        if (have > 0) req.headers['Range'] = 'bytes=$have-';
+        final resp = await client.send(req);
+
+        // 416 : le .tmp a déjà la taille complète (coupé juste avant le renommage).
+        if (resp.statusCode == 416 && have > 0) return have;
+
+        final resumed = resp.statusCode == 206 && have > 0;
+        if (resp.statusCode != 200 && !resumed) {
+          throw Exception('STT download HTTP ${resp.statusCode}: $url');
+        }
+
+        var received = resumed ? have : 0;
+        final sink =
+            dest.openWrite(mode: resumed ? FileMode.append : FileMode.write);
+        try {
+          await for (final chunk in resp.stream) {
+            sink.add(chunk);
+            received += chunk.length;
+            onBytes?.call(received);
+          }
+        } finally {
+          await sink.flush();
+          await sink.close();
+        }
+        return received;
+      } catch (e) {
+        // On garde le .tmp : l'essai suivant reprend à sa taille actuelle.
+        lastError = e;
+        if (attempt < _maxAttempts - 1) {
+          await Future<void>.delayed(Duration(seconds: 2 * (attempt + 1)));
+        }
+      } finally {
+        client.close();
       }
-    } finally {
-      await sink.flush();
-      await sink.close();
     }
-    return received;
+    throw lastError ?? Exception('STT download failed: $url');
   }
 }
