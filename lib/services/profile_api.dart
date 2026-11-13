@@ -909,17 +909,56 @@ abstract final class ProfileApi {
     // them defensively so a stray comma in user input doesn't blow up
     // the query parser.
     final safe = q.replaceAll(',', ' ');
-    final builder = _c.from('profiles').select();
-    final filtered = handleOnly
-        ? builder.ilike('handle', '%$safe%')
-        : builder.or('display_name.ilike.%$safe%,handle.ilike.%$safe%');
-    final rows = await filtered
-        .neq('id', myDeviceId)
-        .order('display_name', ascending: true)
-        .limit(limit);
-    return (rows as List)
-        .map((r) => RemoteProfile.fromMap(Map<String, dynamic>.from(r as Map)))
-        .toList(growable: false);
+    // Avant : « contient » + tri alphabétique + limite 30. Pour « Lia », les 30
+    // premiers étaient Adelia, Amelia, Camelia, Cecilia… (153 noms contiennent
+    // « lia ») : Lia, en « L », n'apparaissait jamais. Maintenant on cherche
+    // d'abord ce qui COMMENCE par la saisie, puis ce qui la contient, et on
+    // classe : nom exact, puis vrais utilisateurs, puis le reste.
+    Future<List<Map<String, dynamic>>> run(String pattern) async {
+      final builder = _c.from('profiles').select();
+      final filtered = handleOnly
+          ? builder.ilike('handle', pattern)
+          : builder.or('display_name.ilike.$pattern,handle.ilike.$pattern');
+      final rows = await filtered
+          .neq('id', myDeviceId)
+          .order('display_name', ascending: true)
+          .limit(60);
+      return (rows as List)
+          .map((r) => Map<String, dynamic>.from(r as Map))
+          .toList(growable: false);
+    }
+
+    final byId = <String, Map<String, dynamic>>{};
+    for (final r in await run('$safe%')) {
+      byId[r['id'].toString()] = r;
+    }
+    if (byId.length < 60) {
+      for (final r in await run('%$safe%')) {
+        byId.putIfAbsent(r['id'].toString(), () => r);
+      }
+    }
+
+    final lower = safe.toLowerCase();
+    int score(Map<String, dynamic> r) {
+      final name = (r['display_name'] ?? '').toString().toLowerCase();
+      final handle = (r['handle'] ?? '').toString().toLowerCase();
+      final human = r['is_ai'] != true;
+      if (name == lower || handle == lower) return human ? 0 : 1;
+      final prefix = name.startsWith(lower) || handle.startsWith(lower);
+      if (prefix) return human ? 2 : 3;
+      return human ? 4 : 5;
+    }
+
+    final list = byId.values.toList()
+      ..sort((a, b) {
+        final s = score(a).compareTo(score(b));
+        if (s != 0) return s;
+        return (a['display_name'] ?? '')
+            .toString()
+            .toLowerCase()
+            .compareTo((b['display_name'] ?? '').toString().toLowerCase());
+      });
+    return list.take(limit).map(RemoteProfile.fromMap).toList(growable: false);
   }
 
   /// Bulk fetch by ids (used to resolve friendship rows into people).
