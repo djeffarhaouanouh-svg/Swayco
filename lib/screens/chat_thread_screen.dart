@@ -26,7 +26,6 @@ import '../services/special_request.dart';
 import '../services/message_reactions.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
-import '../services/locations.dart' show countryFlagFor;
 import '../services/open_thread.dart';
 import '../services/peer_local_time.dart';
 import '../services/profile_api.dart';
@@ -244,19 +243,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// mes propres messages.
   String _quoteAuthor(ChatMessage q) {
     if (q.senderId == _myId) return AppStrings.t('chat_reply_me').toUpperCase();
-    // Le drapeau du PAYS, comme sur l'avatar de l'en-tête (une Suédoise qui écrit
-    // en anglais est 🇸🇪, pas 🇬🇧). Sans pays connu : celui de sa langue.
-    final flag = countryFlagFor(_peer?.country ?? '') ??
-        findLanguageByCode(_peer?.language ?? '')?.flag ??
-        '';
-    final name = _peerFirstName.toUpperCase();
-    return flag.isEmpty ? name : '$name $flag';
-  }
-
-  /// « 🇯🇵 » précédé d'une espace, ou rien si la langue du pair est inconnue.
-  String _flagSuffix() {
-    final flag = findLanguageByCode(_peer?.language ?? '')?.flag ?? '';
-    return flag.isEmpty ? '' : ' $flag';
+    // Le prénom seul : le drapeau est déjà sur l'avatar de l'en-tête.
+    return _peerFirstName.toUpperCase();
   }
 
   /// Ce que JE lis du message cité (traduit s'il est étranger).
@@ -1647,8 +1635,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                                           'name':
                                               _peerFirstName.toUpperCase(),
                                         },
-                                      ).toUpperCase() +
-                                        _flagSuffix()),
+                                      ).toUpperCase()),
                             replyPreview:
                                 _replyTo == null ? '' : _quoteText(_replyTo!),
                             onCancelReply: _cancelReply,
