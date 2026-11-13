@@ -4252,6 +4252,7 @@ class _CallScreenState extends State<CallScreen> {
                           onToggleSide: () => _setMessagesSide(!_msgTop),
                           hint: _tabHint,
                           onHintDone: _endTabHint,
+                          onTapZone: _closeTurns,
                         ),
                       ),
                     ),
@@ -4276,6 +4277,7 @@ class _CallScreenState extends State<CallScreen> {
                             onToggleSide: () => _setMessagesSide(false),
                             hint: _tabHint,
                             onHintDone: _endTabHint,
+                            onTapZone: _closeTurns,
                           )
                         : Padding(
                             padding: const EdgeInsets.only(left: 28),
@@ -4464,7 +4466,11 @@ class _SpokenTurnsPanel extends StatelessWidget {
     required this.onToggleSide,
     required this.hint,
     required this.onHintDone,
+    required this.onTapZone,
   });
+
+  /// Un tap sur les bulles : ferme la zone (en un seul tap).
+  final VoidCallback onTapZone;
 
   final List<_SpokenTurn> turns;
   final String myName;
@@ -4547,6 +4553,7 @@ class _SpokenTurnsPanel extends StatelessWidget {
               onToggleSide: onToggleSide,
               hint: hint,
               onHintDone: onHintDone,
+              onTapZone: onTapZone,
             ),
           ),
           composer,
@@ -4575,6 +4582,7 @@ class _TurnsBlock extends StatefulWidget {
     required this.onToggleSide,
     required this.hint,
     required this.onHintDone,
+    required this.onTapZone,
   });
 
   final List<_SpokenTurn> turns;
@@ -4586,6 +4594,11 @@ class _TurnsBlock extends StatefulWidget {
   final VoidCallback onToggleSide;
   final bool hint;
   final VoidCallback onHintDone;
+
+  /// Un tap sur les bulles elles-mêmes : ferme la zone d'un seul tap. La liste
+  /// (un Scrollable) absorbait ce tap sans rien en faire : il ne passait pas à
+  /// la couche qui ferme, et seul un tap HORS de la zone la refermait.
+  final VoidCallback onTapZone;
 
   @override
   State<_TurnsBlock> createState() => _TurnsBlockState();
@@ -4729,7 +4742,10 @@ class _TurnsBlockState extends State<_TurnsBlock>
                 ),
               );
 
-        final list = Opacity(
+        final list = GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTapZone,
+          child: Opacity(
           opacity: bubblesIn,
           child: Transform.translate(
             offset: Offset(0, 70 * (1 - bubblesIn) * (widget.top ? -1 : 1)),
@@ -4764,6 +4780,7 @@ class _TurnsBlockState extends State<_TurnsBlock>
                 ),
               ),
             ),
+          ),
           ),
         );
 
