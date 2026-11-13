@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/analytics.dart';
 import '../services/app_theme.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
@@ -380,6 +381,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  /// Les raisons proposées : clé envoyée aux statistiques (jamais le texte, qui
+  /// change selon la langue) + texte affiché. La 1re, neutre, est celle qui est
+  /// sélectionnée par défaut : valider sans toucher la roue ne biaise rien.
+  static const List<(String, String)> _leaveReasons = [
+    ('skip', 'leave_why_skip'),
+    ('no_replies', 'leave_why_no_replies'),
+    ('fake_profiles', 'leave_why_fake'),
+    ('translation', 'leave_why_translation'),
+    ('other_app', 'leave_why_other_app'),
+    ('ads', 'leave_why_ads'),
+    ('just_testing', 'leave_why_testing'),
+    ('other', 'leave_why_other'),
+  ];
+
+  /// La clé de la raison choisie, ou `none` si la feuille a été fermée.
+  Future<String> _askLeaveReason() async {
+    final i = await showWheelPicker(
+      context: context,
+      title: AppStrings.t('leave_why_title'),
+      emoji: '👋',
+      labels: [for (final r in _leaveReasons) AppStrings.t(r.$2)],
+    );
+    return i == null ? 'none' : _leaveReasons[i].$1;
+  }
+
   Future<void> _deleteAccount() async {
     final ok = await _confirm(
       title: AppStrings.t('settings_delete_title'),
@@ -388,6 +414,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       destructive: true,
     );
     if (ok != true) return;
+    // « Pourquoi tu pars ? » — une seule question, avant d'effacer : après, le
+    // compte (et l'identité des statistiques) n'existe plus. Fermer la feuille
+    // = ne pas répondre ; la suppression se fait dans tous les cas.
+    final reason = await _askLeaveReason();
+    if (!mounted) return;
+    Analytics.track('account_deleted', props: {'reason': reason});
+    await Analytics.flush().timeout(const Duration(seconds: 5), onTimeout: () {});
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       final uid = await DeviceId.getOrCreate();
