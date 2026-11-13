@@ -3738,9 +3738,12 @@ class _CallScreenState extends State<CallScreen> {
                     key: const ValueKey('turns_dismiss'),
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      // Pendant la démonstration de la languette, le premier
-                      // tap n'arrête QUE la démonstration.
-                      onTap: _tabHint ? _endTabHint : _closeTurns,
+                      // Un seul tap ferme tout, y compris pendant la
+                      // démonstration de la languette : [_closeTurns] l'arrête
+                      // aussi. Avant, le premier tap n'arrêtait QUE la
+                      // démonstration, et il en fallait un second pour fermer
+                      // les bulles.
+                      onTap: _closeTurns,
                     ),
                   ),
                 // Le panneau effacé : l'écran ENTIER le rappelle. C'est ce qui
