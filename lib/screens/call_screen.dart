@@ -256,6 +256,14 @@ class _CallScreenState extends State<CallScreen> {
   /// effacée et la vignette se pose au ras du bas.
   static const double _kPipBottomLift = 128;
 
+  /// Combien de tours du début de l'appel se posent seuls, au repos.
+  static const int _kRestAutoTurns = 2;
+
+  /// Les tours montrés au repos : les deux premiers de l'appel, jamais les
+  /// suivants (qui n'existent qu'avec la zone Messages ouverte).
+  List<_SpokenTurn> get _restTurns =>
+      _turns.length > _kRestAutoTurns ? _turns.sublist(0, _kRestAutoTurns) : _turns;
+
   /// Des bulles (au repos ou la zone ouverte) sont affichées EN HAUT.
   bool get _topMessagesShown =>
       _msgTop && (_turnsOpen || (!_turnsHidden && _turns.isNotEmpty));
@@ -645,7 +653,11 @@ class _CallScreenState extends State<CallScreen> {
     //
     // Sauf si on les a fait taire à la main : ce refus-là vaut pour l'appel, et
     // la phrase suivante n'a pas à revenir dessus.
-    if (!_turnsMuted) {
+    // Seuls les DEUX premiers tours de l'appel (le « bonjour » du démarrage) se
+    // posent d'eux-mêmes ; les suivants n'apparaissent qu'une fois la zone
+    // Messages activée par la touche, sinon ils recouvrent le texte sous le
+    // galet alors qu'on n'a rien demandé.
+    if (!_turnsMuted && _turns.length < _kRestAutoTurns) {
       _turnsHidden = false;
       _restTimer?.cancel();
       _restTimer = Timer(_kRestTtl, _hideTurns);
@@ -4070,7 +4082,7 @@ class _CallScreenState extends State<CallScreen> {
                                           bottom: 10,
                                         ),
                                         child: _RestingTurns(
-                                                turns: _turns,
+                                                turns: _restTurns,
                                                 myName: widget.displayName,
                                                 myAvatarUrl: '',
                                                 peerName: _peerProfile
@@ -4375,7 +4387,7 @@ class _CallScreenState extends State<CallScreen> {
                         : Padding(
                             padding: const EdgeInsets.only(left: 28),
                             child: _RestingTurns(
-                              turns: _turns,
+                              turns: _restTurns,
                               myName: widget.displayName,
                               myAvatarUrl: '',
                               peerName: _peerProfile?.displayName ?? '',

@@ -40,7 +40,7 @@ void main() {
     expect(find.text('Aiko a reçu ta traduction'), findsOneWidget);
     expect(await TranslationStepCaption.shouldShow(), isFalse);
 
-    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 2600));
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('À toi, tu peux reparler'), findsOneWidget);
 

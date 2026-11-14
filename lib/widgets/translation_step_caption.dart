@@ -105,6 +105,11 @@ class _TranslationStepCaptionState extends State<TranslationStepCaption> {
   }
 
   void _onVoice() {
+    // « X a reçu ta traduction » (étape 2) dure son temps plein : un bruit de
+    // micro (la voix traduite qui revient dans le micro d'un test, un souffle)
+    // ne doit pas la renvoyer à « Parle normalement » avant qu'on l'ait lue —
+    // c'est ce qui donnait l'impression de n'avoir que deux états.
+    if (_step == 2) return;
     if (widget.myVoice.value > 0) {
       _quiet?.cancel();
       _quiet = null;
@@ -143,11 +148,11 @@ class _TranslationStepCaptionState extends State<TranslationStepCaption> {
           if (mounted) _go(0);
         });
       case 2:
-        _timer = Timer(const Duration(milliseconds: 2000), () {
+        _timer = Timer(const Duration(milliseconds: 2500), () {
           if (mounted) _go(3);
         });
       case 3:
-        _timer = Timer(const Duration(milliseconds: 2500), () {
+        _timer = Timer(const Duration(milliseconds: 3000), () {
           if (mounted) _go(0);
         });
       default:
