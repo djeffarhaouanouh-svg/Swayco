@@ -3930,29 +3930,43 @@ class _CallScreenState extends State<CallScreen> {
                           : _controlsOpen
                               ? const Alignment(0, 0.34)
                               // Les deux premiers messages du démarrage (bulles au
-                              // repos, en bas) se posent sur la place du texte sous
-                              // le galet : le galet monte de leur hauteur tant
-                              // qu'elles sont là, pour que ce texte reste lisible.
+                              // repos, en bas). Tant que la barre de boutons est
+                              // là, les bulles sont posées AU-DESSUS d'elle, et le
+                              // galet (dont le texte est derrière la barre) ne les
+                              // touche pas : il ne bouge pas. Quand la barre se
+                              // replie, les bulles descendent sur le galet et son
+                              // texte : le galet monte alors JUSTE assez pour que
+                              // son texte reste au-dessus d'elles (calculé depuis
+                              // la hauteur des bulles, pas une valeur fixe).
                               : (!_turnsOpen &&
                                       !_msgTop &&
                                       !_turnsHidden &&
-                                      _turns.isNotEmpty)
+                                      _dockDimmed &&
+                                      _turns.isNotEmpty &&
+                                      box.maxHeight > 0)
                                   ? Alignment(
                                       0,
-                                      box.maxHeight <= 0
-                                          ? 0.8
-                                          : (0.80 -
-                                                  2 *
-                                                      (10 +
-                                                          34 *
-                                                              (_restShowOlder &&
-                                                                      _restTurns.length > 1
-                                                                  ? 2
-                                                                  : 1)) /
-                                                      box.maxHeight)
-                                              .clamp(-0.9, 0.9),
-                                    )
-                              // Rien de déplié : ses ondes atteignent les
+                                      () {
+                                        final n =
+                                            (_restShowOlder && _restTurns.length > 1)
+                                                ? 2
+                                                : 1;
+                                        // Haut des bulles, depuis le bas de l'écran :
+                                        // marge basse (26) + pastille (22) + bulles.
+                                        final bubblesTop = 26.0 + 22.0 + 50.0 * n;
+                                        // Le texte (36 px sous le disque) reste 8 px
+                                        // au-dessus des bulles ; le disque fait 84.
+                                        final discBottom = bubblesTop + 8 + 36;
+                                        final discCenterFromTop =
+                                            box.maxHeight - discBottom - 42;
+                                        // Le centre du bloc galet+texte est 14 px sous
+                                        // celui du disque.
+                                        return (2 * (discCenterFromTop + 14) /
+                                                    box.maxHeight -
+                                                1)
+                                            .clamp(-0.9, 0.80);
+                                      }(),
+                                    )                              // Rien de déplié : ses ondes atteignent les
                               // touches et c'est très bien, elles passent
                               // derrière.
                               : const Alignment(0, 0.80),
