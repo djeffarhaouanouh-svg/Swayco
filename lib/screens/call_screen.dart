@@ -5162,7 +5162,15 @@ class _ComposerPillState extends State<_ComposerPill>
                                             Colors.white.withValues(alpha: 0.6),
                                         fontSize: 14,
                                       ),
+                                      // Aucun liseré, y compris au focus : le
+                                      // thème de l'app en pose un jaune sur les
+                                      // champs, il ne doit pas cerner celui-ci.
                                       border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      disabledBorder: InputBorder.none,
+                                      errorBorder: InputBorder.none,
+                                      focusedErrorBorder: InputBorder.none,
                                       contentPadding:
                                           const EdgeInsets.fromLTRB(8, 8, 0, 8),
                                     ),
