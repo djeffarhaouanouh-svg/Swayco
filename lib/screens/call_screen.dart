@@ -4766,10 +4766,11 @@ class _TurnsBlockState extends State<_TurnsBlock>
     duration: const Duration(milliseconds: 3200),
   );
 
-  /// Atténuation : 7 s sans geste ni nouveau message, les bulles passent à 35 %
-  /// (elles ne disparaissent pas). Les DEUX PREMIÈRES de l'appel (celles du
-  /// démarrage) ne s'atténuent jamais. Un tap sur une bulle atténuée, ou sur la
-  /// languette, les réveille ; un nouveau message aussi.
+  /// Atténuation : 7 s sans geste ni nouveau message, l'AVANT-DERNIÈRE bulle
+  /// passe à 35 % (rien ne disparaît ; la plus récente reste à 100 %). Les DEUX
+  /// PREMIÈRES de l'appel (celles du démarrage) ne s'atténuent jamais. Un tap sur
+  /// la bulle atténuée, ou sur la languette, la réveille ; un nouveau message
+  /// aussi (il arrive à 100 %, le délai de 7 s repart).
   static const Duration _fadeAfter = Duration(seconds: 7);
   static const int _neverFade = 2;
   Timer? _fadeTimer;
@@ -4967,7 +4968,14 @@ class _TurnsBlockState extends State<_TurnsBlock>
                       child: AnimatedOpacity(
                         duration: Duration(milliseconds: _faded ? 600 : 200),
                         curve: Curves.easeOut,
-                        opacity: (_faded && idx >= _neverFade) ? 0.35 : 1.0,
+                        // Seule l'AVANT-DERNIÈRE bulle s'atténue (la plus récente
+                        // reste à 100 %), et jamais l'une des deux premières de
+                        // l'appel. Rien ne disparaît.
+                        opacity: (_faded &&
+                                idx == widget.turns.length - 2 &&
+                                idx >= _neverFade)
+                            ? 0.35
+                            : 1.0,
                         child: _TurnBubble(
                           turn: turn,
                           name: turn.mine ? widget.myName : widget.peerName,
