@@ -4430,7 +4430,9 @@ class _CallScreenState extends State<CallScreen> {
                             onToggleSide: () => _setMessagesSide(false),
                             hint: _tabHint,
                             onHintDone: _endTabHint,
-                            onTapZone: _showTopControls,
+                            // Toucher les messages les referme ; toucher à côté
+                            // réaffiche la barre de boutons.
+                            onTapZone: _closeTurns,
                           )
                         : Padding(
                             padding: const EdgeInsets.only(left: 28),
