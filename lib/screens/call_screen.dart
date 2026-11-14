@@ -256,6 +256,27 @@ class _CallScreenState extends State<CallScreen> {
   /// effacée et la vignette se pose au ras du bas.
   static const double _kPipBottomLift = 128;
 
+  /// Où se pose le galet (alignement vertical) pour que ni le disque ni le texte
+  /// dessous ne touchent ce qui est en dessous : la barre de boutons (raccrocher,
+  /// micro…), la rangée de réglages dépliée, et les deux premiers messages quand
+  /// ils sont affichés. Calculé depuis leurs hauteurs :
+  ///   texte  = 36 px sous le bas du disque, qui fait 84 ;
+  ///   le bloc galet+texte a son centre 14 px sous celui du disque.
+  double _orbY(double h) {
+    if (h <= 0) return 0.80;
+    final showBubbles = !_msgTop && !_turnsHidden && _turns.isNotEmpty;
+    final n = (_restShowOlder && _restTurns.length > 1) ? 2 : 1;
+    final dockH = _dockDimmed ? 0.0 : 96.0; // la barre, hors marge basse
+    final railH = _controlsOpen ? 92.0 : 0.0; // la rangée de réglages
+    final controlsTop = 16.0 + dockH + railH; // haut des boutons, depuis le bas
+    // Les bulles se posent juste au-dessus des boutons (10 px d'air).
+    final top = showBubbles ? controlsTop + 10 + 22 + 50.0 * n : controlsTop;
+    // Rien au-dessus du bord bas : la place habituelle, tout en bas.
+    if (top <= 40) return 0.80;
+    final discBottom = top + 8 + 36;
+    final centerFromTop = h - discBottom - 42 + 14;
+    return (2 * centerFromTop / h - 1).clamp(-0.9, 0.80).toDouble();
+  }
   /// Combien de tours du début de l'appel se posent seuls, au repos.
   static const int _kRestAutoTurns = 2;
 
@@ -3927,46 +3948,9 @@ class _CallScreenState extends State<CallScreen> {
                                       : (0.80 - 200 / box.maxHeight)
                                           .clamp(-0.9, 0.9),
                                 )
-                          : _controlsOpen
-                              ? const Alignment(0, 0.34)
-                              // Les deux premiers messages du démarrage (bulles au
-                              // repos, en bas). Tant que la barre de boutons est
-                              // là, les bulles sont posées AU-DESSUS d'elle, et le
-                              // galet (dont le texte est derrière la barre) ne les
-                              // touche pas : il ne bouge pas. Quand la barre se
-                              // replie, les bulles descendent sur le galet et son
-                              // texte : le galet monte alors JUSTE assez pour que
-                              // son texte reste au-dessus d'elles (calculé depuis
-                              // la hauteur des bulles, pas une valeur fixe).
-                              : (!_turnsOpen &&
-                                      !_msgTop &&
-                                      !_turnsHidden &&
-                                      _dockDimmed &&
-                                      _turns.isNotEmpty &&
-                                      box.maxHeight > 0)
-                                  ? Alignment(
-                                      0,
-                                      () {
-                                        final n =
-                                            (_restShowOlder && _restTurns.length > 1)
-                                                ? 2
-                                                : 1;
-                                        // Haut des bulles, depuis le bas de l'écran :
-                                        // marge basse (26) + pastille (22) + bulles.
-                                        final bubblesTop = 26.0 + 22.0 + 50.0 * n;
-                                        // Le texte (36 px sous le disque) reste 8 px
-                                        // au-dessus des bulles ; le disque fait 84.
-                                        final discBottom = bubblesTop + 8 + 36;
-                                        final discCenterFromTop =
-                                            box.maxHeight - discBottom - 42;
-                                        // Le centre du bloc galet+texte est 14 px sous
-                                        // celui du disque.
-                                        return (2 * (discCenterFromTop + 14) /
-                                                    box.maxHeight -
-                                                1)
-                                            .clamp(-0.9, 0.80);
-                                      }(),
-                                    )                              // Rien de déplié : ses ondes atteignent les
+                          : (!_turnsOpen)
+                              ? Alignment(0, _orbY(box.maxHeight))
+                              // Rien de déplié : ses ondes atteignent les
                               // touches et c'est très bien, elles passent
                               // derrière.
                               : const Alignment(0, 0.80),
