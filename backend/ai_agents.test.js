@@ -147,7 +147,7 @@ test('voice requests are not queued unless AI_VOICE_REQUESTS=1', async () => {
 
 test('newcomer (< 48 h): replies in 3-10 min, stable; older accounts are not newcomers', () => {
   const ds = Array.from({ length: 2000 }, (_, i) => t.newcomerDelayMs(`msg-${i}`));
-  assert.ok(Math.min(...ds) >= 3 * 60 * 1000 && Math.max(...ds) < 10 * 60 * 1000);
+  assert.ok(Math.min(...ds) >= 20 * 1000 && Math.max(...ds) < 2 * 60 * 1000);
   assert.equal(t.newcomerDelayMs('msg-7'), t.newcomerDelayMs('msg-7'));
   assert.equal(t.isNewcomer({ created_at: new Date(Date.now() - 2 * HOUR).toISOString() }), true);
   assert.equal(t.isNewcomer({ created_at: new Date(Date.now() - 49 * HOUR).toISOString() }), false);
@@ -165,9 +165,9 @@ test('reply delays: stable, varied, ordered by level, and inside the reply windo
   // Plus d'attention → plus lent en moyenne.
   assert.ok(stats[3].avg < stats[2].avg && stats[2].avg < stats[1].avg);
   // Moyennes plausibles (≈ 1h30, 3h, 4h40).
-  assert.ok(stats[3].avg > 1 * HOUR && stats[3].avg < 2.2 * HOUR, `L3 ${stats[3].avg / HOUR}`);
-  assert.ok(stats[2].avg > 2.2 * HOUR && stats[2].avg < 4 * HOUR, `L2 ${stats[2].avg / HOUR}`);
-  assert.ok(stats[1].avg > 3.5 * HOUR && stats[1].avg < 6 * HOUR, `L1 ${stats[1].avg / HOUR}`);
+  assert.ok(stats[3].avg > 5 * 60000 && stats[3].avg < 20 * 60000, `L3 ${stats[3].avg / HOUR}`);
+  assert.ok(stats[2].avg > 12 * 60000 && stats[2].avg < 35 * 60000, `L2 ${stats[2].avg / HOUR}`);
+  assert.ok(stats[1].avg > 30 * 60000 && stats[1].avg < 80 * 60000, `L1 ${stats[1].avg / HOUR}`);
   // Pas toutes absentes : une part répond en moins de 30 min à chaque niveau.
   for (const level of [3, 2, 1]) {
     const quick = stats[level].ds.filter((d) => d <= 30 * 60 * 1000).length / stats[level].ds.length;
@@ -175,10 +175,10 @@ test('reply delays: stable, varied, ordered by level, and inside the reply windo
   }
   // Le plus long délai + son attente de réveil reste dans la fenêtre : endormie,
   // elle répond à son réveil (≤ 10 h), jamais au-delà de MAX(délai, 10 h).
-  assert.equal(t.MAX_DELAY_MS, 10 * HOUR);
+  assert.equal(t.MAX_DELAY_MS, 3 * HOUR);
   assert.ok(t.MAX_DELAY_MS + 0 < t.REPLY_WINDOW_MS);
   assert.ok(t.REPLY_WINDOW_MS >= 24 * HOUR);
-  for (const level of [3, 2, 1]) assert.ok(stats[level].max <= t.MAX_DELAY_MS && stats[level].min >= 2 * 60 * 1000);
+  for (const level of [3, 2, 1]) assert.ok(stats[level].max <= t.MAX_DELAY_MS && stats[level].min >= 20 * 1000);
   assert.ok(t.REPLIES_BY_LEVEL[3] > t.REPLIES_BY_LEVEL[2] && t.REPLIES_BY_LEVEL[2] > t.REPLIES_BY_LEVEL[1]);
 });
 

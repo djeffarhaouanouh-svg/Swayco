@@ -338,9 +338,10 @@ const REPLIES_BY_LEVEL = { 3: 3, 2: 2, 1: 1 };
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
 const DELAY_BY_LEVEL = {
-  3: [[30, 2 * MIN, 20 * MIN], [40, 20 * MIN, 2 * HOUR], [30, 2 * HOUR, 5 * HOUR]],
-  2: [[20, 3 * MIN, 25 * MIN], [40, 25 * MIN, 3 * HOUR], [40, 3 * HOUR, 8 * HOUR]],
-  1: [[10, 5 * MIN, 40 * MIN], [35, 40 * MIN, 4 * HOUR], [55, 4 * HOUR, 10 * HOUR]],
+  // Accéléré (2026-11) : moyennes ≈ 11 min (niveau 3), 20 min (2), 50 min (1).
+  3: [[50, 20 * 1000, 3 * MIN], [35, 3 * MIN, 20 * MIN], [15, 20 * MIN, 1 * HOUR]],
+  2: [[40, 30 * 1000, 5 * MIN], [40, 5 * MIN, 30 * MIN], [20, 30 * MIN, 90 * MIN]],
+  1: [[30, 1 * MIN, 10 * MIN], [40, 10 * MIN, 1 * HOUR], [30, 1 * HOUR, 3 * HOUR]],
 };
 const MAX_DELAY_MS = Math.max(
   ...Object.values(DELAY_BY_LEVEL).flatMap((tr) => tr.map((t) => t[2])),
@@ -373,9 +374,9 @@ function isNewcomer(profile) {
   return Number.isFinite(t) && Date.now() - t < NEWCOMER_WINDOW_MS;
 }
 
-/** Délai stable pour un message : 3 à 10 min. */
+/** Délai stable pour un message : 20 s à 2 min. */
 function newcomerDelayMs(messageId) {
-  return 3 * MIN + (hash(`newcomer:${messageId}`) % (7 * MIN));
+  return 20 * 1000 + (hash(`newcomer:${messageId}`) % (100 * 1000));
 }
 
 // ── Style de la réponse (tiré au sort, SANS appel de plus) ───────────────────
