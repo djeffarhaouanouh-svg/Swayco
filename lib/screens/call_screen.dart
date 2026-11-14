@@ -250,8 +250,10 @@ class _CallScreenState extends State<CallScreen> {
   bool _tabHint = false;
   bool _tabHintSeen = false;
 
-  /// De combien la vignette caméra descend quand les messages sont en haut.
-  static const double _kPipDropForMessages = 86;
+  /// Distance entre le bas de l'écran et le bas de la vignette caméra quand
+  /// les messages sont en haut : la barre (~112 px), la rangée du crayon (46)
+  /// et un peu d'air.
+  static const double _kPipBottomLift = 176;
 
   /// Des bulles (au repos ou la zone ouverte) sont affichées EN HAUT.
   bool get _topMessagesShown =>
@@ -3653,14 +3655,22 @@ class _CallScreenState extends State<CallScreen> {
                 if (_pipFeedAvailable(
                     local: local, remote: remote, hasRemote: remoteCount > 0))
                   AnimatedPositioned(
-                    duration: const Duration(milliseconds: 280),
+                    duration: const Duration(milliseconds: 350),
                     curve: Curves.easeOutCubic,
-                    // Messages rangés EN HAUT : la vignette descend un peu,
-                    // pour laisser les bulles se poser à sa gauche sans la
-                    // coller.
-                    top: MediaQuery.paddingOf(context).top +
-                        52 +
-                        (_topMessagesShown ? _kPipDropForMessages : 0),
+                    // La vignette suit le côté des messages (maquette v2) :
+                    // bulles EN HAUT (ou pendant l'animation du bouton Messages)
+                    // → elle descend en bas à droite, au-dessus de la barre et
+                    // du crayon ; bulles en bas → elle reste en haut à droite.
+                    // Elle remonte de 58 px quand la saisie est dépliée.
+                    top: (_topMessagesShown || _tabHint)
+                        ? (MediaQuery.sizeOf(context).height -
+                                MediaQuery.viewPaddingOf(context).top -
+                                MediaQuery.viewPaddingOf(context).bottom -
+                                176 -
+                                _kPipBottomLift -
+                                (_composerOpen ? 58 : 0))
+                            .clamp(52.0, double.infinity)
+                        : MediaQuery.paddingOf(context).top + 52,
                     right: 12,
                     width: 118,
                     height: 176,
