@@ -27,7 +27,12 @@ class TranslationStepCaption extends StatefulWidget {
     required this.peerName,
     required this.myVoice,
     required this.myLines,
+    this.compact = false,
   });
+
+  /// Version étroite (≈112 px, 2 lignes) : quand la vignette caméra est en bas
+  /// à droite, le texte ne doit pas la toucher.
+  final bool compact;
 
   /// Le prénom de la personne en appel (vide : « l'autre » n'est pas nommé).
   final String peerName;
@@ -182,17 +187,24 @@ class _TranslationStepCaptionState extends State<TranslationStepCaption> {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 180),
       child: Container(
-        key: ValueKey('$_step-$_failed'),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        key: ValueKey('$_step-$_failed-${widget.compact}'),
+        constraints: widget.compact
+            ? const BoxConstraints(maxWidth: 112)
+            : const BoxConstraints(),
+        padding: EdgeInsets.symmetric(
+          horizontal: widget.compact ? 10 : 12,
+          vertical: widget.compact ? 4 : 5,
+        ),
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(widget.compact ? 14 : 999),
         ),
         child: Text(
           text,
           textAlign: TextAlign.center,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 13,
+            fontSize: widget.compact ? 11 : 13,
+            height: widget.compact ? 1.25 : null,
             fontWeight: FontWeight.w800,
             color: color,
           ),

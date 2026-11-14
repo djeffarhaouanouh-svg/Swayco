@@ -3745,6 +3745,57 @@ class _CallScreenState extends State<CallScreen> {
                 // referme. La couche est posée par-dessus la vidéo, donc ce
                 // tap-là ne fait QUE fermer — il n'échange pas les deux
                 // images au passage.
+                // Messages en haut : un voile sombre en haut (sous les bulles) et en
+                // bas (sous la vignette, le crayon), pour que le texte blanc se
+                // lise sur n'importe quelle image.
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 260,
+                  child: IgnorePointer(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 350),
+                      opacity: _topMessagesShown ? 1 : 0,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.6),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: 300,
+                  child: IgnorePointer(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 350),
+                      opacity: _topMessagesShown ? 1 : 0,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.6),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 if (_turnsOpen)
                   Positioned.fill(
                     key: const ValueKey('turns_dismiss'),
@@ -3845,6 +3896,17 @@ class _CallScreenState extends State<CallScreen> {
                       ? const Alignment(0, -0.52)
                       : (_turnsOpen && !_msgTop)
                           ? Alignment(0, turnsY.toDouble())
+                          // Messages en haut, saisie dépliée : le galet monte
+                          // d'environ 100 px, pour que le texte sous lui ne
+                          // touche pas la vignette caméra qui monte aussi.
+                          : (_turnsOpen && _msgTop && _composerOpen)
+                              ? Alignment(
+                                  0,
+                                  box.maxHeight <= 0
+                                      ? 0.8
+                                      : (0.80 - 200 / box.maxHeight)
+                                          .clamp(-0.9, 0.9),
+                                )
                           : _controlsOpen
                               ? const Alignment(0, 0.34)
                               // Rien de déplié : ses ondes atteignent les
@@ -3902,7 +3964,9 @@ class _CallScreenState extends State<CallScreen> {
                         // normalement », « Patiente… », « X a reçu ta
                         // traduction », « À toi… ». Pas pendant une
                         // conversation ouverte ni sous un panneau.
-                        else if (_trCaptions && !_sheetOpen && !_turnsOpen)
+                        else if (_trCaptions &&
+                            !_sheetOpen &&
+                            (!_turnsOpen || _msgTop))
                           // Remonté contre le galet : sa boîte garde ~38 px de
                           // marge sous le disque pour les ondes, le texte s'y
                           // pose plutôt que dessous.
@@ -3912,6 +3976,9 @@ class _CallScreenState extends State<CallScreen> {
                               peerName: peerFirstName ?? '',
                               myVoice: _myVoiceLevel,
                               myLines: widget.translation.localTranscript,
+                              // Vignette caméra en bas à droite : le texte se
+                              // resserre (2 lignes) pour ne pas la toucher.
+                              compact: _msgTop || _tabHint,
                             ),
                           ),
                       ],
@@ -4525,12 +4592,14 @@ class _SpokenTurnsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final composer = Positioned(
-      left: 28,
+      // Bulles en haut : le crayon est en bas à GAUCHE (la vignette caméra est
+      // en bas à droite). Bulles en bas : comme avant, à droite.
+      left: top ? 14 : 28,
       right: 14,
       bottom: 0,
       height: 46,
       child: Align(
-        alignment: Alignment.centerRight,
+        alignment: top ? Alignment.centerLeft : Alignment.centerRight,
         child: _ComposerPill(
           controller: chatController,
           focusNode: chatFocus,
