@@ -264,9 +264,11 @@ class _CallScreenState extends State<CallScreen> {
   ///   le bloc galet+texte a son centre 14 px sous celui du disque.
   double _orbY(double h) {
     if (h <= 0) return 0.80;
-    final showBubbles = !_msgTop && !_turnsHidden && _turns.isNotEmpty;
+    final showBubbles =
+        !_turnsOpen && !_msgTop && !_turnsHidden && _turns.isNotEmpty;
     final n = (_restShowOlder && _restTurns.length > 1) ? 2 : 1;
-    final dockH = _dockDimmed ? 0.0 : 96.0; // la barre, hors marge basse
+    final dockShown = _turnsOpen ? _topControls : !_dockDimmed;
+    final dockH = dockShown ? 96.0 : 0.0; // la barre, hors marge basse
     final railH = _controlsOpen ? 92.0 : 0.0; // la rangée de réglages
     final controlsTop = 16.0 + dockH + railH; // haut des boutons, depuis le bas
     // Les bulles se posent juste au-dessus des boutons (10 px d'air).
@@ -291,7 +293,11 @@ class _CallScreenState extends State<CallScreen> {
 
   void _setMessagesSide(bool top) {
     if (top == _msgTop) return;
-    setState(() => _msgTop = top);
+    _topControlsTimer?.cancel();
+    setState(() {
+      _msgTop = top;
+      _topControls = false;
+    });
   }
 
   /// Dans combien d'appels, sur cet appareil, la démonstration a déjà joué. Elle
@@ -403,10 +409,12 @@ class _CallScreenState extends State<CallScreen> {
     _chatFocus.unfocus();
     _restTimer?.cancel();
     _composerIdle?.cancel();
+    _topControlsTimer?.cancel();
     if (!mounted) return;
     if (_tabHint) _endTabHint();
     if (!_turnsOpen && _turnsMuted) return;
     setState(() {
+      _topControls = false;
       _turnsOpen = false;
       _turnsHidden = true;
       _turnsMuted = true;
@@ -460,6 +468,34 @@ class _CallScreenState extends State<CallScreen> {
   /// Le silence au bout duquel le dock disparaît.
   static const Duration _kDockIdle = Duration(seconds: 2);
 
+  /// Messages EN HAUT, zone ouverte : la barre de boutons est effacée. Un tap
+  /// sur l'écran ne referme PAS tout ; il la réaffiche (et la vignette caméra
+  /// remonte un peu au-dessus), puis elle se range seule au bout de quelques
+  /// secondes. Les messages, eux, restent en haut.
+  bool _topControls = false;
+  Timer? _topControlsTimer;
+  static const Duration _kTopControlsIdle = Duration(seconds: 4);
+
+  void _showTopControls() {
+    if (!mounted) return;
+    setState(() => _topControls = true);
+    _armTopControls();
+    _wakeDock();
+  }
+
+  void _armTopControls() {
+    _topControlsTimer?.cancel();
+    _topControlsTimer = Timer(_kTopControlsIdle, () {
+      if (!mounted) return;
+      // Pas sous les doigts de quelqu'un qui s'en sert : réglages dépliés.
+      if (_controlsOpen) {
+        _armTopControls();
+        return;
+      }
+      if (_topControls) setState(() => _topControls = false);
+    });
+  }
+
   /// Quelque chose vient de se passer (une voix, une phrase, un tap) : le dock
   /// se rallume et repart pour [_kDockIdle] de sursis.
   void _wakeDock() {
@@ -475,6 +511,7 @@ class _CallScreenState extends State<CallScreen> {
       setState(() => _dockDimmed = true);
     });
     if (_dockDimmed && mounted) setState(() => _dockDimmed = false);
+    if (_topControls) _armTopControls();
   }
 
   /// Le plancher absolu sous lequel rien n'est jamais de la parole.
@@ -3474,6 +3511,7 @@ class _CallScreenState extends State<CallScreen> {
     _myVoiceLevel.dispose();
     _composerIdle?.cancel();
     _dockIdleTimer?.cancel();
+    _topControlsTimer?.cancel();
     _micProbe?.cancel();
     final declineCh = _declineChannel;
     _declineChannel = null;
@@ -3706,7 +3744,8 @@ class _CallScreenState extends State<CallScreen> {
                                     // Zone ouverte : la barre est effacée, la
                                     // vignette se pose au ras du crayon (et suit
                                     // le clavier).
-                                    ? 16 + MediaQuery.viewInsetsOf(context).bottom
+                                    ? (_topControls ? _kPipBottomLift : 16) +
+                                        MediaQuery.viewInsetsOf(context).bottom
                                     // Bulles au repos en haut : la barre est là,
                                     // la vignette se pose au-dessus d'elle.
                                     : _kPipBottomLift))
@@ -3847,7 +3886,7 @@ class _CallScreenState extends State<CallScreen> {
                       // aussi. Avant, le premier tap n'arrêtait QUE la
                       // démonstration, et il en fallait un second pour fermer
                       // les bulles.
-                      onTap: _closeTurns,
+                      onTap: _msgTop ? _showTopControls : _closeTurns,
                     ),
                   ),
                 // Le panneau effacé : l'écran ENTIER le rappelle. C'est ce qui
@@ -3937,18 +3976,7 @@ class _CallScreenState extends State<CallScreen> {
                       ? const Alignment(0, -0.52)
                       : (_turnsOpen && !_msgTop)
                           ? Alignment(0, turnsY.toDouble())
-                          // Messages en haut, saisie dépliée : le galet monte
-                          // d'environ 100 px, pour que le texte sous lui ne
-                          // touche pas la vignette caméra qui monte aussi.
-                          : (_turnsOpen && _msgTop && _composerOpen)
-                              ? Alignment(
-                                  0,
-                                  box.maxHeight <= 0
-                                      ? 0.8
-                                      : (0.80 - 200 / box.maxHeight)
-                                          .clamp(-0.9, 0.9),
-                                )
-                          : (!_turnsOpen)
+                          : (!_turnsOpen || (_msgTop && _topControls))
                               ? Alignment(0, _orbY(box.maxHeight))
                               // Rien de déplié : ses ondes atteignent les
                               // touches et c'est très bien, elles passent
@@ -4274,7 +4302,7 @@ class _CallScreenState extends State<CallScreen> {
                           // boîte vide) : retirer un enfant re-mappe ses
                           // voisins, et le champ de saisie y perdrait son
                           // focus — c'est le bug de b2f3293.
-                          if (_turnsOpen)
+                          if (_turnsOpen && !(_msgTop && _topControls))
                             const SizedBox(width: double.infinity)
                           else
                           // En veille, la rangée ne se contente plus de
@@ -4402,7 +4430,7 @@ class _CallScreenState extends State<CallScreen> {
                             onToggleSide: () => _setMessagesSide(false),
                             hint: _tabHint,
                             onHintDone: _endTabHint,
-                            onTapZone: _closeTurns,
+                            onTapZone: _showTopControls,
                           )
                         : Padding(
                             padding: const EdgeInsets.only(left: 28),
