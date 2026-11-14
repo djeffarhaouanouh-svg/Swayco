@@ -14,6 +14,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show RealtimeChannel, Supabase;
@@ -261,9 +262,35 @@ class _CallScreenState extends State<CallScreen> {
     setState(() => _msgTop = top);
   }
 
-  /// La démonstration de la languette joue UNE fois par appel : à la première
-  /// ouverture de la zone Messages de cet appel ([_tabHintSeen] passe alors à
-  /// vrai), pas aux suivantes. Un nouvel appel la rejoue.
+  /// Dans combien d'appels, sur cet appareil, la démonstration a déjà joué. Elle
+  /// joue UNE fois par appel (à la première ouverture de Messages de l'appel,
+  /// [_tabHintSeen]) et seulement pour les [_kTabHintCalls] premiers appels :
+  /// on ne va pas la rejouer à chaque appel. Tant que le compteur n'est pas lu,
+  /// il vaut le maximum (pas de démonstration).
+  int _tabHintCalls = _kTabHintCalls;
+  static const int _kTabHintCalls = 3;
+  static const String _kTabHintCallsKey = 'messages_tab_hint_calls';
+
+  Future<void> _loadTabHintCalls() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final n = p.getInt(_kTabHintCallsKey) ?? 0;
+      if (mounted) _tabHintCalls = n;
+    } catch (_) {}
+  }
+
+  /// La démonstration joue maintenant (1re ouverture de cet appel) : on compte
+  /// cet appel.
+  void _countTabHintCall() {
+    _tabHintCalls += 1;
+    unawaited(() async {
+      try {
+        final p = await SharedPreferences.getInstance();
+        await p.setInt(_kTabHintCallsKey, _tabHintCalls);
+      } catch (_) {}
+    }());
+  }
+
   void _endTabHint() {
     if (!_tabHint) return;
     setState(() => _tabHint = false);
@@ -1861,6 +1888,7 @@ class _CallScreenState extends State<CallScreen> {
     Analytics.track('screen_view', props: {'screen': 'live'});
     // Zone messages : côté choisi, démonstration déjà vue, repli de la saisie.
     _chatFocus.addListener(_onChatFocusChanged);
+    unawaited(_loadTabHintCalls());
     // Les textes d'explication sous le galet : tant qu'on n'a jamais vu une
     // phrase partir (voir [TranslationStepCaption]).
     // Toujours affichés : ils ne s'effacent plus après la première phrase
@@ -4050,7 +4078,9 @@ class _CallScreenState extends State<CallScreen> {
                                               // retrouver. La languette se
                                               // présente à la première fois.
                                               _composerOpen = true;
-                                              _tabHint = !_tabHintSeen;
+                                              _tabHint = !_tabHintSeen &&
+                                                  _tabHintCalls < _kTabHintCalls;
+                                              if (_tabHint) _countTabHintCall();
                                               _tabHintSeen = true;
                                               // Le rail se replie en même
                                               // temps : les deux se déplient
