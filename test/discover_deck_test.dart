@@ -256,7 +256,7 @@ void main() {
   });
   test('la taille du lot et la part minimale sont celles mesurées', () {
     expect(kDiscoverFetchSize, 100);
-    expect(kDiscoverDailySwipes, 100);
+    expect(kDiscoverDailySwipes, 50);
     expect((50 * kDiscoverMinMenShare).ceil(), 12);
   });
 }

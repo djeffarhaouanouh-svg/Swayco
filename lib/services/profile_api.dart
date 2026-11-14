@@ -1577,8 +1577,8 @@ abstract final class ProfileApi {
       // Les hommes ne sont que ~14 % des profils : le lot de 50 tiré au hasard
       // n'en contenait que 7 environ.
       final unfiltered = countryList.isEmpty && langs.isEmpty;
-      // Gratuit : [limit] swipes par jour (100). Pro : paquet beaucoup plus long,
-      // illimité en pratique. Le plafond est AUSSI posé côté base (migration 0074).
+      // Gratuit : [limit] swipes par jour (50). Pro : paquet beaucoup plus long,
+      // illimité en pratique. Le plafond est AUSSI posé côté base (migration 0085).
       RemoteProfile? meRow;
       try {
         meRow = await fetchById(myId);
@@ -1686,7 +1686,8 @@ abstract final class ProfileApi {
 
 /// Swipes par jour pour un compte gratuit : c'est la taille du paquet du jour,
 /// quel que soit le pays. Le Pro n'a pas de limite (voir [kDiscoverProDeckSize]).
-const int kDiscoverDailySwipes = 100;
+/// 50 par jour (c'était 100) ; le plafond est aussi posé côté base (migration 0085).
+const int kDiscoverDailySwipes = 50;
 
 /// Taille du paquet d'un compte Pro : « illimité » en pratique.
 const int kDiscoverProDeckSize = 400;
