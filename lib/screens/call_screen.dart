@@ -3929,6 +3929,29 @@ class _CallScreenState extends State<CallScreen> {
                                 )
                           : _controlsOpen
                               ? const Alignment(0, 0.34)
+                              // Les deux premiers messages du démarrage (bulles au
+                              // repos, en bas) se posent sur la place du texte sous
+                              // le galet : le galet monte de leur hauteur tant
+                              // qu'elles sont là, pour que ce texte reste lisible.
+                              : (!_turnsOpen &&
+                                      !_msgTop &&
+                                      !_turnsHidden &&
+                                      _turns.isNotEmpty)
+                                  ? Alignment(
+                                      0,
+                                      box.maxHeight <= 0
+                                          ? 0.8
+                                          : (0.80 -
+                                                  2 *
+                                                      (22 +
+                                                          62 *
+                                                              (_restShowOlder &&
+                                                                      _restTurns.length > 1
+                                                                  ? 2
+                                                                  : 1)) /
+                                                      box.maxHeight)
+                                              .clamp(-0.9, 0.9),
+                                    )
                               // Rien de déplié : ses ondes atteignent les
                               // touches et c'est très bien, elles passent
                               // derrière.
@@ -4658,6 +4681,7 @@ class _SpokenTurnsPanel extends StatelessWidget {
               hint: hint,
               onHintDone: onHintDone,
               onTapZone: onTapZone,
+              holdFade: composerOpen,
             ),
           ),
           composer,
@@ -4687,7 +4711,11 @@ class _TurnsBlock extends StatefulWidget {
     required this.hint,
     required this.onHintDone,
     required this.onTapZone,
+    this.holdFade = false,
   });
+
+  /// Vrai tant que la saisie est dépliée : les bulles ne s'atténuent pas.
+  final bool holdFade;
 
   final List<_SpokenTurn> turns;
   final String myName;
@@ -4723,6 +4751,29 @@ class _TurnsBlockState extends State<_TurnsBlock>
     vsync: this,
     duration: const Duration(milliseconds: 3200),
   );
+
+  /// Atténuation : 7 s sans geste ni nouveau message, les bulles passent à 35 %
+  /// (elles ne disparaissent pas). Les DEUX PREMIÈRES de l'appel (celles du
+  /// démarrage) ne s'atténuent jamais. Un tap sur une bulle atténuée, ou sur la
+  /// languette, les réveille ; un nouveau message aussi.
+  static const Duration _fadeAfter = Duration(seconds: 7);
+  static const int _neverFade = 2;
+  Timer? _fadeTimer;
+  bool _faded = false;
+  int _seenLen = 0;
+
+  void _armFade() {
+    _fadeTimer?.cancel();
+    if (widget.holdFade) return;
+    _fadeTimer = Timer(_fadeAfter, () {
+      if (mounted) setState(() => _faded = true);
+    });
+  }
+
+  void _wake() {
+    if (_faded) setState(() => _faded = false);
+    _armFade();
+  }
 
   /// Ce que le doigt a tiré la languette (vertical).
   double _drag = 0;
@@ -4762,6 +4813,8 @@ class _TurnsBlockState extends State<_TurnsBlock>
   @override
   void initState() {
     super.initState();
+    _seenLen = widget.turns.length;
+    _armFade();
     _enter.forward();
     _enter.addStatusListener((s) {
       if (s == AnimationStatus.completed && widget.hint && mounted) {
@@ -4777,6 +4830,20 @@ class _TurnsBlockState extends State<_TurnsBlock>
   @override
   void didUpdateWidget(covariant _TurnsBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Un nouveau message (le mien ou le sien) remet tout à 100 %.
+    if (widget.turns.length != _seenLen) {
+      _seenLen = widget.turns.length;
+      _wake();
+    }
+    // La saisie dépliée : pas d'atténuation ; au repli, le délai repart.
+    if (widget.holdFade != oldWidget.holdFade) {
+      if (widget.holdFade) {
+        _fadeTimer?.cancel();
+        if (_faded) setState(() => _faded = false);
+      } else {
+        _armFade();
+      }
+    }
     // Un tap sur l'écran a arrêté la démonstration.
     if (oldWidget.hint && !widget.hint) {
       _demo.stop();
@@ -4786,6 +4853,7 @@ class _TurnsBlockState extends State<_TurnsBlock>
 
   @override
   void dispose() {
+    _fadeTimer?.cancel();
     _enter.dispose();
     _demo.dispose();
     super.dispose();
@@ -4850,7 +4918,14 @@ class _TurnsBlockState extends State<_TurnsBlock>
 
         final list = GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: widget.onTapZone,
+          // Atténuées : le tap les réveille au lieu de fermer la zone.
+          onTap: () {
+            if (_faded) {
+              _wake();
+            } else {
+              widget.onTapZone();
+            }
+          },
           child: Opacity(
           opacity: bubblesIn,
           child: Transform.translate(
@@ -4871,15 +4946,21 @@ class _TurnsBlockState extends State<_TurnsBlock>
                   padding: EdgeInsets.zero,
                   itemCount: widget.turns.length,
                   itemBuilder: (ctx, i) {
-                    final turn = widget.turns[widget.turns.length - 1 - i];
+                    final idx = widget.turns.length - 1 - i;
+                    final turn = widget.turns[idx];
                     return Padding(
                       padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
-                      child: _TurnBubble(
-                        turn: turn,
-                        name: turn.mine ? widget.myName : widget.peerName,
-                        avatarUrl: turn.mine
-                            ? widget.myAvatarUrl
-                            : widget.peerAvatarUrl,
+                      child: AnimatedOpacity(
+                        duration: Duration(milliseconds: _faded ? 600 : 200),
+                        curve: Curves.easeOut,
+                        opacity: (_faded && idx >= _neverFade) ? 0.35 : 1.0,
+                        child: _TurnBubble(
+                          turn: turn,
+                          name: turn.mine ? widget.myName : widget.peerName,
+                          avatarUrl: turn.mine
+                              ? widget.myAvatarUrl
+                              : widget.peerAvatarUrl,
+                        ),
                       ),
                     );
                   },
@@ -4904,7 +4985,10 @@ class _TurnsBlockState extends State<_TurnsBlock>
           offset: Offset(-22 * (1 - tabIn), demo.hop),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: widget.onToggleSide,
+            onTap: () {
+              _wake();
+              widget.onToggleSide();
+            },
             onVerticalDragUpdate: (d) => setState(() {
               _drag = (_drag + d.delta.dy).clamp(-160.0, 160.0);
             }),
