@@ -3561,7 +3561,8 @@ class _TinderCardState extends State<_TinderCard> {
                         if (country.isNotEmpty) TextSpan(text: country),
                         if (!widget.preview && flagEmoji.isNotEmpty)
                           TextSpan(
-                            text: '  $flagEmoji',
+                            // Un tiret entre le pays et le drapeau : « Italie - 🇮🇹 ».
+                            text: ' - $flagEmoji',
                             style: const TextStyle(fontSize: 22),
                           ),
                       ],
