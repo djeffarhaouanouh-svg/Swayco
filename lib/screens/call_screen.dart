@@ -251,9 +251,10 @@ class _CallScreenState extends State<CallScreen> {
   bool _tabHintSeen = false;
 
   /// Distance entre le bas de l'écran et le bas de la vignette caméra quand
-  /// les messages sont en haut : la barre (~112 px), la rangée du crayon (46)
-  /// et un peu d'air.
-  static const double _kPipBottomLift = 176;
+  /// des bulles au repos sont en haut et que la barre d'appel est visible :
+  /// la barre (~112 px) et un peu d'air. Zone Messages ouverte, la barre est
+  /// effacée et la vignette se pose au ras du bas.
+  static const double _kPipBottomLift = 128;
 
   /// Des bulles (au repos ou la zone ouverte) sont affichées EN HAUT.
   bool get _topMessagesShown =>
@@ -3658,17 +3659,25 @@ class _CallScreenState extends State<CallScreen> {
                     duration: const Duration(milliseconds: 350),
                     curve: Curves.easeOutCubic,
                     // La vignette suit le côté des messages (maquette v2) :
-                    // bulles EN HAUT (ou pendant l'animation du bouton Messages)
-                    // → elle descend en bas à droite, au-dessus de la barre et
-                    // du crayon ; bulles en bas → elle reste en haut à droite.
-                    // Elle remonte de 58 px quand la saisie est dépliée.
-                    top: (_topMessagesShown || _tabHint)
+                    // bulles EN HAUT → elle descend tout en bas à droite, à la
+                    // hauteur du crayon ; bulles en bas → elle reste en haut à
+                    // droite. PAS pendant l'animation du bouton Messages (elle
+                    // ne bouge que quand les messages sont vraiment en haut).
+                    // Saisie dépliée : elle remonte au-dessus du champ.
+                    top: _topMessagesShown
                         ? (MediaQuery.sizeOf(context).height -
                                 MediaQuery.viewPaddingOf(context).top -
                                 MediaQuery.viewPaddingOf(context).bottom -
                                 176 -
-                                _kPipBottomLift -
-                                (_composerOpen ? 58 : 0))
+                                (_turnsOpen
+                                    // Zone ouverte : la barre est effacée, la
+                                    // vignette se pose au ras du crayon (et suit
+                                    // le clavier).
+                                    ? (_composerOpen ? 74 : 16) +
+                                        MediaQuery.viewInsetsOf(context).bottom
+                                    // Bulles au repos en haut : la barre est là,
+                                    // la vignette se pose au-dessus d'elle.
+                                    : _kPipBottomLift))
                             .clamp(52.0, double.infinity)
                         : MediaQuery.paddingOf(context).top + 52,
                     right: 12,
@@ -3978,7 +3987,7 @@ class _CallScreenState extends State<CallScreen> {
                               myLines: widget.translation.localTranscript,
                               // Vignette caméra en bas à droite : le texte se
                               // resserre (2 lignes) pour ne pas la toucher.
-                              compact: _msgTop || _tabHint,
+                              compact: _msgTop,
                             ),
                           ),
                       ],
