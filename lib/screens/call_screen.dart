@@ -235,9 +235,9 @@ class _CallScreenState extends State<CallScreen> {
 
   // ── Zone messages : côté, saisie repliée, démonstration ────────────────
   /// Les messages sont rangés EN HAUT de l'écran (sinon en bas, par défaut).
-  /// Choisi en glissant (ou touchant) la languette, mémorisé sur l'appareil.
+  /// Choisi en glissant (ou touchant) la languette ; valable pour CET appel
+  /// seulement : chaque appel repart avec les bulles en bas.
   bool _msgTop = false;
-  static const String _kMsgSideKey = 'call_messages_side';
 
   /// La saisie est dépliée (sinon : un rond crayon).
   bool _composerOpen = false;
@@ -249,7 +249,6 @@ class _CallScreenState extends State<CallScreen> {
   /// La démonstration de la languette tourne (première ouverture seulement).
   bool _tabHint = false;
   bool _tabHintSeen = true;
-  static const String _kTabHintKey = 'seen_messages_tab_hint';
 
   /// De combien la vignette caméra descend quand les messages sont en haut.
   static const double _kPipDropForMessages = 56;
@@ -258,40 +257,47 @@ class _CallScreenState extends State<CallScreen> {
   bool get _topMessagesShown =>
       _msgTop && (_turnsOpen || (!_turnsHidden && _turns.isNotEmpty));
 
+  /// Combien de fois la démonstration de la languette a déjà joué sur cet
+  /// appareil : elle rejoue aux [_kTabHintMax] premières ouvertures de la zone
+  /// Messages (une seule fois, on ne la voyait presque jamais).
+  int _tabHintPlays = 0;
+  static const int _kTabHintMax = 3;
+  static const String _kTabHintPlaysKey = 'messages_tab_hint_plays';
+
   Future<void> _loadMessagesPrefs() async {
     try {
       final p = await SharedPreferences.getInstance();
-      final top = p.getString(_kMsgSideKey) == 'top';
-      final seen = p.getBool(_kTabHintKey) ?? false;
+      // Le côté choisi n'est PAS repris d'un appel à l'autre : à l'arrivée les
+      // bulles se posent toujours en bas (elles ne montent qu'avec la zone
+      // Messages, ou quand on glisse la languette pendant l'appel).
+      _tabHintPlays = p.getInt(_kTabHintPlaysKey) ?? 0;
       if (!mounted) return;
-      setState(() {
-        _msgTop = top;
-        _tabHintSeen = seen;
-      });
+      setState(() => _tabHintSeen = _tabHintPlays >= _kTabHintMax);
     } catch (_) {}
+  }
+
+  /// La zone Messages vient de s'ouvrir avec la démonstration : on compte.
+  void _countTabHintPlay() {
+    _tabHintPlays += 1;
+    if (_tabHintPlays >= _kTabHintMax) _tabHintSeen = true;
+    unawaited(() async {
+      try {
+        final p = await SharedPreferences.getInstance();
+        await p.setInt(_kTabHintPlaysKey, _tabHintPlays);
+      } catch (_) {}
+    }());
   }
 
   void _setMessagesSide(bool top) {
     if (top == _msgTop) return;
     setState(() => _msgTop = top);
-    unawaited(() async {
-      try {
-        final p = await SharedPreferences.getInstance();
-        await p.setString(_kMsgSideKey, top ? 'top' : 'bottom');
-      } catch (_) {}
-    }());
   }
 
   void _endTabHint() {
     if (!_tabHint) return;
+    // Le compteur [_countTabHintPlay] a déjà été avancé à l'ouverture : un tap
+    // qui coupe la démonstration ne la rend pas « vue » pour toujours.
     setState(() => _tabHint = false);
-    _tabHintSeen = true;
-    unawaited(() async {
-      try {
-        final p = await SharedPreferences.getInstance();
-        await p.setBool(_kTabHintKey, true);
-      } catch (_) {}
-    }());
   }
 
   /// Déplie la saisie (le rond crayon touché) et monte le clavier.
@@ -4077,6 +4083,7 @@ class _CallScreenState extends State<CallScreen> {
                                               // présente à la première fois.
                                               _composerOpen = true;
                                               _tabHint = !_tabHintSeen;
+                                              if (_tabHint) _countTabHintPlay();
                                               // Le rail se replie en même
                                               // temps : les deux se déplient
                                               // au MÊME endroit, l'un sur
@@ -4303,7 +4310,9 @@ class _CallScreenState extends State<CallScreen> {
                       // s'efface pendant qu'ils sont là, et revient ensuite.
                       child: AnimatedOpacity(
                         duration: const Duration(milliseconds: 250),
-                        opacity: _topMessagesShown ? 0.0 : 0.7,
+                        // Aussi pendant l'animation de la zone Messages qui
+                        // monte en haut puis redescend.
+                        opacity: (_topMessagesShown || _tabHint) ? 0.0 : 0.7,
                         child: SwaycoWordmark(
                           fontSize: 29,
                           letterSpacing: 0.5,
