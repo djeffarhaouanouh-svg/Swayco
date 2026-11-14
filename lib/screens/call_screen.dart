@@ -3685,8 +3685,7 @@ class _CallScreenState extends State<CallScreen> {
                                     // Zone ouverte : la barre est effacée, la
                                     // vignette se pose au ras du crayon (et suit
                                     // le clavier).
-                                    ? (_composerOpen ? 74 : 16) +
-                                        MediaQuery.viewInsetsOf(context).bottom
+                                    ? 16 + MediaQuery.viewInsetsOf(context).bottom
                                     // Bulles au repos en haut : la barre est là,
                                     // la vignette se pose au-dessus d'elle.
                                     : _kPipBottomLift))
@@ -4631,13 +4630,9 @@ class _SpokenTurnsPanel extends StatelessWidget {
         ),
       ),
     );
-    if (top) {
-      return SizedBox(
-        height: 46,
-        width: double.infinity,
-        child: Stack(clipBehavior: Clip.none, children: [composer]),
-      );
-    }
+    // Messages rangés EN HAUT : plus de crayon (il tombait sur la zone des
+    // boutons). Il ne reste rien en bas ; on écrit en les rangeant en bas.
+    if (top) return const SizedBox.shrink();
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 84 + 10),
       child: Stack(
