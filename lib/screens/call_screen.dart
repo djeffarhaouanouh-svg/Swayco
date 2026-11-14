@@ -50,7 +50,6 @@ import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/translation_step_caption.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_popups_extra.dart';
 import '../widgets/swayco_wordmark.dart';
@@ -246,57 +245,27 @@ class _CallScreenState extends State<CallScreen> {
   /// Combien la saisie dépliée reste ouverte sans focus ni geste.
   static const Duration _kComposerIdle = Duration(seconds: 4);
 
-  /// La démonstration de la languette tourne (première ouverture seulement).
+  /// La démonstration de la languette tourne (première ouverture de l'appel).
   bool _tabHint = false;
-  bool _tabHintSeen = true;
+  bool _tabHintSeen = false;
 
   /// De combien la vignette caméra descend quand les messages sont en haut.
-  static const double _kPipDropForMessages = 56;
+  static const double _kPipDropForMessages = 86;
 
   /// Des bulles (au repos ou la zone ouverte) sont affichées EN HAUT.
   bool get _topMessagesShown =>
       _msgTop && (_turnsOpen || (!_turnsHidden && _turns.isNotEmpty));
-
-  /// Combien de fois la démonstration de la languette a déjà joué sur cet
-  /// appareil : elle rejoue aux [_kTabHintMax] premières ouvertures de la zone
-  /// Messages (une seule fois, on ne la voyait presque jamais).
-  int _tabHintPlays = 0;
-  static const int _kTabHintMax = 3;
-  static const String _kTabHintPlaysKey = 'messages_tab_hint_plays';
-
-  Future<void> _loadMessagesPrefs() async {
-    try {
-      final p = await SharedPreferences.getInstance();
-      // Le côté choisi n'est PAS repris d'un appel à l'autre : à l'arrivée les
-      // bulles se posent toujours en bas (elles ne montent qu'avec la zone
-      // Messages, ou quand on glisse la languette pendant l'appel).
-      _tabHintPlays = p.getInt(_kTabHintPlaysKey) ?? 0;
-      if (!mounted) return;
-      setState(() => _tabHintSeen = _tabHintPlays >= _kTabHintMax);
-    } catch (_) {}
-  }
-
-  /// La zone Messages vient de s'ouvrir avec la démonstration : on compte.
-  void _countTabHintPlay() {
-    _tabHintPlays += 1;
-    if (_tabHintPlays >= _kTabHintMax) _tabHintSeen = true;
-    unawaited(() async {
-      try {
-        final p = await SharedPreferences.getInstance();
-        await p.setInt(_kTabHintPlaysKey, _tabHintPlays);
-      } catch (_) {}
-    }());
-  }
 
   void _setMessagesSide(bool top) {
     if (top == _msgTop) return;
     setState(() => _msgTop = top);
   }
 
+  /// La démonstration de la languette joue UNE fois par appel : à la première
+  /// ouverture de la zone Messages de cet appel ([_tabHintSeen] passe alors à
+  /// vrai), pas aux suivantes. Un nouvel appel la rejoue.
   void _endTabHint() {
     if (!_tabHint) return;
-    // Le compteur [_countTabHintPlay] a déjà été avancé à l'ouverture : un tap
-    // qui coupe la démonstration ne la rend pas « vue » pour toujours.
     setState(() => _tabHint = false);
   }
 
@@ -1891,7 +1860,6 @@ class _CallScreenState extends State<CallScreen> {
     widget.translation.localTranscript?.addListener(_onMyTranscript);
     Analytics.track('screen_view', props: {'screen': 'live'});
     // Zone messages : côté choisi, démonstration déjà vue, repli de la saisie.
-    unawaited(_loadMessagesPrefs());
     _chatFocus.addListener(_onChatFocusChanged);
     // Les textes d'explication sous le galet : tant qu'on n'a jamais vu une
     // phrase partir (voir [TranslationStepCaption]).
@@ -4083,7 +4051,7 @@ class _CallScreenState extends State<CallScreen> {
                                               // présente à la première fois.
                                               _composerOpen = true;
                                               _tabHint = !_tabHintSeen;
-                                              if (_tabHint) _countTabHintPlay();
+                                              _tabHintSeen = true;
                                               // Le rail se replie en même
                                               // temps : les deux se déplient
                                               // au MÊME endroit, l'un sur
@@ -4272,7 +4240,9 @@ class _CallScreenState extends State<CallScreen> {
                     key: const ValueKey('turns_top'),
                     top: 4,
                     left: 0,
-                    right: 118 + 12 + 10,
+                    // Pleine largeur (moins la marge) : la vignette caméra descend
+                    // SOUS le bloc au lieu de le serrer sur sa gauche.
+                    right: 12,
                     child: _turnsOpen
                         ? _TurnsBlock(
                             turns: _turns,
@@ -4653,8 +4623,10 @@ class _TurnsBlockState extends State<_TurnsBlock>
       final mq = MediaQuery.of(context);
       final y = box.localToGlobal(Offset.zero).dy;
       final h = box.size.height;
-      final topLimit = mq.padding.top + 4;
-      final bottomLimit = mq.size.height - (16 + mq.padding.bottom) - h;
+      // viewPadding, pas padding : le SafeArea de l'écran a déjà consommé
+      // padding (il vaut 0 ici), et la zone montait jusque sous la barre d'état.
+      final topLimit = mq.viewPadding.top + 4;
+      final bottomLimit = mq.size.height - (16 + mq.viewPadding.bottom) - h;
       final d = widget.top ? bottomLimit - y : y - topLimit;
       _travelPx = d.clamp(_demoTravel, mq.size.height).toDouble();
     } catch (_) {
