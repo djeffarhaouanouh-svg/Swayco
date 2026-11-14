@@ -4750,12 +4750,12 @@ class _TurnsBlockState extends State<_TurnsBlock>
     duration: const Duration(milliseconds: 3200),
   );
 
-  /// Atténuation : 7 s sans geste ni nouveau message, l'AVANT-DERNIÈRE bulle
+  /// Atténuation : 5 s sans geste ni nouveau message, l'AVANT-DERNIÈRE bulle
   /// passe à 35 % (rien ne disparaît ; la plus récente reste à 100 %). Les DEUX
   /// PREMIÈRES de l'appel (celles du démarrage) ne s'atténuent jamais. Un tap sur
   /// la bulle atténuée, ou sur la languette, la réveille ; un nouveau message
-  /// aussi (il arrive à 100 %, le délai de 7 s repart).
-  static const Duration _fadeAfter = Duration(seconds: 7);
+  /// aussi (il arrive à 100 %, le délai de 5 s repart).
+  static const Duration _fadeAfter = Duration(seconds: 5);
   static const int _neverFade = 2;
   Timer? _fadeTimer;
   bool _faded = false;

@@ -7,7 +7,10 @@ import 'revenue_cat.dart';
 class DailySwipes {
   DailySwipes._();
 
-  static const int freeLimit = 100;
+  /// 50 par jour pour un compte gratuit (c'était 100) : même nombre que la taille
+  /// du paquet du jour (`kDiscoverDailySwipes`) et que le « n / max » de l'écran
+  /// de fin.
+  static const int freeLimit = 50;
 
   static const _kDay = 'swipes_day';
   static const _kCount = 'swipes_count';
