@@ -3943,8 +3943,8 @@ class _CallScreenState extends State<CallScreen> {
                                           ? 0.8
                                           : (0.80 -
                                                   2 *
-                                                      (22 +
-                                                          62 *
+                                                      (10 +
+                                                          34 *
                                                               (_restShowOlder &&
                                                                       _restTurns.length > 1
                                                                   ? 2
