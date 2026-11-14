@@ -179,7 +179,11 @@ class _TranslationStepCaptionState extends State<TranslationStepCaption> {
         case 1:
           text = AppStrings.t('tuto_tr_l2');
         case 2:
-          text = AppStrings.t('tuto_tr_l3', args: args);
+          // Colonne étroite (vignette caméra à droite) : la version courte.
+          text = AppStrings.t(
+            widget.compact ? 'tuto_tr_l3s' : 'tuto_tr_l3',
+            args: args,
+          );
         case 3:
           text = AppStrings.t('tuto_tr_l4');
           color = _yellow;
