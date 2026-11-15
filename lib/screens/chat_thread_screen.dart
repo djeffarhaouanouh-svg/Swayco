@@ -3495,7 +3495,7 @@ class _ReactionChip extends StatelessWidget {
   }
 }
 
-/// 😂 ❤️ 🔥 👍 + sous le dernier message du pair (1b) : un tap réagit, le +
+/// 👍 👌 🎉 ❤️ 🔥 + sous le dernier message du pair (1b) : un tap réagit, le +
 /// ouvre le sélecteur complet (le même qu'un appui long sur la bulle).
 class _QuickReactionBar extends StatelessWidget {
   const _QuickReactionBar({required this.onPick, required this.onMore});
@@ -3503,7 +3503,9 @@ class _QuickReactionBar extends StatelessWidget {
   final ValueChanged<String> onPick;
   final VoidCallback onMore;
 
-  static const _emojis = ['😂', '❤️', '🔥', '👍'];
+  // La MÊME liste que la barre qui s'ouvre en touchant un message : deux listes
+  // différentes (😂 ❤️ 🔥 👍 ici, 👍 👌 🎉 ❤️ 🔥 là) se contredisaient.
+  static const _emojis = kQuickReactionEmojis;
 
   /// One glass pill, 36×30 (8c).
   static Widget _pill(Widget child) => Container(
