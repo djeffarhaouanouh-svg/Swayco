@@ -41,6 +41,8 @@ import '../services/profile_api.dart';
 import '../swayco/speech/speech_service.dart';
 import '../swayco/wire_compat.dart';
 import '../services/debug_overlay.dart';
+import '../services/device_id.dart';
+import '../services/supabase_service.dart' show isSupabaseReady;
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
@@ -2010,6 +2012,7 @@ class _CallScreenState extends State<CallScreen> {
       if (mounted) setState(() => _minSplashDone = true);
     });
     unawaited(_loadPeerProfile());
+    unawaited(_loadMyAvatar());
     // Le système peut refuser de transcrire (Siri / Dictée coupés) : sans ce
     // fil, la panne serait totalement muette côté utilisateur.
     AsrService.osRefusedKey.addListener(_onSttRefused);
@@ -2056,6 +2059,24 @@ class _CallScreenState extends State<CallScreen> {
   /// Best-effort fetch of the peer's profile (PDP + language) for the
   /// "call ended" summary card. Silent on any failure — the card just falls
   /// back to an initial-letter avatar and no flag.
+  /// MA photo pour mes bulles : elle était passée vide partout (une chaîne vide),
+  /// donc mes phrases n'avaient jamais que mon initiale — « la photo ne se
+  /// remplit pas ». Lecture silencieuse : sans réseau, l'initiale reste.
+  String _myAvatarUrl = '';
+
+  Future<void> _loadMyAvatar() async {
+    if (!isSupabaseReady) return;
+    try {
+      final id = await DeviceId.getOrCreate();
+      if (id.isEmpty) return;
+      final me = await ProfileApi.fetchById(id);
+      final url = me?.bestAvatarUrl ?? '';
+      if (mounted && url.isNotEmpty && url != _myAvatarUrl) {
+        setState(() => _myAvatarUrl = url);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _loadPeerProfile() async {
     final id = widget.peerId;
     if (id == null || id.isEmpty) return;
@@ -4167,7 +4188,7 @@ class _CallScreenState extends State<CallScreen> {
                                         child: _RestingTurns(
                                                 turns: _restTurns,
                                                 myName: widget.displayName,
-                                                myAvatarUrl: '',
+                                                myAvatarUrl: _myAvatarUrl,
                                                 peerName: _peerProfile
                                                         ?.displayName ??
                                                     '',
@@ -4425,7 +4446,7 @@ class _CallScreenState extends State<CallScreen> {
                         child: _SpokenTurnsPanel(
                           turns: _turns,
                           myName: widget.displayName,
-                          myAvatarUrl: '',
+                          myAvatarUrl: _myAvatarUrl,
                           peerName: _peerProfile?.displayName ?? '',
                           peerAvatarUrl: _peerProfile?.bestAvatarUrl ?? '',
                           chatController: _chatCtrl,
@@ -4458,7 +4479,7 @@ class _CallScreenState extends State<CallScreen> {
                         ? _TurnsBlock(
                             turns: _turns,
                             myName: widget.displayName,
-                            myAvatarUrl: '',
+                            myAvatarUrl: _myAvatarUrl,
                             peerName: _peerProfile?.displayName ?? '',
                             peerAvatarUrl: _peerProfile?.bestAvatarUrl ?? '',
                             top: true,
@@ -4474,7 +4495,7 @@ class _CallScreenState extends State<CallScreen> {
                             child: _RestingTurns(
                               turns: _restTurns,
                               myName: widget.displayName,
-                              myAvatarUrl: '',
+                              myAvatarUrl: _myAvatarUrl,
                               peerName: _peerProfile?.displayName ?? '',
                               peerAvatarUrl: _peerProfile?.bestAvatarUrl ?? '',
                               onTap: _muteTurns,
