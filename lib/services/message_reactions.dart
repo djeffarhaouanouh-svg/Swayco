@@ -10,7 +10,7 @@ import 'supabase_service.dart';
 
 /// Quick-react strip shown on long-press. Double-tap sends the first one
 /// (thumbs-up) without opening the strip.
-const kQuickReactionEmojis = <String>['👍', '👌', '🎉', '❤️', '🔥'];
+const kQuickReactionEmojis = <String>['👍', '😂', '👌', '🎉', '❤️', '🔥'];
 const kThumbsUpEmoji = '👍';
 
 class MessageReaction {

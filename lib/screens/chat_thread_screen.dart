@@ -3495,7 +3495,7 @@ class _ReactionChip extends StatelessWidget {
   }
 }
 
-/// 👍 👌 🎉 ❤️ 🔥 + sous le dernier message du pair (1b) : un tap réagit, le +
+/// 👍 😂 👌 🎉 ❤️ 🔥 + sous le dernier message du pair (1b) : un tap réagit, le +
 /// ouvre le sélecteur complet (le même qu'un appui long sur la bulle).
 class _QuickReactionBar extends StatelessWidget {
   const _QuickReactionBar({required this.onPick, required this.onMore});
