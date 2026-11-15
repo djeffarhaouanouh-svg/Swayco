@@ -184,6 +184,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   StreamSubscription<List<MessageReaction>>? _reactionSub;
   Timer? _pollTimer;
   Timer? _catchUpTimer;
+  Timer? _nativePollTimer;
 
   /// Reactions in this thread, keyed by message id. Rebuilt from the
   /// realtime stream (and the web poll) so both sides see a 👍 land live.
@@ -1034,6 +1035,17 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       },
     );
 
+    // Filet de sécurité sur le natif (le sondage de 5 s plus bas ne tourne que sur
+    // le web) : si le canal temps réel meurt en cours de conversation, le fil
+    // ne se mettait plus à jour du tout — il fallait sortir et revenir. Une
+    // relecture toutes les 4 s ; elle ne repeint que si quelque chose a changé.
+    if (!kIsWeb) {
+      _nativePollTimer = AppPoll.every(
+        const Duration(seconds: 4),
+        _syncMessages,
+      );
+    }
+
     // Première lecture directe, sans attendre le « hello » du canal temps réel,
     // puis jusqu'à 4 rattrapages (toutes les 2,5 s) tant que le flux n'a rien
     // livré : cas du fil ouvert depuis une notification, connexion encore morte.
@@ -1193,6 +1205,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _typing?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _catchUpTimer?.cancel();
+    _nativePollTimer?.cancel();
     _pollTimer?.cancel();
     _voiceTextTimer?.cancel();
     _presenceTimer?.cancel();
@@ -1310,6 +1323,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       _inputCtrl.clear();
       // Envoyé : le bandeau se vide (en cas d'échec il reste).
       if (mounted) setState(() => _replyTo = null);
+      // Mon message doit apparaître tout de suite, même si le canal temps réel
+      // est mort : on relit le fil au lieu d'attendre que le flux le renvoie.
+      unawaited(_syncMessages());
     } catch (e) {
       HapticFeedback.vibrate();
       SwaycoSounds.play(SwSound.error);
