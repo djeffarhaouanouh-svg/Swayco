@@ -2470,9 +2470,19 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   /// par le panneau) ; null tant qu'elle n'est pas connue.
   double? _passportNeed;
 
+  // Zoom : le glissement de la galerie (PageView) se disputait le geste avec le
+  // pincement. Dès que deux doigts sont posés, ou que la photo est agrandie,
+  // la galerie ne défile plus — le geste revient au zoom / au déplacement.
+  int _pointers = 0;
+  bool _zoomed = false;
+  final Map<int, TransformationController> _zoomCtrls = {};
+
   @override
   void dispose() {
     _pc.dispose();
+    for (final c in _zoomCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -2614,8 +2624,21 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: InteractiveViewer(
+                          transformationController: _zoomCtrls.putIfAbsent(
+                            i,
+                            TransformationController.new,
+                          ),
                           minScale: 1,
                           maxScale: 4,
+                          onInteractionEnd: (_) {
+                            final z = (_zoomCtrls[i]?.value
+                                        .getMaxScaleOnAxis() ??
+                                    1) >
+                                1.02;
+                            if (z != _zoomed && mounted) {
+                              setState(() => _zoomed = z);
+                            }
+                          },
                           child: Image.network(
                             widget.photos[i],
                             fit: widget.wholePhoto
@@ -2672,16 +2695,31 @@ class _PhotoViewerState extends State<_PhotoViewer> {
       backgroundColor: Colors.black.withValues(alpha: 0.78),
       body: Stack(
         children: [
-          PageView.builder(
-            controller: _pc,
-            itemCount: _pageCount,
-            onPageChanged: (i) => setState(() {
-              _index = i;
-              _animatePassport = false;
-            }),
-            itemBuilder: (ctx, pi) => pi < _passportOffset
-                ? _passportPage(frameW, frameH)
-                : _photoPage(pi - _passportOffset, frameW, frameH),
+          Listener(
+            onPointerDown: (_) => setState(() => _pointers++),
+            onPointerUp: (_) =>
+                setState(() => _pointers = (_pointers - 1).clamp(0, 10)),
+            onPointerCancel: (_) =>
+                setState(() => _pointers = (_pointers - 1).clamp(0, 10)),
+            child: PageView.builder(
+              controller: _pc,
+              itemCount: _pageCount,
+              physics: (_pointers >= 2 || _zoomed)
+                  ? const NeverScrollableScrollPhysics()
+                  : null,
+              onPageChanged: (i) => setState(() {
+                _index = i;
+                _animatePassport = false;
+                _zoomed = false;
+                // Page quittée : elle revient à sa taille d'origine.
+                for (final c in _zoomCtrls.values) {
+                  c.value = Matrix4.identity();
+                }
+              }),
+              itemBuilder: (ctx, pi) => pi < _passportOffset
+                  ? _passportPage(frameW, frameH)
+                  : _photoPage(pi - _passportOffset, frameW, frameH),
+            ),
           ),
           // Side arrows when there's more than one photo.
           if (multi) ...[
