@@ -63,7 +63,8 @@ abstract final class MessageBanner {
     );
     _entry = entry;
     overlay.insert(entry);
-    _timer = Timer(const Duration(seconds: 5), _dismiss);
+    // 2,5 s (c'était 5) : la bannière restait trop longtemps à l'écran.
+    _timer = Timer(const Duration(milliseconds: 2500), _dismiss);
   }
 
   static void _dismiss() {
