@@ -291,9 +291,12 @@ class _CallScreenState extends State<CallScreen> {
 
   /// Des bulles (au repos ou la zone ouverte) sont affichées EN HAUT.
   bool get _topMessagesShown =>
-      !_camOffMode &&
       _msgTop &&
-      (_turnsOpen || (!_turnsHidden && _turns.isNotEmpty));
+      (_camOffMode
+          // Caméra coupée : les messages sont permanents, le silence ou un tap
+          // ne les retire pas.
+          ? _turns.isNotEmpty
+          : (_turnsOpen || (!_turnsHidden && _turns.isNotEmpty)));
 
   /// v4 : le pair est connecté mais sa caméra est coupée, et son tile occupe la
   /// vue principale. Les 2 dernières bulles y restent en permanence, un tap
@@ -3828,7 +3831,7 @@ class _CallScreenState extends State<CallScreen> {
                   _CameraOffTile(
                     label: peerFirstName,
                     muted: _peerMicMuted(room),
-                    shift: _camOffMode
+                    shift: _camOffMode && !_msgTop
                         ? _camOffGeo(context, MediaQuery.sizeOf(context).height)
                             .tile
                         : 0,
@@ -3997,6 +4000,7 @@ class _CallScreenState extends State<CallScreen> {
                       final last = _turns.length > 2
                           ? _turns.sublist(_turns.length - 2)
                           : _turns;
+                      final pencilShown = _dockDimmed || _composerOpen;
                       // La démonstration de la languette joue à la première
                       // apparition des messages de l'appel, pour les premiers
                       // appels seulement (même règle que la touche Messages).
@@ -4018,12 +4022,17 @@ class _CallScreenState extends State<CallScreen> {
                           // l'animation de la languette (les messages
                           // montent tout en haut, le doigt tire la languette,
                           // ils redescendent). Permanente : jamais atténuée.
-                          if (last.isNotEmpty)
+                          // La languette fait remonter les messages tout en
+                          // haut (et les redescend). Zone plus haute (150) que
+                          // la normale, mais texte à sa taille habituelle.
+                          if (last.isNotEmpty && !_msgTop)
                             AnimatedPositioned(
                               duration: const Duration(milliseconds: 250),
                               curve: Curves.easeOutCubic,
                               left: 0,
-                              right: _composerOpen ? 16 : 70,
+                              // Le crayon n'est là que rail rangé : sinon les
+                              // bulles prennent toute la largeur.
+                              right: (pencilShown && !_composerOpen) ? 70 : 16,
                               bottom: g.bubbles - 10,
                               child: _TurnsBlock(
                                 key: const ValueKey('camoff_block'),
@@ -4034,14 +4043,37 @@ class _CallScreenState extends State<CallScreen> {
                                 peerAvatarUrl:
                                     _peerProfile?.bestAvatarUrl ?? '',
                                 top: false,
-                                // Les messages ne changent plus de côté ici.
-                                onToggleSide: () {},
+                                onToggleSide: () => _setMessagesSide(true),
                                 hint: _tabHint,
                                 onHintDone: _endTabHint,
                                 // Un tap ne fait que ranger / afficher la barre.
                                 onTapZone: _toggleDockCamOff,
                                 holdFade: true,
-                                big: true,
+                                onDark: true,
+                                listMaxHeight: 150,
+                                showEarlier: false,
+                              ),
+                            ),
+                          if (last.isNotEmpty && _msgTop)
+                            Positioned(
+                              key: const ValueKey('camoff_block_top'),
+                              top: 4,
+                              left: 0,
+                              right: 12,
+                              child: _TurnsBlock(
+                                turns: last,
+                                myName: widget.displayName,
+                                myAvatarUrl: _myAvatarUrl,
+                                peerName: _peerProfile?.displayName ?? '',
+                                peerAvatarUrl:
+                                    _peerProfile?.bestAvatarUrl ?? '',
+                                top: true,
+                                onToggleSide: () => _setMessagesSide(false),
+                                hint: _tabHint,
+                                onHintDone: _endTabHint,
+                                onTapZone: _toggleDockCamOff,
+                                holdFade: true,
+                                onDark: true,
                                 listMaxHeight: 150,
                                 showEarlier: false,
                               ),
@@ -4053,18 +4085,31 @@ class _CallScreenState extends State<CallScreen> {
                             right: 14,
                             bottom: g.field,
                             height: 46,
-                            child: Align(
-                              alignment: Alignment.centerRight,
-                              child: _ComposerPill(
-                                controller: _chatCtrl,
-                                focusNode: _chatFocus,
-                                sending: _chatSending,
-                                onSend: _sendCaption,
-                                open: _composerOpen,
-                                onOpen: () {
-                                  _wakeDock();
-                                  _openComposer();
-                                },
+                            // Le crayon n'est présent que lorsque le rail ne
+                            // l'est pas ; champ déplié, il reste. Il garde sa
+                            // place dans l'arbre (le champ ne doit pas être
+                            // re-mappé), il s'efface seulement.
+                            child: IgnorePointer(
+                              ignoring: !pencilShown,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 200),
+                                opacity: pencilShown ? 1 : 0,
+                                child: Align(
+                                  alignment: _msgTop
+                                      ? Alignment.centerLeft
+                                      : Alignment.centerRight,
+                                  child: _ComposerPill(
+                                    controller: _chatCtrl,
+                                    focusNode: _chatFocus,
+                                    sending: _chatSending,
+                                    onSend: _sendCaption,
+                                    open: _composerOpen,
+                                    onOpen: () {
+                                      _wakeDock();
+                                      _openComposer();
+                                    },
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -4225,7 +4270,7 @@ class _CallScreenState extends State<CallScreen> {
                   // ne vient occuper sa place en bas.
                   alignment: _sheetOpen
                       ? const Alignment(0, -0.52)
-                      : _camOffMode
+                      : (_camOffMode && !_msgTop)
                           // v4 : le disque est posé à une hauteur de la
                           // maquette ; le bloc galet + texte a son centre
                           // 14 px sous celui du disque.
@@ -4259,7 +4304,7 @@ class _CallScreenState extends State<CallScreen> {
                     // le réduit pareil : sous elle il n'est plus le sujet.
                     scale: (_sheetOpen || (_turnsOpen && !_msgTop))
                         ? 56 / TranslationOrb.kSize
-                        : _camOffMode
+                        : (_camOffMode && !_msgTop)
                             ? _camOffGeo(context, box.maxHeight).orbScale
                             : 1,
                     child: Column(
@@ -4691,7 +4736,7 @@ class _CallScreenState extends State<CallScreen> {
                 // Messages rangés EN HAUT : sous la barre d'état, à gauche de
                 // la vignette caméra (qui descend un peu pour leur laisser de
                 // l'air). Au repos comme ouverte.
-                if (_topMessagesShown)
+                if (_topMessagesShown && !_camOffMode)
                   Positioned(
                     key: const ValueKey('turns_top'),
                     top: 4,
@@ -5021,7 +5066,7 @@ class _TurnsBlock extends StatefulWidget {
     required this.onHintDone,
     required this.onTapZone,
     this.holdFade = false,
-    this.big = false,
+    this.onDark = false,
     this.listMaxHeight = _SpokenTurnsPanel.maxHeight,
     this.showEarlier = true,
   });
@@ -5029,8 +5074,9 @@ class _TurnsBlock extends StatefulWidget {
   /// Vrai tant que la saisie est dépliée : les bulles ne s'atténuent pas.
   final bool holdFade;
 
-  /// Caméra du pair coupée (v4) : bulles agrandies, deux lignes au plus.
-  final bool big;
+  /// Caméra du pair coupée (v4) : verre blanc sur fond noir, deux lignes au
+  /// plus par bulle. Le texte garde sa taille ; c'est la zone qui est plus haute.
+  final bool onDark;
 
   /// Hauteur maximale de la liste de bulles.
   final double listMaxHeight;
@@ -5289,8 +5335,8 @@ class _TurnsBlockState extends State<_TurnsBlock>
                           avatarUrl: turn.mine
                               ? widget.myAvatarUrl
                               : widget.peerAvatarUrl,
-                          big: widget.big,
-                          maxLines: widget.big ? 2 : null,
+                          onDark: widget.onDark,
+                          maxLines: widget.onDark ? 2 : null,
                         ),
                       ),
                     );
@@ -5677,17 +5723,16 @@ class _TurnBubble extends StatelessWidget {
     required this.name,
     required this.avatarUrl,
     this.maxLines,
-    this.big = false,
+    this.onDark = false,
   });
 
   final _SpokenTurn turn;
   final String name;
   final String avatarUrl;
 
-  /// Version agrandie, pour la caméra de l'interlocuteur coupée (v4) : fond noir
-  /// derrière, donc de la place, et un verre blanc 12 % (le noir translucide y
-  /// serait invisible).
-  final bool big;
+  /// Posée sur le fond noir de la caméra coupée (v4) : verre blanc 12 %, le noir
+  /// translucide y serait invisible. La taille du texte ne change pas.
+  final bool onDark;
 
   /// Combien de lignes au plus, au-delà desquelles la phrase se coupe.
   ///
@@ -5711,7 +5756,7 @@ class _TurnBubble extends StatelessWidget {
       child: ProfileAvatar(
         displayName: name,
         avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
-        size: big ? 29 : 23,
+        size: 23,
       ),
     );
 
@@ -5725,11 +5770,11 @@ class _TurnBubble extends StatelessWidget {
     // La plus récente ne se distingue pas non plus : elle passait en blanc
     // plein, ce qui faisait changer de couleur une bulle déjà lue dès que la
     // suivante arrivait.
-    final Color fill = big
+    final Color fill = onDark
         ? Colors.white.withValues(alpha: 0.12)
         : Colors.black.withValues(alpha: 0.42);
     final Color ink = Colors.white.withValues(alpha: turn.mine ? 0.92 : 0.78);
-    final double radius = big ? 20 : 18;
+    const double radius = 18;
 
     final bubble = Flexible(
       child: ClipRRect(
@@ -5737,9 +5782,7 @@ class _TurnBubble extends StatelessWidget {
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            padding: big
-                ? const EdgeInsets.symmetric(horizontal: 16, vertical: 11)
-                : const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
               color: fill,
               borderRadius: BorderRadius.circular(radius),
@@ -5760,7 +5803,7 @@ class _TurnBubble extends StatelessWidget {
                 // doit pouvoir la relire pour la redire, mais on voit d'un
                 // coup d'œil qu'elle n'est pas partie.
                 color: turn.delivered ? ink : ink.withValues(alpha: 0.4),
-                fontSize: big ? 17.5 : 15.5,
+                fontSize: 15.5,
                 height: 1.3,
                 fontWeight: FontWeight.w400,
                 fontStyle:
