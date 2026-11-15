@@ -668,6 +668,11 @@ class _CallScreenState extends State<CallScreen> {
       // La pastille ne bat que sur de la vraie parole : lui donner le bruit de
       // fond la ferait trembler tout l'appel.
       _localVoice = hot ? lvl : 0.0;
+      if (hot) {
+        if (lvl > _phrasePeak) _phrasePeak = lvl;
+        _phraseSum += lvl;
+        _phraseTicks++;
+      }
       _publishVoiceLevel();
       // Trois relevés consécutifs (~750 ms) plutôt que deux : une porte qui
       // claque ou un raclement de gorge ne tient pas aussi longtemps.
@@ -817,12 +822,38 @@ class _CallScreenState extends State<CallScreen> {
   void _onMyTranscript() {
     final line = widget.translation.localTranscript?.value;
     if (line == null) return;
+    _trackPhraseLevel(line);
     _addTurn(_SpokenTurn(
       mine: true,
       text: line.text,
       delivered: line.delivered,
     ));
     _trackDeliveryStreak(line);
+  }
+
+  // Niveau du micro pendant la phrase en cours (mesure seule, rien n'est affiché) :
+  // sert à fixer plus tard un seuil « parle plus fort » sur de vrais chiffres.
+  double _phrasePeak = 0;
+  double _phraseSum = 0;
+  int _phraseTicks = 0;
+
+  void _trackPhraseLevel(SpokenLine line) {
+    final peak = _phrasePeak, ticks = _phraseTicks, sum = _phraseSum;
+    _phrasePeak = 0;
+    _phraseSum = 0;
+    _phraseTicks = 0;
+    if (ticks == 0 || line.text.trim().isEmpty) return;
+    try {
+      Analytics.track('voice_level', props: {
+        'peak': double.parse(peak.toStringAsFixed(4)),
+        'avg': double.parse((sum / ticks).toStringAsFixed(4)),
+        'ticks': ticks,
+        'chars': line.text.trim().length,
+        'delivered': line.delivered,
+        'floor': double.parse(_noiseFloor.toStringAsFixed(4)),
+        'platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
+      });
+    } catch (_) {}
   }
 
   /// Suit les phrases dites qui n'arrivent pas jusqu'au pair. Une qui passe —
