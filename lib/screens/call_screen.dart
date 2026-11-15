@@ -363,6 +363,7 @@ class _CallScreenState extends State<CallScreen> {
   /// barre de boutons. Les messages, eux, ne se ferment jamais.
   void _toggleDockCamOff() {
     if (!mounted) return;
+    if (_tabHint) _endTabHint();
     if (_chatFocus.hasFocus) {
       _chatFocus.unfocus();
       return;
@@ -3984,9 +3985,8 @@ class _CallScreenState extends State<CallScreen> {
                       ],
                     ),
                   ),
-                // v4 : les 2 dernières bulles, permanentes, et le crayon.
-                // Les bulles ignorent le doigt : un tap dessus ne ferme rien,
-                // il traverse jusqu'à la couche qui range la barre.
+                // v4 : les 2 dernières bulles, permanentes, et le crayon. Un
+                // tap sur les bulles ne ferme rien : il range / affiche la barre.
                 if (_camOffMode)
                   Builder(
                     builder: (context) {
@@ -3997,55 +3997,55 @@ class _CallScreenState extends State<CallScreen> {
                       final last = _turns.length > 2
                           ? _turns.sublist(_turns.length - 2)
                           : _turns;
+                      // La démonstration de la languette joue à la première
+                      // apparition des messages de l'appel, pour les premiers
+                      // appels seulement (même règle que la touche Messages).
+                      if (!_tabHintSeen && last.isNotEmpty) {
+                        _tabHintSeen = true;
+                        if (_tabHintCalls < _kTabHintCalls) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!mounted) return;
+                            _countTabHintCall();
+                            setState(() => _tabHint = true);
+                          });
+                        }
+                      }
                       return Stack(
                         key: const ValueKey('camoff_layer'),
                         fit: StackFit.expand,
                         children: [
-                          AnimatedPositioned(
-                            duration: const Duration(milliseconds: 250),
-                            curve: Curves.easeOutCubic,
-                            left: 30,
-                            right: _composerOpen ? 16 : 70,
-                            bottom: g.bubbles,
-                            child: IgnorePointer(
-                              child: ConstrainedBox(
-                                constraints:
-                                    const BoxConstraints(maxHeight: 150),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    for (var i = 0; i < last.length; i++)
-                                      Padding(
-                                        key: ObjectKey(last[i]),
-                                        padding: EdgeInsets.only(
-                                          top: i == 0 ? 0 : 10,
-                                        ),
-                                        // Les bulles montent à l'ouverture, et
-                                        // chaque nouvelle monte à son tour.
-                                        child: _RiseIn(
-                                          delay: Duration(
-                                              milliseconds: 90 * i),
-                                          child: _TurnBubble(
-                                          turn: last[i],
-                                          name: last[i].mine
-                                              ? widget.displayName
-                                              : (_peerProfile?.displayName ??
-                                                  ''),
-                                          avatarUrl: last[i].mine
-                                              ? _myAvatarUrl
-                                              : (_peerProfile?.bestAvatarUrl ??
-                                                  ''),
-                                          maxLines: 2,
-                                          big: true,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
+                          // La vraie zone Messages : à l'ouverture elle joue
+                          // l'animation de la languette (les messages
+                          // montent tout en haut, le doigt tire la languette,
+                          // ils redescendent). Permanente : jamais atténuée.
+                          if (last.isNotEmpty)
+                            AnimatedPositioned(
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeOutCubic,
+                              left: 0,
+                              right: _composerOpen ? 16 : 70,
+                              bottom: g.bubbles - 10,
+                              child: _TurnsBlock(
+                                key: const ValueKey('camoff_block'),
+                                turns: last,
+                                myName: widget.displayName,
+                                myAvatarUrl: _myAvatarUrl,
+                                peerName: _peerProfile?.displayName ?? '',
+                                peerAvatarUrl:
+                                    _peerProfile?.bestAvatarUrl ?? '',
+                                top: false,
+                                // Les messages ne changent plus de côté ici.
+                                onToggleSide: () {},
+                                hint: _tabHint,
+                                onHintDone: _endTabHint,
+                                // Un tap ne fait que ranger / afficher la barre.
+                                onTapZone: _toggleDockCamOff,
+                                holdFade: true,
+                                big: true,
+                                listMaxHeight: 150,
+                                showEarlier: false,
                               ),
                             ),
-                          ),
                           AnimatedPositioned(
                             duration: const Duration(milliseconds: 250),
                             curve: Curves.easeOutCubic,
@@ -5009,6 +5009,7 @@ class _SpokenTurnsPanel extends StatelessWidget {
 /// la languette se glisse.
 class _TurnsBlock extends StatefulWidget {
   const _TurnsBlock({
+    super.key,
     required this.turns,
     required this.myName,
     required this.myAvatarUrl,
@@ -5020,10 +5021,22 @@ class _TurnsBlock extends StatefulWidget {
     required this.onHintDone,
     required this.onTapZone,
     this.holdFade = false,
+    this.big = false,
+    this.listMaxHeight = _SpokenTurnsPanel.maxHeight,
+    this.showEarlier = true,
   });
 
   /// Vrai tant que la saisie est dépliée : les bulles ne s'atténuent pas.
   final bool holdFade;
+
+  /// Caméra du pair coupée (v4) : bulles agrandies, deux lignes au plus.
+  final bool big;
+
+  /// Hauteur maximale de la liste de bulles.
+  final double listMaxHeight;
+
+  /// Faux : pas de pastille « N plus tôt » (la démonstration garde la sienne).
+  final bool showEarlier;
 
   final List<_SpokenTurn> turns;
   final String myName;
@@ -5206,7 +5219,7 @@ class _TurnsBlockState extends State<_TurnsBlock>
         final earlier = widget.turns.length - 2;
         final Widget? pill = widget.hint && _demo.value > 0
             ? _pill(AppStrings.t('call_tab_hint'), highlighted: true)
-            : (earlier > 0
+            : (earlier > 0 && widget.showEarlier
                 ? _pill(
                     AppStrings.t('call_earlier', args: {'n': '$earlier'}),
                     highlighted: false,
@@ -5243,8 +5256,8 @@ class _TurnsBlockState extends State<_TurnsBlock>
               scale: 0.9 + 0.1 * bubblesIn,
               alignment: widget.top ? Alignment.topLeft : Alignment.bottomLeft,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxHeight: _SpokenTurnsPanel.maxHeight,
+                constraints: BoxConstraints(
+                  maxHeight: widget.listMaxHeight,
                 ),
                 child: ListView.builder(
                   // À l'envers : la plus récente en bas, et on remonte le
@@ -5276,6 +5289,8 @@ class _TurnsBlockState extends State<_TurnsBlock>
                           avatarUrl: turn.mine
                               ? widget.myAvatarUrl
                               : widget.peerAvatarUrl,
+                          big: widget.big,
+                          maxLines: widget.big ? 2 : null,
                         ),
                       ),
                     );
@@ -5647,72 +5662,6 @@ class _ComposerPillState extends State<_ComposerPill>
           ),
         );
       },
-    );
-  }
-}
-
-/// Entrée d'un élément, la même que celle des bulles de la zone Messages
-/// ([_TurnsBlock], « animation de la languette ») : il monte de 70 px en
-/// apparaissant, et grossit de 90 à 100 %. Joue une fois, au montage (après
-/// [delay] éventuel).
-class _RiseIn extends StatefulWidget {
-  const _RiseIn({required this.child, this.delay = Duration.zero});
-
-  final Widget child;
-  final Duration delay;
-
-  @override
-  State<_RiseIn> createState() => _RiseInState();
-}
-
-class _RiseInState extends State<_RiseIn> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    // Même durée que [_TurnsBlockState._enter] : l'intervalle 0,08 → 0,55 de
-    // 1300 ms ci-dessous reprend exactement son tracé.
-    duration: const Duration(milliseconds: 1300),
-  );
-  Timer? _t;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.delay == Duration.zero) {
-      _c.forward();
-    } else {
-      _t = Timer(widget.delay, () {
-        if (mounted) _c.forward();
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _t?.cancel();
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, child) {
-        final t = ((_c.value - 0.08) / (0.55 - 0.08)).clamp(0.0, 1.0);
-        final v = Curves.easeOutCubic.transform(t);
-        return Opacity(
-          opacity: v,
-          child: Transform.translate(
-            offset: Offset(0, 70 * (1 - v)),
-            child: Transform.scale(
-              scale: 0.9 + 0.1 * v,
-              alignment: Alignment.bottomLeft,
-              child: child,
-            ),
-          ),
-        );
-      },
-      child: widget.child,
     );
   }
 }
