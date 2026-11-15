@@ -3362,7 +3362,13 @@ class _MessageBubbleState extends State<_MessageBubble> {
     // Reuse the profile photo overlay (rounded corners, ✕, pinch-zoom, fade,
     // tap-to-dismiss). viewerMode hides the "set as Discover" button and a
     // single-photo list means no side arrows.
-    showPhotoViewer(context, photos: [url], index: 0, viewerMode: true);
+    showPhotoViewer(
+      context,
+      photos: [url],
+      index: 0,
+      viewerMode: true,
+      wholePhoto: true, // la photo reçue en entier, pas recadrée en carte Discover
+    );
   }
 }
 

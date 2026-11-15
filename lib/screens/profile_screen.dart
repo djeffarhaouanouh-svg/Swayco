@@ -2398,6 +2398,7 @@ Future<void> showPhotoViewer(
   required int index,
   bool viewerMode = false,
   RemoteProfile? passportProfile,
+  bool wholePhoto = false,
 }) {
   if (photos.isEmpty && passportProfile == null) return Future<void>.value();
   final pageCount = photos.length + (passportProfile != null ? 1 : 0);
@@ -2411,6 +2412,7 @@ Future<void> showPhotoViewer(
         initialIndex: index.clamp(0, pageCount - 1),
         viewerMode: viewerMode,
         passportProfile: passportProfile,
+        wholePhoto: wholePhoto,
       ),
       // Fade + grow-in (scale from 90%) instead of a flat fade, so the photo
       // eases open instead of popping.
@@ -2435,10 +2437,15 @@ class _PhotoViewer extends StatefulWidget {
     required this.initialIndex,
     this.viewerMode = false,
     this.passportProfile,
+    this.wholePhoto = false,
   });
   final List<String> photos;
   final int initialIndex;
   final bool viewerMode;
+
+  /// Photo reçue dans le chat : affichée EN ENTIER (contain), pas recadrée au
+  /// format de la carte Discover.
+  final bool wholePhoto;
 
   /// Non nul : la page 0 est le passeport, les photos suivent.
   final RemoteProfile? passportProfile;
@@ -2611,7 +2618,9 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                           maxScale: 4,
                           child: Image.network(
                             widget.photos[i],
-                            fit: BoxFit.cover,
+                            fit: widget.wholePhoto
+                                ? BoxFit.contain
+                                : BoxFit.cover,
                             width: frameW,
                             height: frameH,
                             errorBuilder: (_, _, _) => Padding(
@@ -2653,6 +2662,11 @@ class _PhotoViewerState extends State<_PhotoViewer> {
     if (frameH > maxH) {
       frameH = maxH;
       frameW = frameH * aspect;
+    }
+    // Photo de chat : tout l'espace disponible, l'image y tient en entier.
+    if (widget.wholePhoto) {
+      frameW = size.width - 28;
+      frameH = maxH;
     }
     return Scaffold(
       backgroundColor: Colors.black.withValues(alpha: 0.78),
