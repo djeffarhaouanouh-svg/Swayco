@@ -85,13 +85,16 @@ abstract final class NotificationClient {
         return false;
       }
 
-      // Show the banner even while the app is in the FOREGROUND (iOS otherwise
-      // silently suppresses it) — so message/call pushes and the in-app test
-      // notification are actually visible without backgrounding the app.
+      // App au premier plan : on NE laisse PLUS iOS afficher la bannière lui-même
+      // (alert/sound à false). Il l'affichait pour toute poussée, y compris celle
+      // du message qu'on est en train de lire dans le même fil, et rien côté Dart
+      // ne pouvait l'empêcher. C'est maintenant `_handleForegroundMessage`
+      // (main.dart) qui présente la notification locale, et qui la retient quand
+      // la conversation concernée est déjà ouverte à l'écran.
       await messaging.setForegroundNotificationPresentationOptions(
-        alert: true,
+        alert: false,
         badge: true,
-        sound: true,
+        sound: false,
       );
 
       // On iOS we need APNs token to be available before FCM hands us
