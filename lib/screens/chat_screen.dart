@@ -2853,7 +2853,10 @@ class _NoFriendsEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    // Remonté vers le haut (et non au centre exact) : sous la barre du bas, le
+    // centre de la zone paraît trop bas.
+    return Align(
+      alignment: const Alignment(0, -0.55),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
