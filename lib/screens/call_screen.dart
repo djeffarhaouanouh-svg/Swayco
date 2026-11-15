@@ -2671,10 +2671,11 @@ class _CallScreenState extends State<CallScreen> {
     } catch (_) {}
   }
 
-  /// Loudspeaker ⇄ earpiece. Calls start on the earpiece (see AudioController's
-  /// default): against the ear the loudspeaker cannot reach the mic, so the
-  /// feedback loop that makes a call howl has no path to close. A plugged-in
-  /// headset still wins over both — `_applySpeaker` refuses to override the OS.
+  /// Loudspeaker ⇄ earpiece. Calls now START on the loudspeaker with every volume
+  /// at maximum (AudioController.bind). The earpiece stays one tap away: against
+  /// the ear the loudspeaker cannot reach the mic, so no feedback loop. A
+  /// plugged-in headset still wins over both — `_applySpeaker` refuses to
+  /// override the OS.
   Future<void> _toggleSpeaker() async {
     await _audio.setSpeakerOn(!_audio.speakerOn);
     if (mounted) setState(() {});

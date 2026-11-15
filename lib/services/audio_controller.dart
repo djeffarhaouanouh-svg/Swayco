@@ -35,12 +35,12 @@ class AudioController extends ChangeNotifier {
 
   /// Volume de la voix d'origine tant que personne n'a bougé le curseur : aux
   /// trois quarts, pour qu'elle reste présente sans couvrir la traduction.
-  static const double kStartOriginalVolume = 0.75;
+  static const double kStartOriginalVolume = 1.0;
 
   /// Et la traduction à moitié : elle passe par-dessus la voix, donc elle n'a
   /// pas besoin d'être aussi forte pour s'entendre. Réglable en appel, et le
   /// réglage tient d'un appel à l'autre.
-  static const double kStartTranslatedVolume = 0.5;
+  static const double kStartTranslatedVolume = 1.0;
 
   // Un appel normal démarre sur l'ÉCOUTEUR, comme n'importe quel téléphone :
   // collé à l'oreille, le haut-parleur n'atteint pas le micro, donc la boucle
@@ -50,7 +50,7 @@ class AudioController extends ChangeNotifier {
     translatedVolume: kStartTranslatedVolume,
     originalVolume: kStartOriginalVolume,
     duckingEnabled: true,
-    speakerOn: false,
+    speakerOn: true,
   );
 
   AudioRoute _route = AudioRoute.earpiece;
@@ -116,13 +116,18 @@ class AudioController extends ChangeNotifier {
       };
     }
     _prefs = await UserPrefs.loadAudio();
-    // Les volumes NE sont pas réinitialisés : les 3/4 et le 1/2 ne sont que le
-    // point de départ d'un utilisateur qui n'y a jamais touché. Qui a trouvé
-    // son équilibre le retrouve à l'appel suivant.
-    // La route suit le mode : c'est le bouton pressé qui décide, pas l'appel
-    // d'avant. Un appel vidéo se tient à distance, donc haut-parleur ; un appel
-    // audio se prend à l'oreille.
-    _prefs = _prefs.copyWith(speakerOn: video);
+    // Chaque appel démarre pareil : TOUS les volumes au maximum et le
+    // HAUT-PARLEUR, quoi qu'on ait réglé à l'appel d'avant (décision produit :
+    // on entend tout de suite, sans chercher les curseurs). On peut toujours
+    // baisser ou passer à l'écouteur pendant l'appel ; ça ne tient que pour
+    // celui-là. Un casque ou un Bluetooth branché garde la main sur la route
+    // (voir [_applySpeaker]). Le paramètre [video] ne change donc plus rien :
+    // visio ou audio, c'est le haut-parleur.
+    _prefs = _prefs.copyWith(
+      translatedVolume: kStartTranslatedVolume,
+      originalVolume: kStartOriginalVolume,
+      speakerOn: true,
+    );
 
     await _applySpeaker(_prefs.speakerOn);
     await _applyTranslatedVolume(_prefs.translatedVolume);
