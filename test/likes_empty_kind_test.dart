@@ -42,6 +42,22 @@ void main() {
     expect(kind(justBefore, null), LikesEmptyKind.quietToday);
   });
 
+  test('je n\'ai fait qu\'ENVOYER des likes : jamais « Tu as répondu à toutes tes demandes »', () {
+    LikesEmptyKind sent(DateTime? incoming, DateTime? answered) =>
+        classifyLikesEmpty(
+          lastReceived: today10, // mon like envoyé aujourd'hui
+          lastIncoming: incoming,
+          trackIncoming: true,
+          lastAnswered: answered,
+          now: now,
+        );
+    expect(sent(null, null), LikesEmptyKind.quietToday);
+    // Une vraie demande reçue aujourd'hui, ou une réponse de ma part : comme avant.
+    expect(sent(today10, null), LikesEmptyKind.caughtUp);
+    expect(sent(null, today10), LikesEmptyKind.caughtUp);
+    expect(sent(yesterday23, null), LikesEmptyKind.quietToday);
+  });
+
   test('les trois états sont bien trois résultats différents', () {
     final all = {
       kind(null, null),

@@ -290,10 +290,16 @@ abstract final class FriendshipApi {
   /// [ok] est FAUX quand la lecture a échoué : l'appelant garde alors ce qu'il
   /// affichait. Rendre `null` sur une erreur réseau, comme « jamais rien reçu »,
   /// aurait montré l'écran « bienvenue » à quelqu'un qui a des demandes.
-  static Future<({bool ok, DateTime? lastReceived, DateTime? lastAnswered})>
+  static Future<
+          ({
+            bool ok,
+            DateTime? lastReceived,
+            DateTime? lastIncoming,
+            DateTime? lastAnswered
+          })>
       fetchIncomingStamps(String meId) async {
     if (!isSupabaseReady || meId.isEmpty) {
-      return (ok: false, lastReceived: null, lastAnswered: null);
+      return (ok: false, lastReceived: null, lastIncoming: null, lastAnswered: null);
     }
     try {
       // Toute amitié où JE figure compte (demande reçue OU envoyée par moi) :
@@ -306,10 +312,18 @@ abstract final class FriendshipApi {
           .or(mine)
           .order('created_at', ascending: false)
           .limit(1);
+      // Les demandes que d'autres m'ont envoyées, et mes réponses à celles-là
+      // seulement (une IA qui accepte MON like n'est pas une réponse de ma part).
+      final incoming = await _c
+          .from('friendships')
+          .select('created_at')
+          .eq('addressee', meId)
+          .order('created_at', ascending: false)
+          .limit(1);
       final answered = await _c
           .from('friendships')
           .select('responded_at')
-          .or(mine)
+          .eq('addressee', meId)
           .not('responded_at', 'is', null)
           .order('responded_at', ascending: false)
           .limit(1);
@@ -323,11 +337,12 @@ abstract final class FriendshipApi {
       return (
         ok: true,
         lastReceived: at(received, 'created_at'),
+        lastIncoming: at(incoming, 'created_at'),
         lastAnswered: at(answered, 'responded_at'),
       );
     } catch (e) {
       debugPrint('FriendshipApi.fetchIncomingStamps failed: $e');
-      return (ok: false, lastReceived: null, lastAnswered: null);
+      return (ok: false, lastReceived: null, lastIncoming: null, lastAnswered: null);
     }
   }
 

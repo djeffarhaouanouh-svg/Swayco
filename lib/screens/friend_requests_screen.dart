@@ -171,6 +171,8 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         if (stamps.ok) {
           emptyKind = classifyLikesEmpty(
             lastReceived: stamps.lastReceived,
+            lastIncoming: stamps.lastIncoming,
+            trackIncoming: true,
             lastAnswered: stamps.lastAnswered,
             now: DateTime.now(),
           );
