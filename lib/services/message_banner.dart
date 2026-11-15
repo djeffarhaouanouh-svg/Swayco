@@ -63,8 +63,25 @@ abstract final class MessageBanner {
     );
     _entry = entry;
     overlay.insert(entry);
-    // 2,5 s (c'était 5) : la bannière restait trop longtemps à l'écran.
-    _timer = Timer(const Duration(milliseconds: 2500), _dismiss);
+    _timer = Timer(const Duration(seconds: 5), _dismiss);
+    // Si j'ouvre CETTE conversation alors que la bannière est affichée, elle
+    // part tout de suite : le message est déjà sous mes yeux dans le fil.
+    _shownFor = intent.conversationId;
+    if (!_watching) {
+      _watching = true;
+      OpenThread.conversationId.addListener(_onThreadChanged);
+    }
+  }
+
+  static String _shownFor = '';
+  static bool _watching = false;
+
+  static void _onThreadChanged() {
+    if (_entry != null &&
+        _shownFor.isNotEmpty &&
+        OpenThread.conversationId.value == _shownFor) {
+      _dismiss();
+    }
   }
 
   static void _dismiss() {
@@ -72,6 +89,7 @@ abstract final class MessageBanner {
     _timer = null;
     _entry?.remove();
     _entry = null;
+    _shownFor = '';
   }
 }
 
