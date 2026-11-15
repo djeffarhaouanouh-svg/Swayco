@@ -214,6 +214,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
 
   RemoteProfile? _peer;
   bool _sending = false;
+
+  /// Photo choisie, pas encore envoyée : elle s'affiche dans le champ (avec une
+  /// croix pour l'enlever) et part avec la flèche d'envoi.
+  Uint8List? _pendingPhoto;
+  bool _pendingPhotoPng = false;
   String? _error;
 
   // ── Répondre à un message ────────────────────────────────────────────────
@@ -1254,7 +1259,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       return;
     }
     final body = _inputCtrl.text.trim();
-    if (body.isEmpty || _sending) return;
+    final photo = _pendingPhoto;
+    if ((body.isEmpty && photo == null) || _sending) return;
     if (_myId.isEmpty) return;
     if (!isSupabaseReady) {
       setState(() => _error = AppStrings.t('chat_send_failed'));
@@ -1262,20 +1268,43 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
     setState(() => _sending = true);
     try {
-      await ChatApi.sendMessage(
-        conversationId: widget.conversationId,
-        senderId: _myId,
-        senderName: _myName.isEmpty ? 'Moi' : _myName,
-        recipientId: widget.peerDeviceId,
-        body: body,
-        language: _myLang,
-        recipientLang: _peer?.language ?? '',
-        replyToId: _replyTo?.id ?? '',
-      );
-      Analytics.track(
-        'message_sent',
-        props: {'source': 'chat', 'type': 'text'},
-      );
+      // La photo d'abord (elle porte la citation), puis le texte s'il y en a.
+      var replyId = _replyTo?.id ?? '';
+      if (photo != null) {
+        await ChatApi.sendImage(
+          conversationId: widget.conversationId,
+          senderId: _myId,
+          senderName: _myName.isEmpty ? 'Moi' : _myName,
+          recipientId: widget.peerDeviceId,
+          bytes: photo,
+          contentType: _pendingPhotoPng ? 'image/png' : 'image/jpeg',
+          recipientLang: _peer?.language ?? '',
+          replyToId: replyId,
+        );
+        Analytics.track(
+          'message_sent',
+          props: {'source': 'chat', 'type': 'image'},
+        );
+        // Partie : on ne la renverra pas si le texte, lui, échoue.
+        if (mounted) setState(() => _pendingPhoto = null);
+        replyId = '';
+      }
+      if (body.isNotEmpty) {
+        await ChatApi.sendMessage(
+          conversationId: widget.conversationId,
+          senderId: _myId,
+          senderName: _myName.isEmpty ? 'Moi' : _myName,
+          recipientId: widget.peerDeviceId,
+          body: body,
+          language: _myLang,
+          recipientLang: _peer?.language ?? '',
+          replyToId: replyId,
+        );
+        Analytics.track(
+          'message_sent',
+          props: {'source': 'chat', 'type': 'text'},
+        );
+      }
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.msgSent);
       _inputCtrl.clear();
@@ -1366,33 +1395,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       return;
     }
     if (!mounted) return;
-    final isPng = file.name.toLowerCase().endsWith('.png');
-    setState(() => _sending = true);
-    try {
-      await ChatApi.sendImage(
-        conversationId: widget.conversationId,
-        senderId: _myId,
-        senderName: _myName.isEmpty ? 'Moi' : _myName,
-        recipientId: widget.peerDeviceId,
-        bytes: bytes,
-        contentType: isPng ? 'image/png' : 'image/jpeg',
-        recipientLang: _peer?.language ?? '',
-        replyToId: _replyTo?.id ?? '',
-      );
-      Analytics.track(
-        'message_sent',
-        props: {'source': 'chat', 'type': 'image'},
-      );
-      HapticFeedback.lightImpact();
-      SwaycoSounds.play(SwSound.msgSent);
-      if (mounted) setState(() => _replyTo = null);
-    } catch (e) {
-      HapticFeedback.vibrate();
-      SwaycoSounds.play(SwSound.error);
-      if (mounted) setState(() => _error = AppStrings.t('chat_send_failed'));
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
+    // Rien ne part ici : la photo apparaît dans le champ, et c'est la flèche
+    // d'envoi qui l'envoie (la croix l'enlève).
+    setState(() {
+      _pendingPhoto = bytes;
+      _pendingPhotoPng = file!.name.toLowerCase().endsWith('.png');
+      _error = null;
+    });
   }
 
   /// Lance l'appel. [withCamera] distingue les deux boutons de l'en-tête :
@@ -1675,6 +1684,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             sending: _sending,
                             onSend: _send,
                             onSendImage: _sendImage,
+                            photo: _pendingPhoto,
+                            onClearPhoto: () =>
+                                setState(() => _pendingPhoto = null),
                             onSendGif: _sendGif,
                             onSendVoice: _sendVoice,
                             autoTranslate: _autoTranslate,
@@ -3815,7 +3827,14 @@ class _Composer extends StatefulWidget {
     this.onCancelReply,
     this.editing,
     this.onCancelEdit,
+    this.photo,
+    this.onClearPhoto,
   });
+
+  /// La photo choisie et pas encore envoyée : vignette dans le champ, croix en
+  /// haut à droite pour l'enlever, la flèche d'envoi la fait partir.
+  final Uint8List? photo;
+  final VoidCallback? onClearPhoto;
 
   /// Le message que je modifie : un bandeau « MODIFIER LE MESSAGE » remplace
   /// celui de la citation, le rond d'envoi devient une coche, et la pastille
@@ -3935,7 +3954,8 @@ class _ComposerState extends State<_Composer>
 
   /// Le rond jaune montre le micro : champ vide, et pas en train de modifier un
   /// message (là, c'est la coche, jamais le micro).
-  bool get _micMode => !_hasText && widget.editing == null;
+  bool get _micMode =>
+      !_hasText && widget.photo == null && widget.editing == null;
 
   void _onVoiceChanged() {
     final s = _voice.state;
@@ -4310,7 +4330,56 @@ class _ComposerState extends State<_Composer>
               child: holding ? _buildRecordingBar() : GlassPanel(
                 borderRadius: 27,
                 padding: const EdgeInsets.fromLTRB(14, 2, 4, 2),
-                child: Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // La photo choisie, dans le champ : croix en haut à droite
+                    // pour l'enlever ; c'est la flèche d'envoi qui l'envoie.
+                    if (widget.photo != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10, bottom: 4),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(14),
+                              child: Image.memory(
+                                widget.photo!,
+                                height: 120,
+                                fit: BoxFit.contain,
+                                gaplessPlayback: true,
+                              ),
+                            ),
+                            Positioned(
+                              top: -8,
+                              right: -8,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: widget.sending ? null : widget.onClearPhoto,
+                                child: Container(
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.75),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                      width: 1.2,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.close_rounded,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Row(
                   // En bas quand le champ grandit : la photo reste à l'aise.
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -4433,6 +4502,8 @@ class _ComposerState extends State<_Composer>
                     ),
                   ],
                 ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -4453,13 +4524,13 @@ class _ComposerState extends State<_Composer>
               )
             else
               _CircleActionButton(
-                send: _hasText,
+                send: _hasText || widget.photo != null,
                 check: widget.editing != null,
                 busy: widget.sending,
                 // Modifier : coche, jamais le GIF ; champ vide = rien ne part.
                 onTap: widget.sending
                     ? null
-                    : (_hasText
+                    : (_hasText || widget.photo != null
                         ? widget.onSend
                         : (widget.editing != null ? null : widget.onSendGif)),
               ),
