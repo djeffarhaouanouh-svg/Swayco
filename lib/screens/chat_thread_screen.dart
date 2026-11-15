@@ -168,7 +168,7 @@ class ChatThreadScreen extends StatefulWidget {
 }
 
 class _ChatThreadScreenState extends State<ChatThreadScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final _inputCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
 
@@ -183,6 +183,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   StreamSubscription<List<ChatMessage>>? _sub;
   StreamSubscription<List<MessageReaction>>? _reactionSub;
   Timer? _pollTimer;
+  Timer? _catchUpTimer;
 
   /// Reactions in this thread, keyed by message id. Rebuilt from the
   /// realtime stream (and the web poll) so both sides see a 👍 land live.
@@ -578,6 +579,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     // itself for this exact conversation — a message that's already
     // appearing live in the list below doesn't need a banner on top of it.
     OpenThread.conversationId.value = widget.conversationId;
+    WidgetsBinding.instance.addObserver(this);
     _bootstrap();
     _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
@@ -1027,6 +1029,19 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       },
     );
 
+    // Première lecture directe, sans attendre le « hello » du canal temps réel,
+    // puis jusqu'à 4 rattrapages (toutes les 2,5 s) tant que le flux n'a rien
+    // livré : cas du fil ouvert depuis une notification, connexion encore morte.
+    unawaited(_syncMessages());
+    var tries = 0;
+    _catchUpTimer = Timer.periodic(const Duration(milliseconds: 2500), (t) {
+      if (!mounted || _messagesLoaded || ++tries > 4) {
+        t.cancel();
+        return;
+      }
+      unawaited(_syncMessages());
+    });
+
     // Jusqu'où le pair a lu, en direct : le « Lu » doit apparaître au moment
     // où il ouvre le fil, pas au prochain rechargement.
     _peerReadSub = ChatReads.watchPeerLastRead(
@@ -1102,6 +1117,48 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     });
   }
 
+  /// Relit les messages directement, sans attendre le canal temps réel.
+  ///
+  /// Ouvert depuis une notification, le fil s'ouvre au sortir de l'arrière-plan :
+  /// la connexion temps réel est encore morte ou en train de se rétablir, et le
+  /// flux n'émet rien (ou rien de récent) pendant ce temps. Sur le natif aucun
+  /// autre filet n'existait (le sondage ne tourne que sur le web) : le message
+  /// n'apparaissait qu'en sortant puis en rouvrant le fil, qui recréait la
+  /// souscription. On ne remplace la liste que si elle a vraiment changé.
+  Future<void> _syncMessages() async {
+    if (!mounted || !isSupabaseReady) return;
+    try {
+      final rows = await ChatApi.fetchMessages(widget.conversationId);
+      if (!mounted) return;
+      final bodies = {for (final x in _messages) x.id: x.body};
+      final same = _messagesLoaded &&
+          rows.length == _messages.length &&
+          rows.every((r) => bodies.containsKey(r.id) && bodies[r.id] == r.body);
+      if (same) return;
+      setState(() {
+        _messages = rows;
+        _messagesLoaded = true;
+      });
+      _dropDeadTargets(rows);
+      unawaited(ChatUnread.markConversationSeen(widget.conversationId));
+      _publishRead();
+      if (_autoTranslate) {
+        for (final m in rows) {
+          _maybeFetchTranslation(m);
+        }
+      }
+      _refreshSuggestions();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    } catch (_) {
+      // Silencieux : le flux temps réel reste le chemin principal.
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_syncMessages());
+  }
+
   // reverse: true means offset 0 IS the newest message — exact, never an
   // estimate, so there's nothing to guess at on first layout.
   void _scrollToBottom() {
@@ -1129,6 +1186,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _reactionSub?.cancel();
     _peerReadSub?.cancel();
     _typing?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _catchUpTimer?.cancel();
     _pollTimer?.cancel();
     _voiceTextTimer?.cancel();
     _presenceTimer?.cancel();
