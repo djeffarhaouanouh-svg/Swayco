@@ -100,7 +100,7 @@ class CallScreen extends StatefulWidget {
     this.inviteShareText,
     this.isCaller = false,
     this.outgoingCallId,
-    this.startWithCamera = false,
+    this.startWithCamera = true,
     this.peerId,
   });
 
@@ -291,7 +291,89 @@ class _CallScreenState extends State<CallScreen> {
 
   /// Des bulles (au repos ou la zone ouverte) sont affichées EN HAUT.
   bool get _topMessagesShown =>
-      _msgTop && (_turnsOpen || (!_turnsHidden && _turns.isNotEmpty));
+      !_camOffMode &&
+      _msgTop &&
+      (_turnsOpen || (!_turnsHidden && _turns.isNotEmpty));
+
+  /// v4 : le pair est connecté mais sa caméra est coupée, et son tile occupe la
+  /// vue principale. Les 2 dernières bulles y restent en permanence, un tap
+  /// ne fait que ranger / afficher la barre, et le crayon reste présent.
+  /// Désactivé tant que l'ancien panneau Messages est ouvert (jamais les deux).
+  bool get _camOffMode {
+    final r = _room;
+    if (r == null || _selfMain || _turnsOpen) return false;
+    return r.remoteParticipants.isNotEmpty && _remoteVideo(r) == null;
+  }
+
+  /// Valeurs de la maquette v4 (écran de 760 de haut utile). Les distances au
+  /// bas de l'écran gardent leurs dp (elles suivent la hauteur de la barre) ;
+  /// celles mesurées depuis le haut (galet, tile) passent en proportion de [h].
+  ({
+    double bubbles,
+    double field,
+    double orbC,
+    double orbScale,
+    double tile,
+  }) _camOffGeo(BuildContext context, double h) {
+    final kb = MediaQuery.viewInsetsOf(context).bottom;
+    final sb = MediaQuery.viewPaddingOf(context).bottom;
+    double k(double v) => v * h / 760;
+    // 0,667 / 0,8 de la maquette = 0,833 / 1 dans l'app (le galet y est au
+    // format 1 au repos, pas 0,8).
+    if (_composerOpen) {
+      if (kb > 0) {
+        // Clavier levé : barre rangée, champ posé au ras du clavier, et galet
+        // + tile remontés pour ne pas toucher les bulles.
+        final field = kb + 12;
+        return (
+          bubbles: field + 60,
+          field: field,
+          orbC: 0.30 * h,
+          orbScale: 0.833,
+          tile: -0.30 * h,
+        );
+      }
+      return (
+        bubbles: 198 + sb,
+        field: 138 + sb,
+        orbC: k(380),
+        orbScale: 0.833,
+        tile: k(-108),
+      );
+    }
+    if (!_dockDimmed) {
+      return (
+        bubbles: 146 + sb,
+        field: 146 + sb,
+        orbC: k(430),
+        orbScale: 1.0,
+        tile: k(-58),
+      );
+    }
+    return (
+      bubbles: 80 + sb,
+      field: 44 + sb,
+      orbC: k(476),
+      orbScale: 0.833,
+      tile: 0,
+    );
+  }
+
+  /// v4 : un tap sur l'écran (ou une bulle) ne fait QUE ranger ou afficher la
+  /// barre de boutons. Les messages, eux, ne se ferment jamais.
+  void _toggleDockCamOff() {
+    if (!mounted) return;
+    if (_chatFocus.hasFocus) {
+      _chatFocus.unfocus();
+      return;
+    }
+    if (_dockDimmed) {
+      _wakeDock();
+    } else {
+      _dockIdleTimer?.cancel();
+      setState(() => _dockDimmed = true);
+    }
+  }
 
   void _setMessagesSide(bool top) {
     if (top == _msgTop) return;
@@ -377,6 +459,11 @@ class _CallScreenState extends State<CallScreen> {
   void _onChatFocusChanged() {
     if (_chatFocus.hasFocus) {
       _composerIdle?.cancel();
+      // v4 : le clavier monte, la barre se range d'elle-même.
+      if (_camOffMode && mounted && !_dockDimmed) {
+        _dockIdleTimer?.cancel();
+        setState(() => _dockDimmed = true);
+      }
     } else {
       _armComposerIdle();
     }
@@ -506,13 +593,16 @@ class _CallScreenState extends State<CallScreen> {
       if (!mounted || _dockDimmed) return;
       // On ne s'efface pas sous les doigts de quelqu'un qui s'en sert : le
       // sursis est simplement reconduit, sinon la veille ne reviendrait jamais.
-      if (_turnsOpen || _controlsOpen) {
+      if (_turnsOpen || _controlsOpen || (_camOffMode && _composerOpen)) {
         _wakeDock();
         return;
       }
       setState(() => _dockDimmed = true);
     });
-    if (_dockDimmed && mounted) setState(() => _dockDimmed = false);
+    // v4 : clavier levé, la barre reste rangée (elle recouvrirait le champ).
+    if (_dockDimmed && mounted && !(_camOffMode && _chatFocus.hasFocus)) {
+      setState(() => _dockDimmed = false);
+    }
     if (_topControls) _armTopControls();
   }
 
@@ -882,6 +972,10 @@ class _CallScreenState extends State<CallScreen> {
 
   bool _micOn = true;
   late bool _camOn = widget.startWithCamera;
+
+  /// La caméra démarre par défaut. Si l'OS refuse la permission caméra, l'appel
+  /// continue en audio seul au lieu d'échouer : seul le micro est indispensable.
+  late bool _startCam = widget.startWithCamera;
   /// When true, the local self-view fills the screen and the remote feed
   /// lives in the small PiP. Tap either to swap back.
   bool _selfMain = false;
@@ -2152,14 +2246,12 @@ class _CallScreenState extends State<CallScreen> {
     // Camera permission is only needed for a video call. Audio calls never
     // touch the camera (it can still be turned on later from the in-call
     // toggle, which requests permission then).
-    if (widget.startWithCamera) {
+    if (_startCam) {
       final cam = await Permission.camera.request();
       if (!cam.isGranted) {
-        setState(() {
-          _connecting = false;
-          _connectError = AppStrings.t('call_perm_required');
-        });
-        return;
+        // Caméra refusée : on appelle quand même, sans image.
+        _startCam = false;
+        if (mounted) setState(() => _camOn = false);
       }
     }
 
@@ -2246,7 +2338,7 @@ class _CallScreenState extends State<CallScreen> {
       if (room.remoteParticipants.isNotEmpty) {
         _hadRemote = true;
       }
-      await room.localParticipant?.setCameraEnabled(widget.startWithCamera);
+      await room.localParticipant?.setCameraEnabled(_startCam);
       // EC on, NS OFF, AGC OFF — each flag's own reason is on its line below.
       // The oldest of the three: the translation pipeline plays a second audio
       // stream on the speakers that EC doesn't fully account for, so any
@@ -2382,7 +2474,7 @@ class _CallScreenState extends State<CallScreen> {
       // La visio démarre sur le haut-parleur (on tient le téléphone devant
       // soi), l'appel normal sur l'écouteur. Un casque branché prime sur les
       // deux, au niveau de l'OS.
-      await _audio.bind(room, video: widget.startWithCamera);
+      await _audio.bind(room, video: _startCam);
       widget.translation.translationListenable?.addListener(_onTranslationStateChanged);
       // Reset the global mic-mute flag — it persists across re-attaches.
       setSendMuted(false);
@@ -2391,7 +2483,7 @@ class _CallScreenState extends State<CallScreen> {
           _room = room;
           _connecting = false;
           _micOn = true;
-          _camOn = widget.startWithCamera;
+          _camOn = _startCam;
         });
       }
       _connectedAt = DateTime.now();
@@ -3735,6 +3827,10 @@ class _CallScreenState extends State<CallScreen> {
                   _CameraOffTile(
                     label: peerFirstName,
                     muted: _peerMicMuted(room),
+                    shift: _camOffMode
+                        ? _camOffGeo(context, MediaQuery.sizeOf(context).height)
+                            .tile
+                        : 0,
                   )
                 else
                   Container(
@@ -3771,6 +3867,17 @@ class _CallScreenState extends State<CallScreen> {
                           ),
                         ],
                       ],
+                    ),
+                  ),
+                // v4 (caméra du pair coupée) : un tap n'importe où ne fait QUE
+                // ranger / afficher la barre. Posé SOUS la vignette (qui garde
+                // son propre tap) et sous les bulles, qui ignorent le doigt.
+                if (_camOffMode)
+                  Positioned.fill(
+                    key: const ValueKey('camoff_tap'),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _toggleDockCamOff,
                     ),
                   ),
                 // PiP: shows whichever feed is NOT the main one. Tap to
@@ -3877,6 +3984,94 @@ class _CallScreenState extends State<CallScreen> {
                       ],
                     ),
                   ),
+                // v4 : les 2 dernières bulles, permanentes, et le crayon.
+                // Les bulles ignorent le doigt : un tap dessus ne ferme rien,
+                // il traverse jusqu'à la couche qui range la barre.
+                if (_camOffMode)
+                  Builder(
+                    builder: (context) {
+                      final g = _camOffGeo(
+                        context,
+                        MediaQuery.sizeOf(context).height,
+                      );
+                      final last = _turns.length > 2
+                          ? _turns.sublist(_turns.length - 2)
+                          : _turns;
+                      return Stack(
+                        key: const ValueKey('camoff_layer'),
+                        fit: StackFit.expand,
+                        children: [
+                          AnimatedPositioned(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeOutCubic,
+                            left: 30,
+                            right: _composerOpen ? 16 : 70,
+                            bottom: g.bubbles,
+                            child: IgnorePointer(
+                              child: ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints(maxHeight: 150),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    for (var i = 0; i < last.length; i++)
+                                      Padding(
+                                        key: ObjectKey(last[i]),
+                                        padding: EdgeInsets.only(
+                                          top: i == 0 ? 0 : 10,
+                                        ),
+                                        // Les bulles montent à l'ouverture, et
+                                        // chaque nouvelle monte à son tour.
+                                        child: _RiseIn(
+                                          delay: Duration(
+                                              milliseconds: 90 * i),
+                                          child: _TurnBubble(
+                                          turn: last[i],
+                                          name: last[i].mine
+                                              ? widget.displayName
+                                              : (_peerProfile?.displayName ??
+                                                  ''),
+                                          avatarUrl: last[i].mine
+                                              ? _myAvatarUrl
+                                              : (_peerProfile?.bestAvatarUrl ??
+                                                  ''),
+                                          maxLines: 2,
+                                          big: true,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          AnimatedPositioned(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeOutCubic,
+                            left: 14,
+                            right: 14,
+                            bottom: g.field,
+                            height: 46,
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: _ComposerPill(
+                                controller: _chatCtrl,
+                                focusNode: _chatFocus,
+                                sending: _chatSending,
+                                onSend: _sendCaption,
+                                open: _composerOpen,
+                                onOpen: () {
+                                  _wakeDock();
+                                  _openComposer();
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 // Conversation dépliée : un tap n'importe où ailleurs la
                 // referme. La couche est posée par-dessus la vidéo, donc ce
                 // tap-là ne fait QUE fermer — il n'échange pas les deux
@@ -3950,7 +4145,7 @@ class _CallScreenState extends State<CallScreen> {
                 // retrouver une cible, il suffit de toucher n'importe où. Ce
                 // premier tap ne fait QUE rallumer : il n'échange pas les deux
                 // images au passage.
-                if (_dockDimmed && !_turnsOpen)
+                if (_dockDimmed && !_turnsOpen && !_camOffMode)
                   Positioned.fill(
                     key: const ValueKey('dock_wake'),
                     child: GestureDetector(
@@ -4030,6 +4225,23 @@ class _CallScreenState extends State<CallScreen> {
                   // ne vient occuper sa place en bas.
                   alignment: _sheetOpen
                       ? const Alignment(0, -0.52)
+                      : _camOffMode
+                          // v4 : le disque est posé à une hauteur de la
+                          // maquette ; le bloc galet + texte a son centre
+                          // 14 px sous celui du disque.
+                          ? Alignment(
+                              0,
+                              box.maxHeight <= 0
+                                  ? 0.0
+                                  : (2 *
+                                              (_camOffGeo(context, box.maxHeight)
+                                                      .orbC +
+                                                  14) /
+                                              box.maxHeight -
+                                          1)
+                                      .clamp(-0.9, 0.9)
+                                      .toDouble(),
+                            )
                       : (_turnsOpen && !_msgTop)
                           ? Alignment(0, turnsY.toDouble())
                           : (!_turnsOpen || (_msgTop && _topControls))
@@ -4047,7 +4259,9 @@ class _CallScreenState extends State<CallScreen> {
                     // le réduit pareil : sous elle il n'est plus le sujet.
                     scale: (_sheetOpen || (_turnsOpen && !_msgTop))
                         ? 56 / TranslationOrb.kSize
-                        : 1,
+                        : _camOffMode
+                            ? _camOffGeo(context, box.maxHeight).orbScale
+                            : 1,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -4168,6 +4382,7 @@ class _CallScreenState extends State<CallScreen> {
                             // toute la largeur (la languette colle au bord) ;
                             // et rangées en haut, les phrases vivent en haut.
                             child: (_turnsOpen ||
+                                    _camOffMode ||
                                     _msgTop ||
                                     _turns.isEmpty ||
                                     _turnsHidden)
@@ -4252,6 +4467,15 @@ class _CallScreenState extends State<CallScreen> {
                                           ring: true,
                                           onTap: () {
                                             _wakeDock();
+                                            // v4 : les bulles sont déjà là en
+                                            // permanence, la touche ouvre
+                                            // donc directement la saisie.
+                                            if (_camOffMode) {
+                                              setState(
+                                                  () => _controlsOpen = false);
+                                              _openComposer();
+                                              return;
+                                            }
                                             if (_turnsOpen) {
                                               // Referme comme un tap sur
                                               // l'écran : la zone ET les
@@ -5427,6 +5651,72 @@ class _ComposerPillState extends State<_ComposerPill>
   }
 }
 
+/// Entrée d'un élément, la même que celle des bulles de la zone Messages
+/// ([_TurnsBlock], « animation de la languette ») : il monte de 70 px en
+/// apparaissant, et grossit de 90 à 100 %. Joue une fois, au montage (après
+/// [delay] éventuel).
+class _RiseIn extends StatefulWidget {
+  const _RiseIn({required this.child, this.delay = Duration.zero});
+
+  final Widget child;
+  final Duration delay;
+
+  @override
+  State<_RiseIn> createState() => _RiseInState();
+}
+
+class _RiseInState extends State<_RiseIn> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    // Même durée que [_TurnsBlockState._enter] : l'intervalle 0,08 → 0,55 de
+    // 1300 ms ci-dessous reprend exactement son tracé.
+    duration: const Duration(milliseconds: 1300),
+  );
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.delay == Duration.zero) {
+      _c.forward();
+    } else {
+      _t = Timer(widget.delay, () {
+        if (mounted) _c.forward();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, child) {
+        final t = ((_c.value - 0.08) / (0.55 - 0.08)).clamp(0.0, 1.0);
+        final v = Curves.easeOutCubic.transform(t);
+        return Opacity(
+          opacity: v,
+          child: Transform.translate(
+            offset: Offset(0, 70 * (1 - v)),
+            child: Transform.scale(
+              scale: 0.9 + 0.1 * v,
+              alignment: Alignment.bottomLeft,
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: widget.child,
+    );
+  }
+}
+
 /// Une bulle : la PDP de qui parle, du côté de qui parle.
 ///
 /// TOUTES à gauche, les miennes comme les siennes : la conversation n'occupe
@@ -5438,11 +5728,17 @@ class _TurnBubble extends StatelessWidget {
     required this.name,
     required this.avatarUrl,
     this.maxLines,
+    this.big = false,
   });
 
   final _SpokenTurn turn;
   final String name;
   final String avatarUrl;
+
+  /// Version agrandie, pour la caméra de l'interlocuteur coupée (v4) : fond noir
+  /// derrière, donc de la place, et un verre blanc 12 % (le noir translucide y
+  /// serait invisible).
+  final bool big;
 
   /// Combien de lignes au plus, au-delà desquelles la phrase se coupe.
   ///
@@ -5466,7 +5762,7 @@ class _TurnBubble extends StatelessWidget {
       child: ProfileAvatar(
         displayName: name,
         avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
-        size: 23,
+        size: big ? 29 : 23,
       ),
     );
 
@@ -5480,19 +5776,24 @@ class _TurnBubble extends StatelessWidget {
     // La plus récente ne se distingue pas non plus : elle passait en blanc
     // plein, ce qui faisait changer de couleur une bulle déjà lue dès que la
     // suivante arrivait.
-    final Color fill = Colors.black.withValues(alpha: 0.42);
+    final Color fill = big
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.42);
     final Color ink = Colors.white.withValues(alpha: turn.mine ? 0.92 : 0.78);
+    final double radius = big ? 20 : 18;
 
     final bubble = Flexible(
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(radius),
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            padding: big
+                ? const EdgeInsets.symmetric(horizontal: 16, vertical: 11)
+                : const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
               color: fill,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(radius),
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.14),
               ),
@@ -5510,7 +5811,7 @@ class _TurnBubble extends StatelessWidget {
                 // doit pouvoir la relire pour la redire, mais on voit d'un
                 // coup d'œil qu'elle n'est pas partie.
                 color: turn.delivered ? ink : ink.withValues(alpha: 0.4),
-                fontSize: 15.5,
+                fontSize: big ? 17.5 : 15.5,
                 height: 1.3,
                 fontWeight: FontWeight.w400,
                 fontStyle:
@@ -5567,7 +5868,7 @@ class _PipFlipButton extends StatelessWidget {
                 ),
               ),
               child: const Icon(
-                Icons.cameraswitch_rounded,
+                Icons.autorenew_rounded,
                 color: Colors.white,
                 size: 21,
               ),
@@ -7251,10 +7552,20 @@ class _SheetLabel extends StatelessWidget {
 }
 
 class _CameraOffTile extends StatelessWidget {
-  const _CameraOffTile({this.label, this.compact = false, this.muted = false});
+  const _CameraOffTile({
+    this.label,
+    this.compact = false,
+    this.muted = false,
+    this.shift = 0,
+  });
 
   final String? label;
   final bool compact;
+
+  /// Décalage vertical (dp, négatif = vers le haut) du groupe icône + prénom
+  /// quand le bas de l'écran se remplit (v4). Animé : le fond noir, lui, ne
+  /// bouge pas.
+  final double shift;
 
   /// This participant's mic is off. Both sides render it — a peer's mute
   /// arrives as a LiveKit `TrackMutedEvent`, our own from `_micOn` — so each
@@ -7269,7 +7580,13 @@ class _CameraOffTile extends StatelessWidget {
     return Container(
       color: Colors.black,
       alignment: Alignment.center,
-      child: Column(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(end: shift),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        builder: (_, dy, child) =>
+            Transform.translate(offset: Offset(0, dy), child: child),
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -7311,6 +7628,7 @@ class _CameraOffTile extends StatelessWidget {
             ),
           ],
         ],
+      ),
       ),
     );
   }

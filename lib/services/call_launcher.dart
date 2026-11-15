@@ -80,7 +80,7 @@ abstract final class CallLauncher {
     BuildContext context, {
     required String peerDeviceId,
     required RealtimeTranslationPort translation,
-    bool startWithCamera = false,
+    bool startWithCamera = true,
   }) async {
     // AVANT le moindre `await`, sans quoi ça ne sert à rien : le navigateur
     // n'ouvre ses sorties audio que depuis un geste de l'utilisateur, et le
