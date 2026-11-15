@@ -3845,9 +3845,12 @@ class _CallScreenState extends State<CallScreen> {
                         // vignette : c'est SON image qu'on retourne, le bouton
                         // doit être posé dessus. Il déborde à demi du cadre —
                         // d'où le [Clip.none] — pour ne pas manger la vidéo.
+                        // Entièrement DANS la vignette (plus à demi dehors) : la
+                        // part qui dépassait du cadre ne recevait pas le doigt,
+                        // et la cible était petite — dur à viser en appel.
                         Positioned(
-                          right: -6,
-                          bottom: -6,
+                          right: 0,
+                          bottom: 0,
                           child: _PipFlipButton(onTap: _flipCamera),
                         ),
                       ],
@@ -5529,12 +5532,12 @@ class _PipFlipButton extends StatelessWidget {
         // La cible déborde du rond visible, comme partout ailleurs : dans un
         // coin de vignette, un doigt tombe rarement au centre.
         child: SizedBox(
-          width: 44,
-          height: 44,
+          width: 60,
+          height: 60,
           child: Center(
             child: Container(
-              width: 30,
-              height: 30,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.black.withValues(alpha: 0.55),
@@ -5545,7 +5548,7 @@ class _PipFlipButton extends StatelessWidget {
               child: const Icon(
                 Icons.cameraswitch_rounded,
                 color: Colors.white,
-                size: 16,
+                size: 21,
               ),
             ),
           ),
