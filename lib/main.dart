@@ -34,6 +34,7 @@ import 'services/chat_unread.dart';
 import 'services/app_navigator.dart';
 import 'services/guest_invite_api.dart';
 import 'services/local_notifications.dart';
+import 'services/notif_enable_flow.dart';
 import 'services/notification_client.dart';
 import 'services/open_thread.dart';
 import 'services/presence_service.dart';
@@ -844,6 +845,25 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           await _hydrateAuthedSession();
           if (!mounted) return;
           setState(() => _needsOnboarding = false);
+          // Tout de suite après l'onboarding : la demande d'autorisation des
+          // notifications (iPhone et Android 13+), avec son écran d'explication
+          // d'abord pour ne pas gaspiller l'unique demande du système. Seulement
+          // si elle n'a jamais été posée ; refusée plus tard, la bannière de la
+          // liste des messages renvoie vers les réglages.
+          if (!kIsWeb) {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              try {
+                if (await NotificationClient.notifStatus() != 'undetermined') {
+                  return;
+                }
+                final ctx = rootNavigatorKey.currentContext;
+                if (ctx == null || !ctx.mounted) return;
+                await NotifEnableFlow.run(ctx);
+              } catch (e) {
+                debugPrint('post-onboarding notif prompt failed: $e');
+              }
+            });
+          }
         },
       );
     }
