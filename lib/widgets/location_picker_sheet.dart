@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/app_strings.dart';
 import '../services/locations.dart';
 import '../services/onboarding_location.dart';
+import '../services/world_countries.dart';
 import '../theme/swayco_theme.dart';
 import 'popup_kit.dart';
 
@@ -144,13 +145,39 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     );
   }
 
+  /// Minuscules et sans accents, pour comparer « Viêt Nam » et « vietnam ».
+  static String _foldSearch(String s) {
+    const from = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿœæ';
+    const to = 'aaaaaaceeeeiiiinooooouuuuyyoa';
+    final b = StringBuffer();
+    for (final ch in s.toLowerCase().split('')) {
+      final i = from.indexOf(ch);
+      b.write(i >= 0 ? to[i] : ch);
+    }
+    return b.toString();
+  }
+
   Widget _buildCountryList(ScrollController sc) {
-    final q = _search.trim().toLowerCase();
+    final q = _foldSearch(_search.trim());
+    // Cherche dans le nom français de la liste ET dans le nom anglais / celui de
+    // la langue de l'app, sans accents : « Vietnam » ou « Indonesia » trouvent
+    // « Viêt Nam » et « Indonésie ».
     final list = q.isEmpty
         ? kCountries
-        : kCountries
-            .where((c) => c.name.toLowerCase().contains(q))
-            .toList(growable: false);
+        : kCountries.where((c) {
+            if (_foldSearch(c.name).contains(q)) return true;
+            final iso = countryIso2For(c.name);
+            if (iso.isEmpty) return false;
+            for (final w in kWorldCountries.values) {
+              if (w.iso != iso) continue;
+              if (_foldSearch(w.en).contains(q) ||
+                  _foldSearch(w.fr).contains(q)) {
+                return true;
+              }
+            }
+            final local = AppStrings.t('country_$iso');
+            return local != 'country_$iso' && _foldSearch(local).contains(q);
+          }).toList(growable: false);
     return Column(
       children: [
         Padding(
