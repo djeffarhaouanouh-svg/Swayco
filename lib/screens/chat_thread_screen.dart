@@ -4997,8 +4997,8 @@ class _CircleActionButton extends StatelessWidget {
 
 /// The translation switch, under the header (8c): « 文A Traduction JA → FR ⬤ ».
 /// On = brand gradient, yellow icon and track; off = faint glass.
-/// À l'ouverture : tombe du haut, puis « JA → FR » disparaît et le toggle se
-/// colle à « Traduction ».
+/// À l'ouverture : posée d'emblée, SANS animation, avec « JA → FR » ; puis
+/// « JA → FR » se referme (seule animation) et le toggle se colle à « Traduction ».
 class _TranslatePill extends StatefulWidget {
   const _TranslatePill({
     required this.active,
@@ -5023,10 +5023,13 @@ class _TranslatePill extends StatefulWidget {
 
 class _TranslatePillState extends State<_TranslatePill>
     with TickerProviderStateMixin {
+  // Aucune animation à l'arrivée sur la page : la pastille est posée d'emblée
+  // (value 1 = fin de la chute). Seule animation : « JA → FR » qui se referme.
   late final AnimationController _in = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 700),
-  )..forward();
+    value: 1.0,
+  );
   late final AnimationController _pop = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 800),
@@ -5038,7 +5041,7 @@ class _TranslatePillState extends State<_TranslatePill>
   @override
   void initState() {
     super.initState();
-    _pairTimer = Timer(const Duration(milliseconds: 700 + 2400), () {
+    _pairTimer = Timer(const Duration(milliseconds: 2400), () {
       if (mounted) setState(() => _showPair = false);
     });
   }
