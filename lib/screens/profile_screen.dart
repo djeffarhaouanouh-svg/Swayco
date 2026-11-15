@@ -1499,7 +1499,11 @@ class _IdentitySection extends StatelessWidget {
   /// La couverture : la PDP — à défaut la première photo — en plein cadre,
   /// recouverte d'un fondu qui la raccorde au fond de la page. Sur mon profil
   /// un tap = choisir une nouvelle PDP.
-  Widget _cover({required bool editable, required double alignY}) {
+  Widget _cover({
+    required bool editable,
+    required double alignY,
+    bool openViewer = false,
+  }) {
     final pdp = avatarUrl.isNotEmpty
         ? avatarUrl
         : (photos.isNotEmpty ? photos.first : '');
@@ -1536,9 +1540,29 @@ class _IdentitySection extends StatelessWidget {
               ),
       );
     }
-    return GestureDetector(
+    return Builder(
+      builder: (context) => GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: editable ? onPickAvatar : null,
+      // Chez quelqu'un d'autre : un tap sur la grande photo l'ouvre dans la
+      // visionneuse (pincer pour zoomer), à sa place dans la galerie.
+      onTap: editable
+          ? onPickAvatar
+          : (openViewer && pdp.isNotEmpty
+              ? () {
+                  final all = <String>[...photos];
+                  var idx = all.indexOf(pdp);
+                  if (idx < 0) {
+                    all.insert(0, pdp);
+                    idx = 0;
+                  }
+                  showPhotoViewer(
+                    context,
+                    photos: all,
+                    index: idx,
+                    viewerMode: true,
+                  );
+                }
+              : null),
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -1563,7 +1587,7 @@ class _IdentitySection extends StatelessWidget {
             ),          ),
         ],
       ),
-    );
+    ));
   }
 
   /// Le drapeau du pays (vrai drapeau, hauteur 22), l'emoji à défaut.
@@ -1845,7 +1869,9 @@ class _IdentitySection extends StatelessWidget {
           height: _coverHeight,
           child: Stack(
             children: [
-              Positioned.fill(child: _cover(editable: false, alignY: -0.4)),
+              Positioned.fill(
+                child: _cover(editable: false, alignY: -0.4, openViewer: true),
+              ),
               Positioned(
                 left: 20,
                 right: 20,
