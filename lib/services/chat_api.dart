@@ -277,18 +277,28 @@ abstract final class ChatApi {
   /// Most-recent-first window of past messages for a conversation.
   static Future<List<ChatMessage>> fetchMessages(
     String conversationId, {
-    int limit = 200,
+    int limit = _kWindow,
   }) async {
+    // Les PLUS RÉCENTS, pas les plus anciens : trié croissant + limit rendait
+    // les `limit` premiers messages de la conversation, donc passé ce nombre
+    // chaque relecture REMPLAÇAIT la liste par du vieux et les nouveaux
+    // messages disparaissaient. On prend la fin, puis on remet dans l'ordre.
     final rows = await _client
         .from('messages')
         .select()
         .eq('conversation_id', conversationId)
-        .order('created_at', ascending: true)
+        .order('created_at', ascending: false)
         .limit(limit);
-    return (rows as List)
+    final list = (rows as List)
         .map((r) => ChatMessage.fromMap(Map<String, dynamic>.from(r as Map)))
-        .toList(growable: false);
+        .toList();
+    list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return List<ChatMessage>.unmodifiable(list);
   }
+
+  /// Taille de la fenêtre de messages (la même pour la lecture directe et le
+  /// flux temps réel, sinon la liste changerait de taille à chaque relecture).
+  static const int _kWindow = 1000;
 
   /// Un message cité tel qu'on le relit : `null` quand il n'existe plus
   /// (supprimé). Une lecture qui ÉCHOUE (réseau) lève, pour ne pas la prendre
@@ -746,7 +756,8 @@ abstract final class ChatApi {
         .from('messages')
         .stream(primaryKey: ['id'])
         .eq('conversation_id', conversationId)
-        .order('created_at', ascending: true)
+        .order('created_at', ascending: false)
+        .limit(_kWindow)
         .map((rows) {
           final list = rows
               .map((m) => ChatMessage.fromMap(Map<String, dynamic>.from(m)))
