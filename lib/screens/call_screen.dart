@@ -294,63 +294,46 @@ class _CallScreenState extends State<CallScreen> {
     // Le rail déplié (Messages, Langue, Audio…) prend de la place au-dessus de
     // la barre : les bulles se posent AU-DESSUS, jamais dessous.
     final rail = _controlsOpen ? 92.0 : 0.0;
-    double k(double v) => v * h / 760;
-    // 0,667 / 0,8 de la maquette = 0,833 / 1 dans l'app (le galet y est au
-    // format 1 au repos, pas 0,8).
     final double bubbles;
     final double field;
-    final double scale;
-    final double specOrb;
-    final double specShift;
     if (_composerOpen && kb == 0 && _dockDimmed) {
       // Pas de clavier à l'écran (ordinateur) et barre rangée : le champ reste
       // à la place du crayon. À 138 px il flotterait au-dessus d'une barre
       // absente, avec un grand vide dessous.
       field = 44 + sb + rail;
       bubbles = field + 60;
-      scale = 0.833;
-      specOrb = k(476);
-      specShift = 0;
     } else if (_composerOpen) {
       // Clavier levé : barre rangée, champ posé au ras du clavier.
       field = kb > 0 ? kb + 12 : 138 + sb + rail;
       bubbles = field + 60;
-      scale = 0.833;
-      specOrb = k(380);
-      specShift = k(-108);
     } else if (!_dockDimmed) {
       bubbles = field = 146 + sb + rail;
-      scale = 1.0;
-      specOrb = k(430);
-      specShift = k(-58);
     } else {
       // Au niveau du crayon (centre à 67 px du bas) ; au-dessus du rail s'il
       // est déplié.
       bubbles = rail > 0 ? 80 + sb + rail : 47 + sb;
       field = 44 + sb;
-      scale = 0.833;
-      specOrb = k(476);
-      specShift = 0;
     }
-    // Le galet reste où la maquette le pose ; c'est le groupe icône + prénom qui
-    // remonte juste assez pour ne pas toucher le galet et ses ondes (28 px) —
-    // 49 px = sa demi-hauteur.
-    final r = 42 * scale;
-    final tileMaxCenter = specOrb - r - 28 - 49;
+    // Le galet NE BOUGE PAS : il reste où l'ancien affichage le posait
+    // ([_orbY]). Le bloc galet + texte a son centre 14 px sous celui du disque.
+    final orbC = (_orbY(h) + 1) * h / 2 - 14;
+    // C'est le groupe icône + prénom qui remonte, juste assez pour ne pas
+    // toucher le galet et ses ondes (28 px) — 49 px = sa demi-hauteur.
+    const r = 42.0;
     final tile = math.max(
       -(h / 2 - 100),
-      math.min(specShift, tileMaxCenter - h / 2),
+      math.min(0.0, orbC - r - 28 - 49 - h / 2),
     );
     // La zone Messages grandit vers le haut, pour les très longs messages
     // (audio), jusqu'au galet et son texte (~36 px sous le disque) sans le
     // recouvrir. Au-delà, on fait défiler dans la zone.
     final zoneMax =
-        (h - bubbles - (specOrb + r + 40)).clamp(66.0, 280.0).toDouble();
+        (h - bubbles - (orbC + r + 40)).clamp(66.0, 280.0).toDouble();
     return (
       bubbles: bubbles,
       field: field,
-      orbC: specOrb,
-      orbScale: scale,
+      orbC: orbC,
+      orbScale: 1.0,
       tile: tile,
       zoneMax: zoneMax,
     );
@@ -3800,7 +3783,7 @@ class _CallScreenState extends State<CallScreen> {
                   _CameraOffTile(
                     label: peerFirstName,
                     muted: _peerMicMuted(room),
-                    shift: _camOffMode && !_msgTop
+                    shift: _camOffMode
                         ? _camOffGeo(context, MediaQuery.sizeOf(context).height)
                             .tile
                         : 0,
@@ -4244,23 +4227,6 @@ class _CallScreenState extends State<CallScreen> {
                   // ne vient occuper sa place en bas.
                   alignment: _sheetOpen
                       ? const Alignment(0, -0.52)
-                      : (_camOffMode && !_msgTop)
-                          // v4 : le disque est posé à une hauteur de la
-                          // maquette ; le bloc galet + texte a son centre
-                          // 14 px sous celui du disque.
-                          ? Alignment(
-                              0,
-                              box.maxHeight <= 0
-                                  ? 0.0
-                                  : (2 *
-                                              (_camOffGeo(context, box.maxHeight)
-                                                      .orbC +
-                                                  14) /
-                                              box.maxHeight -
-                                          1)
-                                      .clamp(-0.9, 0.9)
-                                      .toDouble(),
-                            )
                       : (_turnsOpen && !_msgTop)
                           ? Alignment(0, turnsY.toDouble())
                           : (!_turnsOpen || (_msgTop && _topControls))
@@ -4278,9 +4244,7 @@ class _CallScreenState extends State<CallScreen> {
                     // le réduit pareil : sous elle il n'est plus le sujet.
                     scale: (_sheetOpen || (_turnsOpen && !_msgTop))
                         ? 56 / TranslationOrb.kSize
-                        : (_camOffMode && !_msgTop)
-                            ? _camOffGeo(context, box.maxHeight).orbScale
-                            : 1,
+                        : 1,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
