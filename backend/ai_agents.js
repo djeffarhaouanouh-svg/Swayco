@@ -971,6 +971,10 @@ async function autoAcceptLikes(ctx) {
     if ((await autoLikesToday(sb, ai.id)) >= AUTO_LIKES_PER_DAY) continue;
     // 1 acceptation par personne et par jour.
     if ((await autoAcceptsToday(sb, r.requester)) >= AUTO_ACCEPT_PER_USER_PER_DAY) continue;
+    // Déjà traité : on ne retente pas l'insertion (erreur 23505 à chaque cycle).
+    const { data: seenFr } = await sb.from('ai_actions').select('id')
+      .eq('ref', `fr:${r.id}`).limit(1);
+    if (seenFr && seenFr.length) continue;
     const claim = await sb.from('ai_actions').insert({
       ai_id: ai.id, target_id: r.requester, kind: 'like', source: 'auto',
       ref: `fr:${r.id}`, status: 'running',
@@ -1259,6 +1263,10 @@ async function processNudges(ctx) {
       if (!isAwake(ai)) continue;
       if (await isBlocked(sb, ai.id, target.id)) continue;
 
+      // Cette relance existe déjà (même échouée) : pas de nouvelle insertion.
+      const { data: seenNudge } = await sb.from('ai_actions').select('id')
+        .eq('ref', `nudge:${c.conversation}:${n}`).limit(1);
+      if (seenNudge && seenNudge.length) continue;
       const claim = await sb.from('ai_actions').insert({
         ai_id: ai.id, target_id: target.id, kind: 'message', source: 'auto',
         ref: `nudge:${c.conversation}:${n}`, status: 'running',

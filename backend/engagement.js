@@ -204,10 +204,18 @@ async function logAvailable(sb) {
 
 /** Ecrit la ligne AVANT d'envoyer. false = deja envoye (ou impossible). */
 async function claim(sb, userId, kind, ref) {
-  const { error } = await sb
+  // « ON CONFLICT DO NOTHING » : un doublon (déjà envoyé) ne renvoie aucune
+  // ligne ET ne produit plus d'erreur 23505 dans les logs Postgres. Avant, chaque
+  // cycle retentait l'insertion pour les mêmes notifications : des milliers
+  // d'erreurs par jour. Une ligne rendue = on a bien pris la place.
+  const { data, error } = await sb
     .from('notif_log')
-    .insert({ user_id: userId, kind, ref: String(ref) });
-  return !error;
+    .upsert(
+      { user_id: userId, kind, ref: String(ref) },
+      { onConflict: 'user_id,kind,ref', ignoreDuplicates: true },
+    )
+    .select('id');
+  return !error && Array.isArray(data) && data.length > 0;
 }
 
 async function sentLast24h(sb, userId) {
