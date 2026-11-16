@@ -604,6 +604,26 @@ class _CallScreenState extends State<CallScreen> {
     });
   }
 
+  /// Le rail déplié (Messages, Langue, Audio, REC) se referme seul après ce délai
+  /// sans toucher. Il ne repart QUE sur un geste sur le rail : pas sur la voix
+  /// ni les phrases, qui rallument le dock en continu pendant une conversation
+  /// et le garderaient ouvert pour toujours.
+  Timer? _controlsIdleTimer;
+  static const Duration _kControlsIdle = Duration(seconds: 5);
+
+  void _armControlsIdle() {
+    _controlsIdleTimer?.cancel();
+    _controlsIdleTimer = Timer(_kControlsIdle, () {
+      if (!mounted || !_controlsOpen) return;
+      // Un panneau (langues, son) est ouvert par-dessus : ce n'est pas du repos.
+      if (_sheetOpen) {
+        _armControlsIdle();
+        return;
+      }
+      setState(() => _controlsOpen = false);
+    });
+  }
+
   /// Quelque chose vient de se passer (une voix, une phrase, un tap) : le dock
   /// se rallume et repart pour [_kDockIdle] de sursis.
   void _wakeDock() {
@@ -3675,6 +3695,7 @@ class _CallScreenState extends State<CallScreen> {
     _myVoiceLevel.dispose();
     _composerIdle?.cancel();
     _dockIdleTimer?.cancel();
+    _controlsIdleTimer?.cancel();
     _topControlsTimer?.cancel();
     _micProbe?.cancel();
     final declineCh = _declineChannel;
@@ -4631,8 +4652,12 @@ class _CallScreenState extends State<CallScreen> {
                                                 ? 'REC'
                                                 : 'STOP',
                                             active: _egressId != null,
-                                            onTap:
-                                                _egressBusy ? () {} : _toggleEgress,
+                                            onTap: _egressBusy
+                                                ? () {}
+                                                : () {
+                                                    _armControlsIdle();
+                                                    _toggleEgress();
+                                                  },
                                           ),
                                       ],
                                     ),
@@ -4707,6 +4732,11 @@ class _CallScreenState extends State<CallScreen> {
                                 // fois, quel que soit celui qu'on ouvre.
                                 if (_controlsOpen) _turnsOpen = false;
                               });
+                              if (_controlsOpen) {
+                                _armControlsIdle();
+                              } else {
+                                _controlsIdleTimer?.cancel();
+                              }
                             },
                             ),
                           ),
