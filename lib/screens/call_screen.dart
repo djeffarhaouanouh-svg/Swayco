@@ -239,7 +239,7 @@ class _CallScreenState extends State<CallScreen> {
     if (h <= 0) return 0.80;
     final showBubbles =
         !_turnsOpen && !_msgTop && _turns.isNotEmpty;
-    const n = 1;
+    final n = _restTurns.length.clamp(1, 2);
     final dockShown = _turnsOpen ? _topControls : !_dockDimmed;
     final dockH = dockShown ? 96.0 : 0.0; // la barre, hors marge basse
     final railH = _controlsOpen ? 92.0 : 0.0; // la rangée de réglages
@@ -252,9 +252,9 @@ class _CallScreenState extends State<CallScreen> {
     final centerFromTop = h - discBottom - 42 + 14;
     return (2 * centerFromTop / h - 1).clamp(-0.9, 0.80).toDouble();
   }
-  /// Les tours montrés au repos : la DERNIÈRE phrase, une seule bulle à la fois.
-  List<_SpokenTurn> get _restTurns =>
-      _turns.length > 1 ? _turns.sublist(_turns.length - 1) : _turns;
+  /// Les tours montrés au repos : les deux dernières phrases si elles sont
+  /// courtes, sinon la dernière seule (voir [_lastTurnsToShow]).
+  List<_SpokenTurn> get _restTurns => _lastTurnsToShow(_turns);
 
   /// Des bulles (au repos ou la zone ouverte) sont affichées EN HAUT.
   bool get _topMessagesShown =>
@@ -3966,10 +3966,9 @@ class _CallScreenState extends State<CallScreen> {
                         context,
                         MediaQuery.sizeOf(context).height,
                       );
-                      // UNE seule bulle à la fois : la dernière.
-                      final last = _turns.length > 1
-                          ? _turns.sublist(_turns.length - 1)
-                          : _turns;
+                      // Deux bulles si les deux dernières phrases sont courtes,
+                      // sinon la dernière seule.
+                      final last = _lastTurnsToShow(_turns);
                       // Le crayon n'est là que sans rail (barre ni réglages
                       // dépliés) ; champ déplié, il reste.
                       final pencilShown =
@@ -4775,6 +4774,25 @@ class _CallScreenState extends State<CallScreen> {
 
 }
 
+/// Une phrase est « courte » jusqu'à ce nombre de caractères : elle tient sur
+/// une ligne de bulle.
+const int _kShortTurnChars = 40;
+
+/// Ce qu'on affiche des messages permanents : les DEUX dernières phrases quand
+/// elles sont toutes deux courtes, sinon la dernière seule — une phrase longue
+/// (message audio) prend la place pour elle.
+List<_SpokenTurn> _lastTurnsToShow(List<_SpokenTurn> turns) {
+  if (turns.length >= 2) {
+    final a = turns[turns.length - 2];
+    final b = turns[turns.length - 1];
+    if (a.text.trim().length <= _kShortTurnChars &&
+        b.text.trim().length <= _kShortTurnChars) {
+      return turns.sublist(turns.length - 2);
+    }
+  }
+  return turns.isEmpty ? turns : turns.sublist(turns.length - 1);
+}
+
 /// Un tour de parole : ce qu'une des deux personnes vient de dire, déjà dans
 /// la langue de CE device (ma phrase telle que je l'ai dite ; celle du pair
 /// telle qu'elle m'arrive traduite).
@@ -4816,7 +4834,7 @@ class _RestingTurns extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shown = turns.length > 1 ? turns.sublist(turns.length - 1) : turns;
+    final shown = turns;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
