@@ -962,6 +962,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': 'Trop de tentatives. Patiente quelques minutes puis réessaie.',
     'login_err_network': 'Pas de connexion. Vérifie ton réseau et réessaie.',
     'login_err_generic': 'Une erreur est survenue. Réessaie dans un instant.',
+    'friend_limit_week': 'Tu as atteint ta limite de nouvelles personnes pour cette semaine. Passe à Pro pour en ajouter sans limite.',
     'login_check_inbox':
         'Vérifie ta boîte mail : on t\'a envoyé un lien de confirmation.',
     'login_resend_confirm': 'Renvoyer le mail de confirmation',
@@ -1965,6 +1966,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': 'Too many attempts. Wait a few minutes and try again.',
     'login_err_network': 'No connection. Check your network and try again.',
     'login_err_generic': 'Something went wrong. Please try again in a moment.',
+    'friend_limit_week': 'You\'ve reached this week\'s limit for new connections. Go Pro to add more without limits.',
     'login_check_inbox': 'Check your inbox — we sent you a confirmation link.',
     'login_resend_confirm': 'Resend confirmation email',
     'login_resend_sent':
@@ -3020,6 +3022,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': 'Demasiados intentos. Espera unos minutos y vuelve a intentarlo.',
     'login_err_network': 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     'login_err_generic': 'Algo salió mal. Inténtalo de nuevo en un momento.',
+    'friend_limit_week': 'Has alcanzado el límite de nuevas conexiones de esta semana. Pásate a Pro para añadir más sin límite.',
     'login_check_inbox':
         'Revisa tu bandeja de entrada — te enviamos un enlace de confirmación.',
     'login_resend_confirm': 'Reenviar correo de confirmación',
@@ -4015,6 +4018,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': 'Zu viele Versuche. Warte ein paar Minuten und versuche es erneut.',
     'login_err_network': 'Keine Verbindung. Prüfe dein Netzwerk und versuche es erneut.',
     'login_err_generic': 'Etwas ist schiefgelaufen. Versuche es gleich noch einmal.',
+    'friend_limit_week': 'Du hast das Limit für neue Kontakte in dieser Woche erreicht. Mit Pro kannst du unbegrenzt weitere hinzufügen.',
     'login_check_inbox':
         'Sieh in deinem Posteingang nach — wir haben dir einen Bestätigungslink gesendet.',
     'login_resend_confirm': 'Bestätigungs-E-Mail erneut senden',
@@ -5015,6 +5019,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': 'Troppi tentativi. Attendi qualche minuto e riprova.',
     'login_err_network': 'Nessuna connessione. Controlla la rete e riprova.',
     'login_err_generic': 'Qualcosa è andato storto. Riprova tra un attimo.',
+    'friend_limit_week': 'Hai raggiunto il limite di nuove connessioni di questa settimana. Passa a Pro per aggiungerne senza limiti.',
     'login_check_inbox':
         'Controlla la tua casella di posta — ti abbiamo inviato un link di conferma.',
     'login_resend_confirm': 'Invia di nuovo l\'email di conferma',
@@ -6015,6 +6020,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': 'Demasiadas tentativas. Aguarda uns minutos e tenta de novo.',
     'login_err_network': 'Sem ligação. Verifica a tua rede e tenta de novo.',
     'login_err_generic': 'Ocorreu um erro. Tenta de novo daqui a pouco.',
+    'friend_limit_week': 'Atingiste o limite de novas ligações desta semana. Passa ao Pro para adicionar sem limites.',
     'login_check_inbox':
         'Verifique a sua caixa de entrada — enviámos-lhe um link de confirmação.',
     'login_resend_confirm': 'Reenviar e-mail de confirmação',
@@ -6973,6 +6979,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': 'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
     'login_err_network': 'Sem conexão. Verifique sua rede e tente de novo.',
     'login_err_generic': 'Algo deu errado. Tente de novo em instantes.',
+    'friend_limit_week': 'Você atingiu o limite de novas conexões desta semana. Assine o Pro para adicionar sem limites.',
     'login_check_inbox': 'Verifique sua caixa de entrada — enviamos um link de confirmação para você.',
     'login_resend_confirm': 'Reenviar e-mail de confirmação',
     'login_resend_sent': 'E-mail de confirmação reenviado. Verifique sua caixa de entrada (e a pasta de spam).',
@@ -7967,6 +7974,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': 'Te veel pogingen. Wacht een paar minuten en probeer het opnieuw.',
     'login_err_network': 'Geen verbinding. Controleer je netwerk en probeer het opnieuw.',
     'login_err_generic': 'Er ging iets mis. Probeer het zo meteen opnieuw.',
+    'friend_limit_week': 'Je hebt de limiet voor nieuwe contacten van deze week bereikt. Ga naar Pro om onbeperkt toe te voegen.',
     'login_check_inbox':
         'Controleer je inbox — we hebben je een bevestigingslink gestuurd.',
     'login_resend_confirm': 'Bevestigingsmail opnieuw sturen',
@@ -8952,6 +8960,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': 'محاولات كثيرة جدًا. انتظر بضع دقائق ثم حاول مجددًا.',
     'login_err_network': 'لا يوجد اتصال. تحقق من الشبكة وحاول مجددًا.',
     'login_err_generic': 'حدث خطأ ما. حاول مجددًا بعد قليل.',
+    'friend_limit_week': 'وصلت إلى حد الأصدقاء الجدد لهذا الأسبوع. اشترك في Pro للإضافة دون حدود.',
     'login_check_inbox': 'تحقق من صندوق الوارد — أرسلنا لك رابط تأكيد.',
     'login_resend_confirm': 'إعادة إرسال بريد التأكيد',
     'login_resend_sent':
@@ -9949,6 +9958,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': 'Слишком много попыток. Подожди несколько минут и попробуй снова.',
     'login_err_network': 'Нет соединения. Проверь сеть и попробуй снова.',
     'login_err_generic': 'Что-то пошло не так. Попробуй ещё раз чуть позже.',
+    'friend_limit_week': 'Ты достиг недельного лимита новых знакомств. Оформи Pro, чтобы добавлять без ограничений.',
     'login_check_inbox':
         'Проверьте почту — мы отправили вам ссылку для подтверждения.',
     'login_resend_confirm': 'Отправить письмо повторно',
@@ -10896,6 +10906,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': '尝试次数过多，请等几分钟后再试。',
     'login_err_network': '没有网络连接，请检查网络后重试。',
     'login_err_generic': '出了点问题，请稍后再试。',
+    'friend_limit_week': '你已达到本周新增好友的上限。升级 Pro 即可不限数量添加。',
     'login_check_inbox': '请查收邮箱 — 我们已向你发送了一个确认链接。',
     'login_resend_confirm': '重新发送确认邮件',
     'login_resend_sent': '确认邮件已重新发送。请查收邮箱（以及垃圾邮件文件夹）。',
@@ -11847,6 +11858,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': '試行回数が多すぎます。数分待ってからもう一度お試しください。',
     'login_err_network': '接続できません。ネットワークを確認してもう一度お試しください。',
     'login_err_generic': '問題が発生しました。しばらくしてからもう一度お試しください。',
+    'friend_limit_week': '今週の新しいつながりの上限に達しました。Proにすると無制限に追加できます。',
     'login_check_inbox': '受信トレイを確認してください — 確認リンクを送信しました。',
     'login_resend_confirm': '確認メールを再送信',
     'login_resend_sent': '確認メールを再送信しました。受信トレイ（と迷惑メールフォルダ）を確認してください。',
@@ -12793,6 +12805,7 @@ abstract final class AppStrings {
     'login_err_rate_limit': '시도가 너무 많아요. 몇 분 뒤에 다시 시도해 주세요.',
     'login_err_network': '연결되지 않았어요. 네트워크를 확인하고 다시 시도해 주세요.',
     'login_err_generic': '문제가 생겼어요. 잠시 후 다시 시도해 주세요.',
+    'friend_limit_week': '이번 주 새 인연 추가 한도에 도달했어요. Pro로 업그레이드하면 제한 없이 추가할 수 있어요.',
     'login_check_inbox': '받은편지함을 확인하세요 — 확인 링크를 보내드렸어요.',
     'login_resend_confirm': '확인 이메일 재전송',
     'login_resend_sent': '확인 이메일을 다시 보냈어요. 받은편지함(과 스팸함)을 확인하세요.',

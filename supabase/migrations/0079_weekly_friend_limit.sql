@@ -75,7 +75,8 @@ begin
   if v_count >= v_limit then
     raise exception 'weekly_friend_limit'
       using errcode = 'P0001',
-            hint = format('user %s already has %s AI friends this week', v_human, v_count);
+            -- Ce texte part au client dans l'erreur : jamais le mot « IA ».
+            hint = format('user %s reached the weekly limit (%s)', v_human, v_count);
   end if;
 
   return new;

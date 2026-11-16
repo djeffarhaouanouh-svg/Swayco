@@ -26,6 +26,12 @@ String friendlyError(Object e) {
     _ => '$e',
   }.toLowerCase();
 
+  // Plafond hebdomadaire de nouveaux contacts sans Pro (garde-fou en base). On
+  // ne dit JAMAIS pourquoi en détail : le texte brut de la base, lui, parle de
+  // comptes IA et ne doit pas être montré.
+  if (msg.contains('weekly_friend_limit')) {
+    return AppStrings.t('friend_limit_week');
+  }
   if (code == 'user_already_exists' ||
       code == 'email_exists' ||
       msg.contains('already registered') ||
