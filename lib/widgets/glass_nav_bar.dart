@@ -543,35 +543,41 @@ class _NavItemState extends State<_NavItem>
             count: count,
             child: label == null
               ? Container(
-                  width: 8,
-                  height: 8,
-                  // Clair : le jaune fluo disparaît sur la barre blanche, un contour
-                  // blanc n'y change rien — on le cerne de sombre.
+                  width: SC.light ? 11 : 8,
+                  height: SC.light ? 11 : 8,
+                  // Clair : le jaune fluo disparaît sur la barre blanche — on lui
+                  // pose un fond sombre derrière (le point fluo est dedans).
                   decoration: BoxDecoration(
-                    color: SC.accent,
+                    color: SC.light ? SC.onAccent : SC.accent,
                     shape: BoxShape.circle,
-                    border: SC.light
-                        ? Border.all(color: SC.onAccent, width: 1.5)
-                        : null,
                   ),
+                  child: SC.light
+                      ? Center(
+                          child: Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: SC.accent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        )
+                      : null,
                 )
               : Container(
                   height: 16,
                   constraints: const BoxConstraints(minWidth: 16),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   alignment: Alignment.center,
+                  // Clair : fond sombre derrière, texte fluo dessus.
                   decoration: BoxDecoration(
-                    color: SC.accent,
+                    color: SC.light ? SC.onAccent : SC.accent,
                     borderRadius: BorderRadius.circular(999),
-                    border: SC.light
-                        ? Border.all(color: SC.onAccent, width: 1.5)
-                        : null,
                   ),
                   child: Text(
                     label,
                     style: TextStyle(
-                      // Clair : du blanc sur du jaune fluo ne se lit pas.
-                      color: SC.light ? SC.onAccent : Colors.white,
+                      color: SC.light ? SC.accent : Colors.white,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       height: 1,

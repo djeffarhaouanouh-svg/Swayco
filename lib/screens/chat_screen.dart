@@ -2695,11 +2695,24 @@ class _SectionHeader extends StatelessWidget {
           ),
           if (count > 0) ...[
             const SizedBox(width: 8),
-            Text(
-              AppStrings.t('chat_unread_count', args: {'n': '$count'}),
-              style: _label.copyWith(
-                color: SC.accent,
-                letterSpacing: 0,
+            // Clair : du jaune fluo sur du blanc ne se lit pas — on lui pose un
+            // fond sombre derrière. Sombre : inchangé.
+            Container(
+              padding: SC.light
+                  ? const EdgeInsets.symmetric(horizontal: 8, vertical: 2)
+                  : EdgeInsets.zero,
+              decoration: SC.light
+                  ? BoxDecoration(
+                      color: SC.onAccent,
+                      borderRadius: BorderRadius.circular(999),
+                    )
+                  : null,
+              child: Text(
+                AppStrings.t('chat_unread_count', args: {'n': '$count'}),
+                style: _label.copyWith(
+                  color: SC.accent,
+                  letterSpacing: 0,
+                ),
               ),
             ),
           ],
