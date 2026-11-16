@@ -14,6 +14,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show RealtimeChannel, Supabase;
@@ -2055,6 +2056,9 @@ class _CallScreenState extends State<CallScreen> {
     _wireDeviceTtsSignal();
     ttsSpeaking.addListener(_syncTranslationSpeaking);
     unawaited(_loadDeviceVoiceLangs());
+    // L'écran reste allumé tant que l'appel dure : sans ça, le téléphone se met
+    // en veille au bout de quelques secondes sans toucher, alors qu'on parle.
+    unawaited(_keepScreenOn(true));
     _wakeDock();
     // Caller waiting for pickup: listen for the callee declining so we
     // can close this screen instead of ringing into an empty room.
@@ -3590,6 +3594,8 @@ class _CallScreenState extends State<CallScreen> {
       Attribution.logCallEnded(_callKind, durMs);
     }
     widget.translation.translationListenable?.removeListener(_onTranslationStateChanged);
+    // L'appel est fini : l'écran peut de nouveau se mettre en veille.
+    unawaited(_keepScreenOn(false));
     _audio.dispose();
     unawaited(_ttsPlayer.dispose());
     _cancelQueuedSpeech();
@@ -3621,6 +3627,18 @@ class _CallScreenState extends State<CallScreen> {
       }());
     }
     super.dispose();
+  }
+
+  Future<void> _keepScreenOn(bool on) async {
+    try {
+      if (on) {
+        await WakelockPlus.enable();
+      } else {
+        await WakelockPlus.disable();
+      }
+    } catch (_) {
+      // Pas de wakelock disponible (plateforme, test) : l'appel continue.
+    }
   }
 
   @override
