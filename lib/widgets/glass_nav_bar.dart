@@ -545,12 +545,13 @@ class _NavItemState extends State<_NavItem>
               ? Container(
                   width: 8,
                   height: 8,
-                  // Clair : contour blanc de 2 px pour détacher le jaune.
+                  // Clair : le jaune fluo disparaît sur la barre blanche, un contour
+                  // blanc n'y change rien — on le cerne de sombre.
                   decoration: BoxDecoration(
                     color: SC.accent,
                     shape: BoxShape.circle,
                     border: SC.light
-                        ? Border.all(color: Colors.white, width: 2)
+                        ? Border.all(color: SC.onAccent, width: 1.5)
                         : null,
                   ),
                 )
@@ -563,13 +564,14 @@ class _NavItemState extends State<_NavItem>
                     color: SC.accent,
                     borderRadius: BorderRadius.circular(999),
                     border: SC.light
-                        ? Border.all(color: Colors.white, width: 2)
+                        ? Border.all(color: SC.onAccent, width: 1.5)
                         : null,
                   ),
                   child: Text(
                     label,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      // Clair : du blanc sur du jaune fluo ne se lit pas.
+                      color: SC.light ? SC.onAccent : Colors.white,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       height: 1,
