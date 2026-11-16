@@ -596,11 +596,15 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   }
 
   /// Local time at the peer's place, derived from the free-text city they
-  /// filled into their profile (country as a fallback). Null when no city is
+  /// filled into their profile (country as a fallback). Null when neither is
   /// set or the place isn't in our timezone table — the header line then hides.
   PeerLocalTime? get _peerClock {
     final p = _peer;
-    if (p == null || p.city.trim().isEmpty) return null;
+    // Ville OU pays suffit : sans ville, on prend l'heure du pays (le fuseau
+    // principal) et la ligne affiche le nom du pays.
+    if (p == null || (p.city.trim().isEmpty && p.country.trim().isEmpty)) {
+      return null;
+    }
     return resolvePeerLocalTime(city: p.city, country: p.country);
   }
 
@@ -1603,7 +1607,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                           title: widget.title,
                           peer: _peer,
                           clock: peerClock,
-                          place: _peer?.city ?? '',
+                          place: (_peer?.city.trim().isNotEmpty ?? false)
+                              ? _peer!.city
+                              : (_peer?.country ?? ''),
                           blockedByPeer: _peerBlockedMe,
                           onCall: () => _startCall(withCamera: false),
                           onVideoCall: () => _startCall(withCamera: true),
