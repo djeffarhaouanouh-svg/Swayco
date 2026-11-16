@@ -528,6 +528,11 @@ class _NavItemState extends State<_NavItem>
     );
   }
 
+  /// Le fond sombre et diffus derrière une pastille jaune, en mode clair.
+  static const List<BoxShadow> _lightBadgeBackdrop = [
+    BoxShadow(color: Color(0x73000000), blurRadius: 7, spreadRadius: 1),
+  ];
+
   Widget _badged(Widget child, int count) {
     if (count <= 0) return child;
     final label = navBarUnreadLabel(count);
@@ -543,41 +548,33 @@ class _NavItemState extends State<_NavItem>
             count: count,
             child: label == null
               ? Container(
-                  width: SC.light ? 11 : 8,
-                  height: SC.light ? 11 : 8,
-                  // Clair : le jaune fluo disparaît sur la barre blanche — on lui
-                  // pose un fond sombre derrière (le point fluo est dedans).
+                  width: 8,
+                  height: 8,
+                  // Clair : le jaune fluo disparaît sur la barre blanche — un fond
+                  // sombre doux derrière le relève, sans contour.
                   decoration: BoxDecoration(
-                    color: SC.light ? SC.onAccent : SC.accent,
+                    color: SC.accent,
                     shape: BoxShape.circle,
+                    boxShadow: SC.light ? _lightBadgeBackdrop : null,
                   ),
-                  child: SC.light
-                      ? Center(
-                          child: Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: SC.accent,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        )
-                      : null,
                 )
               : Container(
                   height: 16,
                   constraints: const BoxConstraints(minWidth: 16),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   alignment: Alignment.center,
-                  // Clair : fond sombre derrière, texte fluo dessus.
+                  // Clair : la bulle reste jaune, un fond sombre doux derrière la
+                  // relève, sans contour.
                   decoration: BoxDecoration(
-                    color: SC.light ? SC.onAccent : SC.accent,
+                    color: SC.accent,
                     borderRadius: BorderRadius.circular(999),
+                    boxShadow: SC.light ? _lightBadgeBackdrop : null,
                   ),
                   child: Text(
                     label,
                     style: TextStyle(
-                      color: SC.light ? SC.accent : Colors.white,
+                      // Clair : du blanc sur du jaune fluo ne se lit pas.
+                      color: SC.light ? SC.onAccent : Colors.white,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       height: 1,
