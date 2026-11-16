@@ -761,8 +761,19 @@ async function processReplies(ctx) {
   const dayStart = utcDayStart();
   let sent = 0;
   const prot = await protectedIds(sb);
+  // Messages DÉJÀ pris en charge (répondus, ou mis en silence par le quota) : leur
+  // ref existe. On les saute d'avance. Avant, chaque cycle retentait l'insertion
+  // du verrou, qui échouait (23505 « ai_actions_ref_uniq ») : ~58 000 erreurs
+  // par jour dans les logs Postgres, pour rien.
+  const takenRefs = new Set();
+  const msgRefs = [...latest.values()].map((m) => `msg:${m.id}`);
+  if (msgRefs.length) {
+    const { data: taken } = await sb.from('ai_actions').select('ref').in('ref', msgRefs);
+    for (const r of taken || []) takenRefs.add(r.ref);
+  }
   for (const m of latest.values()) {
     if (prot.has(m.sender)) continue; // protégé : aucune IA ne lui répond
+    if (takenRefs.has(`msg:${m.id}`)) continue; // déjà pris en charge (ref unique)
     const instant = TEST_INSTANT_TARGETS.has(m.sender);
     const level = await attentionLevel(sb, m.recipient).catch(() => 3);
     // Nouvel inscrit (< 48 h) : réponse rapide, sans sommeil, quota large.
