@@ -340,7 +340,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await AuthService.resetPassword(_email);
       if (!mounted) return;
-      // Le code à 6 chiffres arrive par e-mail : on ouvre tout de suite l'écran
+      // Le code arrive par e-mail : on ouvre tout de suite l'écran
       // où le saisir (le lien de l'e-mail ne marche que sur le web).
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(

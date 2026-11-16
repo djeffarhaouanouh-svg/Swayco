@@ -102,7 +102,7 @@ abstract final class AuthService {
     );
   }
 
-  /// Valide le code à 6 chiffres reçu par e-mail (mot de passe oublié). Réussi,
+  /// Valide le code reçu par e-mail (mot de passe oublié). Réussi,
   /// il ouvre une session de récupération et le client émet
   /// `AuthChangeEvent.passwordRecovery` : `main.dart` affiche alors l'écran du
   /// nouveau mot de passe, comme pour le lien — mais sans lien, donc sans

@@ -8,7 +8,7 @@ import '../widgets/sway_onb_kit.dart';
 
 /// Reached from the "Mot de passe oublié ?" link on the login screen. One
 /// field (email) + a send button that fires `AuthService.resetPassword`.
-/// Then the 6-digit code from the email is typed HERE (no link to open, so it
+/// Then the code from the email is typed HERE (no link to open, so it
 /// works the same on iOS, Android and the web); a valid code opens the recovery
 /// session and `main.dart` shows `NewPasswordScreen`. The email link still
 /// works on the web.
@@ -90,7 +90,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _error = null;
       _info = null;
     });
-    if (code.length != 6) {
+    // La longueur dépend du réglage Supabase (6 par défaut, 8 sur ce projet) :
+    // on accepte toute longueur plausible, c'est le serveur qui tranche.
+    if (code.length < 6 || code.length > 10) {
       setState(() => _error = AppStrings.t('forgot_pw_code_invalid'));
       return;
     }
