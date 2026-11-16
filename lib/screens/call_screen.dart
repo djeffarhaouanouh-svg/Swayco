@@ -309,59 +309,74 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   /// Valeurs de la maquette v4 (écran de 760 de haut utile). Les distances au
-  /// bas de l'écran gardent leurs dp (elles suivent la hauteur de la barre) ;
-  /// celles mesurées depuis le haut (galet, tile) passent en proportion de [h].
+  /// bas de l'écran gardent leurs dp (elles suivent la hauteur de la barre et du
+  /// rail déplié) ; celles mesurées depuis le haut (galet, tile) passent en
+  /// proportion de [h], PUIS sont corrigées pour que rien ne se touche : le
+  /// galet reste au-dessus de la bulle, et le groupe icône + prénom au-dessus
+  /// du galet (ses ondes comprises).
   ({
     double bubbles,
     double field,
     double orbC,
     double orbScale,
     double tile,
+    double zoneMax,
   }) _camOffGeo(BuildContext context, double h) {
     final kb = MediaQuery.viewInsetsOf(context).bottom;
     final sb = MediaQuery.viewPaddingOf(context).bottom;
+    // Le rail déplié (Messages, Langue, Audio…) prend de la place au-dessus de
+    // la barre : les bulles se posent AU-DESSUS, jamais dessous.
+    final rail = _controlsOpen ? 92.0 : 0.0;
     double k(double v) => v * h / 760;
     // 0,667 / 0,8 de la maquette = 0,833 / 1 dans l'app (le galet y est au
     // format 1 au repos, pas 0,8).
+    final double bubbles;
+    final double field;
+    final double scale;
+    final double specOrb;
+    final double specShift;
     if (_composerOpen) {
-      if (kb > 0) {
-        // Clavier levé : barre rangée, champ posé au ras du clavier, et galet
-        // + tile remontés pour ne pas toucher les bulles.
-        final field = kb + 12;
-        return (
-          bubbles: field + 60,
-          field: field,
-          orbC: 0.30 * h,
-          orbScale: 0.833,
-          tile: -0.30 * h,
-        );
-      }
-      return (
-        bubbles: 198 + sb,
-        field: 138 + sb,
-        orbC: k(380),
-        orbScale: 0.833,
-        tile: k(-108),
-      );
+      // Clavier levé : barre rangée, champ posé au ras du clavier.
+      field = kb > 0 ? kb + 12 : 138 + sb + rail;
+      bubbles = field + 60;
+      scale = 0.833;
+      specOrb = k(380);
+      specShift = k(-108);
+    } else if (!_dockDimmed) {
+      bubbles = field = 146 + sb + rail;
+      scale = 1.0;
+      specOrb = k(430);
+      specShift = k(-58);
+    } else {
+      bubbles = 80 + sb + rail;
+      field = 44 + sb;
+      scale = 0.833;
+      specOrb = k(476);
+      specShift = 0;
     }
-    if (!_dockDimmed) {
-      return (
-        bubbles: 146 + sb,
-        field: 146 + sb,
-        orbC: k(430),
-        orbScale: 1.0,
-        tile: k(-58),
-      );
-    }
+    // Le galet reste où la maquette le pose ; c'est le groupe icône + prénom qui
+    // remonte juste assez pour ne pas toucher le galet et ses ondes (28 px) —
+    // 49 px = sa demi-hauteur.
+    final r = 42 * scale;
+    final tileMaxCenter = specOrb - r - 28 - 49;
+    final tile = math.max(
+      -(h / 2 - 100),
+      math.min(specShift, tileMaxCenter - h / 2),
+    );
+    // La zone Messages grandit vers le haut, pour les très longs messages
+    // (audio), jusqu'au galet et son texte (~36 px sous le disque) sans le
+    // recouvrir. Au-delà, on fait défiler dans la zone.
+    final zoneMax =
+        (h - bubbles - (specOrb + r + 40)).clamp(66.0, 280.0).toDouble();
     return (
-      bubbles: 80 + sb,
-      field: 44 + sb,
-      orbC: k(476),
-      orbScale: 0.833,
-      tile: 0,
+      bubbles: bubbles,
+      field: field,
+      orbC: specOrb,
+      orbScale: scale,
+      tile: tile,
+      zoneMax: zoneMax,
     );
   }
-
   /// v4 : un tap sur l'écran (ou une bulle) ne fait QUE ranger ou afficher la
   /// barre de boutons. Les messages, eux, ne se ferment jamais.
   void _toggleDockCamOff() {
@@ -3997,10 +4012,14 @@ class _CallScreenState extends State<CallScreen> {
                         context,
                         MediaQuery.sizeOf(context).height,
                       );
-                      final last = _turns.length > 2
-                          ? _turns.sublist(_turns.length - 2)
+                      // UNE seule bulle à la fois : la dernière.
+                      final last = _turns.length > 1
+                          ? _turns.sublist(_turns.length - 1)
                           : _turns;
-                      final pencilShown = _dockDimmed || _composerOpen;
+                      // Le crayon n'est là que sans rail (barre ni réglages
+                      // dépliés) ; champ déplié, il reste.
+                      final pencilShown =
+                          (_dockDimmed && !_controlsOpen) || _composerOpen;
                       // La démonstration de la languette joue à la première
                       // apparition des messages de l'appel, pour les premiers
                       // appels seulement (même règle que la touche Messages).
@@ -4050,7 +4069,7 @@ class _CallScreenState extends State<CallScreen> {
                                 onTapZone: _toggleDockCamOff,
                                 holdFade: true,
                                 onDark: true,
-                                listMaxHeight: 150,
+                                listMaxHeight: g.zoneMax,
                                 showEarlier: false,
                               ),
                             ),
@@ -4074,7 +4093,7 @@ class _CallScreenState extends State<CallScreen> {
                                 onTapZone: _toggleDockCamOff,
                                 holdFade: true,
                                 onDark: true,
-                                listMaxHeight: 150,
+                                listMaxHeight: g.zoneMax,
                                 showEarlier: false,
                               ),
                             ),
@@ -5336,7 +5355,7 @@ class _TurnsBlockState extends State<_TurnsBlock>
                               ? widget.myAvatarUrl
                               : widget.peerAvatarUrl,
                           onDark: widget.onDark,
-                          maxLines: widget.onDark ? 2 : null,
+                          maxLines: null,
                         ),
                       ),
                     );
