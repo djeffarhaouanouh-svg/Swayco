@@ -302,7 +302,16 @@ class _CallScreenState extends State<CallScreen> {
     final double scale;
     final double specOrb;
     final double specShift;
-    if (_composerOpen) {
+    if (_composerOpen && kb == 0 && _dockDimmed) {
+      // Pas de clavier à l'écran (ordinateur) et barre rangée : le champ reste
+      // à la place du crayon. À 138 px il flotterait au-dessus d'une barre
+      // absente, avec un grand vide dessous.
+      field = 44 + sb + rail;
+      bubbles = field + 60;
+      scale = 0.833;
+      specOrb = k(476);
+      specShift = 0;
+    } else if (_composerOpen) {
       // Clavier levé : barre rangée, champ posé au ras du clavier.
       field = kb > 0 ? kb + 12 : 138 + sb + rail;
       bubbles = field + 60;
