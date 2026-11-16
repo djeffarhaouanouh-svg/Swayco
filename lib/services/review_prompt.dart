@@ -12,11 +12,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// reste : les magasins limitent le nombre d'affichages (3 par an sur iOS) et ne
 /// disent pas si la fenêtre est vraiment apparue.
 ///
-/// Déclencheur : après le [_kAfterMessages]ᵉ message ENVOYÉ depuis l'appli, une
+/// Déclencheur : après le [_kAfterMessages]ᵉ message (le 10ᵉ) ENVOYÉ depuis l'appli, une
 /// seule fois par installation. Le décompte vit sur l'appareil.
 abstract final class ReviewPrompt {
   /// Nombre de messages envoyés après lequel on demande.
-  static const int _kAfterMessages = 4;
+  static const int _kAfterMessages = 10;
 
   /// Petit délai : la fenêtre ne doit pas surgir pile pendant l'envoi.
   static const Duration _kDelay = Duration(seconds: 3);

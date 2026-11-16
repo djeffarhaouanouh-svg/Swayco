@@ -327,7 +327,7 @@ abstract final class ChatApi {
           return inserted['id']?.toString() ?? '';
         }
         await _client.from('messages').insert(row);
-        // Un message de la personne est parti : au 4e, la demande d'avis.
+        // Un message de la personne est parti : au 10e, la demande d'avis.
         unawaited(ReviewPrompt.noteMessageSent());
         return '';
       } on PostgrestException catch (e) {
