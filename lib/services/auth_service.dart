@@ -102,6 +102,25 @@ abstract final class AuthService {
     );
   }
 
+  /// Valide le code à 6 chiffres reçu par e-mail (mot de passe oublié). Réussi,
+  /// il ouvre une session de récupération et le client émet
+  /// `AuthChangeEvent.passwordRecovery` : `main.dart` affiche alors l'écran du
+  /// nouveau mot de passe, comme pour le lien — mais sans lien, donc sans
+  /// dépendre du navigateur ni de l'appareil où l'e-mail est ouvert.
+  static Future<void> verifyRecoveryCode({
+    required String email,
+    required String code,
+  }) async {
+    if (!isSupabaseReady) {
+      throw StateError('Supabase non configuré');
+    }
+    await _auth.verifyOTP(
+      type: OtpType.recovery,
+      email: email.trim().toLowerCase(),
+      token: code.trim(),
+    );
+  }
+
   /// Re-trigger the signup confirmation email for users who never clicked
   /// the original link. Idempotent server-side: Supabase rate-limits how
   /// often this can fire per address.

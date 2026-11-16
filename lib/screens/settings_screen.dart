@@ -9,6 +9,7 @@ import '../services/analytics.dart';
 import '../services/app_theme.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
+import 'forgot_password_screen.dart';
 import '../services/ui_variant.dart';
 import '../services/presence_service.dart';
 import '../services/swayco_sounds.dart';
@@ -338,7 +339,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await AuthService.resetPassword(_email);
       if (!mounted) return;
-      _toast(AppStrings.t('settings_email_sent'));
+      // Le code à 6 chiffres arrive par e-mail : on ouvre tout de suite l'écran
+      // où le saisir (le lien de l'e-mail ne marche que sur le web).
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              ForgotPasswordScreen(initialEmail: _email, alreadySent: true),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       _toast(AppStrings.t('error_prefix', args: {'msg': '$e'}));
