@@ -4436,15 +4436,6 @@ class _CallScreenState extends State<CallScreen> {
                                           ring: true,
                                           onTap: () {
                                             _wakeDock();
-                                            // v4 : les bulles sont déjà là en
-                                            // permanence, la touche ouvre
-                                            // donc directement la saisie.
-                                            if (_camOffMode) {
-                                              setState(
-                                                  () => _controlsOpen = false);
-                                              _openComposer();
-                                              return;
-                                            }
                                             if (_turnsOpen) {
                                               // Referme comme un tap sur
                                               // l'écran : la zone ET les
