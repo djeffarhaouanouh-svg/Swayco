@@ -943,6 +943,170 @@ class _CallScreenState extends State<CallScreen> {
   final FlutterTts _deviceTts = FlutterTts();
   String _deviceTtsLang = '';
 
+  /// Panneau de debug (comptes autorisés seulement) : ouvert ou replié, et le
+  /// dernier retour de `speak()` pour le lire d'un coup d'œil.
+  bool _debugOpen = false;
+  String _lastSpeak = '—';
+
+  /// Panneau de debug (🐛, en haut à gauche) : l'état de la voix et de la route,
+  /// les dernières lignes du journal, et deux boutons d'essai. N'existe que pour
+  /// un compte autorisé (même contrôle que le bouton REC) ; rien n'en sort du
+  /// téléphone.
+  Widget _buildDebugPanel() {
+    return Positioned(
+      key: const ValueKey('dbg_panel'),
+      top: 6,
+      left: 6,
+      child: _debugOpen ? _debugBody() : _debugChip(),
+    );
+  }
+
+  Widget _debugChip() {
+    return GestureDetector(
+      onTap: () => setState(() => _debugOpen = true),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text('🐛', style: TextStyle(fontSize: 16)),
+      ),
+    );
+  }
+
+  Widget _debugBody() {
+    final size = MediaQuery.of(context).size;
+    const mono = TextStyle(
+      color: Colors.white,
+      fontSize: 10.5,
+      height: 1.25,
+      fontFamily: 'Courier',
+      decoration: TextDecoration.none,
+    );
+    Widget btn(String label, VoidCallback onTap) => GestureDetector(
+          onTap: onTap,
+          child: Container(
+            margin: const EdgeInsets.only(right: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(label,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    decoration: TextDecoration.none)),
+          ),
+        );
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: size.width - 12,
+        maxHeight: size.height * 0.5,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.86),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ListenableBuilder(
+          listenable: Listenable.merge([_audio, DebugOverlay.lines, ttsSpeaking]),
+          builder: (context, _) {
+            final lines = DebugOverlay.lines.value;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  const Text('VOIX / ROUTE',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          decoration: TextDecoration.none)),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => setState(() => _debugOpen = false),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.close, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ]),
+                Text(
+                  'haut-parleur=${_audio.speakerOn}  route=${_audio.route.name}\n'
+                  'volume voix=${_audio.translatedVolume.toStringAsFixed(2)}  '
+                  'original=${_audio.originalVolume.toStringAsFixed(2)}\n'
+                  'voix parle=${ttsSpeaking.value}  son traduit=$_translationEnabled\n'
+                  'langue voix=${_deviceTtsLang.isEmpty ? "—" : _deviceTtsLang}  '
+                  'sortie=$_myOutputLang\n'
+                  'dernier speak: $_lastSpeak',
+                  style: mono,
+                ),
+                const SizedBox(height: 6),
+                Row(children: [
+                  btn('Relancer la voix',
+                      () => unawaited(_reprimeDeviceTts('bouton'))),
+                  btn('Test voix', () {
+                    final l = _myOutputLang.isNotEmpty ? _myOutputLang : 'fr';
+                    DebugOverlay.log('test voix demandé ($l)');
+                    unawaited(_enqueueSpeak('Test de la voix, un deux trois', l));
+                  }),
+                  btn(_audio.speakerOn ? 'Écouteur' : 'Haut-parleur',
+                      () => unawaited(_toggleSpeaker())),
+                ]),
+                const SizedBox(height: 6),
+                Flexible(
+                  child: SingleChildScrollView(
+                    reverse: true,
+                    child: Text(lines.isEmpty ? '(journal vide)' : lines.join('\n'),
+                        style: mono),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// RELANCE de la voix de l'appareil après un changement de route (écouteur ⇄
+  /// haut-parleur). Hypothèse à tester : changer la route reconfigure la session
+  /// audio de WebRTC sous les pieds du moteur de synthèse, qui continue alors de
+  /// « parler » dans le vide (même famille de panne que le silence du build 203,
+  /// voir swayco_sounds.dart). On l'arrête, on lui fait oublier sa langue, on
+  /// ré-arme l'attente de fin de phrase, et on rejoue une phrase muette pour
+  /// qu'il reprenne la session telle qu'elle est maintenant. Sans effet sur
+  /// l'appel lui-même ; ignoré si une phrase est en cours.
+  Future<void> _reprimeDeviceTts(String why) async {
+    if (kIsWeb || ttsSpeaking.value) return;
+    DebugOverlay.log('tts reprime ($why)');
+    try {
+      await _deviceTts.stop();
+      _deviceTtsLang = '';
+      await _deviceTts.awaitSpeakCompletion(true);
+      final tag = _voiceTagFor(_myOutputLang);
+      if (tag.isNotEmpty) {
+        await _deviceTts.setLanguage(tag);
+        _deviceTtsLang = tag;
+      }
+      await _deviceTts.setVolume(0.0);
+      await _deviceTts.speak(' ').timeout(const Duration(seconds: 2));
+      await _deviceTts.stop();
+      await _applyTranslatedVolumeToDeviceTts();
+      DebugOverlay.log('tts reprime done');
+    } catch (e) {
+      DebugOverlay.log('tts reprime failed: $e');
+      try {
+        await _deviceTts.stop();
+        await _applyTranslatedVolumeToDeviceTts();
+      } catch (_) {}
+    }
+  }
+
   /// True exactly while a translation is being SPOKEN, whichever engine speaks
   /// it — the premium voice or the device (`flutter_tts`) one.
   ///
@@ -1249,6 +1413,8 @@ class _CallScreenState extends State<CallScreen> {
       // speak() then plays nothing and fires no event.
       resumeSpeechSynthesisIfPaused();
       final res = await _deviceTts.speak(text).timeout(_speakCap(text));
+      _lastSpeak = 'res=$res ${DateTime.now().toIso8601String().substring(11, 19)}';
+      DebugOverlay.log('speak res=$res speaker=${_audio.speakerOn}');
       if (res == 0) {
         DebugOverlay.log('speak REFUSED (engine still marked speaking) — '
             'unlocking and saying it again');
@@ -2039,8 +2205,13 @@ class _CallScreenState extends State<CallScreen> {
     // Le bouton REC : autorisé par la liste du serveur (en plus de l'e-mail
     // compilé). Silencieux en cas d'erreur : le bouton reste simplement caché.
     unawaited(EgressApi.checkAllowed().then((ok) {
-      if (ok && mounted) setState(() => _egressAllowedByServer = true);
+      if (ok && mounted) {
+        setState(() => _egressAllowedByServer = true);
+        DebugOverlay.capture = true;
+      }
     }));
+    // Panneau de debug : même public que REC (comptes autorisés uniquement).
+    DebugOverlay.capture = _isEgressAdmin;
     _start();
     // Hold the connecting splash for a minimum of 5s so it is actually
     // readable even when the room connects almost instantly.
@@ -2740,7 +2911,10 @@ class _CallScreenState extends State<CallScreen> {
   /// override the OS.
   Future<void> _toggleSpeaker() async {
     await _audio.setSpeakerOn(!_audio.speakerOn);
+    DebugOverlay.log('speaker route -> ${_audio.speakerOn ? "loudspeaker" : "earpiece"}');
     if (mounted) setState(() {});
+    // Relance de la voix : voir [_reprimeDeviceTts].
+    unawaited(_reprimeDeviceTts('route change'));
   }
 
   /// Retourner la caméra, avant / arrière.
@@ -4168,6 +4342,8 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
+                // Panneau de debug de la voix : comptes autorisés seulement.
+                if (_isEgressAdmin) _buildDebugPanel(),
                 // Le galet, bas dans l'écran mais pas au ras des touches : ses
                 // ondes montent jusqu'à 2,4 fois son disque, et si elles
                 // atteignaient les réglages dépliés on ne saurait plus ce qui
