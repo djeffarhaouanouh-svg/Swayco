@@ -14,7 +14,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show RealtimeChannel, Supabase;
@@ -364,34 +363,8 @@ class _CallScreenState extends State<CallScreen> {
     });
   }
 
-  /// Dans combien d'appels, sur cet appareil, la démonstration a déjà joué. Elle
-  /// joue UNE fois par appel (à la première ouverture de Messages de l'appel,
-  /// [_tabHintSeen]) et seulement pour les [_kTabHintCalls] premiers appels :
-  /// on ne va pas la rejouer à chaque appel. Tant que le compteur n'est pas lu,
-  /// il vaut le maximum (pas de démonstration).
-  int _tabHintCalls = _kTabHintCalls;
-  static const int _kTabHintCalls = 3;
-  static const String _kTabHintCallsKey = 'messages_tab_hint_calls';
-
-  Future<void> _loadTabHintCalls() async {
-    try {
-      final p = await SharedPreferences.getInstance();
-      final n = p.getInt(_kTabHintCallsKey) ?? 0;
-      if (mounted) _tabHintCalls = n;
-    } catch (_) {}
-  }
-
-  /// La démonstration joue maintenant (1re ouverture de cet appel) : on compte
-  /// cet appel.
-  void _countTabHintCall() {
-    _tabHintCalls += 1;
-    unawaited(() async {
-      try {
-        final p = await SharedPreferences.getInstance();
-        await p.setInt(_kTabHintCallsKey, _tabHintCalls);
-      } catch (_) {}
-    }());
-  }
+  // La démonstration de la languette joue à CHAQUE appel (au premier message) :
+  // plus de compteur d'appels.
 
   void _endTabHint() {
     if (!_tabHint) return;
@@ -782,6 +755,12 @@ class _CallScreenState extends State<CallScreen> {
     //
     // Permanente : la dernière phrase reste affichée, sans délai ni retrait.
     setState(() {
+      // Le premier message de l'appel (« Bonjour ») lance l'animation de la
+      // languette : la section monte, la vignette descend, puis tout revient.
+      if (_turns.isEmpty && _turnsOpen && !_tabHintSeen) {
+        _tabHintSeen = true;
+        _tabHint = true;
+      }
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
       if (_turns.length > 60) _turns.removeRange(0, _turns.length - 60);
@@ -2045,7 +2024,6 @@ class _CallScreenState extends State<CallScreen> {
     Analytics.track('screen_view', props: {'screen': 'live'});
     // Zone messages : côté choisi, démonstration déjà vue, repli de la saisie.
     _chatFocus.addListener(_onChatFocusChanged);
-    unawaited(_loadTabHintCalls());
     // Les textes d'explication sous le galet : tant qu'on n'a jamais vu une
     // phrase partir (voir [TranslationStepCaption]).
     // Toujours affichés : ils ne s'effacent plus après la première phrase
@@ -2441,6 +2419,10 @@ class _CallScreenState extends State<CallScreen> {
           _connecting = false;
           _micOn = true;
           _camOn = _startCam;
+          // La section Messages s'ouvre dès l'arrivée sur la page live, avec sa
+          // languette ; seule la touche Messages la referme.
+          _turnsOpen = true;
+          _composerOpen = false;
         });
       }
       _connectedAt = DateTime.now();
@@ -3851,7 +3833,7 @@ class _CallScreenState extends State<CallScreen> {
                     // droite. PAS pendant l'animation du bouton Messages (elle
                     // ne bouge que quand les messages sont vraiment en haut).
                     // Saisie dépliée : elle remonte au-dessus du champ.
-                    top: _topMessagesShown
+                    top: (_topMessagesShown || (_tabHint && _turnsOpen))
                         ? (MediaQuery.sizeOf(context).height -
                                 MediaQuery.viewPaddingOf(context).top -
                                 MediaQuery.viewPaddingOf(context).bottom -
@@ -4138,7 +4120,7 @@ class _CallScreenState extends State<CallScreen> {
                       // aussi. Avant, le premier tap n'arrêtait QUE la
                       // démonstration, et il en fallait un second pour fermer
                       // les bulles.
-                      onTap: _msgTop ? _showTopControls : _closeTurns,
+                      onTap: _showTopControls,
                     ),
                   ),
                 // Le panneau effacé : l'écran ENTIER le rappelle. C'est ce qui
@@ -4454,9 +4436,7 @@ class _CallScreenState extends State<CallScreen> {
                                               // retrouver. La languette se
                                               // présente à la première fois.
                                               _composerOpen = true;
-                                              _tabHint = !_tabHintSeen &&
-                                                  _tabHintCalls < _kTabHintCalls;
-                                              if (_tabHint) _countTabHintCall();
+                                              _tabHint = !_tabHintSeen;
                                               _tabHintSeen = true;
                                               // Le rail se replie en même
                                               // temps : les deux se déplient
@@ -4536,7 +4516,7 @@ class _CallScreenState extends State<CallScreen> {
                           // boîte vide) : retirer un enfant re-mappe ses
                           // voisins, et le champ de saisie y perdrait son
                           // focus — c'est le bug de b2f3293.
-                          if (_turnsOpen && !(_msgTop && _topControls))
+                          if (_turnsOpen && !_topControls)
                             const SizedBox(width: double.infinity)
                           else
                           // En veille, la rangée ne se contente plus de
@@ -4624,7 +4604,11 @@ class _CallScreenState extends State<CallScreen> {
                       top: false,
                       child: Padding(
                         padding: EdgeInsets.only(
-                          bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+                          bottom: 16 +
+                              MediaQuery.of(context).viewInsets.bottom +
+                              // La barre est rappelée par un tap : la zone se
+                              // pose au-dessus d'elle.
+                              ((_topControls && !_msgTop) ? 112.0 : 0.0),
                         ),
                         child: _SpokenTurnsPanel(
                           turns: _turns,
@@ -5104,6 +5088,14 @@ class _TurnsBlockState extends State<_TurnsBlock>
       } else {
         _armFade();
       }
+    }
+    // La démonstration est demandée alors que la zone est déjà en place (le
+    // premier message de l'appel arrive après l'entrée) : on la lance.
+    if (!oldWidget.hint &&
+        widget.hint &&
+        _enter.status == AnimationStatus.completed) {
+      _measureTravel();
+      _demo.forward(from: 0);
     }
     // Un tap sur l'écran a arrêté la démonstration.
     if (oldWidget.hint && !widget.hint) {
