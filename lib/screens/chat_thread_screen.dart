@@ -1424,9 +1424,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     });
   }
 
-  /// Lance l'appel. [withCamera] distingue les deux boutons de l'en-tête :
-  /// le téléphone appelle caméra coupée, la caméra ouvre le mode visio.
-  void _startCall({required bool withCamera}) {
+  /// Lance l'appel. Tous les appels démarrent caméra allumée, des deux côtés.
+  void _startCall() {
     if (_peerBlockedMe) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppStrings.t('chat_blocked_by_peer'))),
@@ -1437,7 +1436,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       context,
       peerDeviceId: widget.peerDeviceId,
       translation: widget.translation,
-      startWithCamera: withCamera,
+      startWithCamera: true,
     );
   }
 
@@ -1611,8 +1610,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                               ? _peer!.city
                               : (_peer?.country ?? ''),
                           blockedByPeer: _peerBlockedMe,
-                          onCall: () => _startCall(withCamera: false),
-                          onVideoCall: () => _startCall(withCamera: true),
+                          onCall: _startCall,
                           onViewProfile: () => Navigator.of(context).push<void>(
                             MaterialPageRoute<void>(
                               builder: (_) =>
@@ -2154,7 +2152,6 @@ class _ThreadHeader extends StatelessWidget {
     required this.title,
     required this.peer,
     required this.onCall,
-    required this.onVideoCall,
     required this.onViewProfile,
     this.clock,
     this.place = '',
@@ -2176,11 +2173,8 @@ class _ThreadHeader extends StatelessWidget {
   /// True when the peer has blocked ME — greys out the call button.
   final bool blockedByPeer;
 
-  /// Téléphone : appel normal, caméra coupée des deux côtés.
+  /// Téléphone : lance l'appel, caméra allumée des deux côtés.
   final VoidCallback onCall;
-
-  /// Caméra : mode visio, la mienne s'allume dès l'entrée en appel.
-  final VoidCallback onVideoCall;
 
   final VoidCallback onViewProfile;
 
@@ -2312,46 +2306,23 @@ class _ThreadHeader extends StatelessWidget {
                 },
               ),
             ),
-            // Deux boutons d'appel : la caméra démarre le mode visio, le
-            // téléphone un appel normal (caméras coupées) — c'est lui qui est
-            // au bord, le plus près du pouce.
+            // Un seul bouton d'appel (le téléphone), caméra allumée des deux
+            // côtés.
             //
-            // Bloqué par le pair, ils cessent d'être des boutons : plus de
-            // verre, plus de rebond, plus rien à toucher — il ne reste que les
-            // deux icônes en creux. Un bouton grisé se presse quand même ;
-            // une icône nue, non. Ce qu'on peut encore faire est en bas.
-            // Caméra d'abord, puis téléphone au bord.
+            // Bloqué par le pair, il cesse d'être un bouton : plus de verre,
+            // plus de rebond, plus rien à toucher — il ne reste que l'icône en
+            // creux. Un bouton grisé se presse quand même ; une icône nue, non.
+            // Ce qu'on peut encore faire est en bas.
             if (blockedByPeer)
-              const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _DeadCallIcon(icon: Icons.videocam_rounded),
-                  SizedBox(width: 8),
-                  _DeadCallIcon(icon: Icons.phone_rounded),
-                ],
-              )
+              const _DeadCallIcon(icon: Icons.phone_rounded)
             else
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  LiquidGlassButton(
-                    icon: Icons.videocam_rounded,
-                    sfSymbol: 'video.fill',
-                    size: 44,
-                    iconSize: 19,
-                    semanticLabel: 'Video call',
-                    onTap: onVideoCall,
-                  ),
-                  const SizedBox(width: 8),
-                  LiquidGlassButton(
-                    icon: Icons.phone_rounded,
-                    sfSymbol: 'phone.fill',
-                    size: 44,
-                    iconSize: 19,
-                    semanticLabel: 'Call',
-                    onTap: onCall,
-                  ),
-                ],
+              LiquidGlassButton(
+                icon: Icons.phone_rounded,
+                sfSymbol: 'phone.fill',
+                size: 44,
+                iconSize: 19,
+                semanticLabel: 'Call',
+                onTap: onCall,
               ),
           ],
         ),
