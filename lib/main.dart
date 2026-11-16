@@ -447,7 +447,15 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
                 .ensureLanguageInstalled(localProfile.sourceLang));
           }
         } else {
-          AppStrings.setFromCode(PlatformDispatcher.instance.locale.languageCode);
+          // Plusieurs langues sur le téléphone : la première que l'appli sait
+          // afficher (la première seule faisait tomber en anglais quelqu'un dont
+          // la langue n°1 n'existe pas ici et la n°2 est le français).
+          for (final loc in PlatformDispatcher.instance.locales) {
+            if (AppStrings.hasLanguage(loc.languageCode)) {
+              AppStrings.setFromCode(loc.languageCode);
+              break;
+            }
+          }
         }
       } catch (e) {
         debugPrint('loadProfile failed: $e');

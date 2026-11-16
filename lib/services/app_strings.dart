@@ -29,6 +29,10 @@ abstract final class AppStrings {
     currentBcp47.value = code;
   }
 
+  /// L'appli a-t-elle des textes pour cette langue ? (`setFromCode` n'en dit
+  /// rien : il ignore en silence une langue qu'il ne connaît pas.)
+  static bool hasLanguage(String bcp47) => _maps.containsKey(_normalize(bcp47));
+
   /// La map de l'interface active : pour `pt`, celle du Brésil ou du Portugal.
   static Map<String, String>? _activeMap(String code) =>
       (code == 'pt' && ptBrazilian.value) ? _ptBr : _maps[code];
@@ -953,6 +957,11 @@ abstract final class AppStrings {
     'login_err_email': 'Entre une adresse e-mail valide.',
     'login_err_password': 'Le mot de passe doit faire 6 caractères ou plus.',
     'login_err_invalid_credentials': 'Mot de passe invalide.',
+    'login_err_user_exists': 'Un compte existe déjà avec cet e-mail. Connecte-toi.',
+    'login_err_weak_password': 'Mot de passe trop faible. Choisis-en un plus long ou plus varié.',
+    'login_err_rate_limit': 'Trop de tentatives. Patiente quelques minutes puis réessaie.',
+    'login_err_network': 'Pas de connexion. Vérifie ton réseau et réessaie.',
+    'login_err_generic': 'Une erreur est survenue. Réessaie dans un instant.',
     'login_check_inbox':
         'Vérifie ta boîte mail : on t\'a envoyé un lien de confirmation.',
     'login_resend_confirm': 'Renvoyer le mail de confirmation',
@@ -1947,6 +1956,11 @@ abstract final class AppStrings {
     'login_err_email': 'Enter a valid email address.',
     'login_err_password': 'Password must be at least 6 characters.',
     'login_err_invalid_credentials': 'Incorrect password.',
+    'login_err_user_exists': 'An account already exists with this email. Sign in instead.',
+    'login_err_weak_password': 'Password too weak. Pick a longer or more varied one.',
+    'login_err_rate_limit': 'Too many attempts. Wait a few minutes and try again.',
+    'login_err_network': 'No connection. Check your network and try again.',
+    'login_err_generic': 'Something went wrong. Please try again in a moment.',
     'login_check_inbox': 'Check your inbox — we sent you a confirmation link.',
     'login_resend_confirm': 'Resend confirmation email',
     'login_resend_sent':
@@ -2993,6 +3007,11 @@ abstract final class AppStrings {
     'login_err_email': 'Introduce un correo válido.',
     'login_err_password': 'La contraseña debe tener al menos 6 caracteres.',
     'login_err_invalid_credentials': 'Contraseña incorrecta.',
+    'login_err_user_exists': 'Ya existe una cuenta con este correo. Inicia sesión.',
+    'login_err_weak_password': 'Contraseña demasiado débil. Elige una más larga o variada.',
+    'login_err_rate_limit': 'Demasiados intentos. Espera unos minutos y vuelve a intentarlo.',
+    'login_err_network': 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
+    'login_err_generic': 'Algo salió mal. Inténtalo de nuevo en un momento.',
     'login_check_inbox':
         'Revisa tu bandeja de entrada — te enviamos un enlace de confirmación.',
     'login_resend_confirm': 'Reenviar correo de confirmación',
@@ -3979,6 +3998,11 @@ abstract final class AppStrings {
     'login_err_email': 'Gib eine gültige E-Mail-Adresse ein.',
     'login_err_password': 'Das Passwort muss mindestens 6 Zeichen lang sein.',
     'login_err_invalid_credentials': 'Falsches Passwort.',
+    'login_err_user_exists': 'Mit dieser E-Mail gibt es schon ein Konto. Melde dich an.',
+    'login_err_weak_password': 'Passwort zu schwach. Wähle ein längeres oder abwechslungsreicheres.',
+    'login_err_rate_limit': 'Zu viele Versuche. Warte ein paar Minuten und versuche es erneut.',
+    'login_err_network': 'Keine Verbindung. Prüfe dein Netzwerk und versuche es erneut.',
+    'login_err_generic': 'Etwas ist schiefgelaufen. Versuche es gleich noch einmal.',
     'login_check_inbox':
         'Sieh in deinem Posteingang nach — wir haben dir einen Bestätigungslink gesendet.',
     'login_resend_confirm': 'Bestätigungs-E-Mail erneut senden',
@@ -4970,6 +4994,11 @@ abstract final class AppStrings {
     'login_err_email': 'Inserisci un indirizzo email valido.',
     'login_err_password': 'La password deve contenere almeno 6 caratteri.',
     'login_err_invalid_credentials': 'Password errata.',
+    'login_err_user_exists': 'Esiste già un account con questa e-mail. Accedi.',
+    'login_err_weak_password': 'Password troppo debole. Scegline una più lunga o varia.',
+    'login_err_rate_limit': 'Troppi tentativi. Attendi qualche minuto e riprova.',
+    'login_err_network': 'Nessuna connessione. Controlla la rete e riprova.',
+    'login_err_generic': 'Qualcosa è andato storto. Riprova tra un attimo.',
     'login_check_inbox':
         'Controlla la tua casella di posta — ti abbiamo inviato un link di conferma.',
     'login_resend_confirm': 'Invia di nuovo l\'email di conferma',
@@ -5961,6 +5990,11 @@ abstract final class AppStrings {
     'login_err_email': 'Introduza um endereço de e-mail válido.',
     'login_err_password': 'A palavra-passe deve ter pelo menos 6 caracteres.',
     'login_err_invalid_credentials': 'Palavra-passe incorreta.',
+    'login_err_user_exists': 'Já existe uma conta com este e-mail. Inicia sessão.',
+    'login_err_weak_password': 'Palavra-passe demasiado fraca. Escolhe uma mais longa ou variada.',
+    'login_err_rate_limit': 'Demasiadas tentativas. Aguarda uns minutos e tenta de novo.',
+    'login_err_network': 'Sem ligação. Verifica a tua rede e tenta de novo.',
+    'login_err_generic': 'Ocorreu um erro. Tenta de novo daqui a pouco.',
     'login_check_inbox':
         'Verifique a sua caixa de entrada — enviámos-lhe um link de confirmação.',
     'login_resend_confirm': 'Reenviar e-mail de confirmação',
@@ -6910,6 +6944,11 @@ abstract final class AppStrings {
     'login_err_email': 'Digite um endereço de e-mail válido.',
     'login_err_password': 'A senha deve ter pelo menos 6 caracteres.',
     'login_err_invalid_credentials': 'Senha incorreta.',
+    'login_err_user_exists': 'Já existe uma conta com este e-mail. Entre nela.',
+    'login_err_weak_password': 'Senha muito fraca. Escolha uma mais longa ou variada.',
+    'login_err_rate_limit': 'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
+    'login_err_network': 'Sem conexão. Verifique sua rede e tente de novo.',
+    'login_err_generic': 'Algo deu errado. Tente de novo em instantes.',
     'login_check_inbox': 'Verifique sua caixa de entrada — enviamos um link de confirmação para você.',
     'login_resend_confirm': 'Reenviar e-mail de confirmação',
     'login_resend_sent': 'E-mail de confirmação reenviado. Verifique sua caixa de entrada (e a pasta de spam).',
@@ -7895,6 +7934,11 @@ abstract final class AppStrings {
     'login_err_email': 'Voer een geldig e-mailadres in.',
     'login_err_password': 'Het wachtwoord moet minstens 6 tekens bevatten.',
     'login_err_invalid_credentials': 'Onjuist wachtwoord.',
+    'login_err_user_exists': 'Er bestaat al een account met dit e-mailadres. Log in.',
+    'login_err_weak_password': 'Wachtwoord te zwak. Kies een langer of gevarieerder wachtwoord.',
+    'login_err_rate_limit': 'Te veel pogingen. Wacht een paar minuten en probeer het opnieuw.',
+    'login_err_network': 'Geen verbinding. Controleer je netwerk en probeer het opnieuw.',
+    'login_err_generic': 'Er ging iets mis. Probeer het zo meteen opnieuw.',
     'login_check_inbox':
         'Controleer je inbox — we hebben je een bevestigingslink gestuurd.',
     'login_resend_confirm': 'Bevestigingsmail opnieuw sturen',
@@ -8871,6 +8915,11 @@ abstract final class AppStrings {
     'login_err_email': 'أدخل عنوان بريد إلكتروني صالحًا.',
     'login_err_password': 'يجب ألا تقل كلمة المرور عن 6 أحرف.',
     'login_err_invalid_credentials': 'كلمة المرور غير صحيحة.',
+    'login_err_user_exists': 'يوجد حساب بهذا البريد الإلكتروني بالفعل. سجّل الدخول.',
+    'login_err_weak_password': 'كلمة المرور ضعيفة جدًا. اختر كلمة أطول أو أكثر تنوعًا.',
+    'login_err_rate_limit': 'محاولات كثيرة جدًا. انتظر بضع دقائق ثم حاول مجددًا.',
+    'login_err_network': 'لا يوجد اتصال. تحقق من الشبكة وحاول مجددًا.',
+    'login_err_generic': 'حدث خطأ ما. حاول مجددًا بعد قليل.',
     'login_check_inbox': 'تحقق من صندوق الوارد — أرسلنا لك رابط تأكيد.',
     'login_resend_confirm': 'إعادة إرسال بريد التأكيد',
     'login_resend_sent':
@@ -9859,6 +9908,11 @@ abstract final class AppStrings {
     'login_err_email': 'Введите корректный адрес эл. почты.',
     'login_err_password': 'Пароль должен содержать не менее 6 символов.',
     'login_err_invalid_credentials': 'Неверный пароль.',
+    'login_err_user_exists': 'Аккаунт с этой почтой уже существует. Войди в него.',
+    'login_err_weak_password': 'Слишком слабый пароль. Выбери подлиннее или посложнее.',
+    'login_err_rate_limit': 'Слишком много попыток. Подожди несколько минут и попробуй снова.',
+    'login_err_network': 'Нет соединения. Проверь сеть и попробуй снова.',
+    'login_err_generic': 'Что-то пошло не так. Попробуй ещё раз чуть позже.',
     'login_check_inbox':
         'Проверьте почту — мы отправили вам ссылку для подтверждения.',
     'login_resend_confirm': 'Отправить письмо повторно',
@@ -10797,6 +10851,11 @@ abstract final class AppStrings {
     'login_err_email': '请输入有效的邮箱地址。',
     'login_err_password': '密码至少需要 6 个字符。',
     'login_err_invalid_credentials': '密码错误。',
+    'login_err_user_exists': '该邮箱已注册账号，请直接登录。',
+    'login_err_weak_password': '密码太弱，请换一个更长或更复杂的密码。',
+    'login_err_rate_limit': '尝试次数过多，请等几分钟后再试。',
+    'login_err_network': '没有网络连接，请检查网络后重试。',
+    'login_err_generic': '出了点问题，请稍后再试。',
     'login_check_inbox': '请查收邮箱 — 我们已向你发送了一个确认链接。',
     'login_resend_confirm': '重新发送确认邮件',
     'login_resend_sent': '确认邮件已重新发送。请查收邮箱（以及垃圾邮件文件夹）。',
@@ -11739,6 +11798,11 @@ abstract final class AppStrings {
     'login_err_email': '有効なメールアドレスを入力してください。',
     'login_err_password': 'パスワードは6文字以上で入力してください。',
     'login_err_invalid_credentials': 'パスワードが間違っています。',
+    'login_err_user_exists': 'このメールアドレスのアカウントは既にあります。ログインしてください。',
+    'login_err_weak_password': 'パスワードが弱すぎます。もっと長く、または複雑なものにしてください。',
+    'login_err_rate_limit': '試行回数が多すぎます。数分待ってからもう一度お試しください。',
+    'login_err_network': '接続できません。ネットワークを確認してもう一度お試しください。',
+    'login_err_generic': '問題が発生しました。しばらくしてからもう一度お試しください。',
     'login_check_inbox': '受信トレイを確認してください — 確認リンクを送信しました。',
     'login_resend_confirm': '確認メールを再送信',
     'login_resend_sent': '確認メールを再送信しました。受信トレイ（と迷惑メールフォルダ）を確認してください。',
@@ -12676,6 +12740,11 @@ abstract final class AppStrings {
     'login_err_email': '유효한 이메일 주소를 입력하세요.',
     'login_err_password': '비밀번호는 최소 6자 이상이어야 해요.',
     'login_err_invalid_credentials': '비밀번호가 올바르지 않아요.',
+    'login_err_user_exists': '이 이메일로 만든 계정이 이미 있어요. 로그인해 주세요.',
+    'login_err_weak_password': '비밀번호가 너무 약해요. 더 길거나 다양한 문자를 써 주세요.',
+    'login_err_rate_limit': '시도가 너무 많아요. 몇 분 뒤에 다시 시도해 주세요.',
+    'login_err_network': '연결되지 않았어요. 네트워크를 확인하고 다시 시도해 주세요.',
+    'login_err_generic': '문제가 생겼어요. 잠시 후 다시 시도해 주세요.',
     'login_check_inbox': '받은편지함을 확인하세요 — 확인 링크를 보내드렸어요.',
     'login_resend_confirm': '확인 이메일 재전송',
     'login_resend_sent': '확인 이메일을 다시 보냈어요. 받은편지함(과 스팸함)을 확인하세요.',
