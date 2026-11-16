@@ -527,6 +527,10 @@ abstract final class ProfileApi {
   /// Whether this launch already guaranteed the caller's `profiles` row.
   static bool _profileRowEnsured = false;
 
+  /// Oublie la garantie « ma ligne existe » : le prochain
+  /// [ensureMyProfileRow] la recrée vraiment (cas où la base dit qu'elle manque).
+  static void forgetEnsuredProfileRow() => _profileRowEnsured = false;
+
   /// Guarantee the signed-in user has a `profiles` row before any action
   /// that FK-references it (send a message, friend request, ring a call).
   ///
@@ -548,8 +552,27 @@ abstract final class ProfileApi {
     final uid = AuthService.currentUserId;
     if (uid.isEmpty) return;
     final local = await UserPrefs.loadProfile();
-    final name = local?.firstName.trim() ?? '';
-    if (name.isEmpty) return;
+    var name = local?.firstName.trim() ?? '';
+    if (name.isEmpty) {
+      // Pas de prénom en cache local (inscription interrompue, cache effacé…) :
+      // on ne laisse PAS le compte sans ligne `profiles` — sans elle, un
+      // « Match », un message ou un appel plante sur la clé étrangère. Un
+      // prénom d'attente tiré de l'adresse e-mail suffit à créer la ligne ;
+      // il est insert-only, donc remplacé dès que la personne renseigne le sien.
+      final meta = AuthService.currentUser?.userMetadata;
+      final fromMeta = ((meta?['full_name'] ?? meta?['name'] ?? '') as Object)
+          .toString()
+          .trim();
+      final mail = AuthService.currentEmail;
+      final fromMail = mail.contains('@') ? mail.split('@').first : '';
+      final base = fromMeta.isNotEmpty
+          ? fromMeta
+          : fromMail.replaceAll(RegExp(r'[^A-Za-zÀ-ÿ]'), ' ').trim();
+      name = base.isEmpty
+          ? 'Swayco'
+          : base.split(' ').first[0].toUpperCase() +
+              base.split(' ').first.substring(1);
+    }
     await upsertMyProfile(
       deviceId: uid,
       displayName: name,

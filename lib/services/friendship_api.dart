@@ -228,15 +228,32 @@ abstract final class FriendshipApi {
       );
     }
 
-    final inserted = await _c
-        .from('friendships')
-        .insert({
-          'requester': meId,
-          'addressee': peerId,
-          'status': 'pending',
-        })
-        .select()
-        .single();
+    Future<Map<String, dynamic>> insertPending() async {
+      final r = await _c
+          .from('friendships')
+          .insert({
+            'requester': meId,
+            'addressee': peerId,
+            'status': 'pending',
+          })
+          .select()
+          .single();
+      return Map<String, dynamic>.from(r);
+    }
+
+    Map<String, dynamic> inserted;
+    try {
+      inserted = await insertPending();
+    } on PostgrestException catch (e) {
+      // 23503 sur requester : ma ligne `profiles` manque malgré la garantie
+      // ci-dessus (écriture ratée en silence plus tôt). On la recrée de force,
+      // une seule fois, puis on rejoue — plutôt que de laisser la personne
+      // coincée sur un « Match » qui ne marche jamais.
+      if (e.code != '23503') rethrow;
+      ProfileApi.forgetEnsuredProfileRow();
+      await ProfileApi.ensureMyProfileRow();
+      inserted = await insertPending();
+    }
     // Fire-and-forget push: peer gets a "X veut te matcher" notif. Best
     // effort — never block the insert on the dispatch call.
     final row = Friendship.fromMap(Map<String, dynamic>.from(inserted));
