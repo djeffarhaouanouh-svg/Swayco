@@ -528,7 +528,7 @@ class _NavItemState extends State<_NavItem>
     );
   }
 
-  /// Le fond sombre et diffus derrière une pastille jaune, en mode clair.
+  /// Le fond sombre et diffus derrière une pastille jaune (clair ET sombre).
   static const List<BoxShadow> _lightBadgeBackdrop = [
     BoxShadow(color: Color(0x73000000), blurRadius: 7, spreadRadius: 1),
   ];
@@ -550,12 +550,12 @@ class _NavItemState extends State<_NavItem>
               ? Container(
                   width: 8,
                   height: 8,
-                  // Clair : le jaune fluo disparaît sur la barre blanche — un fond
-                  // sombre doux derrière le relève, sans contour.
-                  decoration: BoxDecoration(
+                  // Le jaune fluo est relevé par un fond sombre doux derrière, sans
+                  // contour — en clair comme en sombre.
+                  decoration: const BoxDecoration(
                     color: SC.accent,
                     shape: BoxShape.circle,
-                    boxShadow: SC.light ? _lightBadgeBackdrop : null,
+                    boxShadow: _lightBadgeBackdrop,
                   ),
                 )
               : Container(
@@ -563,18 +563,18 @@ class _NavItemState extends State<_NavItem>
                   constraints: const BoxConstraints(minWidth: 16),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   alignment: Alignment.center,
-                  // Clair : la bulle reste jaune, un fond sombre doux derrière la
-                  // relève, sans contour.
+                  // La bulle reste jaune, un fond sombre doux derrière la relève,
+                  // sans contour — en clair comme en sombre.
                   decoration: BoxDecoration(
                     color: SC.accent,
                     borderRadius: BorderRadius.circular(999),
-                    boxShadow: SC.light ? _lightBadgeBackdrop : null,
+                    boxShadow: _lightBadgeBackdrop,
                   ),
                   child: Text(
                     label,
                     style: TextStyle(
-                      // Clair : du blanc sur du jaune fluo ne se lit pas.
-                      color: SC.light ? SC.onAccent : Colors.white,
+                      // Du blanc sur du jaune fluo ne se lit pas : texte sombre.
+                      color: SC.onAccent,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       height: 1,

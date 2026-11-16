@@ -2695,31 +2695,26 @@ class _SectionHeader extends StatelessWidget {
           ),
           if (count > 0) ...[
             const SizedBox(width: 8),
-            // Clair : du jaune fluo sur du blanc ne se lit pas — comme les
-            // badges de la barre de navigation, une bulle jaune avec le texte
-            // sombre, relevée par un fond sombre doux derrière. Sombre :
-            // inchangé.
+            // Comme les badges de la barre de navigation, en clair comme en
+            // sombre : une bulle jaune avec le texte sombre, relevée par un fond
+            // sombre doux derrière.
             Container(
-              padding: SC.light
-                  ? const EdgeInsets.symmetric(horizontal: 8, vertical: 2)
-                  : EdgeInsets.zero,
-              decoration: SC.light
-                  ? BoxDecoration(
-                      color: SC.accent,
-                      borderRadius: BorderRadius.circular(999),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x73000000),
-                          blurRadius: 7,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    )
-                  : null,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: SC.accent,
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x73000000),
+                    blurRadius: 7,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
               child: Text(
                 AppStrings.t('chat_unread_count', args: {'n': '$count'}),
                 style: _label.copyWith(
-                  color: SC.light ? SC.onAccent : SC.accent,
+                  color: SC.onAccent,
                   letterSpacing: 0,
                 ),
               ),
