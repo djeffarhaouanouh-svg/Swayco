@@ -3410,8 +3410,23 @@ class _TinderCardState extends State<_TinderCard> {
               top: 20,
               left: 0,
               right: 0,
-              child: Center(
-                child: _PhotoDots(count: photos.length, active: _photoIndex),
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  final dots =
+                      _PhotoDots(count: photos.length, active: _photoIndex);
+                  // Largeur naturelle : 24 px par point + 4 px d'écart. Centrée
+                  // en haut, elle ne doit toucher ni le badge (POPULAIRE /
+                  // Vérifié, ~125 px à gauche) ni le bouton d'annulation (~70 px
+                  // à droite).
+                  final natural = photos.length * 24 + (photos.length - 1) * 4;
+                  if (natural <= box.maxWidth - 250) return Center(child: dots);
+                  // Trop de photos : la rangée passe SOUS le badge, rétrécie
+                  // pour tenir entre le bord gauche et le bouton d'annulation.
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 32, left: 14, right: 70),
+                    child: FittedBox(fit: BoxFit.scaleDown, child: dots),
+                  );
+                },
               ),
             ),
 
