@@ -538,22 +538,28 @@ class _CallScreenState extends State<CallScreen> {
   /// Quelque chose vient de se passer (une voix, une phrase, un tap) : le dock
   /// se rallume et repart pour [_kDockIdle] de sursis.
   void _wakeDock() {
-    _dockIdleTimer?.cancel();
-    _dockIdleTimer = Timer(_kDockIdle, () {
-      if (!mounted || _dockDimmed) return;
-      // On ne s'efface pas sous les doigts de quelqu'un qui s'en sert : le
-      // sursis est simplement reconduit, sinon la veille ne reviendrait jamais.
-      if (_turnsOpen || _controlsOpen || (_camOffMode && _composerOpen)) {
-        _wakeDock();
-        return;
-      }
-      setState(() => _dockDimmed = true);
-    });
+    _armDockIdle();
     // v4 : clavier levé, la barre reste rangée (elle recouvrirait le champ).
     if (_dockDimmed && mounted && !(_camOffMode && _chatFocus.hasFocus)) {
       setState(() => _dockDimmed = false);
     }
     if (_topControls) _armTopControls();
+  }
+
+  /// Le sursis avant que le dock s'efface. Reconduit TOUT SEUL tant que quelqu'un
+  /// s'en sert — sans passer par [_wakeDock] : il rallumait aussi le délai de la
+  /// barre rappelée par un tap ([_armTopControls]), qui ne s'éteignait plus
+  /// jamais puisque la section Messages est ouverte en permanence.
+  void _armDockIdle() {
+    _dockIdleTimer?.cancel();
+    _dockIdleTimer = Timer(_kDockIdle, () {
+      if (!mounted || _dockDimmed) return;
+      if (_turnsOpen || _controlsOpen || (_camOffMode && _composerOpen)) {
+        _armDockIdle();
+        return;
+      }
+      setState(() => _dockDimmed = true);
+    });
   }
 
   /// Le plancher absolu sous lequel rien n'est jamais de la parole.
