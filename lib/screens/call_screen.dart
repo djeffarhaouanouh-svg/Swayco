@@ -3956,18 +3956,17 @@ class _CallScreenState extends State<CallScreen> {
                       // dépliés) ; champ déplié, il reste.
                       final pencilShown =
                           (_dockDimmed && !_controlsOpen) || _composerOpen;
-                      // La démonstration de la languette joue à la première
-                      // apparition des messages de l'appel, pour les premiers
-                      // appels seulement (même règle que la touche Messages).
+                      // La démonstration de la languette (les messages montent
+                      // tout en haut puis redescendent) joue à la première
+                      // apparition des messages de CHAQUE appel — sans limite
+                      // d'appels : les messages étant permanents, c'est elle
+                      // qui annonce qu'on peut les faire monter.
                       if (!_tabHintSeen && last.isNotEmpty) {
                         _tabHintSeen = true;
-                        if (_tabHintCalls < _kTabHintCalls) {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (!mounted) return;
-                            _countTabHintCall();
-                            setState(() => _tabHint = true);
-                          });
-                        }
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted) return;
+                          setState(() => _tabHint = true);
+                        });
                       }
                       return Stack(
                         key: const ValueKey('camoff_layer'),
