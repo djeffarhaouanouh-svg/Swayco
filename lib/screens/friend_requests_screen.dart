@@ -31,6 +31,7 @@ import '../widgets/popup_kit.dart' show popupDisplay;
 import 'chat_thread_screen.dart';
 import 'paywall_screen.dart' show showBoostPaywall;
 import 'profile_screen.dart';
+import '../services/friendly_error.dart';
 
 
 /// Demandes — the people who liked me. Accepting is the match (the two likes
@@ -194,7 +195,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = friendlyError(e);
         _loading = false;
       });
     }
@@ -231,7 +232,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       if (!mounted) return;
       setState(() => _requests = [..._requests, req]);
       FriendRequestUnread.setCount(_requests.length);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e))));
     }
   }
 
@@ -295,7 +296,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       if (!mounted) return;
       setState(() => _requests = [..._requests, req]);
       FriendRequestUnread.setCount(_requests.length);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e))));
     }
   }
 

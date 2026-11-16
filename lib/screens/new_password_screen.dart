@@ -5,6 +5,7 @@ import '../services/app_strings.dart';
 import '../services/auth_service.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/sway_onb_kit.dart';
+import '../services/friendly_error.dart';
 
 /// Shown when the app is opened from a Supabase password-recovery link
 /// (`AuthChangeEvent.passwordRecovery`, or a `type=recovery` launch URL on
@@ -82,14 +83,14 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
             msg.contains('session')) {
           _error = AppStrings.t('reset_pw_expired');
         } else {
-          _error = e.message;
+          _error = friendlyError(e);
         }
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = '$e';
+        _error = friendlyError(e);
       });
     }
   }

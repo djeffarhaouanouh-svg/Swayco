@@ -33,6 +33,7 @@ import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_popups_extra.dart';
 import 'paywall_screen.dart';
 import 'verification_flow.dart';
+import '../services/friendly_error.dart';
 
 /// Hosts every secondary account-level action that doesn't belong on the
 /// main profile view: account management, notification toggles, privacy,
@@ -349,7 +350,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      _toast(AppStrings.t('error_prefix', args: {'msg': '$e'}));
+      _toast(friendlyError(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -457,7 +458,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
-      _toast(AppStrings.t('error_prefix', args: {'msg': '$e'}));
+      _toast(friendlyError(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1132,7 +1133,7 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'})),
+          content: Text(friendlyError(e)),
         ),
       );
     }

@@ -50,7 +50,8 @@ import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_wave_promo.dart';
 import 'call_screen.dart';
 import 'chat_thread_screen.dart';
-import 'profile_screen.dart';
+import 'profile_screen.dart';
+import '../services/friendly_error.dart';
 
 /// La police des chiffres et des titres de section : une chasse fixe, pour que
 /// les heures d'une ligne à l'autre tombent sur la même colonne et que les
@@ -694,7 +695,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'})),
+        content: Text(friendlyError(e)),
       ));
     }
   }
@@ -715,7 +716,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'})),
+        content: Text(friendlyError(e)),
       ));
     }
   }

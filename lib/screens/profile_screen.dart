@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
@@ -65,7 +65,8 @@ import 'discover_screen.dart'
     show MyCardPreviewScreen, ProfileInfoPanel, discoverCardAspect;
 import '../widgets/passport_tile.dart';
 import 'onboarding_screen.dart';
-import 'settings_screen.dart';
+import 'settings_screen.dart';
+import '../services/friendly_error.dart';
 
 /// Profile view. Two modes:
 ///
@@ -270,7 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(
-          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'}))));
+          content: Text(friendlyError(e))));
     }
   }
 
@@ -306,7 +307,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(
-          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'}))));
+          content: Text(friendlyError(e))));
     }
   }
 
@@ -338,7 +339,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(
-          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'}))));
+          content: Text(friendlyError(e))));
     }
   }
 
@@ -376,7 +377,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(
-          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'}))));
+          content: Text(friendlyError(e))));
     }
   }
 
@@ -696,7 +697,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(
-          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'}))));
+          content: Text(friendlyError(e))));
     }
   }
 

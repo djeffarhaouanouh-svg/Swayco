@@ -54,7 +54,8 @@ import '../widgets/voice_note_player.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_animations.dart';
 import '../widgets/swayco_dialog.dart';
-import 'profile_screen.dart';
+import 'profile_screen.dart';
+import '../services/friendly_error.dart';
 
 /// One-to-one chat thread for [conversationId]. Title is the human-friendly
 /// name shown in the header. The header phone icon dials the peer directly
@@ -575,7 +576,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(
-          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'}))));
+          content: Text(friendlyError(e))));
     }
   }
 
@@ -1794,7 +1795,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       SwaycoSounds.play(SwSound.deleted);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e))));
     }
   }
 

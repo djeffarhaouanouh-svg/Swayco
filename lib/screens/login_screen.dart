@@ -1,6 +1,6 @@
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/app_strings.dart';
 import '../services/swayco_sounds.dart';
 import '../services/auth_service.dart';
+import '../services/friendly_error.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/sway_onb_kit.dart';
 import '../widgets/swayco_wordmark.dart';
@@ -60,51 +61,9 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  /// Le message d'erreur dans la langue de l'appli. Supabase répond en anglais
-  /// (User already registered…) et une panne réseau donne le texte brut de
-  /// l'exception : rien de tout ça ne doit s'afficher tel quel. Le texte
-  /// d'origine reste dans la console pour le diagnostic.
-  String _errorText(Object e) {
-    debugPrint('login error: $e');
-    final code = e is AuthException ? (e.code ?? '').toLowerCase() : '';
-    final msg = (e is AuthException ? e.message : '$e').toLowerCase();
-    if (code == 'user_already_exists' ||
-        code == 'email_exists' ||
-        msg.contains('already registered') ||
-        msg.contains('already been registered') ||
-        msg.contains('already exists')) {
-      return AppStrings.t('login_err_user_exists');
-    }
-    if (code == 'weak_password' ||
-        msg.contains('weak') ||
-        msg.contains('password should be') ||
-        msg.contains('password is too')) {
-      return AppStrings.t('login_err_weak_password');
-    }
-    if (code.contains('rate_limit') ||
-        msg.contains('rate limit') ||
-        msg.contains('too many') ||
-        msg.contains('security purposes')) {
-      return AppStrings.t('login_err_rate_limit');
-    }
-    if (code == 'email_address_invalid' ||
-        (code == 'validation_failed' && msg.contains('email')) ||
-        msg.contains('invalid email') ||
-        msg.contains('unable to validate email')) {
-      return AppStrings.t('login_err_email');
-    }
-    if (msg.contains('socketexception') ||
-        msg.contains('failed host lookup') ||
-        msg.contains('clientexception') ||
-        msg.contains('xmlhttprequest') ||
-        msg.contains('network') ||
-        msg.contains('connection') ||
-        msg.contains('timed out') ||
-        msg.contains('timeout')) {
-      return AppStrings.t('login_err_network');
-    }
-    return AppStrings.t('login_err_generic');
-  }
+  /// Le message d'erreur dans la langue de l'appli (fonction commune à tous les
+  /// écrans : voir [friendlyError]).
+  String _errorText(Object e) => friendlyError(e);
 
   Future<void> _submit() async {
     final email = _emailCtrl.text.trim();

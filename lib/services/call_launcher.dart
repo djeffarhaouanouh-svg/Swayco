@@ -16,7 +16,8 @@ import 'incoming_call_api.dart';
 import 'profile_api.dart';
 import 'supabase_service.dart';
 import 'token_api.dart';
-import 'user_prefs.dart';
+import 'user_prefs.dart';
+import 'friendly_error.dart';
 
 /// Single entry point that any screen can call to dial a friend. Wraps the
 /// "derive deterministic room id from both device ids + mint LiveKit token
@@ -152,7 +153,7 @@ abstract final class CallLauncher {
       if (ring.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('La notif d\'appel a échoué : ${ring.error}'),
+            content: Text(AppStrings.t('login_err_generic')),
             duration: const Duration(seconds: 6),
           ),
         );
@@ -192,7 +193,7 @@ abstract final class CallLauncher {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Impossible de démarrer l\'appel : $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
       return false;

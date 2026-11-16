@@ -62,7 +62,8 @@ import 'chat_thread_screen.dart';
 import 'paywall_screen.dart';
 import '../services/daily_swipes.dart';
 import '../widgets/daily_limit_view.dart';
-import 'profile_screen.dart';
+import 'profile_screen.dart';
+import '../services/friendly_error.dart';
 
 /// Le fond du panneau déplié : opaque, un cran au-dessus du noir de la page —
 /// assez pour qu'on voie où il commence quand il recouvre la photo, assez peu
@@ -482,7 +483,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       debugPrint('discover: direct message failed: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Envoi échoué: $e')));
+          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
     }
   }
 
