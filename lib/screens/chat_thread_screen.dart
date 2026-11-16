@@ -72,6 +72,9 @@ const double _kChromeSolid = 0.92;
 /// (vers le haut) : c'est LÀ que les messages transparaissent.
 const double _kChromeFade = 40;
 
+/// Hauteur du fondu derrière la barre d'écriture (maquette 1b / 1c).
+const double _kFooterFade = 190;
+
 /// Le fond du header / du footer : [solid] px à [_kChromeSolid] (là où il y a
 /// du contenu), puis [_kChromeFade] px de fondu jusqu'à transparent, en
 /// courbe douce — un fondu linéaire court faisait une marche visible.
@@ -1537,9 +1540,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         _ThreadHeader.height +
         pillH +
         (_error != null ? 40 : 0);
-    // Hauteur du composer (champ ~50 + 4 dessus + 12 dessous + une part de
-    // la safe area, cf. _buildIdleBar) : le fond y reste constant.
-    final footerSolid = 70 + MediaQuery.paddingOf(context).bottom * 0.4;
     return Scaffold(
       backgroundColor: _kThreadBg,
       // canPop:false coupe le glissement retour d'iOS (bord gauche → droite) :
@@ -1637,17 +1637,24 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                   ],
                 ),
               ),
-              // ── Footer : même fond, inversé — constant derrière le composer,
-              //    puis 40 px de fondu doux au-dessus. ─────────────────────────
+              // ── Footer : fondu haut derrière la barre. Transparent en haut, fond
+              //    PLEIN à 66 % de la hauteur : les bulles s'effacent avant
+              //    d'arriver au champ, rien ne transparaît derrière lui. ──────
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
                 child: IgnorePointer(
                   child: Container(
-                    height: _kChromeFade + footerSolid,
+                    height: _kFooterFade +
+                        MediaQuery.paddingOf(context).bottom * 0.4,
                     decoration: BoxDecoration(
-                      gradient: _chromeGradient(solid: footerSolid, top: false),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [_kThreadBg.withValues(alpha: 0), _kThreadBg],
+                        stops: const [0, 0.66],
+                      ),
                     ),
                   ),
                 ),
@@ -4298,6 +4305,55 @@ class _ComposerState extends State<_Composer>
         : name;
   }
 
+  /// Surface pleine du champ (maquette 1b sombre / 1c clair). Le contour est
+  /// dessiné en foregroundDecoration : il ne change PAS la taille (54 px).
+  Widget _fieldSurface({
+    required double radius,
+    EdgeInsetsGeometry? padding,
+    required Widget child,
+  }) {
+    final light = SC.light;
+    return Container(
+      padding: padding,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: light ? const Color(0xFFF7F7F8) : const Color(0xFF1F1F24),
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: light
+            ? const [
+                BoxShadow(
+                  color: Color(0x2904123A), // rgba(4,18,58,.16)
+                  blurRadius: 28,
+                  offset: Offset(0, 6),
+                ),
+                BoxShadow(
+                  color: Color(0x1A04123A), // rgba(4,18,58,.10)
+                  blurRadius: 3,
+                  offset: Offset(0, 1),
+                ),
+              ]
+            : const [
+                BoxShadow(
+                  color: Color(0x99000000), // noir 60 %
+                  blurRadius: 28,
+                  offset: Offset(0, 6),
+                ),
+                BoxShadow(
+                  color: Color(0x66000000), // noir 40 %
+                  blurRadius: 3,
+                  offset: Offset(0, 1),
+                ),
+              ],
+      ),
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        // SC.stroke : blanc 18 % en sombre, bleu de marque 15 % en clair.
+        border: Border.all(color: SC.stroke, width: 1),
+      ),
+      child: child,
+    );
+  }
+
   Widget _buildIdleBar() {
     final holding = _voice.state == VoiceRecState.holding;
     // Lowered: use only part of the bottom safe-area inset so the bar sits a
@@ -4322,8 +4378,8 @@ class _ComposerState extends State<_Composer>
               // Appui long sur le micro (1c) : toute la ligne devient la barre
               // d'enregistrement, de la même hauteur (54) pour ne pas faire
               // sauter la liste.
-              child: holding ? _buildRecordingBar() : GlassPanel(
-                borderRadius: 27,
+              child: holding ? _buildRecordingBar() : _fieldSurface(
+                radius: 27,
                 padding: const EdgeInsets.fromLTRB(14, 2, 4, 2),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -4582,8 +4638,8 @@ class _ComposerState extends State<_Composer>
   /// 1c — la barre d'enregistrement : point rouge, minuteur, « Glisse pour
   /// annuler » qui suit le doigt.
   Widget _buildRecordingBar() {
-    return GlassPanel(
-      borderRadius: 27,
+    return _fieldSurface(
+      radius: 27,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: SizedBox(
         height: 54,
@@ -4711,8 +4767,8 @@ class _ComposerState extends State<_Composer>
         12,
         12 + MediaQuery.paddingOf(context).bottom * 0.4,
       ),
-      child: GlassPanel(
-        borderRadius: 32,
+      child: _fieldSurface(
+        radius: 32,
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         child: ListenableBuilder(
           listenable: Listenable.merge([_voice, _pulse]),
