@@ -1,6 +1,6 @@
 -- 0079_weekly_friend_limit.sql
 --
--- Plafond d'amis IA par semaine pour un compte SANS Pro : 5 amis IA sur 7 jours
+-- Plafond d'amis IA par semaine pour un compte SANS Pro : 10 amis IA sur 7 jours
 -- glissants. Les amis HUMAINS ne sont jamais limités. Appliqué dans la base, donc
 -- impossible à contourner depuis l'app (le client écrit directement dans
 -- `friendships`).
@@ -9,7 +9,7 @@
 -- trigger ne s'intéresse qu'aux lignes entre un humain et une IA :
 --   * deux humains (ou deux IA) : jamais plafonné ;
 --   * l'humain est Pro (is_pro) ou abonné (subscription_tier <> 'free') : jamais plafonné ;
---   * sinon : s'il a déjà 5 amis IA acceptés sur les 7 derniers jours, la 6e IA
+--   * sinon : s'il a déjà 10 amis IA acceptés sur les 7 derniers jours, la 11e IA
 --     ne devient pas son amie (la demande reste en attente, l'IA ne répond pas).
 -- Les amitiés déjà existantes ne sont pas touchées.
 --
@@ -27,7 +27,7 @@ security definer
 set search_path = public
 as $$
 declare
-  v_limit constant int := 5;
+  v_limit constant int := 10;
   v_window constant interval := interval '7 days';
   v_requester_ai boolean;
   v_addressee_ai boolean;
