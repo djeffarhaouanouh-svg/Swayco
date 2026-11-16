@@ -3,7 +3,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
-import '../screens/paywall_screen.dart';
+import '../screens/paywall_screen.dart' show showLikesProSheet;
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
 import '../services/profile_api.dart';
@@ -79,9 +79,30 @@ class BlurredAvatar extends StatelessWidget {
   }
 }
 
-/// Tap on a blurred liker → the Likes paywall ("1b", full screen): the wall
-/// of [likers] (blurred) with their count, go Pro (reveals all) or watch a
-/// video (reveals [profile]). [onRevealed] fires once a video unlocked it.
+/// Lance la pub récompensée et, si elle va au bout, révèle [profile].
+/// Pub indisponible : un message, rien n'est révélé.
+Future<void> revealWithAd(
+  BuildContext context, {
+  required String myId,
+  required RemoteProfile profile,
+  required VoidCallback onRevealed,
+}) async {
+  unawaited(RewardedVideo.preload());
+  if (!RewardedVideo.isAvailable) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppStrings.t('likes_video_soon'))),
+    );
+    return;
+  }
+  if (!await RewardedVideo.show()) return;
+  Analytics.track('ad_watched', props: {'source': 'likes_unlock'});
+  await LikesUnlocks.add(myId, profile.id);
+  onRevealed();
+}
+
+/// La carte « Tout révéler avec Pro » : la feuille « Débloquer tous les
+/// profils » — un abonnement Pro (révèle tout le monde) ou une pub, qui révèle
+/// [profile] seulement ; [onRevealed] part une fois la pub vue jusqu'au bout.
 Future<void> showLikesUnlockSheet(
   BuildContext context, {
   required String myId,
@@ -90,25 +111,15 @@ Future<void> showLikesUnlockSheet(
   List<RemoteProfile?> likers = const [],
 }) {
   unawaited(RewardedVideo.preload());
-  Future<void> watchVideo() async {
-    if (!RewardedVideo.isAvailable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('likes_video_soon'))),
-      );
-      return;
-    }
-    final p = profile;
-    if (p == null || !await RewardedVideo.show()) return;
-    Analytics.track('ad_watched', props: {'source': 'likes_unlock'});
-    await LikesUnlocks.add(myId, p.id);
-    onRevealed();
-  }
-
-  return showLikesWallPaywall(
+  return showLikesProSheet(
     context,
     likers: likers.isEmpty ? [profile] : likers,
-    videoAvailable: RewardedVideo.isAvailable,
-    onWatchVideo: () => unawaited(watchVideo()),
-    profile: profile,
+    onWatchAd: () {
+      final p = profile;
+      if (p == null) return;
+      unawaited(
+        revealWithAd(context, myId: myId, profile: p, onRevealed: onRevealed),
+      );
+    },
   );
 }

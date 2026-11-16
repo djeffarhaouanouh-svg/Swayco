@@ -28,7 +28,6 @@ import '../widgets/nav_auto_hide.dart';
 import '../widgets/likes_lock.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/popup_kit.dart' show popupDisplay;
-import '../widgets/profile_avatar.dart';
 import 'chat_thread_screen.dart';
 import 'paywall_screen.dart' show showBoostPaywall;
 import 'profile_screen.dart';
@@ -438,19 +437,40 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         _openProfile(p);
         return;
       }
-      // The paywall's wall + "N people liked you": everyone who liked me,
-      // requests and photo likes alike, each person once.
-      final seen = <String>{};
-      showLikesUnlockSheet(
+      // « Révéler » : directement la pub, pas de pop-up. Une fois vue
+      // jusqu'au bout, CETTE vignette devient nette ; les autres restent floutées.
+      revealWithAd(
         context,
         myId: _myId,
         profile: p,
-        likers: [
-          for (final q in [for (final r in _requests) r.requester, ])
-            if (q != null && seen.add(q.id)) q,
-        ],
         onRevealed: () {
           if (mounted) setState(() => _lock?.unlocked.add(p.id));
+        },
+      );
+    }
+
+    // « Tout révéler avec Pro » : la feuille Pro / pub. La pub y révèle le
+    // premier liker non révélé ; les drapeaux viennent de tous les likers, les
+    // non révélés d'abord, chacun une seule fois.
+    final hiddenLikers = <RemoteProfile?>[];
+    final shownLikers = <RemoteProfile?>[];
+    final seenIds = <String>{};
+    for (final r in _requests) {
+      final q = r.requester;
+      if (q == null || !seenIds.add(q.id)) continue;
+      (revealed(q) ? shownLikers : hiddenLikers).add(q);
+    }
+    final showUnlockAll = hiddenLikers.isNotEmpty;
+    void openUnlockAll() {
+      if (hiddenLikers.isEmpty) return;
+      final first = hiddenLikers.first!;
+      showLikesUnlockSheet(
+        context,
+        myId: _myId,
+        profile: first,
+        likers: [...hiddenLikers, ...shownLikers],
+        onRevealed: () {
+          if (mounted) setState(() => _lock?.unlocked.add(first.id));
         },
       );
     }
@@ -469,12 +489,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           _RequestTile(
             request: req,
             leaving: _leaving.contains(req.friendship.id),
-            revealed: false,
-            onOpenProfile: () => openOrUnlock(req.requester),
-            // Verrou : sur une carte floutée, « Add » ouvre l'écran Pro / vidéo
-            // au lieu d'accepter (accepter = match = voir qui c'est : le flou
-            // ne servait à rien). Une fois la personne révélée, « Add » marche.
-            onAccept: () => openOrUnlock(req.requester),
+            // Verrou : accepter = match = voir qui c'est, le flou ne servirait
+            // plus à rien. « Révéler » lance la pub ; une fois la personne
+            // révélée, la vignette change et « Ajouter » marche.
+            onReveal: () => openOrUnlock(req.requester),
             onReject: () => _reject(req),
           ),
     ];
@@ -516,26 +534,41 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                 return SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(16, 4, 16, navBody + 8),
-                  child: SizedBox(
-                    height: height,
-                    child: Stack(
-                      children: [
-                        for (var i = 0; i < rows.length; i++)
-                          AnimatedPositioned(
-                            key: ValueKey(_requests[i].friendship.id),
-                            duration: const Duration(milliseconds: 350),
-                            curve: Curves.easeOutCubic,
-                            left: (i % 2) * (tile + gap),
-                            top: (i ~/ 2) * (tile + gap),
-                            width: tile,
-                            height: tile,
-                            child: FadeSlideIn(
-                              delay: Duration(milliseconds: i * 55),
-                              child: rows[i],
-                            ),
-                          ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Elle défile avec la grille ; jamais pour une femme, un
+                      // Pro actif, ou quand tout est déjà révélé.
+                      if (showUnlockAll) ...[
+                        _UnlockAllCard(
+                          hidden: hiddenLikers,
+                          total: _requests.length,
+                          onTap: openUnlockAll,
+                        ),
+                        const SizedBox(height: 14),
                       ],
-                    ),
+                      SizedBox(
+                        height: height,
+                        child: Stack(
+                          children: [
+                            for (var i = 0; i < rows.length; i++)
+                              AnimatedPositioned(
+                                key: ValueKey(_requests[i].friendship.id),
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeOutCubic,
+                                left: (i % 2) * (tile + gap),
+                                top: (i ~/ 2) * (tile + gap),
+                                width: tile,
+                                height: tile,
+                                child: FadeSlideIn(
+                                  delay: Duration(milliseconds: i * 55),
+                                  child: rows[i],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -544,24 +577,22 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   }
 }
 
-/// Une demande en carre : la premiere photo de la galerie en plein cadre
-/// (floutee tant que la personne n'est pas revelee), drapeau en haut a gauche,
-/// prenom (ou « Quelqu'un ») et boutons Add / ✕ en bas.
+/// Une demande VERROUILLÉE (non révélée), en carré : la première photo de la
+/// galerie en plein cadre, floutée, un voile bleu nuit, le drapeau du pays en
+/// haut à gauche (l'accroche de curiosité : jamais flouté), ✕ en haut à droite
+/// et un bouton « Révéler » en bas. Le bouton ET le reste de la vignette lancent
+/// la pub : pas de pop-up.
 class _RequestTile extends StatelessWidget {
   const _RequestTile({
     required this.request,
-    required this.revealed,
-    required this.onOpenProfile,
-    required this.onAccept,
+    required this.onReveal,
     required this.onReject,
     this.leaving = false,
   });
 
   final IncomingFriendRequest request;
   final bool leaving;
-  final bool revealed;
-  final VoidCallback onOpenProfile;
-  final VoidCallback onAccept;
+  final VoidCallback onReveal;
   final VoidCallback onReject;
 
   /// La premiere photo de la galerie ; a defaut la photo Discover, puis l'avatar.
@@ -578,31 +609,16 @@ class _RequestTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = request.requester;
     final photo = _photoOf(p);
-    final name = !revealed
-        ? AppStrings.t('likes_someone')
-        : p?.displayName.isNotEmpty == true
-            ? p!.displayName
-            : (p?.handle.isNotEmpty == true
-                ? '@${p!.handle}'
-                : AppStrings.t('chat_no_name'));
-    final flag = p == null
-        ? ''
-        : countryFlagFor(p.country) ??
-            findLanguageByCode(p.language)?.flag ??
-            '';
+    final country = p?.country.trim() ?? '';
+    final iso = countryIso2For(country);
+    final emoji = country.isEmpty
+        ? (p == null ? null : findLanguageByCode(p.language)?.flag)
+        : countryFlagFor(country);
     Widget image() {
       if (photo.isEmpty) {
         return ColoredBox(
           color: SC.menu,
-          child: Center(
-            child: revealed
-                ? ProfileAvatar(
-                    displayName: p?.displayName ?? '',
-                    avatarUrl: p?.avatarUrl,
-                    size: 72,
-                  )
-                : BlurredAvatar(profile: p, size: 72),
-          ),
+          child: Center(child: BlurredAvatar(profile: p, size: 72)),
         );
       }
       final img = Image.network(
@@ -610,7 +626,6 @@ class _RequestTile extends StatelessWidget {
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => ColoredBox(color: SC.menu),
       );
-      if (revealed) return img;
       // Floute, et agrandi un peu pour que le flou ne laisse pas de bord clair.
       return Transform.scale(
         scale: 1.15,
@@ -628,75 +643,310 @@ class _RequestTile extends StatelessWidget {
         scale: leaving ? 0.85 : 1,
         duration: const Duration(milliseconds: 200),
         child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onOpenProfile,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            image(),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0x00000000), Color(0xD9000000)],
-                  stops: [0.4, 1],
-                ),
+          behavior: HitTestBehavior.opaque,
+          onTap: onReveal,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              // Clair : la même ombre que les vignettes révélées.
+              boxShadow: SC.light
+                  ? const [
+                      BoxShadow(
+                        color: Color(0x591F5EFF),
+                        blurRadius: 22,
+                        spreadRadius: -10,
+                        offset: Offset(0, 8),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  image(),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x00040A1E), Color(0x8C040A1E)],
+                        stops: [0.4, 1],
+                      ),
+                    ),
+                  ),
+                  if (iso.isNotEmpty || (emoji ?? '').isNotEmpty)
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0x8C04123A),
+                          border: Border.all(
+                            color: const Color(0x66FFFFFF),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: iso.isNotEmpty
+                            ? ClipOval(
+                                child: Image.network(
+                                  'https://flagcdn.com/w80/${iso.toLowerCase()}.png',
+                                  width: 20,
+                                  height: 20,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => Text(
+                                    emoji ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      height: 1,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                emoji ?? '',
+                                style: const TextStyle(fontSize: 15, height: 1),
+                              ),
+                      ),
+                    ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: PadTap(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onReject,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0x80EF4444),
+                          border: Border.all(color: const Color(0xD9EF4444)),
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 10,
+                    right: 10,
+                    bottom: 10,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onReveal,
+                      child: Container(
+                        height: 40,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          gradient: SC.brandGradient,
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: SC.brandBlue.withValues(alpha: 0.8),
+                              blurRadius: 20,
+                              spreadRadius: -8,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          AppStrings.t('likes_reveal'),
+                          maxLines: 1,
+                          style: popupDisplay(
+                            fontSize: 13,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            if (!revealed)
-              const Center(
-                child: Icon(Icons.lock_rounded, color: Colors.white, size: 30),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// La carte « Tout révéler avec Pro », au-dessus de la grille : trois profils
+/// floutés qui se chevauchent (cadenas sur le dernier), le titre, le nombre de
+/// personnes qui m'ont liké et une flèche. Elle ouvre la feuille Pro / pub.
+class _UnlockAllCard extends StatelessWidget {
+  const _UnlockAllCard({
+    required this.hidden,
+    required this.total,
+    required this.onTap,
+  });
+
+  /// Les premiers likers non révélés (trois au plus) : leurs avatars floutés.
+  final List<RemoteProfile?> hidden;
+
+  /// Toutes les personnes qui m'ont liké.
+  final int total;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final light = SC.light;
+    // La couleur de fond de la carte : elle cerne les ronds et le cadenas.
+    final ring = light ? const Color(0xFFF2F6FF) : const Color(0xFF1A2040);
+    final shown = hidden.take(3).toList();
+    final n = shown.length;
+    // Rond 40, chevauchement -14 : chaque profil décale de 26.
+    final width = n == 0 ? 0.0 : 40.0 + (n - 1) * 26.0;
+
+    final decoration = light
+        ? BoxDecoration(
+            color: const Color(0xFFF2F6FF),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0x381F5EFF), width: 1.2),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x801F5EFF),
+                blurRadius: 24,
+                spreadRadius: -12,
+                offset: Offset(0, 10),
               ),
-            if (flag.isNotEmpty)
-              Positioned(
-                top: 10,
-                left: 10,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black.withValues(alpha: 0.45),
-                  ),
-                  child: Text(flag, style: const TextStyle(fontSize: 15)),
+            ],
+          )
+        : BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1A2040), Color(0xFF161D30)],
+            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: SC.accent.withValues(alpha: 0.4),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: SC.accent.withValues(alpha: 0.28),
+                blurRadius: 28,
+                spreadRadius: -12,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          );
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        decoration: decoration,
+        padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (n > 0) ...[
+              SizedBox(
+                width: width,
+                height: 40,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    for (var i = 0; i < n; i++)
+                      Positioned(
+                        left: i * 26.0,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: ring, width: 2.5),
+                          ),
+                          child: BlurredAvatar(
+                            profile: shown[i],
+                            size: 35,
+                            sigma: 5,
+                          ),
+                        ),
+                      ),
+                    Positioned(
+                      left: (n - 1) * 26.0 + 40 - 24 + 7,
+                      bottom: -5,
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: SC.accent,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: ring, width: 2.5),
+                        ),
+                        child: const Icon(
+                          Icons.lock_rounded,
+                          size: 13,
+                          color: SC.onAccent,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            Positioned(
-              left: 10,
-              right: 10,
-              bottom: 8,
+              const SizedBox(width: 12),
+            ],
+            Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    name,
-                    maxLines: 1,
+                    AppStrings.t('likes_unlock_all_title'),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: popupDisplay(
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.45,
+                      color: SC.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      _AcceptButton(onTap: onAccept),
-                      const SizedBox(width: 4),
-                      _RejectButton(onTap: onReject),
-                    ],
+                  const SizedBox(height: 2),
+                  Text(
+                    total == 1
+                        ? AppStrings.t('likes_unlock_all_sub_one')
+                        : AppStrings.t(
+                            'likes_unlock_all_sub',
+                            args: {'n': '$total'},
+                          ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: SC.textPrimary.withValues(alpha: 0.72),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 12),
+            Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                color: SC.accent,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.arrow_forward_rounded,
+                size: 20,
+                color: SC.onAccent,
+              ),
+            ),
           ],
-        ),
-      ),
         ),
       ),
     );
@@ -1059,59 +1309,6 @@ class _PopInEmojiState extends State<_PopInEmoji>
         child: Transform.scale(scale: _scale.value, child: child),
       ),
       child: Text(widget.emoji, style: TextStyle(fontSize: widget.fontSize)),
-    );
-  }
-}
-
-class _AcceptButton extends StatelessWidget {
-  const _AcceptButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: SC.accent,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Text(
-            AppStrings.t('add_friend_short'),
-            style: const TextStyle(
-              color: Color(0xFF0A1024),
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RejectButton extends StatelessWidget {
-  const _RejectButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      shape: const CircleBorder(),
-      child: PadInkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.all(6),
-          child: Icon(
-            Icons.close_rounded,
-            color: Colors.white.withValues(alpha: 0.85),
-            size: 22,
-          ),
-        ),
-      ),
     );
   }
 }

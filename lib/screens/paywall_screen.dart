@@ -17,7 +17,6 @@ import '../services/stripe_api.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/fade_scale_route.dart';
 import '../widgets/purchase_failure_sheets.dart';
-import '../widgets/likes_lock.dart' show BlurredAvatar;
 import '../widgets/popup_kit.dart';
 import '../widgets/sparkles.dart';
 import '../widgets/profile_avatar.dart';
@@ -47,14 +46,13 @@ Future<void> showBoostPaywall(
   );
 }
 
-/// The Likes-page paywall ("1b"): a wall of the blurred likers, go Pro or
-/// watch a video to reveal one. [onWatchVideo] runs after this screen closed.
-Future<void> showLikesWallPaywall(
+/// La feuille « Débloquer tous les profils » de la page Likes : un abonnement
+/// Pro (révèle tout le monde) ou une pub ([onWatchAd], lancé après la fermeture
+/// de la feuille : elle révèle UN profil). [likers] donne les drapeaux.
+Future<void> showLikesProSheet(
   BuildContext context, {
   required List<RemoteProfile?> likers,
-  required bool videoAvailable,
-  required VoidCallback onWatchVideo,
-  RemoteProfile? profile,
+  required VoidCallback onWatchAd,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -62,15 +60,9 @@ Future<void> showLikesWallPaywall(
     backgroundColor: Colors.transparent,
     barrierColor:
         SC.light ? const Color(0x4D04123A) : const Color(0x99040A1E),
-    builder: (_) => _LikesSheet(
-      likers: likers,
-      profile: profile ?? (likers.isEmpty ? null : likers.first),
-      videoAvailable: videoAvailable,
-      onWatchVideo: onWatchVideo,
-    ),
+    builder: (_) => _LikesSheet(likers: likers, onWatchAd: onWatchAd),
   );
 }
-
 // ══════════════════════════════════════════════════════════════════════════
 // Shared purchase logic — identical for both paywalls.
 // ══════════════════════════════════════════════════════════════════════════
@@ -98,20 +90,6 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
     RevenueCat.trialDaysOf(RevenueCat.proPackageId).then((d) {
       if (mounted) setState(() => _trialDays = d);
     });
-  }
-
-  /// "7 jours gratuits, puis 9,99 €/mois" when a trial applies, else
-  /// "9,99 €/mois"; null while the price is still loading.
-  String? _priceLine() {
-    final price = _price;
-    if (price == null) return null;
-    final perMonth = '$price${AppStrings.t('paywall_period_month')}';
-    final days = _trialDays;
-    if (days == null) return perMonth;
-    return AppStrings.t(
-      'pw_trial_then',
-      args: {'days': '$days', 'price': perMonth},
-    );
   }
 
   Future<void> _subscribe() async {
@@ -1143,23 +1121,18 @@ class _BoostPaywallState extends State<_BoostPaywall> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// Pop-up Likes (A / A2) — feuille du bas sur la liste des demandes
+// Pop-up « Débloquer tous les profils » — feuille du bas sur la page Likes
 // ══════════════════════════════════════════════════════════════════════════
 
 class _LikesSheet extends StatefulWidget {
-  const _LikesSheet({
-    required this.likers,
-    required this.profile,
-    required this.videoAvailable,
-    required this.onWatchVideo,
-  });
+  const _LikesSheet({required this.likers, required this.onWatchAd});
 
+  /// Les personnes qui m'ont liké (non révélées d'abord) : leurs pays donnent
+  /// la rangée de drapeaux.
   final List<RemoteProfile?> likers;
 
-  /// La personne touchée dans la liste.
-  final RemoteProfile? profile;
-  final bool videoAvailable;
-  final VoidCallback onWatchVideo;
+  /// Lancé APRÈS la fermeture de la feuille : regarder une pub révèle UN profil.
+  final VoidCallback onWatchAd;
 
   @override
   State<_LikesSheet> createState() => _LikesSheetState();
@@ -1172,228 +1145,212 @@ class _LikesSheetState extends State<_LikesSheet> with _PaywallPurchase {
     _loadPrice();
   }
 
-  /// « au Japon », « en France », « aux États-Unis » : la préposition française
-  /// dépend du pays ; les autres langues portent la leur dans la chaîne.
-  String _countryLabel(String country, String iso) {
-    final localized = iso.isEmpty ? '' : AppStrings.t('country_$iso');
-    final name =
-        localized.isNotEmpty && localized != 'country_$iso' ? localized : country;
-    if (!AppStrings.currentBcp47.value.toLowerCase().startsWith('fr')) {
-      return name;
-    }
-    const plural = {'États-Unis', 'Pays-Bas', 'Émirats arabes unis'};
-    const masculineE = {'Mexique', 'Cambodge', 'Mozambique'};
-    if (plural.contains(country)) return 'aux $name';
-    if (masculineE.contains(country)) return 'au $name';
-    final feminine = country.endsWith('e') || country == 'Corée du Sud';
-    return feminine ? 'en $name' : 'au $name';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final p = widget.profile;
-    final others = [
-      for (final l in widget.likers)
-        if (l != null && l.id != p?.id) l,
-    ];
-    final many = widget.likers.length > 1;
-    final total = widget.likers.length;
-    final country = p?.country.trim() ?? '';
-    final iso = countryIso2For(country);
-    final hasCountry = country.isNotEmpty;
-    final priceLine = _priceLine();
+    final light = SC.light;
+    final ink = PopupTokens.ink;
 
-    // Drapeaux des AUTRES likers : pays distincts d'abord, 5 au plus.
+    // Drapeaux : pays DISTINCTS des likers, cinq au plus.
     final seen = <String>{};
     final flagIsos = <String>[];
-    var extra = 0;
-    if (many) {
-      for (final o in others) {
-        final c = countryIso2For(o.country.trim());
-        if (c.isEmpty || c == iso) continue;
-        if (seen.add(c)) {
-          if (flagIsos.length < 5) {
-            flagIsos.add(c);
-          } else {
-            extra++;
-          }
-        }
-      }
+    for (final l in widget.likers) {
+      if (l == null) continue;
+      final c = countryIso2For(l.country.trim());
+      if (c.isEmpty || !seen.add(c)) continue;
+      flagIsos.add(c);
+      if (flagIsos.length == 5) break;
     }
 
-    final proSub = many
-        ? AppStrings.t('pw_pro_reveal_n', args: {'n': '$total'})
-        : AppStrings.t('pw_pro_all_likes');
-    final proSubFull = priceLine == null ? proSub : '$proSub · $priceLine';
-    // Free trial this user really gets: same button as the Pro paywall,
-    // "Essayer 7 jours offerts" over "puis 9,99 €/mois · …".
+    // Bouton Pro : l'essai que CETTE personne obtient vraiment, sinon le prix.
+    // Rien n'est écrit en dur : tout vient de RevenueCat.
     final trialDays = _trialDays;
-    final trialPrice = _price;
-    final trial = trialDays != null && trialPrice != null;
-    final videoLabel = widget.videoAvailable
-        ? AppStrings.t(many ? 'pw_video_reveal_only' : 'pw_video_reveal_one')
-        : AppStrings.t('likes_video_soon');
+    final price = _price;
+    final trial = trialDays != null && price != null;
+    final perMonth =
+        price == null ? null : '$price${AppStrings.t('paywall_period_month')}';
+    final proSub = AppStrings.t('pw_pro_all_likes');
+    final ctaSubtitle = trial
+        ? '${AppStrings.t('pw_trial_after', args: {'price': perMonth!})}'
+            ' · ${AppStrings.t('pw_cancel_anytime')}'
+        : (perMonth == null ? proSub : '$proSub · $perMonth');
 
-    final ink = PopupTokens.ink;
     final titleStyle = popupDisplay(
       fontSize: 25,
-      letterSpacing: -0.75,
       height: 1.2,
+      letterSpacing: -0.75,
       color: ink,
     );
-    final head = hasCountry
-        ? AppStrings.t(
-            'pw_likes_one_title',
-            args: {'country': _countryLabel(country, iso)},
-          )
-        : AppStrings.t('pw_likes_one_title_nocountry');
+
+    final surface = BoxDecoration(
+      color: light ? Colors.white : null,
+      gradient: light
+          ? null
+          : const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1A2040), Color(0xFF16161E), Color(0xFF131318)],
+              stops: [0, 0.5, 1],
+            ),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      border: Border.all(
+        color: light ? const Color(0x291F5EFF) : const Color(0x1FFFFFFF),
+      ),
+    );
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: PopupSurface(
-        sheet: true,
-        washHeight: 170,
-        child: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(22, 12, 22, 14),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Center(child: PopupHandle()),
-                const SizedBox(height: 6),
-                Center(
-                  child: _LockedAvatar(
-                    profile: p,
-                    iso: hasCountry ? iso : '',
-                    country: hasCountry ? country : '',
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  runSpacing: 2,
-                  children: [
-                    Text(head, textAlign: TextAlign.center, style: titleStyle),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: SC.accent,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        AppStrings.t('pw_likes_pill'),
-                        softWrap: false,
-                        style: titleStyle.copyWith(color: SC.onAccent),
+      child: DecoratedBox(
+        decoration: surface,
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          child: Stack(
+            children: [
+              // Halo en haut.
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 170,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: Alignment.topCenter,
+                        radius: 1.1,
+                        colors: light
+                            ? const [
+                                Color(0x332B7FFF),
+                                Color(0x1418DDEA),
+                                Color(0x001F5EFF),
+                              ]
+                            : const [
+                                Color(0x572B7FFF),
+                                Color(0x1418DDEA),
+                                Color(0x001F5EFF),
+                              ],
+                        stops: const [0, 0.5, 1],
                       ),
                     ),
-                    Text('!', style: titleStyle),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  many
-                      ? AppStrings.t(
-                          'pw_likes_many_sub',
-                          args: {'n': '${total - 1}'},
-                        )
-                      : AppStrings.t('pw_likes_one_sub'),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: PopupTokens.textBody,
-                    fontSize: 14,
-                    height: 1.45,
-                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                if (flagIsos.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 7,
-                    runSpacing: 7,
+              ),
+              SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(22, 12, 22, 34),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      for (final c in flagIsos)
-                        Container(
-                          width: 34,
-                          height: 34,
-                          alignment: Alignment.center,
+                      // Poignée.
+                      Center(
+                        child: Container(
+                          width: 38,
+                          height: 4,
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: PopupTokens.ghost,
-                            border: Border.all(color: PopupTokens.ghostBorder),
+                            color: light
+                                ? const Color(0x401F5EFF)
+                                : const Color(0x38FFFFFF),
+                            borderRadius: BorderRadius.circular(999),
                           ),
-                          child: _RoundFlag(iso: c, size: 20),
                         ),
-                      if (extra > 0)
-                        Container(
-                          height: 34,
-                          constraints: const BoxConstraints(minWidth: 34),
-                          padding: const EdgeInsets.symmetric(horizontal: 9),
-                          alignment: Alignment.center,
+                      ),
+                      if (flagIsos.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final c in flagIsos)
+                              Container(
+                                width: 42,
+                                height: 42,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: light
+                                      ? const Color(0xFFF2F6FF)
+                                      : const Color(0x1AFFFFFF),
+                                  border: Border.all(
+                                    color: light
+                                        ? const Color(0x331F5EFF)
+                                        : const Color(0x38FFFFFF),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: _RoundFlag(iso: c, size: 24),
+                              ),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      // « Débloquer » puis, dessous, « tous les profils » sur
+                      // une pastille jaune qui ne se coupe pas.
+                      Text(
+                        AppStrings.t('likes_sheet_title_a'),
+                        textAlign: TextAlign.center,
+                        style: titleStyle,
+                      ),
+                      const SizedBox(height: 2),
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
                           decoration: BoxDecoration(
                             color: SC.accent,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            '+$extra',
-                            style: const TextStyle(
-                              color: SC.onAccent,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                            ),
+                            AppStrings.t('likes_sheet_title_b'),
+                            softWrap: false,
+                            style: titleStyle.copyWith(color: SC.onAccent),
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        AppStrings.t('likes_sheet_sub'),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: PopupTokens.textBody,
+                          fontSize: 14,
+                          height: 1.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Sparkles(
+                        color: SC.onAccent,
+                        child: _TwoLineCta(
+                          title: trial
+                              ? AppStrings.t(
+                                  'pw_trial_cta',
+                                  args: {'days': '$trialDays'},
+                                )
+                              : AppStrings.t('pw_pro_switch'),
+                          subtitle: ctaSubtitle,
+                          busy: _busy,
+                          onPressed: _subscribe,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _WatchAdButton(
+                        label: AppStrings.t('pw_watch_ad'),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          widget.onWatchAd();
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      // Obligations App Store 3.1.2 : toujours là, discrètes.
+                      _legalDisclosure(color: ink.withValues(alpha: 0.4)),
+                      const SizedBox(height: 8),
+                      _footer(color: ink.withValues(alpha: 0.4)),
                     ],
                   ),
-                ],
-                const SizedBox(height: 14),
-                Sparkles(
-                  color: SC.onAccent,
-                  child: _TwoLineCta(
-                    title: trial
-                        ? AppStrings.t('pw_trial_cta', args: {'days': '$trialDays'})
-                        : AppStrings.t('pw_pro_switch'),
-                    subtitle: trial
-                        ? '${AppStrings.t('pw_trial_after', args: {
-                            'price': '$trialPrice${AppStrings.t('paywall_period_month')}',
-                          })} · $proSub'
-                        : proSubFull,
-                    busy: _busy,
-                    onPressed: _subscribe,
-                  ),
                 ),
-                const SizedBox(height: 10),
-                _VideoButton(
-                  title: AppStrings.t('pw_watch_ad'),
-                  subtitle: videoLabel,
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    widget.onWatchVideo();
-                  },
-                ),
-                const SizedBox(height: 4),
-                Center(
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    child: Text(
-                      AppStrings.t('pw_later'),
-                      style: TextStyle(
-                        color: ink.withValues(alpha: 0.6),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-                _legalDisclosure(color: ink.withValues(alpha: 0.4)),
-                const SizedBox(height: 8),
-                _footer(color: ink.withValues(alpha: 0.5)),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1401,131 +1358,11 @@ class _LikesSheetState extends State<_LikesSheet> with _PaywallPurchase {
   }
 }
 
-/// Avatar flouté (96) dans un anneau de marque de 3 px, cadenas jaune en haut
-/// à droite, pastille drapeau du pays en bas à droite.
-class _LockedAvatar extends StatelessWidget {
-  const _LockedAvatar({
-    required this.profile,
-    required this.iso,
-    required this.country,
-  });
+/// Bouton « Regarder une pub » : pilule au dégradé de marque, 56 de haut.
+class _WatchAdButton extends StatelessWidget {
+  const _WatchAdButton({required this.label, required this.onTap});
 
-  final RemoteProfile? profile;
-  final String iso;
-  final String country;
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = PopupTokens.surface;
-    return SizedBox(
-      width: 96,
-      height: 96,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 96,
-            height: 96,
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: SC.brandGradient,
-              boxShadow: [
-                BoxShadow(
-                  color: SC.brandBlue.withValues(alpha: 0.8),
-                  blurRadius: 26,
-                  spreadRadius: -8,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: surface, width: 3),
-              ),
-              child: BlurredAvatar(profile: profile, size: 84, sigma: 9),
-            ),
-          ),
-          Positioned(
-            top: 0,
-            right: 0,
-            child: Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: SC.accent,
-                shape: BoxShape.circle,
-                border: Border.all(color: surface, width: 3),
-              ),
-              child: const Icon(Icons.lock_rounded, size: 15, color: SC.onAccent),
-            ),
-          ),
-          if (iso.isNotEmpty || country.isNotEmpty)
-            Positioned(
-              right: -10,
-              bottom: -10,
-              child: Container(
-                width: 42,
-                height: 42,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: surface,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: SC.accent, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: SC.accent.withValues(alpha: 0.45),
-                      blurRadius: 24,
-                    ),
-                  ],
-                ),
-                child: _RoundFlag(iso: iso, country: country, size: 24),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Drapeau rond (flagcdn) ; l'emoji du pays à défaut.
-class _RoundFlag extends StatelessWidget {
-  const _RoundFlag({required this.iso, this.country = '', required this.size});
-
-  final String iso;
-  final String country;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final emoji = country.isEmpty ? null : countryFlagFor(country);
-    Widget fallback() => emoji == null
-        ? SizedBox(width: size, height: size)
-        : Text(emoji, style: TextStyle(fontSize: size * 0.8, height: 1));
-    if (iso.isEmpty) return fallback();
-    return ClipOval(
-      child: Image.network(
-        'https://flagcdn.com/w80/${iso.toLowerCase()}.png',
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => fallback(),
-      ),
-    );
-  }
-}
-
-/// Action secondaire : pilule au dégradé de marque, texte blanc, deux lignes.
-class _VideoButton extends StatelessWidget {
-  const _VideoButton({
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
+  final String label;
   final VoidCallback onTap;
 
   @override
@@ -1549,49 +1386,49 @@ class _VideoButton extends StatelessWidget {
         child: InkWell(
           customBorder: const StadiumBorder(),
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.play_circle_outline_rounded,
-                  size: 22,
-                  color: Colors.white,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.play_circle_rounded,
+                size: 22,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: popupDisplay(fontSize: 15, color: Colors.white),
                 ),
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Drapeau rond (flagcdn) ; l'emoji du pays à défaut.
+class _RoundFlag extends StatelessWidget {
+  const _RoundFlag({required this.iso, required this.size});
+
+  final String iso;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget fallback() => SizedBox(width: size, height: size);
+    if (iso.isEmpty) return fallback();
+    return ClipOval(
+      child: Image.network(
+        'https://flagcdn.com/w80/${iso.toLowerCase()}.png',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback(),
       ),
     );
   }
