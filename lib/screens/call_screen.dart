@@ -203,37 +203,8 @@ class _CallScreenState extends State<CallScreen> {
   final FocusNode _chatFocus = FocusNode();
   bool _chatSending = false;
 
-  /// Les phrases au repos sont retirées parce que le temps a passé. La
-  /// prochaine phrase les ramène — [_addTurn] remet ça à faux.
-  bool _turnsHidden = false;
-
-  /// Les phrases au repos ont été retirées À LA MAIN, et elles restent parties.
-  ///
-  /// Le silence et le doigt ne disent pas la même chose. Personne n'a parlé
-  /// depuis dix secondes : le sous-titre n'a plus rien à montrer, la phrase
-  /// suivante le rappelle et c'est bien. Mais quelqu'un qui TOUCHE pour s'en
-  /// débarrasser en pleine conversation dit « je ne veux plus de ça » — et lui
-  /// remettre une bulle à chaque phrase, alors que l'autre est justement en
-  /// train de parler, c'est refuser de l'entendre.
-  ///
-  /// Ça ne se lève qu'à la touche Messages : redemander la conversation, c'est
-  /// le seul geste qui dise le contraire du premier.
-  bool _turnsMuted = false;
-
-  /// Ce que les phrases au repos restent à l'écran quand plus rien n'arrive.
-  ///
-  /// Un sous-titre s'efface : posé pour toujours sur un appel vidéo, il ne se
-  /// referme jamais et finit par recouvrir le visage qu'on est venu voir. Dix
-  /// secondes, c'est le temps de relire la dernière phrase et pas plus — le
-  /// fil complet est à un tap, il n'est jamais perdu.
-  static const Duration _kRestTtl = Duration(seconds: 10);
-  Timer? _restTimer;
-
-  /// Au repos, la plus ANCIENNE des deux bulles part plus tôt que la récente :
-  /// elle a déjà été lue, la récente est celle qu'on suit.
-  static const Duration _kRestOlderTtl = Duration(seconds: 5);
-  Timer? _restOlderTimer;
-  bool _restShowOlder = true;
+  // Les messages au repos sont PERMANENTS : ni délai, ni retrait au doigt. Un tap
+  // sur eux ne fait que ranger / afficher la barre de boutons.
 
   // ── Zone messages : côté, saisie repliée, démonstration ────────────────
   /// Les messages sont rangés EN HAUT de l'écran (sinon en bas, par défaut).
@@ -267,8 +238,8 @@ class _CallScreenState extends State<CallScreen> {
   double _orbY(double h) {
     if (h <= 0) return 0.80;
     final showBubbles =
-        !_turnsOpen && !_msgTop && !_turnsHidden && _turns.isNotEmpty;
-    final n = (_restShowOlder && _restTurns.length > 1) ? 2 : 1;
+        !_turnsOpen && !_msgTop && _turns.isNotEmpty;
+    const n = 1;
     final dockShown = _turnsOpen ? _topControls : !_dockDimmed;
     final dockH = dockShown ? 96.0 : 0.0; // la barre, hors marge basse
     final railH = _controlsOpen ? 92.0 : 0.0; // la rangée de réglages
@@ -281,13 +252,9 @@ class _CallScreenState extends State<CallScreen> {
     final centerFromTop = h - discBottom - 42 + 14;
     return (2 * centerFromTop / h - 1).clamp(-0.9, 0.80).toDouble();
   }
-  /// Combien de tours du début de l'appel se posent seuls, au repos.
-  static const int _kRestAutoTurns = 2;
-
-  /// Les tours montrés au repos : les deux premiers de l'appel, jamais les
-  /// suivants (qui n'existent qu'avec la zone Messages ouverte).
+  /// Les tours montrés au repos : la DERNIÈRE phrase, une seule bulle à la fois.
   List<_SpokenTurn> get _restTurns =>
-      _turns.length > _kRestAutoTurns ? _turns.sublist(0, _kRestAutoTurns) : _turns;
+      _turns.length > 1 ? _turns.sublist(_turns.length - 1) : _turns;
 
   /// Des bulles (au repos ou la zone ouverte) sont affichées EN HAUT.
   bool get _topMessagesShown =>
@@ -296,7 +263,7 @@ class _CallScreenState extends State<CallScreen> {
           // Caméra coupée : les messages sont permanents, le silence ou un tap
           // ne les retire pas.
           ? _turns.isNotEmpty
-          : (_turnsOpen || (!_turnsHidden && _turns.isNotEmpty)));
+          : (_turnsOpen || _turns.isNotEmpty));
 
   /// v4 : le pair est connecté mais sa caméra est coupée, et son tile occupe la
   /// vue principale. Les 2 dernières bulles y restent en permanence, un tap
@@ -488,44 +455,21 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// Le temps a passé : on retire, et la phrase suivante ramènera tout.
-  void _hideTurns() {
-    _restTimer?.cancel();
-    if (_turnsHidden || !mounted) return;
-    setState(() => _turnsHidden = true);
-  }
-
-  /// Un doigt les a retirées : elles ne reviennent plus d'elles-mêmes.
-  void _muteTurns() {
-    _restTimer?.cancel();
-    if (!mounted) return;
-    setState(() {
-      _turnsHidden = true;
-      _turnsMuted = true;
-    });
-  }
-
   /// Referme la conversation ET le clavier, et emporte les phrases au repos
   /// avec. Les trois vont ensemble : un tap qui ne ferme que le panneau laisse
   /// les bulles derrière, et l'écran a l'air de ne jamais se rendre — c'est
   /// exactement ce qu'on reprochait à la version d'avant.
   ///
-  /// Et c'est un geste, donc ça fait taire pour de bon : refermer le panneau
-  /// puis se voir rendre une bulle à la phrase suivante, c'est ne pas avoir été
-  /// écouté.
+  /// Les phrases au repos, elles, restent : les messages sont permanents.
   void _closeTurns() {
     _chatFocus.unfocus();
-    _restTimer?.cancel();
     _composerIdle?.cancel();
     _topControlsTimer?.cancel();
     if (!mounted) return;
     if (_tabHint) _endTabHint();
-    if (!_turnsOpen && _turnsMuted) return;
     setState(() {
       _topControls = false;
       _turnsOpen = false;
-      _turnsHidden = true;
-      _turnsMuted = true;
       _composerOpen = false;
     });
   }
@@ -842,27 +786,7 @@ class _CallScreenState extends State<CallScreen> {
     // personne l'ait demandé. Se DÉPLIER reste au bouton Messages ; PARAÎTRE
     // se fait tout seul.
     //
-    // Et repart pour dix secondes : chaque phrase relance le sursis, une
-    // conversation suivie garde donc ses sous-titres, un silence les rend.
-    //
-    // Sauf si on les a fait taire à la main : ce refus-là vaut pour l'appel, et
-    // la phrase suivante n'a pas à revenir dessus.
-    // Seuls les DEUX premiers tours de l'appel (le « bonjour » du démarrage) se
-    // posent d'eux-mêmes ; les suivants n'apparaissent qu'une fois la zone
-    // Messages activée par la touche, sinon ils recouvrent le texte sous le
-    // galet alors qu'on n'a rien demandé.
-    if (!_turnsMuted && _turns.length < _kRestAutoTurns) {
-      _turnsHidden = false;
-      _restTimer?.cancel();
-      _restTimer = Timer(_kRestTtl, _hideTurns);
-      // La plus ancienne des deux revient avec la nouvelle phrase, puis part
-      // seule au bout de [_kRestOlderTtl].
-      _restShowOlder = true;
-      _restOlderTimer?.cancel();
-      _restOlderTimer = Timer(_kRestOlderTtl, () {
-        if (mounted) setState(() => _restShowOlder = false);
-      });
-    }
+    // Permanente : la dernière phrase reste affichée, sans délai ni retrait.
     setState(() {
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
@@ -3657,8 +3581,6 @@ class _CallScreenState extends State<CallScreen> {
     _chatCtrl.dispose();
     _chatFocus.removeListener(_onChatFocusChanged);
     _chatFocus.dispose();
-    _restTimer?.cancel();
-    _restOlderTimer?.cancel();
     _splashTimer?.cancel();
     _ringTimeout?.cancel();
     // call_ended is emitted here, not in _hangUp(), because dispose()
@@ -4469,8 +4391,7 @@ class _CallScreenState extends State<CallScreen> {
                             child: (_turnsOpen ||
                                     _camOffMode ||
                                     _msgTop ||
-                                    _turns.isEmpty ||
-                                    _turnsHidden)
+                                    _turns.isEmpty)
                                 ? const SizedBox(width: double.infinity)
                                 : Align(
                                     alignment: Alignment.centerLeft,
@@ -4495,22 +4416,10 @@ class _CallScreenState extends State<CallScreen> {
                                                 peerAvatarUrl:
                                                     _peerProfile?.bestAvatarUrl ??
                                                         '',
-                                                // Le tap sur une phrase la
-                                                // RETIRE, il n'ouvre pas la
-                                                // zone. L'inverse faisait un
-                                                // cercle dont on ne sortait
-                                                // pas : on touchait la bulle,
-                                                // la zone s'ouvrait, on
-                                                // touchait ailleurs pour la
-                                                // fermer, la bulle revenait —
-                                                // et l'écran ne se rendait
-                                                // jamais. Ouvrir reste
-                                                // l'affaire de la touche
-                                                // Messages, et d'elle seule —
-                                                // qui est aussi le seul geste
-                                                // qui les fait revenir.
-                                                onTap: _muteTurns,
-                                                showOlder: _restShowOlder,
+                                                // Un tap sur la phrase ne la retire
+                                                // pas : il range / affiche la
+                                                // barre de boutons.
+                                                onTap: _toggleDockCamOff,
                                               ),
                                       ),
                                     ),
@@ -4572,16 +4481,6 @@ class _CallScreenState extends State<CallScreen> {
                                             }
                                             setState(() {
                                               _turnsOpen = true;
-                                              // Les phrases masquées
-                                              // reparaissent avec la zone :
-                                              // c'est le fil qu'on demande.
-                                              // Et ça lève le silence qu'un
-                                              // tap avait posé — redemander la
-                                              // conversation est le seul geste
-                                              // qui dise le contraire.
-                                              _turnsHidden = false;
-                                              _turnsMuted = false;
-                                              _restTimer?.cancel();
                                               // La saisie apparaît DÉPLIÉE puis se
                                               // replie d'elle-même en rond crayon
                                               // (voir _foldComposerSoon) : on voit
@@ -4816,8 +4715,7 @@ class _CallScreenState extends State<CallScreen> {
                               myAvatarUrl: _myAvatarUrl,
                               peerName: _peerProfile?.displayName ?? '',
                               peerAvatarUrl: _peerProfile?.bestAvatarUrl ?? '',
-                              onTap: _muteTurns,
-                              showOlder: _restShowOlder,
+                              onTap: _toggleDockCamOff,
                             ),
                           ),
                   ),
@@ -4876,20 +4774,12 @@ class _SpokenTurn {
   final bool delivered;
 }
 
-/// Les derniers tours AU REPOS : posés au-dessus des touches, sans rien
-/// effacer. C'est ce qui fait découvrir la conversation — une phrase paraît
-/// d'elle-même dès qu'elle est dite, et le tap dessus la retire.
+/// La dernière phrase, AU REPOS : posée au-dessus des touches (ou en haut), sans
+/// rien effacer. Elle est PERMANENTE : aucun délai, et un tap dessus ne la retire
+/// pas (il range / affiche la barre de boutons).
 ///
 /// PAS de saisie ici : au repos c'est une notification, pas une conversation.
-/// Elle vient s'y poser d'elle-même, par-dessus l'appel et sans qu'on ait rien
-/// demandé — y mettre un champ de texte, c'est réclamer une réponse à quelqu'un
-/// qui regardait un visage. Écrire est un geste qu'on choisit : il appartient
-/// au panneau qu'on ouvre.
-///
-/// Ça remplace l'ouverture automatique d'avant : la zone entière s'ouvrait
-/// toute seule à la première phrase, ce qui, maintenant qu'elle efface la
-/// barre, emportait les touches sans que personne l'ait demandé. Ici la phrase
-/// se montre, et rien d'autre ne bouge.
+/// Écrire est un geste qu'on choisit : il appartient au panneau qu'on ouvre.
 class _RestingTurns extends StatelessWidget {
   const _RestingTurns({
     required this.turns,
@@ -4898,34 +4788,22 @@ class _RestingTurns extends StatelessWidget {
     required this.myAvatarUrl,
     required this.peerName,
     required this.peerAvatarUrl,
-    this.showOlder = true,
   });
 
   final List<_SpokenTurn> turns;
   final VoidCallback onTap;
-
-  /// Faux : seule la plus récente reste (la plus ancienne est partie plus tôt).
-  final bool showOlder;
   final String myName;
   final String myAvatarUrl;
   final String peerName;
   final String peerAvatarUrl;
 
-  /// Deux, comme dans la zone ouverte. Au repos on ne fait pas défiler : ce
-  /// qui dépasse n'est pas montré, il attend qu'on ouvre.
-  static const int _kRestCount = 2;
-
-  /// Et deux lignes chacune. Le compte de bulles ne suffit pas à borner ce que
-  /// ça prend : deux phrases longues font huit lignes et le bloc monte jusqu'au
-  /// milieu de l'écran. Deux fois deux lignes, c'est une hauteur qu'on connaît
-  /// d'avance, quelle que soit la phrase.
-  static const int _kRestLines = 2;
+  /// Une seule bulle à la fois, mais qui peut être longue (message audio) : on
+  /// la laisse aller jusqu'à six lignes avant de la couper.
+  static const int _kRestLines = 6;
 
   @override
   Widget build(BuildContext context) {
-    final count = showOlder ? _kRestCount : 1;
-    final shown =
-        turns.length > count ? turns.sublist(turns.length - count) : turns;
+    final shown = turns.length > 1 ? turns.sublist(turns.length - 1) : turns;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -4933,30 +4811,6 @@ class _RestingTurns extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Le même mot qu'en haut du panneau ouvert, au même endroit : à
-          // droite, au-dessus des phrases. Un tap les retire ici comme là, et
-          // rien ne le disait — un geste qui ne s'annonce pas n'existe pas.
-          // Sans la pastille ni le titre : au repos ce n'est pas un panneau,
-          // c'est un sous-titre.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(6, 0, 6, 6),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                AppStrings.t('call_turns_close'),
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4),
-                  fontSize: 10.5,
-                  letterSpacing: 0.2,
-                  shadows: const [
-                    // Posé à même la vidéo, sans le verre d'une bulle
-                    // derrière : sur une image claire, ce gris disparaîtrait.
-                    Shadow(color: Colors.black, blurRadius: 6),
-                  ],
-                ),
-              ),
-            ),
-          ),
           for (final turn in shown)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
