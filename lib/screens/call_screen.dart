@@ -324,7 +324,9 @@ class _CallScreenState extends State<CallScreen> {
       specOrb = k(430);
       specShift = k(-58);
     } else {
-      bubbles = 80 + sb + rail;
+      // Au niveau du crayon (centre à 67 px du bas) ; au-dessus du rail s'il
+      // est déplié.
+      bubbles = rail > 0 ? 80 + sb + rail : 47 + sb;
       field = 44 + sb;
       scale = 0.833;
       specOrb = k(476);
@@ -4004,7 +4006,7 @@ class _CallScreenState extends State<CallScreen> {
                               // Le crayon n'est là que rail rangé : sinon les
                               // bulles prennent toute la largeur.
                               right: (pencilShown && !_composerOpen) ? 70 : 16,
-                              bottom: g.bubbles - 10,
+                              bottom: g.bubbles,
                               child: _TurnsBlock(
                                 key: const ValueKey('camoff_block'),
                                 turns: last,
@@ -4021,6 +4023,7 @@ class _CallScreenState extends State<CallScreen> {
                                 onTapZone: _toggleDockCamOff,
                                 holdFade: true,
                                 onDark: true,
+                                snug: true,
                                 listMaxHeight: g.zoneMax,
                                 showEarlier: false,
                               ),
@@ -4045,6 +4048,7 @@ class _CallScreenState extends State<CallScreen> {
                                 onTapZone: _toggleDockCamOff,
                                 holdFade: true,
                                 onDark: true,
+                                snug: true,
                                 listMaxHeight: g.zoneMax,
                                 showEarlier: false,
                               ),
@@ -4979,6 +4983,7 @@ class _TurnsBlock extends StatefulWidget {
     required this.onTapZone,
     this.holdFade = false,
     this.onDark = false,
+    this.snug = false,
     this.listMaxHeight = _SpokenTurnsPanel.maxHeight,
     this.showEarlier = true,
   });
@@ -4989,6 +4994,10 @@ class _TurnsBlock extends StatefulWidget {
   /// Caméra du pair coupée (v4) : verre blanc sur fond noir, deux lignes au
   /// plus par bulle. Le texte garde sa taille ; c'est la zone qui est plus haute.
   final bool onDark;
+
+  /// Les bulles se collent au bord (bas, ou haut si [top]) de la zone au lieu
+  /// de flotter dans sa hauteur minimale de 84 px.
+  final bool snug;
 
   /// Hauteur maximale de la liste de bulles.
   final double listMaxHeight;
@@ -5354,7 +5363,14 @@ class _TurnsBlockState extends State<_TurnsBlock>
             children: [
               ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 64 + 20),
-                child: column,
+                child: widget.snug
+                    ? Align(
+                        alignment: widget.top
+                            ? Alignment.topLeft
+                            : Alignment.bottomLeft,
+                        child: column,
+                      )
+                    : column,
               ),
               Positioned(
                 left: 0,
