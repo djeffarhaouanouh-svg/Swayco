@@ -3456,7 +3456,8 @@ class _ReactionChip extends StatelessWidget {
       builder: (context, t, child) =>
           Transform.scale(scale: t, alignment: Alignment.center, child: child),
       child: Material(
-        color: const Color(0xFF1C1C1E),
+        // Clair : une pastille blanche, pas un bloc noir sur la conversation.
+        color: SC.light ? Colors.white : const Color(0xFF1C1C1E),
         elevation: 3,
         shadowColor: Colors.black54,
         borderRadius: BorderRadius.circular(999),
@@ -3469,7 +3470,11 @@ class _ReactionChip extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0x33FFFFFF)),
+              border: Border.all(
+                color: SC.light
+                    ? const Color(0x1F000000)
+                    : const Color(0x33FFFFFF),
+              ),
             ),
             child: Text.rich(
               TextSpan(
