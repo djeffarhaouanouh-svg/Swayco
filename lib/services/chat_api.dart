@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app_strings.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
+import 'review_prompt.dart';
 
 class ChatMessage {
   ChatMessage({
@@ -322,9 +323,12 @@ abstract final class ChatApi {
         if (returnId) {
           final inserted =
               await _client.from('messages').insert(row).select('id').single();
+          unawaited(ReviewPrompt.noteMessageSent());
           return inserted['id']?.toString() ?? '';
         }
         await _client.from('messages').insert(row);
+        // Un message de la personne est parti : au 4e, la demande d'avis.
+        unawaited(ReviewPrompt.noteMessageSent());
         return '';
       } on PostgrestException catch (e) {
         final present = [for (final c in optional) if (row.containsKey(c)) c];
