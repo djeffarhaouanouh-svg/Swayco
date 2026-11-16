@@ -361,7 +361,7 @@ abstract final class UserPrefs {
       translatedVolume: p.getDouble(keyTranslatedVolume) ?? 1.0,
       originalVolume: p.getDouble(keyOriginalVolume) ?? 1.0,
       duckingEnabled: p.getBool(keyDuckingEnabled) ?? true,
-      speakerOn: p.getBool(keySpeakerOn) ?? true,
+      speakerOn: p.getBool(keySpeakerOn) ?? false,
     );
   }
 

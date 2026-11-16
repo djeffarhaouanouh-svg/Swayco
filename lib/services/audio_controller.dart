@@ -50,7 +50,7 @@ class AudioController extends ChangeNotifier {
     translatedVolume: kStartTranslatedVolume,
     originalVolume: kStartOriginalVolume,
     duckingEnabled: true,
-    speakerOn: true,
+    speakerOn: false,
   );
 
   AudioRoute _route = AudioRoute.earpiece;
@@ -116,17 +116,17 @@ class AudioController extends ChangeNotifier {
       };
     }
     _prefs = await UserPrefs.loadAudio();
-    // Chaque appel démarre pareil : TOUS les volumes au maximum et le
-    // HAUT-PARLEUR, quoi qu'on ait réglé à l'appel d'avant (décision produit :
-    // on entend tout de suite, sans chercher les curseurs). On peut toujours
-    // baisser ou passer à l'écouteur pendant l'appel ; ça ne tient que pour
-    // celui-là. Un casque ou un Bluetooth branché garde la main sur la route
-    // (voir [_applySpeaker]). Le paramètre [video] ne change donc plus rien :
-    // visio ou audio, c'est le haut-parleur.
+    // Chaque appel démarre pareil : TOUS les volumes au maximum, quoi qu'on ait
+    // réglé à l'appel d'avant (décision produit : on entend tout de suite, sans
+    // chercher les curseurs). La route, elle, démarre sur l'ÉCOUTEUR : sur le
+    // haut-parleur, la voix de la traduction ne jouait plus du tout sur iPhone
+    // (testé : haut-parleur coupé, elle revient). On peut passer au haut-parleur
+    // d'un tap pendant l'appel ; ça ne tient que pour celui-là. Un casque ou un
+    // Bluetooth branché garde la main sur la route (voir [_applySpeaker]).
     _prefs = _prefs.copyWith(
       translatedVolume: kStartTranslatedVolume,
       originalVolume: kStartOriginalVolume,
-      speakerOn: true,
+      speakerOn: false,
     );
 
     await _applySpeaker(_prefs.speakerOn);
