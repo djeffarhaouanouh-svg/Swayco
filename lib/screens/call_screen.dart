@@ -196,6 +196,11 @@ class _CallScreenState extends State<CallScreen> {
   /// de l'appel s'efface le temps qu'elle est là.
   bool _turnsOpen = false;
 
+  /// Les messages sont COUPÉS (touche Messages) : ni bulles, ni languette, ni
+  /// crayon. Sinon ils sont permanents — rien d'autre ne les ferme. La touche
+  /// Messages les remet.
+  bool _messagesCut = false;
+
   /// La saisie de la conversation. Ce qui est tapé part comme une phrase dite :
   /// traduit chez le pair, écrit et lu à voix haute. Rien n'est persisté, ça ne
   /// vit que le temps de l'appel.
@@ -238,7 +243,7 @@ class _CallScreenState extends State<CallScreen> {
   double _orbY(double h) {
     if (h <= 0) return 0.80;
     final showBubbles =
-        !_turnsOpen && !_msgTop && _turns.isNotEmpty;
+        !_turnsOpen && !_msgTop && _turns.isNotEmpty && !_messagesCut;
     final n = _restTurns.length.clamp(1, 2);
     final dockShown = _turnsOpen ? _topControls : !_dockDimmed;
     final dockH = dockShown ? 96.0 : 0.0; // la barre, hors marge basse
@@ -259,6 +264,7 @@ class _CallScreenState extends State<CallScreen> {
   /// Des bulles (au repos ou la zone ouverte) sont affichées EN HAUT.
   bool get _topMessagesShown =>
       _msgTop &&
+      !_messagesCut &&
       (_camOffMode
           // Caméra coupée : les messages sont permanents, le silence ou un tap
           // ne les retire pas.
@@ -439,6 +445,7 @@ class _CallScreenState extends State<CallScreen> {
       _topControls = false;
       _turnsOpen = false;
       _composerOpen = false;
+      _messagesCut = true;
     });
   }
 
@@ -472,9 +479,9 @@ class _CallScreenState extends State<CallScreen> {
       setState(() {
         _sheetOpen = false;
         // Et le rail avec : c'est lui qui a ouvert ce panneau, le laisser
-        // déplié obligeait à un second geste pour revenir à l'appel.
+        // déplié obligeait à un second geste pour revenir à l'appel. Les
+        // messages, eux, restent : seule la touche Messages les coupe.
         _controlsOpen = false;
-        _turnsOpen = false;
       });
     });
   }
@@ -3987,7 +3994,7 @@ class _CallScreenState extends State<CallScreen> {
                   ),
                 // v4 : les 2 dernières bulles, permanentes, et le crayon. Un
                 // tap sur les bulles ne ferme rien : il range / affiche la barre.
-                if (_camOffMode)
+                if (_camOffMode && !_messagesCut)
                   Builder(
                     builder: (context) {
                       final g = _camOffGeo(
@@ -4411,6 +4418,7 @@ class _CallScreenState extends State<CallScreen> {
                             child: (_turnsOpen ||
                                     _camOffMode ||
                                     _msgTop ||
+                                    _messagesCut ||
                                     _turns.isEmpty)
                                 ? const SizedBox(width: double.infinity)
                                 : Align(
@@ -4492,6 +4500,7 @@ class _CallScreenState extends State<CallScreen> {
                                             }
                                             setState(() {
                                               _turnsOpen = true;
+                                              _messagesCut = false;
                                               // La saisie apparaît DÉPLIÉE puis se
                                               // replie d'elle-même en rond crayon
                                               // (voir _foldComposerSoon) : on voit
@@ -4634,11 +4643,10 @@ class _CallScreenState extends State<CallScreen> {
                               _wakeDock();
                               setState(() {
                                 _controlsOpen = !_controlsOpen;
-                                // Et dans l'autre sens aussi : les réglages et
-                                // la conversation se disputent la même bande
-                                // au-dessus de la barre. Un seul des deux à la
-                                // fois, quel que soit celui qu'on ouvre.
-                                if (_controlsOpen) _turnsOpen = false;
+                                // Les messages restent : ils sont permanents (avec
+                                // leur languette et leur crayon), la zone se pose
+                                // au-dessus des réglages dépliés. Seule la touche
+                                // Messages les coupe.
                               });
                               if (_controlsOpen) {
                                 _armControlsIdle();
@@ -4670,8 +4678,11 @@ class _CallScreenState extends State<CallScreen> {
                           bottom: 16 +
                               MediaQuery.of(context).viewInsets.bottom +
                               // La barre est rappelée par un tap : la zone se
-                              // pose au-dessus d'elle.
-                              ((_topControls && !_msgTop) ? 112.0 : 0.0),
+                              // pose au-dessus d'elle (et au-dessus des
+                              // réglages quand ils sont dépliés). Bulles en bas
+                              // comme en haut : le crayon est toujours là.
+                              (_topControls ? 112.0 : 0.0) +
+                              (_controlsOpen ? 92.0 : 0.0),
                         ),
                         child: _SpokenTurnsPanel(
                           turns: _turns,
@@ -4689,7 +4700,9 @@ class _CallScreenState extends State<CallScreen> {
                           onToggleSide: () => _setMessagesSide(!_msgTop),
                           hint: _tabHint,
                           onHintDone: _endTabHint,
-                          onTapZone: _closeTurns,
+                          // Un tap sur les messages ne les ferme PLUS : il
+                          // rappelle la barre. Seule la touche Messages coupe.
+                          onTapZone: _showTopControls,
                         ),
                       ),
                     ),
@@ -4716,9 +4729,9 @@ class _CallScreenState extends State<CallScreen> {
                             onToggleSide: () => _setMessagesSide(false),
                             hint: _tabHint,
                             onHintDone: _endTabHint,
-                            // Toucher les messages les referme ; toucher à côté
-                            // réaffiche la barre de boutons.
-                            onTapZone: _closeTurns,
+                            // Toucher les messages rappelle la barre de boutons ;
+                            // seule la touche Messages les coupe.
+                            onTapZone: _showTopControls,
                           )
                         : Padding(
                             padding: const EdgeInsets.only(left: 28),
@@ -4941,9 +4954,16 @@ class _SpokenTurnsPanel extends StatelessWidget {
         ),
       ),
     );
-    // Messages rangés EN HAUT : plus de crayon (il tombait sur la zone des
-    // boutons). Il ne reste rien en bas ; on écrit en les rangeant en bas.
-    if (top) return const SizedBox.shrink();
+    // Messages rangés EN HAUT : les bulles sont en haut, mais le crayon reste
+    // en bas à gauche — permanent, comme la languette. L'écran d'appel remonte
+    // toute la zone au-dessus de la barre quand elle est rappelée (voir le
+    // remplissage du panneau), donc il ne tombe plus sur les boutons.
+    if (top) {
+      return SizedBox(
+        height: 46,
+        child: Stack(clipBehavior: Clip.none, children: [composer]),
+      );
+    }
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 84 + 10),
       child: Stack(
