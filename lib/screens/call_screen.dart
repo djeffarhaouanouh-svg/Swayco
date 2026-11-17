@@ -1079,8 +1079,6 @@ class _CallScreenState extends State<CallScreen> {
                 const SizedBox(height: 6),
                 Wrap(runSpacing: 6, children: [
                   btn('Lire la route', () => unawaited(_logRoute('manuel'))),
-                  btn('Relancer la voix',
-                      () => unawaited(_reprimeDeviceTts('bouton'))),
                   btn('Test voix', () {
                     final l = _myOutputLang.isNotEmpty ? _myOutputLang : 'fr';
                     DebugOverlay.log('test voix demandé ($l)');
@@ -1120,40 +1118,6 @@ class _CallScreenState extends State<CallScreen> {
         ),
       ),
     );
-  }
-
-  /// RELANCE de la voix de l'appareil après un changement de route (écouteur ⇄
-  /// haut-parleur). Hypothèse à tester : changer la route reconfigure la session
-  /// audio de WebRTC sous les pieds du moteur de synthèse, qui continue alors de
-  /// « parler » dans le vide (même famille de panne que le silence du build 203,
-  /// voir swayco_sounds.dart). On l'arrête, on lui fait oublier sa langue, on
-  /// ré-arme l'attente de fin de phrase, et on rejoue une phrase muette pour
-  /// qu'il reprenne la session telle qu'elle est maintenant. Sans effet sur
-  /// l'appel lui-même ; ignoré si une phrase est en cours.
-  Future<void> _reprimeDeviceTts(String why) async {
-    if (kIsWeb || ttsSpeaking.value) return;
-    DebugOverlay.log('tts reprime ($why)');
-    try {
-      await _deviceTts.stop();
-      _deviceTtsLang = '';
-      await _deviceTts.awaitSpeakCompletion(true);
-      final tag = _voiceTagFor(_myOutputLang);
-      if (tag.isNotEmpty) {
-        await _deviceTts.setLanguage(tag);
-        _deviceTtsLang = tag;
-      }
-      await _deviceTts.setVolume(0.0);
-      await _deviceTts.speak(' ').timeout(const Duration(seconds: 2));
-      await _deviceTts.stop();
-      await _applyTranslatedVolumeToDeviceTts();
-      DebugOverlay.log('tts reprime done');
-    } catch (e) {
-      DebugOverlay.log('tts reprime failed: $e');
-      try {
-        await _deviceTts.stop();
-        await _applyTranslatedVolumeToDeviceTts();
-      } catch (_) {}
-    }
   }
 
   /// True exactly while a translation is being SPOKEN, whichever engine speaks
@@ -2964,8 +2928,6 @@ class _CallScreenState extends State<CallScreen> {
     await _audio.setSpeakerOn(!_audio.speakerOn);
     DebugOverlay.log('speaker route -> ${_audio.speakerOn ? "loudspeaker" : "earpiece"}');
     if (mounted) setState(() {});
-    // Relance de la voix : voir [_reprimeDeviceTts].
-    unawaited(_reprimeDeviceTts('route change'));
     // Où le système envoie le son une fois la bascule faite (il lui faut un
     // instant pour changer de sortie).
     Future<void>.delayed(
