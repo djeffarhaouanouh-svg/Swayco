@@ -54,7 +54,7 @@ import '../widgets/voice_note_player.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_animations.dart';
 import '../widgets/swayco_dialog.dart';
-import 'profile_screen.dart';
+import 'profile_screen.dart';
 import '../services/friendly_error.dart';
 
 /// One-to-one chat thread for [conversationId]. Title is the human-friendly
@@ -777,6 +777,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       ? m.id
       : '${m.id}:${m.editedAt!.millisecondsSinceEpoch}';
 
+  /// Combien de fois on a déjà redemandé la traduction d'un message qui nous est
+  /// revenue inchangée (voir [_maybeFetchTranslation]).
+  final Map<String, int> _translationTries = {};
+
   void _maybeFetchTranslation(ChatMessage m) {
     if (!_autoTranslate || _myLang.isEmpty) return;
     if (m.isDeleted) return;
@@ -802,6 +806,23 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           context: ctx,
         );
         if (!mounted) return;
+        // Le moteur a rendu le texte INCHANGÉ (ou rien) : c'est ce que fait
+        // fetchTextTranslation en cas d'échec — réseau, délai dépassé, limite de
+        // débit. Le graver comme « traduction » figeait le message en langue
+        // d'origine pour toute la session, sans jamais le redemander. On
+        // réessaie donc deux fois, un peu plus tard ; au-delà (un texte qui se
+        // traduit vraiment en lui-même : un émoji, un nom), on le laisse tel quel.
+        if (out.isEmpty || out == m.body) {
+          final tries = (_translationTries[id] ?? 0) + 1;
+          _translationTries[id] = tries;
+          if (tries <= 2) {
+            setState(() => _translatingIds.remove(id));
+            Future<void>.delayed(Duration(seconds: 3 * tries), () {
+              if (mounted) _maybeFetchTranslation(m);
+            });
+            return;
+          }
+        }
         setState(() {
           _translations[id] = out;
           _translatingIds.remove(id);
