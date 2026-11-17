@@ -948,6 +948,16 @@ class _CallScreenState extends State<CallScreen> {
   bool _debugOpen = false;
   String _lastSpeak = '—';
 
+  /// Comptes qui voient le panneau de debug EN PLUS de la liste du serveur : le
+  /// contrôle serveur peut échouer en silence (réseau, jeton), et un panneau qui
+  /// ne s'affiche pas ne sert à rien pour diagnostiquer. Une adresse, pas un
+  /// droit : le panneau ne change rien d'autre que ce qu'on lit à l'écran.
+  static const Set<String> _kDebugPanelEmails = {'lenny.hardoroc@gmail.com'};
+
+  bool get _showDebugPanel =>
+      _isEgressAdmin ||
+      _kDebugPanelEmails.contains(AuthService.currentEmail.toLowerCase());
+
   /// Panneau de debug (🐛, en haut à gauche) : l'état de la voix et de la route,
   /// les dernières lignes du journal, et deux boutons d'essai. N'existe que pour
   /// un compte autorisé (même contrôle que le bouton REC) ; rien n'en sort du
@@ -2211,7 +2221,7 @@ class _CallScreenState extends State<CallScreen> {
       }
     }));
     // Panneau de debug : même public que REC (comptes autorisés uniquement).
-    DebugOverlay.capture = _isEgressAdmin;
+    DebugOverlay.capture = _showDebugPanel;
     _start();
     // Hold the connecting splash for a minimum of 5s so it is actually
     // readable even when the room connects almost instantly.
@@ -4342,8 +4352,6 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
-                // Panneau de debug de la voix : comptes autorisés seulement.
-                if (_isEgressAdmin) _buildDebugPanel(),
                 // Le galet, bas dans l'écran mais pas au ras des touches : ses
                 // ondes montent jusqu'à 2,4 fois son disque, et si elles
                 // atteignaient les réglages dépliés on ne saurait plus ce qui
@@ -4897,6 +4905,10 @@ class _CallScreenState extends State<CallScreen> {
                     ),
                   ),
                 ),
+                // Panneau de debug de la voix : TOUT AU-DESSUS (dernier enfant),
+                // sinon une couche pleine page dessinée après lui le cache et
+                // lui prend ses taps. Comptes autorisés seulement.
+                if (_showDebugPanel) _buildDebugPanel(),
               ],
             ),
                   ),
