@@ -2427,6 +2427,13 @@ class _CallScreenState extends State<CallScreen> {
       // soi), l'appel normal sur l'écouteur. Un casque branché prime sur les
       // deux, au niveau de l'OS.
       await _audio.bind(room, video: _startCam);
+      // Au départ aussi : sur iPhone un appel vidéo peut très bien démarrer sur le
+      // haut-parleur de lui-même, et sans relance la voix traduite y reste muette
+      // jusqu'au premier changement de route (voir [_reprimeDeviceTts]). Un
+      // instant d'attente : la route a besoin de se poser.
+      Future<void>.delayed(const Duration(milliseconds: 700), () {
+        if (mounted) unawaited(_reprimeDeviceTts('call start'));
+      });
       widget.translation.translationListenable?.addListener(_onTranslationStateChanged);
       // Reset the global mic-mute flag — it persists across re-attaches.
       setSendMuted(false);

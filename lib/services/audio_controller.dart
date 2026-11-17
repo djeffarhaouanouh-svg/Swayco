@@ -35,12 +35,12 @@ class AudioController extends ChangeNotifier {
 
   /// Volume de la voix d'origine tant que personne n'a bougé le curseur : aux
   /// trois quarts, pour qu'elle reste présente sans couvrir la traduction.
-  static const double kStartOriginalVolume = 1.0;
+  static const double kStartOriginalVolume = 0.9;
 
   /// Et la traduction à moitié : elle passe par-dessus la voix, donc elle n'a
   /// pas besoin d'être aussi forte pour s'entendre. Réglable en appel, et le
   /// réglage tient d'un appel à l'autre.
-  static const double kStartTranslatedVolume = 1.0;
+  static const double kStartTranslatedVolume = 0.9;
 
   // Un appel normal démarre sur l'ÉCOUTEUR, comme n'importe quel téléphone :
   // collé à l'oreille, le haut-parleur n'atteint pas le micro, donc la boucle

@@ -358,8 +358,8 @@ abstract final class UserPrefs {
     return AudioPrefs(
       // Mêmes valeurs de départ que AudioController : tout au maximum, haut-parleur
       // (et chaque appel les remet de toute façon, voir AudioController.bind).
-      translatedVolume: p.getDouble(keyTranslatedVolume) ?? 1.0,
-      originalVolume: p.getDouble(keyOriginalVolume) ?? 1.0,
+      translatedVolume: p.getDouble(keyTranslatedVolume) ?? 0.9,
+      originalVolume: p.getDouble(keyOriginalVolume) ?? 0.9,
       duckingEnabled: p.getBool(keyDuckingEnabled) ?? true,
       speakerOn: p.getBool(keySpeakerOn) ?? false,
     );
