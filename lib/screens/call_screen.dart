@@ -949,6 +949,25 @@ class _CallScreenState extends State<CallScreen> {
   bool _debugCopied = false;
   String _lastSpeak = '—';
 
+  /// Dernière lecture de la session audio de l'iPhone (lecture seule, voir
+  /// SceneDelegate.swift) : catégorie, mode, options, SORTIE réellement
+  /// utilisée. Sert à voir si la voix de synthèse sort au même endroit que
+  /// celle de l'appel. Vide hors iPhone, et inactif hors panneau de debug.
+  String _lastRoute = '—';
+  static const MethodChannel _routeCh = MethodChannel('swayco/audio_route');
+
+  Future<void> _logRoute(String when) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
+    if (!DebugOverlay.capture) return;
+    try {
+      final s = await _routeCh.invokeMethod<String>('snapshot') ?? '?';
+      if (mounted) setState(() => _lastRoute = s);
+      DebugOverlay.log('ROUTE $when: $s');
+    } catch (e) {
+      DebugOverlay.log('ROUTE $when: lecture impossible ($e)');
+    }
+  }
+
   /// Comptes qui voient le panneau de debug EN PLUS de la liste du serveur : le
   /// contrôle serveur peut échouer en silence (réseau, jeton), et un panneau qui
   /// ne s'affiche pas ne sert à rien pour diagnostiquer. Une adresse, pas un
@@ -1053,11 +1072,13 @@ class _CallScreenState extends State<CallScreen> {
                   'voix parle=${ttsSpeaking.value}  son traduit=$_translationEnabled\n'
                   'langue voix=${_deviceTtsLang.isEmpty ? "—" : _deviceTtsLang}  '
                   'sortie=$_myOutputLang\n'
-                  'dernier speak: $_lastSpeak',
+                  'dernier speak: $_lastSpeak\n'
+                  'ROUTE iOS: $_lastRoute',
                   style: mono,
                 ),
                 const SizedBox(height: 6),
                 Wrap(runSpacing: 6, children: [
+                  btn('Lire la route', () => unawaited(_logRoute('manuel'))),
                   btn('Relancer la voix',
                       () => unawaited(_reprimeDeviceTts('bouton'))),
                   btn('Test voix', () {
@@ -1076,6 +1097,7 @@ class _CallScreenState extends State<CallScreen> {
                         'son traduit=$_translationEnabled\n'
                         'langue voix=$_deviceTtsLang sortie=$_myOutputLang\n'
                         'dernier speak: $_lastSpeak\n'
+                        'ROUTE iOS: $_lastRoute\n'
                         '--- journal ---\n${DebugOverlay.lines.value.join('\n')}';
                     unawaited(Clipboard.setData(ClipboardData(text: text)));
                     setState(() => _debugCopied = true);
@@ -1439,7 +1461,9 @@ class _CallScreenState extends State<CallScreen> {
       // Mobile Chrome auto-pauses speechSynthesis after a stretch of inactivity;
       // speak() then plays nothing and fires no event.
       resumeSpeechSynthesisIfPaused();
+      await _logRoute('avant speak');
       final res = await _deviceTts.speak(text).timeout(_speakCap(text));
+      unawaited(_logRoute('après speak'));
       _lastSpeak = 'res=$res ${DateTime.now().toIso8601String().substring(11, 19)}';
       DebugOverlay.log('speak res=$res speaker=${_audio.speakerOn}');
       if (res == 0) {
@@ -2942,6 +2966,10 @@ class _CallScreenState extends State<CallScreen> {
     if (mounted) setState(() {});
     // Relance de la voix : voir [_reprimeDeviceTts].
     unawaited(_reprimeDeviceTts('route change'));
+    // Où le système envoie le son une fois la bascule faite (il lui faut un
+    // instant pour changer de sortie).
+    Future<void>.delayed(
+        const Duration(milliseconds: 400), () => _logRoute('après bascule'));
   }
 
   /// Retourner la caméra, avant / arrière.

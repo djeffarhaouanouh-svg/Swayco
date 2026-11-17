@@ -86,6 +86,22 @@ abstract final class MatchCelebration {
     return id;
   }
 
+  /// Oublie les personnes dont le match n'existe plus : [currentMatchIds] est la
+  /// liste de mes matchs d'AUJOURD'HUI. Sans ça, quelqu'un fêté une fois l'était
+  /// pour toujours — rompre puis se rematcher (deux comptes de test, une erreur
+  /// corrigée) ne rejouait aucune animation, ni d'un côté ni de l'autre.
+  ///
+  /// Une liste VIDE ne purge rien : une lecture qui échoue ou une compte sans
+  /// match ne doit pas effacer la mémoire, sinon tous les matchs seraient
+  /// refêtés au prochain lancement.
+  static void forgetEnded(Set<String> currentMatchIds) {
+    if (currentMatchIds.isEmpty) return;
+    final gone = _alreadyShown.difference(currentMatchIds);
+    if (gone.isEmpty) return;
+    _alreadyShown.removeAll(gone);
+    _persist();
+  }
+
   /// Mark [peerId] as already celebrated without enqueueing — used by the
   /// local accept/like-back path that shows the overlay itself.
   static void markShown(String peerId) {

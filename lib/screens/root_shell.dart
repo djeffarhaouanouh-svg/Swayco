@@ -280,6 +280,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         // its celebration now. With nothing stored yet (first launch), the
         // matches found are the baseline — don't replay every past match.
         final hadHistory = await MatchCelebration.restore();
+        // Un match terminé puis refait doit se fêter de nouveau.
+        if (hadHistory) MatchCelebration.forgetEnded(ids);
         final unseen = hadHistory
             ? ids.difference(MatchCelebration.shown)
             : <String>{};
@@ -292,6 +294,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         return;
       }
       final fresh = ids.difference(_knownMatchIds);
+      // Ceux qui ne sont plus mes matchs sont oubliés : s'ils reviennent, c'est
+      // un NOUVEAU match, avec son animation des deux côtés.
+      MatchCelebration.forgetEnded(ids);
       _knownMatchIds = ids;
       if (fresh.isNotEmpty) MatchCelebration.matchesChanged.value++;
       for (final id in fresh) {

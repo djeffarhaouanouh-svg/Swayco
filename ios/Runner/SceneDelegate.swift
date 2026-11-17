@@ -1,3 +1,4 @@
+import AVFoundation
 import Flutter
 import UIKit
 import UserNotifications
@@ -48,6 +49,34 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     // Whisper recogniser. Same timing constraint as SwayMicTap: registered on
     // THIS engine's messenger, after the generated plugins.
     SwayAppleStt.register(with: flutterVC.binaryMessenger)
+
+    // LECTURE SEULE de la session audio, pour le panneau de debug de l'appel :
+    // où le système envoie réellement le son (écouteur, haut-parleur, casque), et
+    // avec quelle catégorie / mode / options. C'est ce qui manquait pour savoir
+    // si la voix de synthèse sort au même endroit que celle de l'appel. Ne
+    // modifie RIEN — aucun setCategory, aucun setActive.
+    let routeChannel = FlutterMethodChannel(
+      name: "swayco/audio_route", binaryMessenger: flutterVC.binaryMessenger)
+    routeChannel.setMethodCallHandler { call, result in
+      guard call.method == "snapshot" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      let s = AVAudioSession.sharedInstance()
+      let outs = s.currentRoute.outputs.map { $0.portType.rawValue }.joined(separator: ",")
+      let ins = s.currentRoute.inputs.map { $0.portType.rawValue }.joined(separator: ",")
+      let o = s.categoryOptions
+      var opts: [String] = []
+      if o.contains(.mixWithOthers) { opts.append("mix") }
+      if o.contains(.defaultToSpeaker) { opts.append("defSpk") }
+      if o.contains(.allowBluetooth) { opts.append("bt") }
+      if o.contains(.allowBluetoothA2DP) { opts.append("a2dp") }
+      if o.contains(.duckOthers) { opts.append("duck") }
+      let vol = String(format: "%.2f", s.outputVolume)
+      result(
+        "cat=\(s.category.rawValue) mode=\(s.mode.rawValue) opts=[\(opts.joined(separator: ","))] out=[\(outs)] in=[\(ins)] sysvol=\(vol)"
+      )
+    }
 
     let window = UIWindow(windowScene: windowScene)
     window.rootViewController = flutterVC
