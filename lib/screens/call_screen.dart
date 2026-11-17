@@ -3925,7 +3925,7 @@ class _CallScreenState extends State<CallScreen> {
                                     // la vignette se pose au-dessus d'elle.
                                     : _kPipBottomLift))
                             .clamp(52.0, double.infinity)
-                        : MediaQuery.paddingOf(context).top + 52,
+                        : MediaQuery.paddingOf(context).top + 40,
                     right: 12,
                     width: 118,
                     height: 176,
@@ -4267,10 +4267,21 @@ class _CallScreenState extends State<CallScreen> {
                     // la hauteur ; le galet se pose JUSTE au-dessus. Calculé
                     // plutôt que réglé à la main : le clavier fait monter la
                     // zone, et une valeur fixe le laisserait dessous.
-                    final lift = _SpokenTurnsPanel.zoneHeight +
+                    // Le galet descend : son TEXTE se pose juste au-dessus de la fin
+                    // des messages, pas à une hauteur fixe qui laissait un grand
+                    // vide quand il n'y a que deux petites bulles. Calculé depuis
+                    // ce qui occupe réellement le bas de l'écran : le rembourrage,
+                    // le clavier, la barre et les réglages quand ils sont rappelés
+                    // (le panneau se pose au-dessus d'eux), la hauteur des bulles
+                    // (94 au minimum, plus la saisie dépliée), puis le galet réduit
+                    // et son texte (~60 : rayon, air, une ligne).
+                    final lift = 16 + // le rembourrage bas de la colonne
                         MediaQuery.of(context).viewInsets.bottom +
-                        16 + // le rembourrage bas de la colonne
-                        46; // la moitié du galet réduit, plus un peu d'air
+                        (_topControls ? 112.0 : 0.0) +
+                        (_controlsOpen ? 92.0 : 0.0) +
+                        94 + // hauteur minimale de la zone des bulles
+                        (_composerOpen ? 58.0 : 0.0) + // la saisie dépliée
+                        60; // le galet réduit et son texte
                     final turnsY = box.maxHeight <= 0
                         ? 0.0
                         : (1 - 2 * lift / box.maxHeight).clamp(-0.9, 0.9);
@@ -4932,10 +4943,6 @@ class _SpokenTurnsPanel extends StatelessWidget {
   /// Deux bulles d'une ligne (~38 chacune) et l'air entre elles. Au-delà on
   /// remonte le fil en faisant défiler ; aucune troisième bulle estompée.
   static const double maxHeight = 84;
-
-  /// Ce que la zone occupe en bas de l'écran (pastille, bulles, saisie et
-  /// air) : le galet en a besoin pour se poser au-dessus.
-  static const double zoneHeight = 30 + maxHeight + 58 + 10;
 
   /// La saisie dépliée fait remonter les bulles d'autant.
   static const double _composerLift = 58;
