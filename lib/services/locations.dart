@@ -82,6 +82,9 @@ const List<Country> kCountries = [
   Country(name: "Côte d'Ivoire", flag: '🇨🇮', cities: [
     'Abidjan', 'Bouaké', 'Yamoussoukro', 'Daloa',
   ]),
+  Country(name: 'Angola', flag: '🇦🇴', cities: [
+    'Luanda', 'Huambo', 'Lobito', 'Benguela', 'Lubango', 'Cabinda', 'Malanje',
+  ]),
   Country(name: 'Égypte', flag: '🇪🇬', cities: [
     'Le Caire', 'Alexandrie', 'Gizeh', 'Charm el-Cheikh', 'Louxor',
   ]),
@@ -255,6 +258,7 @@ const Map<String, String> _kIso2 = {
   'Tunisie': 'tn',
   'Sénégal': 'sn',
   "Côte d'Ivoire": 'ci',
+  'Angola': 'ao',
   'Égypte': 'eg',
   'Arabie Saoudite': 'sa',
   'Émirats arabes unis': 'ae',

@@ -37,6 +37,7 @@ const COUNTRY_TZ = {
   'Brésil': 'America/Sao_Paulo', 'Maroc': 'Africa/Casablanca',
   'Algérie': 'Africa/Algiers', 'Tunisie': 'Africa/Tunis',
   'Sénégal': 'Africa/Dakar', "Côte d'Ivoire": 'Africa/Abidjan',
+  'Angola': 'Africa/Luanda',
   'Égypte': 'Africa/Cairo', 'Arabie Saoudite': 'Asia/Riyadh',
   'Émirats arabes unis': 'Asia/Dubai', 'Turquie': 'Europe/Istanbul',
   'Russie': 'Europe/Moscow', 'Chine': 'Asia/Shanghai', 'Japon': 'Asia/Tokyo',

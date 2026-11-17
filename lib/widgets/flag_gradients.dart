@@ -172,6 +172,7 @@ List<Color> flagRingColors({required String country, required String language}) 
     'Tunisie': [Color(0xFFE70013), Color(0xFFE70013)],
     'Sénégal': [Color(0xFF00853F), Color(0xFFE31B23)],
     "Côte d'Ivoire": [Color(0xFFF77F00), Color(0xFF009E60)],
+    'Angola': [Color(0xFFCC092F), Color(0xFF000000)],
     'Égypte': [Color(0xFFCE1126), Color(0xFF1A1A1A)],
     'Arabie Saoudite': [Color(0xFF006C35), Color(0xFF006C35)],
     'Émirats arabes unis': [Color(0xFF00732F), Color(0xFFFF0000)],

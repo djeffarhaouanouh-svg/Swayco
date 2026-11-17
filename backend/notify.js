@@ -177,6 +177,7 @@ const COUNTRY_ISO2 = {
   'Italie': 'it', 'Allemagne': 'de', 'Pays-Bas': 'nl', 'Mexique': 'mx',
   'Argentine': 'ar', 'Colombie': 'co', 'Brésil': 'br', 'Maroc': 'ma',
   'Algérie': 'dz', 'Tunisie': 'tn', 'Sénégal': 'sn', "Côte d'Ivoire": 'ci',
+  'Angola': 'ao',
   'Égypte': 'eg', 'Arabie Saoudite': 'sa', 'Émirats arabes unis': 'ae',
   'Turquie': 'tr', 'Russie': 'ru', 'Chine': 'cn', 'Japon': 'jp',
   'Corée du Sud': 'kr', 'Inde': 'in', 'Australie': 'au', 'Luxembourg': 'lu',

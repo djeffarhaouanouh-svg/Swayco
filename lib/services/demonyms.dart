@@ -27,6 +27,7 @@ const Map<String, ({String frM, String frF, String en, String ja})> kDemonyms = 
   'Tunisie': (frM: 'Tunisien', frF: 'Tunisienne', en: 'Tunisian', ja: 'チュニジア人'),
   'Sénégal': (frM: 'Sénégalais', frF: 'Sénégalaise', en: 'Senegalese', ja: 'セネガル人'),
   "Côte d'Ivoire": (frM: 'Ivoirien', frF: 'Ivoirienne', en: 'Ivorian', ja: 'コートジボワール人'),
+  'Angola': (frM: 'Angolais', frF: 'Angolaise', en: 'Angolan', ja: 'アンゴラ人'),
   'Égypte': (frM: 'Égyptien', frF: 'Égyptienne', en: 'Egyptian', ja: 'エジプト人'),
   'Arabie Saoudite': (frM: 'Saoudien', frF: 'Saoudienne', en: 'Saudi', ja: 'サウジアラビア人'),
   'Émirats arabes unis': (frM: 'Émirati', frF: 'Émiratie', en: 'Emirati', ja: 'アラブ首長国連邦の'),
