@@ -946,6 +946,7 @@ class _CallScreenState extends State<CallScreen> {
   /// Panneau de debug (comptes autorisés seulement) : ouvert ou replié, et le
   /// dernier retour de `speak()` pour le lire d'un coup d'œil.
   bool _debugOpen = false;
+  bool _debugCopied = false;
   String _lastSpeak = '—';
 
   /// Comptes qui voient le panneau de debug EN PLUS de la liste du serveur : le
@@ -1056,7 +1057,7 @@ class _CallScreenState extends State<CallScreen> {
                   style: mono,
                 ),
                 const SizedBox(height: 6),
-                Row(children: [
+                Wrap(runSpacing: 6, children: [
                   btn('Relancer la voix',
                       () => unawaited(_reprimeDeviceTts('bouton'))),
                   btn('Test voix', () {
@@ -1066,6 +1067,22 @@ class _CallScreenState extends State<CallScreen> {
                   }),
                   btn(_audio.speakerOn ? 'Écouteur' : 'Haut-parleur',
                       () => unawaited(_toggleSpeaker())),
+                  btn(_debugCopied ? 'Copié ✓' : 'Copier', () {
+                    final text = 'haut-parleur=${_audio.speakerOn} '
+                        'route=${_audio.route.name}\n'
+                        'volume voix=${_audio.translatedVolume.toStringAsFixed(2)} '
+                        'original=${_audio.originalVolume.toStringAsFixed(2)}\n'
+                        'voix parle=${ttsSpeaking.value} '
+                        'son traduit=$_translationEnabled\n'
+                        'langue voix=$_deviceTtsLang sortie=$_myOutputLang\n'
+                        'dernier speak: $_lastSpeak\n'
+                        '--- journal ---\n${DebugOverlay.lines.value.join('\n')}';
+                    unawaited(Clipboard.setData(ClipboardData(text: text)));
+                    setState(() => _debugCopied = true);
+                    Future<void>.delayed(const Duration(seconds: 2), () {
+                      if (mounted) setState(() => _debugCopied = false);
+                    });
+                  }),
                 ]),
                 const SizedBox(height: 6),
                 Flexible(
