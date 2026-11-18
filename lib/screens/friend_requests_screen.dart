@@ -543,7 +543,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                       if (showUnlockAll) ...[
                         _UnlockAllCard(
                           hidden: hiddenLikers,
-                          total: _requests.length,
+                          // Les profils encore FLOUTÉS, pas toutes les demandes :
+                          // le total ne bougeait jamais quand on en révélait un
+                          // par une pub, et la phrase restait à « 12 ».
+                          total: hiddenLikers.length,
                           onTap: openUnlockAll,
                         ),
                         const SizedBox(height: 14),
