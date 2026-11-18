@@ -16,7 +16,7 @@ class ProBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => showPaywallSheet(context),
+      onTap: () => showPaywallSheet(context, source: 'pro_banner'),
       child: Sparkles(
         borderRadius: 20,
         count: 9,

@@ -289,7 +289,8 @@ class _DailyLimitViewState extends State<DailyLimitView> {
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: () => showPaywallSheet(context),
+                      onTap: () =>
+                          showPaywallSheet(context, source: 'daily_limit'),
                       child: Container(
                         height: 58,
                         alignment: Alignment.center,

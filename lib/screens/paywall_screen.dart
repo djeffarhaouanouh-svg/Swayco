@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/analytics.dart';
 import '../services/app_strings.dart';
 import '../services/swayco_sounds.dart';
 import '../services/device_id.dart';
@@ -24,11 +25,19 @@ import '../widgets/profile_avatar.dart';
 /// The subscription paywall ("1c", direction 8c): a preview of MY card as a
 /// Pro, with a Free / Pro switch. Full screen, slides up; pops when closed or
 /// once the purchase went through. Call from anywhere (settings, Discover…).
-Future<void> showPaywallSheet(BuildContext context) {
+///
+/// [source] : d'où on l'ouvre (`discover_direct_message`, `settings`,
+/// `daily_limit`, `pro_banner`…). Il part dans l'événement `paywall_vue`, pour
+/// savoir QUEL écran amène les gens ici — sans lui on ne mesure qu'un seul
+/// point d'entrée sur six.
+Future<void> showPaywallSheet(
+  BuildContext context, {
+  String source = 'unknown',
+}) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
       fullscreenDialog: true,
-      builder: (_) => const _ProPreviewPaywall(),
+      builder: (_) => _ProPreviewPaywall(source: source),
     ),
   );
 }
@@ -73,6 +82,26 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
 
   bool _busy = false;
 
+  /// Mesure du paywall (`paywall_vue`, `achat_demarre`, `achat_annule`,
+  /// `achat_reussi`, `achat_echoue`) : d'où il a été ouvert, et quelle offre.
+  String paywallSource = 'unknown';
+  String paywallPlan = 'pro';
+
+  /// Un événement du paywall, avec toujours la source, l'offre, le prix affiché
+  /// et l'essai gratuit s'il y en a un : c'est ce qui permet de comparer les
+  /// offres et les écrans. Jamais bloquant.
+  void _trackPaywall(String event, [Map<String, dynamic>? extra]) {
+    try {
+      Analytics.track(event, props: {
+        'source': paywallSource,
+        'plan': paywallPlan,
+        if (_price != null) 'price': _price,
+        if (_trialDays != null) 'trial_days': _trialDays,
+        ...?extra,
+      });
+    } catch (_) {}
+  }
+
   /// Store-localized price from RevenueCat ("8,99 €"). Null while loading,
   /// on web (Stripe shows its own price) or when the package can't load.
   String? _price;
@@ -95,6 +124,7 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
   Future<void> _subscribe() async {
     if (_busy) return;
     setState(() => _busy = true);
+    _trackPaywall('achat_demarre');
     try {
       // iOS/Android → always the native store (Stripe is forbidden there,
       // even if RevenueCat failed to configure). Web/desktop → Stripe.
@@ -113,6 +143,16 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
       packageId: RevenueCat.proPackageId,
       entitlementId: RevenueCat.proEntitlementId,
     );
+    // Le résultat est mesuré AVANT le test `mounted` : une personne qui ferme
+    // l'écran pendant l'achat doit quand même compter.
+    switch (outcome) {
+      case PurchaseOutcome.success:
+        _trackPaywall('achat_reussi');
+      case PurchaseOutcome.cancelled:
+        _trackPaywall('achat_annule');
+      default:
+        _trackPaywall('achat_echoue', {'outcome': outcome.name});
+    }
     if (!mounted) return;
     if (outcome == PurchaseOutcome.success) {
       HapticFeedback.heavyImpact();
@@ -150,6 +190,9 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
 
   Future<void> _subscribeViaStripe() async {
     final url = await StripeApi.startCheckout(_stripeTier);
+    if (url == null || url.isEmpty) {
+      _trackPaywall('achat_echoue', {'outcome': 'checkout_error'});
+    }
     if (!mounted) return;
     if (url == null || url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -278,7 +321,10 @@ mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
 // ══════════════════════════════════════════════════════════════════════════
 
 class _ProPreviewPaywall extends StatefulWidget {
-  const _ProPreviewPaywall();
+  const _ProPreviewPaywall({this.source = 'unknown'});
+
+  /// D'où le paywall a été ouvert (voir [showPaywallSheet]).
+  final String source;
 
   @override
   State<_ProPreviewPaywall> createState() => _ProPreviewPaywallState();
@@ -292,6 +338,11 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
   @override
   void initState() {
     super.initState();
+    paywallSource = widget.source;
+    paywallPlan = 'pro';
+    // Vu : une ouverture, avec sa source. Le prix et l'essai ne sont pas encore
+    // chargés ici (ils arrivent du store) : ils sont dans les événements d'achat.
+    _trackPaywall('paywall_vue');
     _loadPrice();
     _loadMe();
   }
@@ -888,9 +939,22 @@ class _BoostPaywallState extends State<_BoostPaywall> {
   String? _price;
   RemoteProfile? _me;
 
+  /// Mesure du Boost : mêmes noms d'événements que le Pro, plan `boost`.
+  void _trackBoost(String event, [Map<String, dynamic>? extra]) {
+    try {
+      Analytics.track(event, props: {
+        'source': 'boost',
+        'plan': 'boost',
+        if (_price != null) 'price': _price,
+        ...?extra,
+      });
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
+    _trackBoost('paywall_vue');
     if (RevenueCat.isSupported) {
       RevenueCat.priceOf(RevenueCat.boostPackageId).then((p) {
         if (mounted) setState(() => _price = p);
@@ -912,9 +976,19 @@ class _BoostPaywallState extends State<_BoostPaywall> {
   Future<void> _buy() async {
     if (_busy) return;
     setState(() => _busy = true);
+    _trackBoost('achat_demarre');
     final outcome = await RevenueCat.purchaseConsumable(
       RevenueCat.boostPackageId,
     );
+    switch (outcome) {
+      case PurchaseOutcome.success:
+      case PurchaseOutcome.pendingActivation:
+        _trackBoost('achat_reussi');
+      case PurchaseOutcome.cancelled:
+        _trackBoost('achat_annule');
+      default:
+        _trackBoost('achat_echoue', {'outcome': outcome.name});
+    }
     if (!mounted) return;
     setState(() => _busy = false);
     // Succès : le snackbar du Boost (et `pendingActivation`, ici sans objet :
@@ -1142,6 +1216,9 @@ class _LikesSheetState extends State<_LikesSheet> with _PaywallPurchase {
   @override
   void initState() {
     super.initState();
+    paywallSource = 'likes_sheet';
+    paywallPlan = 'pro';
+    _trackPaywall('paywall_vue');
     _loadPrice();
   }
 

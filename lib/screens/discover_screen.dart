@@ -62,7 +62,7 @@ import 'chat_thread_screen.dart';
 import 'paywall_screen.dart';
 import '../services/daily_swipes.dart';
 import '../widgets/daily_limit_view.dart';
-import 'profile_screen.dart';
+import 'profile_screen.dart';
 import '../services/friendly_error.dart';
 
 /// Le fond du panneau déplié : opaque, un cran au-dessus du noir de la page —
@@ -438,7 +438,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       final goPro = await showSpecialMessageProSheet(context, peer: peer);
       if (!mounted || goPro != true) return;
       Analytics.track('paywall_open', props: {'source': 'discover_direct_message'});
-      await showPaywallSheet(context);
+      await showPaywallSheet(context, source: 'discover_direct_message');
       if (!mounted || !RevenueCat.proActive.value) return;
     }
     final left = await SpecialMessageQuota.remaining(_myId);
@@ -1574,7 +1574,7 @@ class _DiscoverHeader extends StatelessWidget {
               top: 2,
               child: PadTap(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => showPaywallSheet(context),
+                onTap: () => showPaywallSheet(context, source: 'discover_bar'),
                 child: Sparkles(
                   child: Container(
                   height: 30,

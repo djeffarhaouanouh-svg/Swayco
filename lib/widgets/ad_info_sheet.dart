@@ -37,7 +37,9 @@ Future<void> showAfterAdSheet(BuildContext context) async {
   await p.setString(_kUpsellAtKey, DateTime.now().toIso8601String());
   if (!context.mounted) return;
   final goPremium = await _show<bool>(context, const _AdUpsellSheet());
-  if (goPremium == true && context.mounted) await showPaywallSheet(context);
+  if (goPremium == true && context.mounted) {
+    await showPaywallSheet(context, source: 'ad_upsell');
+  }
 }
 
 Future<T?> _show<T>(BuildContext context, Widget sheet) =>

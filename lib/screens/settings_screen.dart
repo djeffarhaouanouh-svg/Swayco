@@ -703,7 +703,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 size: 20,
                               )
                             : null,
-                        onTap: () => showPaywallSheet(context),
+                        onTap: () => showPaywallSheet(context, source: 'settings'),
                       ),
                     ),
                   ],
