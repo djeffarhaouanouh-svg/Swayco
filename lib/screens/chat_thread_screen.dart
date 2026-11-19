@@ -43,6 +43,7 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../widgets/chat_reply_widgets.dart';
+import '../widgets/chat_video.dart';
 import '../widgets/gif_picker_sheet.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/liquid_glass_button.dart';
@@ -170,6 +171,9 @@ class ChatThreadScreen extends StatefulWidget {
   @override
   State<ChatThreadScreen> createState() => _ChatThreadScreenState();
 }
+
+/// Ce que la personne veut joindre à son message (la feuille « photo / vidéo »).
+enum _MediaChoice { photoCamera, photoGallery, videoCamera, videoGallery }
 
 class _ChatThreadScreenState extends State<ChatThreadScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
@@ -1367,8 +1371,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// Pick an image from the gallery and send it as an image message.
   /// La petite feuille « Prendre une photo / Choisir dans la galerie ».
   /// Null = fermée sans choisir.
-  Future<ImageSource?> _askPhotoSource() {
-    Widget row(IconData icon, String label, ImageSource source) => ListTile(
+  Future<_MediaChoice?> _askPhotoSource() {
+    Widget row(IconData icon, String label, _MediaChoice choice) => ListTile(
           leading: Icon(icon, color: SC.accentFg),
           title: Text(
             label,
@@ -1377,9 +1381,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
               fontWeight: FontWeight.w600,
             ),
           ),
-          onTap: () => Navigator.of(context).pop(source),
+          onTap: () => Navigator.of(context).pop(choice),
         );
-    return showModalBottomSheet<ImageSource>(
+    return showModalBottomSheet<_MediaChoice>(
       context: context,
       backgroundColor: SC.menu,
       shape: const RoundedRectangleBorder(
@@ -1392,9 +1396,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               row(Icons.photo_camera_rounded, AppStrings.t('chat_photo_take'),
-                  ImageSource.camera),
+                  _MediaChoice.photoCamera),
               row(Icons.photo_library_rounded,
-                  AppStrings.t('chat_photo_gallery'), ImageSource.gallery),
+                  AppStrings.t('chat_photo_gallery'), _MediaChoice.photoGallery),
+              row(Icons.videocam_rounded, AppStrings.t('chat_video_take'),
+                  _MediaChoice.videoCamera),
+              row(Icons.video_library_rounded,
+                  AppStrings.t('chat_video_gallery'), _MediaChoice.videoGallery),
             ],
           ),
         ),
@@ -1408,9 +1416,21 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       setState(() => _error = AppStrings.t('chat_send_failed'));
       return;
     }
-    // Appareil photo ou galerie : on propose (un selfie se prend sur place).
-    final source = await _askPhotoSource();
-    if (source == null || !mounted) return;
+    // Appareil photo ou galerie, photo ou vidéo : on propose.
+    final choice = await _askPhotoSource();
+    if (choice == null || !mounted) return;
+    if (choice == _MediaChoice.videoCamera ||
+        choice == _MediaChoice.videoGallery) {
+      await _sendVideo(
+        choice == _MediaChoice.videoCamera
+            ? ImageSource.camera
+            : ImageSource.gallery,
+      );
+      return;
+    }
+    final source = choice == _MediaChoice.photoCamera
+        ? ImageSource.camera
+        : ImageSource.gallery;
     final XFile? file;
     final Uint8List bytes;
     try {
@@ -1447,6 +1467,75 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       _pendingPhotoPng = file!.name.toLowerCase().endsWith('.png');
       _error = null;
     });
+  }
+
+  /// Choisit (ou filme) une vidéo et l'envoie. Contrairement à une photo, elle
+  /// ne passe pas par le champ de texte : elle part tout de suite après le
+  /// choix. 60 secondes au plus (le sélecteur coupe), 80 Mo au plus (au-delà,
+  /// l'envoi pourrait planter l'appli : on le dit).
+  Future<void> _sendVideo(ImageSource source) async {
+    final XFile? file;
+    try {
+      if (source == ImageSource.camera && !kIsWeb) {
+        final cam = await Permission.camera.request();
+        if (!cam.isGranted) {
+          if (mounted) {
+            setState(() => _error = AppStrings.t('verif_camera_denied'));
+          }
+          return;
+        }
+      }
+      file = await ImagePicker().pickVideo(
+        source: source,
+        maxDuration: const Duration(seconds: 60),
+        preferredCameraDevice: CameraDevice.rear,
+      );
+      if (file == null) return;
+    } catch (e) {
+      if (mounted) setState(() => _error = AppStrings.t('chat_gallery_denied'));
+      return;
+    }
+    if (!mounted) return;
+    final size = await file.length();
+    if (size > ChatApi.maxVideoBytes) {
+      if (mounted) setState(() => _error = AppStrings.t('chat_video_too_big'));
+      return;
+    }
+    final lowerName = file.name.toLowerCase();
+    final ext = lowerName.endsWith('.mov') ? 'mov' : 'mp4';
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    try {
+      final bytes = await file.readAsBytes();
+      await ChatApi.sendVideo(
+        conversationId: widget.conversationId,
+        senderId: _myId,
+        senderName: _myName.isEmpty ? 'Moi' : _myName,
+        recipientId: widget.peerDeviceId,
+        bytes: bytes,
+        extension: ext,
+        recipientLang: _peer?.language ?? '',
+        replyToId: _replyTo?.id ?? '',
+      );
+      Analytics.track(
+        'message_sent',
+        props: {'source': 'chat', 'type': 'video'},
+      );
+      HapticFeedback.lightImpact();
+      SwaycoSounds.play(SwSound.msgSent);
+      if (mounted) setState(() => _replyTo = null);
+      unawaited(_syncMessages());
+    } catch (e) {
+      HapticFeedback.vibrate();
+      SwaycoSounds.play(SwSound.error);
+      if (mounted) {
+        setState(() => _error = AppStrings.t('chat_send_failed'));
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   /// Lance l'appel. Tous les appels démarrent caméra allumée, des deux côtés.
@@ -3010,8 +3099,20 @@ class _MessageBubbleState extends State<_MessageBubble> {
               ),
             ),
           ),
+        // Vidéo : la vignette avec son bouton lecture ; un toucher la lit en
+        // plein écran. Rangée dans `image_url`, elle se reconnaît à son extension.
+        if (message.isVideo)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: GestureDetector(
+              onTap: () => showChatVideo(context, message.imageUrl),
+              onDoubleTap: _thumbsUp,
+              onLongPress: _openPicker,
+              child: const ChatVideoTile(),
+            ),
+          ),
         // Image messages: show the photo (tap to view full-screen).
-        if (message.isImage)
+        if (message.isImage && !message.isVideo)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: GestureDetector(

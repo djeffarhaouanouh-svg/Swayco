@@ -67,6 +67,20 @@ class _QuoteThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Une vidéo n'a pas d'image à montrer : une icône lecture à la place.
+    if (isVideoUrl(url)) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: ColoredBox(
+            color: SC.fgA(0.12),
+            child: Icon(Icons.play_arrow_rounded, size: 22, color: SC.fgA(0.7)),
+          ),
+        ),
+      );
+    }
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: SizedBox(
@@ -168,11 +182,19 @@ class _QuoteLine extends StatelessWidget {
     if (q.isImage && text.trim().isEmpty) {
       return Row(
         children: [
-          Icon(Icons.photo_outlined, size: 17, color: iconColor),
+          Icon(
+            q.isVideo ? Icons.videocam_outlined : Icons.photo_outlined,
+            size: 17,
+            color: iconColor,
+          ),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
-              isGifUrl(q.imageUrl) ? 'GIF' : AppStrings.t('chat_reply_photo'),
+              q.isVideo
+                  ? AppStrings.t('chat_reply_video')
+                  : isGifUrl(q.imageUrl)
+                      ? 'GIF'
+                      : AppStrings.t('chat_reply_photo'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: color, fontSize: fontSize, height: 1.3),

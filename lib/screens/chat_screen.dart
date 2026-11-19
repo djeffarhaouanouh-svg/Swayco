@@ -50,7 +50,7 @@ import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_wave_promo.dart';
 import 'call_screen.dart';
 import 'chat_thread_screen.dart';
-import 'profile_screen.dart';
+import 'profile_screen.dart';
 import '../services/friendly_error.dart';
 
 /// La police des chiffres et des titres de section : une chasse fixe, pour que
@@ -1731,9 +1731,11 @@ class _FriendChatRow extends StatelessWidget {
         ));
       } else {
         subtitleParts.add(TextSpan(
-          text: lastMessage!.isImage
-              ? AppStrings.t('push_photo')
-              : lastMessage!.body,
+          text: lastMessage!.isVideo
+              ? AppStrings.t('push_video')
+              : lastMessage!.isImage
+                  ? AppStrings.t('push_photo')
+                  : lastMessage!.body,
         ));
       }
       dateSuffix = ' · ${_formatTime(lastMessage!.createdAt)}';

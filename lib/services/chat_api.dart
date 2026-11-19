@@ -10,6 +10,19 @@ import 'profile_api.dart';
 import 'push_dispatcher.dart';
 import 'review_prompt.dart';
 
+/// Vrai si [url] pointe un fichier VIDÉO (extension `.mp4`, `.mov`, `.m4v`,
+/// `.webm`, `.3gp`), requête et ancre ignorées.
+bool isVideoUrl(String url) {
+  if (url.isEmpty) return false;
+  final path = Uri.tryParse(url)?.path ?? url;
+  final lower = path.toLowerCase();
+  return lower.endsWith('.mp4') ||
+      lower.endsWith('.mov') ||
+      lower.endsWith('.m4v') ||
+      lower.endsWith('.webm') ||
+      lower.endsWith('.3gp');
+}
+
 class ChatMessage {
   ChatMessage({
     required this.id,
@@ -122,8 +135,14 @@ class ChatMessage {
   /// Un message special recu : carte speciale + demande Accepter / Refuser.
   bool get isSpecial => special;
 
-  /// True when this message carries an image.
+  /// True when this message carries an image (or a video: both live in
+  /// `image_url`, no schema change needed — [isVideo] tells them apart).
   bool get isImage => imageUrl.isNotEmpty;
+
+  /// True when the media of this message is a VIDEO. Reconnu à l'extension de
+  /// l'URL (`.mp4`, `.mov`…) : la vidéo est rangée dans `image_url`, comme une
+  /// image, pour ne demander AUCUNE modification de la base.
+  bool get isVideo => isVideoUrl(imageUrl);
 
   /// True when this message is a voice note.
   bool get isVoice => audioUrl.isNotEmpty;
@@ -420,6 +439,7 @@ abstract final class ChatApi {
     String body = '',
     bool imageBody = false,
     bool voiceBody = false,
+    bool videoBody = false,
     bool special = false,
   }) async {
     final lang = recipientLang.isNotEmpty
@@ -434,7 +454,9 @@ abstract final class ChatApi {
           ? AppStrings.tIn(lang, 'push_special_message')
           : (voiceBody
               ? AppStrings.tIn(lang, 'voice_message')
-              : (imageBody ? AppStrings.tIn(lang, 'push_photo') : body)),
+              : (videoBody
+                  ? AppStrings.tIn(lang, 'push_video')
+                  : (imageBody ? AppStrings.tIn(lang, 'push_photo') : body))),
       type: 'message',
       data: {
         'conversationId': conversationId,
@@ -498,6 +520,66 @@ abstract final class ChatApi {
       conversationId: conversationId,
       senderId: senderId,
       imageBody: true,
+    ));
+  }
+
+  /// Plus gros fichier vidéo accepté, en octets. Les octets passent par la
+  /// mémoire du téléphone : au-delà, l'envoi risque de planter l'appli.
+  static const int maxVideoBytes = 80 * 1024 * 1024;
+
+  /// Upload a chat VIDEO and insert its message. Same bucket and folder as
+  /// [sendImage]; the public URL goes in `image_url` and the `.mp4` / `.mov`
+  /// extension is what makes the thread draw a player instead of a picture
+  /// (see [ChatMessage.isVideo]). Push body: "🎥 Vidéo", localised.
+  static Future<void> sendVideo({
+    required String conversationId,
+    required String senderId,
+    required String senderName,
+    required String recipientId,
+    required Uint8List bytes,
+    String extension = 'mp4',
+    String recipientLang = '',
+    String replyToId = '',
+  }) async {
+    if (bytes.isEmpty) throw ArgumentError('vidéo vide');
+    if (bytes.length > maxVideoBytes) throw ArgumentError('vidéo trop lourde');
+    final ext = extension.toLowerCase().replaceAll('.', '');
+    final isMov = ext == 'mov';
+    final safeExt = isMov ? 'mov' : 'mp4';
+    final contentType = isMov ? 'video/quicktime' : 'video/mp4';
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final path = 'chat/$conversationId/$stamp.$safeExt';
+    await _client.storage.from('avatars').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            upsert: true,
+            contentType: contentType,
+            cacheControl: '3600',
+          ),
+        );
+    final url = _client.storage.from('avatars').getPublicUrl(path);
+    await ProfileApi.ensureMyProfileRow();
+    await _insertRow(
+      {
+        'conversation_id': conversationId,
+        'sender': senderId,
+        'recipient': recipientId,
+        'sender_name': senderName,
+        'body': '',
+        'language': '',
+        'image_url': url,
+        if (replyToId.isNotEmpty) 'reply_to_id': _replyValue(replyToId),
+      },
+      optional: const ['reply_to_id'],
+    );
+    unawaited(_notifyMessage(
+      recipientId: recipientId,
+      recipientLang: recipientLang,
+      senderName: senderName,
+      conversationId: conversationId,
+      senderId: senderId,
+      videoBody: true,
     ));
   }
 

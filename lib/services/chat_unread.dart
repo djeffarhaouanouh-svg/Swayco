@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_strings.dart';
+import 'chat_api.dart' show isVideoUrl;
 import 'chat_reads.dart';
 import 'message_banner.dart';
 import 'message_reactions.dart';
@@ -174,7 +175,7 @@ abstract final class ChatUnread {
       preview: audioUrl.isNotEmpty
           ? AppStrings.t('push_voice')
           : imageUrl.isNotEmpty
-              ? AppStrings.t('push_photo')
+              ? AppStrings.t(isVideoUrl(imageUrl) ? 'push_video' : 'push_photo')
               : body,
     ));
   }
