@@ -44,6 +44,8 @@ import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../widgets/chat_reply_widgets.dart';
 import '../widgets/chat_video.dart';
+import '../widgets/chat_quiz.dart';
+import '../services/quiz_api.dart';
 import '../widgets/gif_picker_sheet.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/liquid_glass_button.dart';
@@ -189,6 +191,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   );
 
   StreamSubscription<List<ChatMessage>>? _sub;
+  StreamSubscription<QuizState?>? _quizSub;
+
+  /// Le quiz de la conversation (null = jamais lancé ici).
+  QuizState? _quiz;
+  bool _quizBusy = false;
   StreamSubscription<List<MessageReaction>>? _reactionSub;
   Timer? _pollTimer;
   Timer? _catchUpTimer;
@@ -279,6 +286,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   bool _canEdit(ChatMessage m) =>
       m.senderId == _myId &&
       !m.isDeleted &&
+      !m.isQuiz &&
       !m.isVoice &&
       !m.isImage &&
       !m.isSpecial &&
@@ -787,7 +795,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
 
   void _maybeFetchTranslation(ChatMessage m) {
     if (!_autoTranslate || _myLang.isEmpty) return;
-    if (m.isDeleted) return;
+    if (m.isDeleted || m.isQuiz) return;
     final id = _tKey(m);
     if (m.id.isEmpty) return;
     // Pas de texte (un vocal pas encore transcrit, une image) : rien à traduire.
@@ -1001,6 +1009,22 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       if (!mounted || rows.isEmpty) return;
       setState(() => _reactionsByMessage = reactionsByMessage(rows));
     }));
+
+    // Le quiz de ce fil : état lu une fois, puis suivi en direct (l'autre peut
+    // l'avancer ou l'arrêter).
+    unawaited(QuizApi.fetch(widget.conversationId).then((q) {
+      if (mounted && q != null) setState(() => _quiz = q);
+    }));
+    try {
+      _quizSub = QuizApi.watch(widget.conversationId).listen(
+        (q) {
+          if (mounted && q != null) setState(() => _quiz = q);
+        },
+        onError: (Object e) => debugPrint('quiz stream error: $e'),
+      );
+    } catch (e) {
+      debugPrint('quiz watch failed: $e');
+    }
 
     _sub = ChatApi.subscribeMessages(widget.conversationId).listen(
       (rows) {
@@ -1233,6 +1257,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _scrollCtrl.removeListener(_MessageBubble.dismissActivePicker);
     _MessageBubble.dismissActivePicker();
     _sub?.cancel();
+    _quizSub?.cancel();
     _reactionSub?.cancel();
     _peerReadSub?.cancel();
     _typing?.dispose();
@@ -1645,6 +1670,146 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
+  // ── Quiz ─────────────────────────────────────────────────────────────────
+
+  bool get _quizActive => _quiz?.active ?? false;
+
+  /// La carte de la question en cours : la dernière carte du fil, tant que le
+  /// quiz est actif. Null sinon.
+  ChatMessage? get _activeQuizCard {
+    final q = _quiz;
+    if (q == null || !q.active) return null;
+    for (final m in _messages.reversed) {
+      if (m.isQuizQuestion && m.quizTheme == q.theme && m.quizIndex == q.index) {
+        return m;
+      }
+    }
+    return null;
+  }
+
+  /// Le bouton quiz : choisir un thème, puis la première question part.
+  Future<void> _openQuiz() async {
+    if (_sending || _quizBusy || _quizActive) return;
+    final theme = await showQuizThemeSheet(context, _peerFirstName);
+    if (theme == null || !mounted) return;
+    await _startQuiz(theme);
+  }
+
+  Future<void> _startQuiz(String theme) async {
+    if (_quizBusy) return;
+    setState(() => _quizBusy = true);
+    try {
+      final q = await QuizApi.start(
+        conversationId: widget.conversationId,
+        theme: theme == 'surprise' ? '' : theme,
+        peerId: widget.peerDeviceId,
+        myName: _myName,
+      );
+      Analytics.track('quiz_started', props: {
+        'theme': theme,
+        'source': 'chat',
+      });
+      if (mounted && q != null) setState(() => _quiz = q);
+      HapticFeedback.lightImpact();
+      await _syncMessages();
+    } catch (e) {
+      debugPrint('quiz start failed: $e');
+      if (mounted) setState(() => _error = AppStrings.t('chat_send_failed'));
+    } finally {
+      if (mounted) setState(() => _quizBusy = false);
+    }
+  }
+
+  /// « Question suivante » : le SERVEUR choisit la question (ou clôt le quiz).
+  Future<void> _quizNext() async {
+    final q = _quiz;
+    if (q == null || !q.active || _quizBusy) return;
+    setState(() => _quizBusy = true);
+    try {
+      final next = await QuizApi.next(
+        conversationId: widget.conversationId,
+        from: q.index,
+        peerId: widget.peerDeviceId,
+        myName: _myName,
+      );
+      Analytics.track('quiz_next', props: {'theme': q.theme, 'from': q.index});
+      if (mounted && next != null) setState(() => _quiz = next);
+      HapticFeedback.lightImpact();
+      await _syncMessages();
+    } catch (e) {
+      debugPrint('quiz next failed: $e');
+      if (mounted) setState(() => _error = AppStrings.t('chat_send_failed'));
+    } finally {
+      if (mounted) setState(() => _quizBusy = false);
+    }
+  }
+
+  /// Le « ⋯ » du bandeau : arrêter (avec confirmation) ou changer de thème.
+  Future<void> _quizMenu() async {
+    final choice = await showQuizMenu(context);
+    if (choice == null || !mounted) return;
+    if (choice == 'stop') {
+      final stop = await showQuizStopDialog(context);
+      if (!stop || !mounted) return;
+      try {
+        final s = await QuizApi.stop(
+          conversationId: widget.conversationId,
+          peerId: widget.peerDeviceId,
+          myName: _myName,
+        );
+        Analytics.track('quiz_stopped', props: {'theme': _quiz?.theme ?? ''});
+        if (mounted && s != null) setState(() => _quiz = s);
+        await _syncMessages();
+      } catch (e) {
+        debugPrint('quiz stop failed: $e');
+      }
+    } else if (choice == 'change') {
+      final theme = await showQuizThemeSheet(context, _peerFirstName);
+      if (theme == null || !mounted) return;
+      await _startQuiz(theme);
+    }
+  }
+
+  /// Ce qui se pose sous le dernier message pendant un quiz : la pastille
+  /// d'attente, ou le bouton « Question suivante » quand les deux ont répondu.
+  Widget? _quizTail() {
+    final q = _quiz;
+    final card = _activeQuizCard;
+    if (q == null || card == null) return null;
+    var mine = false;
+    var peer = false;
+    for (final m in _messages) {
+      if (!m.createdAt.isAfter(card.createdAt)) continue;
+      if (m.isQuiz || m.isDeleted) continue;
+      if (m.senderId == _myId) {
+        mine = true;
+      } else {
+        peer = true;
+      }
+    }
+    if (mine && peer) {
+      return QuizNextButton(
+        key: ValueKey('quiz-next-${q.index}'),
+        label: AppStrings.t(q.isLast ? 'quiz_finish' : 'quiz_next'),
+        busy: _quizBusy,
+        onTap: _quizNext,
+      );
+    }
+    if (mine) {
+      return QuizWaitingPill(
+        key: ValueKey('quiz-wait-${q.index}'),
+        text: AppStrings.t('quiz_waiting', args: {'name': _peerFirstName}),
+      );
+    }
+    if (!peer) {
+      return QuizWaitingPill(
+        key: ValueKey('quiz-nobody-${q.index}'),
+        text: AppStrings.t('quiz_nobody'),
+      );
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final peerClock = _peerClock;
@@ -1666,6 +1831,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     final headerH = safeTop +
         _ThreadHeader.height +
         pillH +
+        (_quizActive ? QuizBanner.height : 0) +
         (_error != null ? 40 : 0);
     return Scaffold(
       backgroundColor: _kThreadBg,
@@ -1748,6 +1914,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                           onToggleBlock: _toggleBlockPeer,
                           onReport: _reportPeer,
                         ),
+                        // Quiz en cours : « Quiz Voyage · Question 2 sur 5 » et
+                        // son ⋯ (arrêter / changer de thème).
+                        if (_quizActive)
+                          QuizBanner(state: _quiz!, onMenu: _quizMenu),
                         // Le réglage de traduction : sous l'en-tête, plus dans
                         // la barre d'écriture (maquette 8c).
                         if (showPill)
@@ -1842,6 +2012,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             onClearPhoto: () =>
                                 setState(() => _pendingPhoto = null),
                             onSendGif: _sendGif,
+                            onQuiz: _openQuiz,
+                            quizActive: _quizActive || _quizBusy,
                             onSendVoice: _sendVoice,
                             autoTranslate: _autoTranslate,
                             onTypingChanged: (t) => _typing?.setTyping(t),
@@ -2059,10 +2231,15 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       final last = _messages.last;
       final reacted = (_reactionsByMessage[last.id] ?? const [])
           .any((r) => r.userId == _myId);
-      if (!reacted && !last.isDeleted && last.id.isNotEmpty) {
+      if (!reacted && !last.isDeleted && !last.isQuiz && last.id.isNotEmpty) {
         quickReactId = last.id;
       }
     }
+
+    // Le quiz en cours : la carte active (contour qui tourne) et ce qui se pose
+    // sous le dernier message.
+    final activeQuizCardId = _activeQuizCard?.id;
+    final quizTail = _quizTail();
 
     // Local TTS is local — no cloud cost, available to all tiers.
     //
@@ -2092,7 +2269,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       ),
       // The peer's "writing…" bubble is the newest row: index 0 of the
       // reversed list, under their last message.
-      itemCount: items.length + (_peerTyping ? 1 : 0),
+      itemCount: items.length + (_peerTyping ? 1 : 0) + (quizTail != null ? 1 : 0),
       itemBuilder: (ctx, index) {
         if (_peerTyping && index == 0) {
           return const Align(
@@ -2103,13 +2280,45 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
             ),
           );
         }
-        final i = _peerTyping ? index - 1 : index;
+        var i = _peerTyping ? index - 1 : index;
+        // Sous le dernier message : la pastille d'attente / « Question suivante ».
+        if (quizTail != null) {
+          if (i == 0) return quizTail;
+          i -= 1;
+        }
         final item = items[items.length - 1 - i];
         if (item.isDay) {
           return _DaySeparator(day: item.day!);
         }
         final m = item.message!;
         final mine = m.senderId == _myId;
+        // Le quiz : une carte question, ou une ligne « arrêté / terminé ».
+        if (m.isQuizQuestion) {
+          return QuizQuestionCard(
+            key: ValueKey('quiz-card-${m.id}'),
+            theme: m.quizTheme,
+            index: m.quizIndex,
+            active: m.id == activeQuizCardId,
+          );
+        }
+        if (m.isQuizSystem) {
+          if (m.body == 'quiz_done') {
+            return QuizSystemLine(
+              key: ValueKey('quiz-sys-${m.id}'),
+              text: AppStrings.t('quiz_done'),
+              icon: Icons.flag_rounded,
+            );
+          }
+          return QuizSystemLine(
+            key: ValueKey('quiz-sys-${m.id}'),
+            text: m.quizStoppedBy == _myId
+                ? AppStrings.t('quiz_stopped_me')
+                : AppStrings.t(
+                    'quiz_stopped_peer',
+                    args: {'name': _peerFirstName},
+                  ),
+          );
+        }
         final display = _displayBodyFor(m);
         // Une carte spéciale reçue a ses propres boutons : on n'y répond pas.
         // Un message supprimé n'est plus une cible : ni réponse, ni menu.
@@ -3964,6 +4173,8 @@ class _Composer extends StatefulWidget {
     required this.onSendVoice,
     required this.autoTranslate,
     required this.myLang,
+    this.onQuiz,
+    this.quizActive = false,
     this.onTypingChanged,
     this.peerLang = '',
     this.peerFirstName = '',
@@ -4018,6 +4229,11 @@ class _Composer extends StatefulWidget {
 
   /// Ouvre le catalogue Giphy et envoie le GIF choisi.
   final Future<void> Function() onSendGif;
+
+  /// Le bouton quiz, à côté du champ : choisir un thème. Grisé tant qu'un quiz
+  /// est en cours (il redevient actif à l'arrêt ou à la fin).
+  final Future<void> Function()? onQuiz;
+  final bool quizActive;
 
   /// Envoie le vocal enregistré (octets, durée, format).
   final Future<void> Function(VoiceRecording recording) onSendVoice;
@@ -4628,6 +4844,28 @@ class _ComposerState extends State<_Composer>
                         ),
                       ),
                     ),
+                    // Le quiz : un bouton à part, avant le GIF et la photo.
+                    if (widget.editing == null && widget.onQuiz != null)
+                      GestureDetector(
+                        key: const ValueKey('quizButton'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: widget.sending || widget.quizActive
+                            ? null
+                            : widget.onQuiz,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 8,
+                          ),
+                          child: Icon(
+                            Icons.quiz_rounded,
+                            size: 23,
+                            color: SC.fg.withValues(
+                              alpha: widget.quizActive ? 0.3 : 0.75,
+                            ),
+                          ),
+                        ),
+                      ),
                     // La pastille GIF (1b) : dans le champ, avant la photo,
                     // seulement tant que le champ est vide.
                     AnimatedSwitcher(

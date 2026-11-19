@@ -150,6 +150,34 @@ class ChatMessage {
   /// True when this message references a Discover photo (reaction / intro).
   bool get hasDiscoverPhoto => discoverPhoto.isNotEmpty;
 
+  /// Une carte question du quiz (`quiz|<thème>|<n>`).
+  bool get isQuizQuestion => body.startsWith('quiz|');
+
+  /// Une ligne système du quiz : arrêté (`quiz_stop|<uid>`) ou terminé.
+  bool get isQuizSystem =>
+      body.startsWith('quiz_stop|') || body == 'quiz_done';
+
+  /// Tout ce qui vient du quiz : ni traduit, ni répondable, ni modifiable.
+  bool get isQuiz => isQuizQuestion || isQuizSystem;
+
+  /// Thème de la carte question ('' si ce n'est pas une carte).
+  String get quizTheme {
+    if (!isQuizQuestion) return '';
+    final p = body.split('|');
+    return p.length > 1 ? p[1] : '';
+  }
+
+  /// Numéro de la carte question (0 si ce n'est pas une carte).
+  int get quizIndex {
+    if (!isQuizQuestion) return 0;
+    final p = body.split('|');
+    return p.length > 2 ? int.tryParse(p[2]) ?? 0 : 0;
+  }
+
+  /// Qui a arrêté le quiz (ligne système `quiz_stop|<uid>`), sinon ''.
+  String get quizStoppedBy =>
+      body.startsWith('quiz_stop|') ? body.substring('quiz_stop|'.length) : '';
+
   factory ChatMessage.fromMap(Map<String, dynamic> m) {
     final created = m['created_at'];
     return ChatMessage(
@@ -399,7 +427,7 @@ abstract final class ChatApi {
     final row = <String, dynamic>{
       'conversation_id': conversationId,
       'sender': senderId,
-      'recipient': recipientId,
+      if (recipientId.isNotEmpty) 'recipient': recipientId,
       'sender_name': senderName,
       'body': body,
       'language': language,
@@ -442,6 +470,9 @@ abstract final class ChatApi {
     bool videoBody = false,
     bool special = false,
   }) async {
+    // Message de groupe : pas de destinataire unique, le groupe envoie ses
+    // propres notifications (voir GroupApi).
+    if (recipientId.isEmpty) return;
     final lang = recipientLang.isNotEmpty
         ? recipientLang
         : (await ProfileApi.fetchById(recipientId))?.language ?? '';
@@ -502,7 +533,7 @@ abstract final class ChatApi {
       {
         'conversation_id': conversationId,
         'sender': senderId,
-        'recipient': recipientId,
+        if (recipientId.isNotEmpty) 'recipient': recipientId,
         'sender_name': senderName,
         'body': '',
         // `language` is NOT NULL with no default — an image carries no language,
@@ -564,7 +595,7 @@ abstract final class ChatApi {
       {
         'conversation_id': conversationId,
         'sender': senderId,
-        'recipient': recipientId,
+        if (recipientId.isNotEmpty) 'recipient': recipientId,
         'sender_name': senderName,
         'body': '',
         'language': '',
@@ -617,7 +648,7 @@ abstract final class ChatApi {
     final row = <String, dynamic>{
       'conversation_id': conversationId,
       'sender': senderId,
-      'recipient': recipientId,
+      if (recipientId.isNotEmpty) 'recipient': recipientId,
       'sender_name': senderName,
       'body': '',
       // `language` est NOT NULL sans défaut : rien n'est transcrit, donc vide.
@@ -701,7 +732,7 @@ abstract final class ChatApi {
       {
         'conversation_id': conversationId,
         'sender': senderId,
-        'recipient': recipientId,
+        if (recipientId.isNotEmpty) 'recipient': recipientId,
         'sender_name': senderName,
         'body': '',
         // `language` est NOT NULL sans défaut : un GIF n'a pas de langue.

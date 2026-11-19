@@ -172,7 +172,9 @@ abstract final class ChatUnread {
       conversationId: convId,
       peerId: senderId,
       senderName: row['sender_name']?.toString().trim() ?? '',
-      preview: audioUrl.isNotEmpty
+      preview: (body.startsWith('quiz|') || body.startsWith('quiz_'))
+          ? AppStrings.t('quiz_preview')
+          : audioUrl.isNotEmpty
           ? AppStrings.t('push_voice')
           : imageUrl.isNotEmpty
               ? AppStrings.t(isVideoUrl(imageUrl) ? 'push_video' : 'push_photo')

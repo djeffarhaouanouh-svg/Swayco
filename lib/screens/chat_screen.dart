@@ -52,6 +52,11 @@ import 'call_screen.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 import '../services/friendly_error.dart';
+import '../services/group_api.dart';
+import '../services/official_api.dart';
+import '../widgets/chat_list_extras.dart';
+import 'group_screens.dart';
+import 'official_thread_screen.dart';
 
 /// La police des chiffres et des titres de section : une chasse fixe, pour que
 /// les heures d'une ligne à l'autre tombent sur la même colonne et que les
@@ -89,6 +94,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   // from ANY path (this list, a push notification, …) clears its row
   // immediately, without needing that path to remember to trigger a reload.
   List<({String conversationId, DateTime createdAt})> _inbound = const [];
+
+  /// Mes groupes (handoff messages_groupes_quiz, A), leurs membres, leur
+  /// dernier message et les messages reçus (pour la pastille de non-lus).
+  List<ChatGroup> _groups = const [];
+  Map<String, RemoteProfile> _groupProfiles = const {};
+  Map<String, ChatMessage> _groupLatest = const {};
+  List<({String conversationId, DateTime createdAt})> _groupInbound = const [];
+
+  /// Le compte officiel Swayco (B) : ses messages et ce que j'en ai vu.
+  List<OfficialPost> _official = const [];
+  DateTime? _officialSeen;
   bool _loading = true;
   String? _error;
   /// UI lock while a guest-invite link is being minted (prevents double-tap).
@@ -489,8 +505,45 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           return lb.compareTo(la); // most recent first
         });
       final specialHandled = await SpecialRequest.handled(id);
+      // Groupes et compte officiel : deux lectures de plus, chacune isolée (une
+      // table pas encore migrée ne doit jamais vider la liste des amis).
+      var groups = const <ChatGroup>[];
+      var groupLatest = const <String, ChatMessage>{};
+      var groupInbound = const <({String conversationId, DateTime createdAt})>[];
+      var groupProfiles = const <String, RemoteProfile>{};
+      var official = const <OfficialPost>[];
+      DateTime? officialSeen;
+      try {
+        groups = await GroupApi.fetchMine(id);
+        final extras = await Future.wait([
+          GroupApi.fetchLatest(groups),
+          GroupApi.fetchInbound(id, groups),
+          ProfileApi.fetchByIds({
+            for (final g in groups)
+              for (final m in g.members) m.userId,
+          }.toList()),
+          OfficialApi.fetch(),
+          OfficialApi.seenAt(),
+        ]);
+        groupLatest = extras[0] as Map<String, ChatMessage>;
+        groupInbound =
+            extras[1] as List<({String conversationId, DateTime createdAt})>;
+        groupProfiles = {
+          for (final p in extras[2] as List<RemoteProfile>) p.id: p,
+        };
+        official = extras[3] as List<OfficialPost>;
+        officialSeen = extras[4] as DateTime?;
+      } catch (e) {
+        debugPrint('chat list: groups/official load failed: $e');
+      }
       if (!mounted || seq != _reloadSeq) return;
       setState(() {
+        _groups = groups;
+        _groupLatest = groupLatest;
+        _groupInbound = groupInbound;
+        _groupProfiles = groupProfiles;
+        _official = official;
+        _officialSeen = officialSeen;
         _specialHandled = specialHandled;
         _myId = id;
         _friends = friends;
@@ -611,6 +664,96 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     } else if (key != null) {
       _showTopToast(AppStrings.t(key, args: {'name': name}));
     }
+  }
+
+  // ── Groupes, compte officiel, invitation ──────────────────────────────────
+
+  /// Le « + » jaune : « Nouveau groupe », puis on ouvre le groupe créé.
+  Future<void> _openNewGroup() async {
+    HapticFeedback.lightImpact();
+    final gid = await showNewGroupSheet(context, friends: _friends);
+    if (gid == null || gid.isEmpty || !mounted) return;
+    await _reload(silent: true);
+    if (!mounted) return;
+    await _openGroup(gid);
+  }
+
+  Future<void> _openGroup(String groupId) async {
+    ChatGroup? g;
+    for (final x in _groups) {
+      if (x.id == groupId) g = x;
+    }
+    await Navigator.of(context).push<void>(
+      chatThreadRoute(
+        builder: (_) => GroupThreadScreen(groupId: groupId, initialGroup: g),
+      ),
+    );
+    if (mounted) _reload(silent: true);
+  }
+
+  Future<void> _openOfficial() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => OfficialThreadScreen(initial: _official),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _officialSeen = DateTime.now());
+  }
+
+  /// « Invite tes amis » : la feuille de partage du téléphone, avec le lien.
+  Future<void> _shareInvite() async {
+    Analytics.track('invite_friends_share', props: {'source': 'messages'});
+    final box = context.findRenderObject() as RenderBox?;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: AppStrings.t(
+            'invite_friends_share_text',
+            args: {'link': 'https://www.swayco.fr'},
+          ),
+          sharePositionOrigin: box != null
+              ? box.localToGlobal(Offset.zero) & box.size
+              : null,
+        ),
+      );
+    } catch (_) {}
+  }
+
+  /// La date qui classe un groupe : son dernier message, sinon sa création.
+  DateTime _groupTime(ChatGroup g) =>
+      _groupLatest[g.conversationId]?.createdAt ?? g.createdAt;
+
+  int _groupUnread(ChatGroup g) {
+    final seen = ChatUnread.threadSeenAt(g.conversationId);
+    var n = 0;
+    for (final m in _groupInbound) {
+      if (m.conversationId != g.conversationId) continue;
+      if (seen == null || m.createdAt.isAfter(seen)) n++;
+    }
+    return n;
+  }
+
+  /// Les rangées de conversations : amis et groupes mêlés, du plus récent au
+  /// plus ancien. Les amis sans message restent en bas, après les groupes.
+  List<({RemoteProfile? peer, ChatGroup? group})> _listEntries() {
+    final dms = _friends.where((p) => !_isSpecialPending(p)).toList();
+    final groups = [..._groups]
+      ..sort((a, b) => _groupTime(b).compareTo(_groupTime(a)));
+    final out = <({RemoteProfile? peer, ChatGroup? group})>[];
+    var gi = 0;
+    for (final p in dms) {
+      final t = _latestByConv[_conversationIdFor(p.id)]?.createdAt;
+      while (gi < groups.length &&
+          (t == null || _groupTime(groups[gi]).isAfter(t))) {
+        out.add((peer: null, group: groups[gi++]));
+      }
+      out.add((peer: p, group: null));
+    }
+    while (gi < groups.length) {
+      out.add((peer: null, group: groups[gi++]));
+    }
+    return out;
   }
 
   Future<void> _openThread(RemoteProfile peer) async {
@@ -932,6 +1075,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
               ),
             const SizedBox(width: 6),
+            // Le « + » jaune : nouveau groupe (à droite de la loupe).
             // La loupe — venue de Découvrir. Elle s'étire en champ au tap.
             Semantics(
               button: true,
@@ -960,6 +1104,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
               ),
             ),
+            const SizedBox(width: 8),
+            NewGroupButton(onTap: _openNewGroup),
           ],
         );
 
@@ -1118,7 +1264,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
       );
     }
-    if (_friends.isEmpty) {
+    if (_friends.isEmpty && _groups.isEmpty) {
       return const _NoFriendsEmpty();
     }
     // LAYER STRUCTURE: the mesh fond (built in build()) sits at the back; the
@@ -1167,6 +1313,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
+                      // Le compte officiel Swayco, épinglé en première ligne.
+                      OfficialChatRow(
+                          last: _official.isEmpty ? null : _official.last,
+                          unreadCount:
+                              OfficialApi.unread(_official, _officialSeen),
+                          onTap: _openOfficial,
+                        ),
                       // Messages speciaux recus : section a part, en tete.
                       if (_friends.any(_isSpecialPending)) ...[
                         _SectionHeader(
@@ -1184,14 +1337,47 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             onViewProfile: () => _viewProfile(p),
                           ),
                       ],
-                      if (_friends.any((p) => !_isSpecialPending(p)))
+                      if (_friends.any((p) => !_isSpecialPending(p)) ||
+                          _groups.isNotEmpty)
                         _SectionHeader(
                           label: AppStrings.t('messages_section'),
-                          count: _unreadConversations,
+                          count: _unreadConversations +
+                              _groups.where((g) => _groupUnread(g) > 0).length,
                         ),
-                      // Conversation rows.
-                      for (final (i, p)
-                          in _friends.where((p) => !_isSpecialPending(p)).indexed)
+                      // Conversation rows (amis et groupes, du plus récent au
+                      // plus ancien).
+                      for (final (i, entry) in _listEntries().indexed)
+                        if (entry.group != null)
+                          FadeSlideIn(
+                            key: ValueKey('grp-${entry.group!.id}'),
+                            delay: Duration(milliseconds: i * 55),
+                            child: GroupChatRow(
+                              name: entry.group!.name,
+                              members: [
+                                for (final m in entry.group!.members)
+                                  if (_groupProfiles[m.userId] != null)
+                                    _groupProfiles[m.userId]!,
+                              ],
+                              lastMessage:
+                                  _groupLatest[entry.group!.conversationId],
+                              lastAuthor: () {
+                                final last =
+                                    _groupLatest[entry.group!.conversationId];
+                                if (last == null) return '';
+                                if (last.senderId == _myId) {
+                                  return AppStrings.t('group_you');
+                                }
+                                final p = _groupProfiles[last.senderId];
+                                final n = (p?.displayName ?? last.senderName)
+                                    .trim();
+                                return n.isEmpty ? '' : n.split(' ').first;
+                              }(),
+                              unreadCount: _groupUnread(entry.group!),
+                              onTap: () => _openGroup(entry.group!.id),
+                            ),
+                          )
+                        else
+                        for (final p in [entry.peer!])
                         FadeSlideIn(
                           key: ValueKey(p.id),
                           delay: Duration(milliseconds: i * 55),
@@ -1225,6 +1411,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             ],
                           ),
                         ),
+                      // « Invite tes amis sur Swayco » : sous la dernière
+                      // conversation (A7).
+                      InviteFriendsCard(onShare: _shareInvite),
                     ],
                   ),
                 ),
@@ -1731,7 +1920,9 @@ class _FriendChatRow extends StatelessWidget {
         ));
       } else {
         subtitleParts.add(TextSpan(
-          text: lastMessage!.isVideo
+          text: lastMessage!.isQuiz
+              ? AppStrings.t('quiz_preview')
+              : lastMessage!.isVideo
               ? AppStrings.t('push_video')
               : lastMessage!.isImage
                   ? AppStrings.t('push_photo')
