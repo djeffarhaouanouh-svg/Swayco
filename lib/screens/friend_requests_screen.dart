@@ -543,10 +543,11 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                       if (showUnlockAll) ...[
                         _UnlockAllCard(
                           hidden: hiddenLikers,
-                          // Les profils encore FLOUTÉS, pas toutes les demandes :
-                          // le total ne bougeait jamais quand on en révélait un
-                          // par une pub, et la phrase restait à « 12 ».
-                          total: hiddenLikers.length,
+                          // Le total ne change pas quand on révèle un profil ;
+                          // la ligne du dessous, elle, dit combien il en reste
+                          // de floutés (« dont 11 à révéler »).
+                          total: _requests.length,
+                          toReveal: hiddenLikers.length,
                           onTap: openUnlockAll,
                         ),
                         const SizedBox(height: 14),
@@ -791,6 +792,7 @@ class _UnlockAllCard extends StatelessWidget {
   const _UnlockAllCard({
     required this.hidden,
     required this.total,
+    required this.toReveal,
     required this.onTap,
   });
 
@@ -799,6 +801,10 @@ class _UnlockAllCard extends StatelessWidget {
 
   /// Toutes les personnes qui m'ont liké.
   final int total;
+
+  /// Combien d'entre elles sont encore floutées. Quand il y en a déjà eu de
+  /// révélées (par une pub), une petite ligne le dit sous le total.
+  final int toReveal;
   final VoidCallback onTap;
 
   @override
@@ -933,6 +939,25 @@ class _UnlockAllCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  // « dont 11 à révéler » : seulement quand au moins un profil
+                  // a déjà été révélé, sinon la ligne répéterait le total.
+                  if (toReveal > 0 && toReveal < total)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Text(
+                        AppStrings.t(
+                          'likes_unlock_all_left',
+                          args: {'n': '$toReveal'},
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: SC.textPrimary.withValues(alpha: 0.55),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
