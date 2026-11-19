@@ -536,6 +536,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       } catch (e) {
         debugPrint('chat list: groups/official load failed: $e');
       }
+      // Lecture locale, sans réseau : sans elle un échec ci-dessus ferait
+      // repasser le guide pour « jamais ouvert ».
+      officialSeen ??= await OfficialApi.seenAt();
       if (!mounted || seq != _reloadSeq) return;
       setState(() {
         _groups = groups;
@@ -544,6 +547,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _groupProfiles = groupProfiles;
         _official = official;
         _officialSeen = officialSeen;
+        ChatUnread.setOfficialUnread(OfficialApi.unread(official, officialSeen));
         _specialHandled = specialHandled;
         _myId = id;
         _friends = friends;
@@ -1315,6 +1319,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       ),
                       // Le compte officiel Swayco, épinglé en première ligne.
                       OfficialChatRow(
+                          welcome: _officialSeen == null || _official.isEmpty,
                           last: _official.isEmpty ? null : _official.last,
                           unreadCount:
                               OfficialApi.unread(_official, _officialSeen),

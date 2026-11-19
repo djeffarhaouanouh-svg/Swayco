@@ -31,6 +31,7 @@ import 'services/attribution.dart';
 import 'services/auth_service.dart';
 import 'services/call_alert.dart';
 import 'services/chat_unread.dart';
+import 'services/official_api.dart';
 import 'services/app_navigator.dart';
 import 'services/guest_invite_api.dart';
 import 'services/local_notifications.dart';
@@ -701,6 +702,9 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     // now, insert-only so a shared account's language is never clobbered.
     unawaited(ProfileApi.ensureMyProfileRow());
     unawaited(ChatUnread.start(uid));
+    // Le guide d'accueil du compte officiel Swayco arrive dès cette ouverture :
+    // sa pastille s'ajoute à celle de Messages.
+    unawaited(OfficialApi.refreshBadge());
     // Apply the user's saved Settings preferences.
     final prefs = await SharedPreferences.getInstance();
     // In-app sounds: gate the CallAlert ring / dial tone.

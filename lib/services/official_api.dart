@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'chat_unread.dart';
+
 /// Un message du compte officiel Swayco (table `official_posts`).
 class OfficialPost {
   const OfficialPost({
@@ -9,12 +11,17 @@ class OfficialPost {
     required this.title,
     required this.body,
     required this.createdAt,
+    this.mediaUrl = '',
   });
 
   final String id;
   final String title;
   final String body;
   final DateTime createdAt;
+
+  /// L'EXEMPLE posé sous le message : un GIF, une image ou une courte vidéo
+  /// (`media_url`, migration 0087). Vide = pas d'exemple.
+  final String mediaUrl;
 
   static OfficialPost? fromRow(Map<String, dynamic> m) {
     final body = m['body']?.toString() ?? '';
@@ -25,6 +32,7 @@ class OfficialPost {
       title: m['title']?.toString() ?? '',
       body: body,
       createdAt: at.toLocal(),
+      mediaUrl: m['media_url']?.toString() ?? '',
     );
   }
 }
@@ -73,11 +81,23 @@ abstract final class OfficialApi {
       final p = await SharedPreferences.getInstance();
       await p.setString(_seenKey, DateTime.now().toUtc().toIso8601String());
     } catch (_) {}
+    ChatUnread.setOfficialUnread(0);
   }
 
-  /// Combien de messages de l'équipe n'ont pas encore été vus.
+  /// Combien de messages n'ont pas encore été vus : ceux de l'équipe plus le
+  /// guide d'accueil (compté pour 1) tant que la conversation n'a jamais été
+  /// ouverte. Le guide est dans l'app : il arrive dès la première ouverture,
+  /// même sans réseau.
   static int unread(List<OfficialPost> posts, DateTime? seen) {
-    if (seen == null) return posts.length;
+    if (seen == null) return posts.length + 1;
     return posts.where((p) => p.createdAt.isAfter(seen)).length;
+  }
+
+  /// Recalcule la pastille de la barre de navigation (Messages) à partir du
+  /// compte officiel. À l'ouverture de l'app, puis à chaque rechargement.
+  static Future<void> refreshBadge() async {
+    final posts = await fetch();
+    final seen = await seenAt();
+    ChatUnread.setOfficialUnread(unread(posts, seen));
   }
 }

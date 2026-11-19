@@ -1,6 +1,6 @@
 // Poste un message du compte officiel Swayco (lecture seule dans l'app).
 //
-//   node admin/scripts/post_official.mjs "Titre" "Texte du message"
+//   node admin/scripts/post_official.mjs "Titre" "Texte du message" ["URL du GIF/vidéo"]
 //   node admin/scripts/post_official.mjs --list
 //   node admin/scripts/post_official.mjs --delete <id>
 //
@@ -46,10 +46,12 @@ if (args[0] === '--list') {
   if (error) throw error;
   console.log('supprimé');
 } else if (args.length >= 2) {
-  const [title, body] = args;
+  // Le 3e argument (optionnel) : l'URL d'un GIF / d'une image / d'une vidéo
+  // posée en exemple sous le message.
+  const [title, body, media_url = ''] = args;
   const { data, error } = await sb
     .from('official_posts')
-    .insert({ title, body })
+    .insert({ title, body, media_url })
     .select('id')
     .single();
   if (error) throw error;

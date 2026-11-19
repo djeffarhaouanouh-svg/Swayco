@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../services/analytics.dart';
 import '../services/app_strings.dart';
 import '../services/chat_api.dart';
 import '../services/official_api.dart';
@@ -13,6 +15,24 @@ import 'group_avatar.dart';
 
 const Color _kYellow = Color(0xFFF4FF1F);
 const Color _kNavy = Color(0xFF04123A);
+
+/// Ouvre la feuille de partage du téléphone avec le lien de l'app.
+Future<void> shareSwayco(BuildContext context) async {
+  Analytics.track('invite_friends_share', props: {'source': 'official_guide'});
+  final box = context.findRenderObject() as RenderBox?;
+  try {
+    await SharePlus.instance.share(
+      ShareParams(
+        text: AppStrings.t(
+          'invite_friends_share_text',
+          args: {'link': 'https://www.swayco.fr'},
+        ),
+        sharePositionOrigin:
+            box != null ? box.localToGlobal(Offset.zero) & box.size : null,
+      ),
+    );
+  } catch (_) {}
+}
 
 String _hm(DateTime dt) {
   final now = DateTime.now();
@@ -200,17 +220,22 @@ class OfficialChatRow extends StatelessWidget {
     required this.last,
     required this.unreadCount,
     required this.onTap,
+    this.welcome = false,
   });
 
   final OfficialPost? last;
   final int unreadCount;
   final VoidCallback onTap;
 
+  /// Jamais ouvert (ou rien d'autre que le guide) : l'aperçu est le mot de
+  /// bienvenue.
+  final bool welcome;
+
   @override
   Widget build(BuildContext context) {
     final unread = unreadCount > 0;
-    final preview = last == null
-        ? AppStrings.t('official_empty')
+    final preview = (welcome || last == null)
+        ? AppStrings.t('official_guide_welcome')
         : (last!.title.isNotEmpty ? last!.title : last!.body);
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),

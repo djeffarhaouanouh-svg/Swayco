@@ -220,7 +220,18 @@ abstract final class ChatUnread {
       final seen = _seenFor(r['conversation_id']?.toString() ?? '');
       if (seen == null || at.isAfter(seen)) n++;
     }
+    n += _officialUnread;
     if (count.value != n) count.value = n;
+  }
+
+  /// Les messages non lus du compte officiel Swayco (guide d'accueil compris) :
+  /// ils s'ajoutent à la pastille de la barre de navigation.
+  static int _officialUnread = 0;
+
+  static void setOfficialUnread(int n) {
+    if (_officialUnread == n) return;
+    _officialUnread = n;
+    _recount();
   }
 
   /// Kept for older call sites. Must NOT raise the install floor — that

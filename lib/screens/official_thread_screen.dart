@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/app_strings.dart';
+import '../services/chat_api.dart' show isVideoUrl;
 import '../services/official_api.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/chat_video.dart';
+import '../widgets/official_guide.dart';
 import '../widgets/popup_kit.dart';
 
 /// La conversation du compte officiel Swayco (handoff messages_groupes_quiz,
@@ -30,8 +33,10 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
   }
 
   Future<void> _load() async {
-    final posts = await OfficialApi.fetch();
+    // Ouvrir la conversation = tout avoir vu : la pastille s'éteint tout de
+    // suite, sans attendre le réseau.
     await OfficialApi.markSeen();
+    final posts = await OfficialApi.fetch();
     if (!mounted) return;
     setState(() => _posts = posts);
   }
@@ -107,26 +112,34 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
           ),
           Divider(height: 1, color: SC.stroke.withValues(alpha: 0.10)),
           Expanded(
-            child: _posts.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Text(
-                        AppStrings.t('official_empty'),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: SC.textMuted, fontSize: 14),
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    reverse: true,
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                    itemCount: _posts.length,
-                    itemBuilder: (_, i) {
-                      final p = _posts[_posts.length - 1 - i];
-                      return _OfficialCard(post: p, time: _time(p.createdAt));
-                    },
-                  ),
+            // Le guide d'accueil d'abord (message, exemple, message,
+            // exemple…), puis les messages de l'équipe.
+            child: ListView.builder(
+              reverse: true,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              itemCount: officialGuide.length + _posts.length,
+              itemBuilder: (ctx, i) {
+                final index = officialGuide.length + _posts.length - 1 - i;
+                if (index < officialGuide.length) {
+                  final step = officialGuide[index];
+                  return _OfficialCard(
+                    title: step.titleKey == null
+                        ? ''
+                        : AppStrings.t(step.titleKey!),
+                    body: AppStrings.t(step.bodyKey),
+                    time: '',
+                    extra: step.example?.call(ctx),
+                  );
+                }
+                final p = _posts[index - officialGuide.length];
+                return _OfficialCard(
+                  title: p.title,
+                  body: p.body,
+                  time: _time(p.createdAt),
+                  extra: p.mediaUrl.isEmpty ? null : _PostMedia(url: p.mediaUrl),
+                );
+              },
+            ),
           ),
           Container(
             width: double.infinity,
@@ -158,11 +171,52 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
   }
 }
 
-class _OfficialCard extends StatelessWidget {
-  const _OfficialCard({required this.post, required this.time});
+/// L'exemple d'un message de l'équipe : un GIF / une image (animée si GIF), ou
+/// une vidéo qui s'ouvre au toucher.
+class _PostMedia extends StatelessWidget {
+  const _PostMedia({required this.url});
 
-  final OfficialPost post;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = isVideoUrl(url)
+        ? const ChatVideoTile()
+        : ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Image.network(
+              url,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
+          );
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: isVideoUrl(url)
+          ? GestureDetector(
+              onTap: () => showChatVideo(context, url),
+              child: child,
+            )
+          : child,
+    );
+  }
+}
+
+class _OfficialCard extends StatelessWidget {
+  const _OfficialCard({
+    required this.title,
+    required this.body,
+    required this.time,
+    this.extra,
+  });
+
+  final String title;
+  final String body;
   final String time;
+
+  /// L'exemple sous le texte (maquette du guide, ou média d'un message).
+  final Widget? extra;
 
   @override
   Widget build(BuildContext context) {
@@ -185,9 +239,9 @@ class _OfficialCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (post.title.isNotEmpty) ...[
+                if (title.isNotEmpty) ...[
                   Text(
-                    post.title,
+                    title,
                     style: popupDisplay(
                       fontSize: 15,
                       height: 1.25,
@@ -197,21 +251,25 @@ class _OfficialCard extends StatelessWidget {
                   const SizedBox(height: 6),
                 ],
                 SelectableText(
-                  post.body,
+                  body,
                   style: TextStyle(
                     color: SC.textPrimary,
                     fontSize: 14.5,
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  time,
-                  style: GoogleFonts.ibmPlexMono(
-                    color: SC.textMuted,
-                    fontSize: 10.5,
+                // L'exemple, juste sous le message.
+                ?extra,
+                if (time.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    time,
+                    style: GoogleFonts.ibmPlexMono(
+                      color: SC.textMuted,
+                      fontSize: 10.5,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
