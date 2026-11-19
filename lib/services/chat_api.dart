@@ -525,7 +525,7 @@ abstract final class ChatApi {
 
   /// Plus gros fichier vidéo accepté, en octets. Les octets passent par la
   /// mémoire du téléphone : au-delà, l'envoi risque de planter l'appli.
-  static const int maxVideoBytes = 80 * 1024 * 1024;
+  static const int maxVideoBytes = 200 * 1024 * 1024;
 
   /// Upload a chat VIDEO and insert its message. Same bucket and folder as
   /// [sendImage]; the public URL goes in `image_url` and the `.mp4` / `.mov`
