@@ -173,7 +173,7 @@ class ChatThreadScreen extends StatefulWidget {
 }
 
 /// Ce que la personne veut joindre à son message (la feuille « photo / vidéo »).
-enum _MediaChoice { photoCamera, photoGallery, videoCamera, videoGallery }
+enum _MediaChoice { photoCamera, photoGallery, videoCamera }
 
 class _ChatThreadScreenState extends State<ChatThreadScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
@@ -1401,8 +1401,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                   AppStrings.t('chat_photo_gallery'), _MediaChoice.photoGallery),
               row(Icons.videocam_rounded, AppStrings.t('chat_video_take'),
                   _MediaChoice.videoCamera),
-              row(Icons.video_library_rounded,
-                  AppStrings.t('chat_video_gallery'), _MediaChoice.videoGallery),
             ],
           ),
         ),
@@ -1419,13 +1417,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     // Appareil photo ou galerie, photo ou vidéo : on propose.
     final choice = await _askPhotoSource();
     if (choice == null || !mounted) return;
-    if (choice == _MediaChoice.videoCamera ||
-        choice == _MediaChoice.videoGallery) {
-      await _sendVideo(
-        choice == _MediaChoice.videoCamera
-            ? ImageSource.camera
-            : ImageSource.gallery,
-      );
+    if (choice == _MediaChoice.videoCamera) {
+      await _filmAndSendVideo();
       return;
     }
     final source = choice == _MediaChoice.photoCamera
@@ -1445,15 +1438,32 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         }
       }
       final picker = ImagePicker();
-      file = await picker.pickImage(
-        source: source,
-        // Le selfie : caméra frontale d'abord.
-        preferredCameraDevice: CameraDevice.front,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 85,
-      );
-      if (file == null) return;
+      if (source == ImageSource.gallery) {
+        // La galerie ouvre TOUT : photos et vidéos ensemble. Une vidéo choisie
+        // part comme telle, une photo attend dans le champ.
+        file = await picker.pickMedia(
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 85,
+        );
+        if (file == null) return;
+        final isVideo = (file.mimeType ?? '').startsWith('video/') ||
+            isVideoUrl(file.name);
+        if (isVideo) {
+          await _sendVideoFile(file);
+          return;
+        }
+      } else {
+        file = await picker.pickImage(
+          source: source,
+          // Le selfie : caméra frontale d'abord.
+          preferredCameraDevice: CameraDevice.front,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 85,
+        );
+        if (file == null) return;
+      }
       bytes = await file.readAsBytes();
     } catch (e) {
       if (mounted) setState(() => _error = AppStrings.t('chat_gallery_denied'));
@@ -1469,14 +1479,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     });
   }
 
-  /// Choisit (ou filme) une vidéo et l'envoie. Contrairement à une photo, elle
-  /// ne passe pas par le champ de texte : elle part tout de suite après le
-  /// choix. 60 secondes au plus (le sélecteur coupe), 80 Mo au plus (au-delà,
-  /// l'envoi pourrait planter l'appli : on le dit).
-  Future<void> _sendVideo(ImageSource source) async {
+  /// Filme une vidéo avec la caméra (60 secondes au plus : l'appareil coupe) et
+  /// l'envoie tout de suite.
+  Future<void> _filmAndSendVideo() async {
     final XFile? file;
     try {
-      if (source == ImageSource.camera && !kIsWeb) {
+      if (!kIsWeb) {
         final cam = await Permission.camera.request();
         if (!cam.isGranted) {
           if (mounted) {
@@ -1486,7 +1494,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         }
       }
       file = await ImagePicker().pickVideo(
-        source: source,
+        source: ImageSource.camera,
         maxDuration: const Duration(seconds: 60),
         preferredCameraDevice: CameraDevice.rear,
       );
@@ -1495,6 +1503,14 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       if (mounted) setState(() => _error = AppStrings.t('chat_gallery_denied'));
       return;
     }
+    await _sendVideoFile(file);
+  }
+
+  /// Envoie la vidéo [file] (filmée ou choisie dans la galerie). Contrairement à
+  /// une photo, elle ne passe pas par le champ de texte : elle part tout de
+  /// suite. 80 Mo au plus (au-delà, l'envoi pourrait planter l'appli : on le
+  /// dit).
+  Future<void> _sendVideoFile(XFile file) async {
     if (!mounted) return;
     final size = await file.length();
     if (size > ChatApi.maxVideoBytes) {
