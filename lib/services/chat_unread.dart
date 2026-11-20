@@ -220,8 +220,106 @@ abstract final class ChatUnread {
       final seen = _seenFor(r['conversation_id']?.toString() ?? '');
       if (seen == null || at.isAfter(seen)) n++;
     }
+    // Les groupes : même règle, sauf ceux mis en silence.
+    for (final r in _groupRows) {
+      final convId = r['conversation_id']?.toString() ?? '';
+      if (_mutedGroups.contains(convId)) continue;
+      final at = DateTime.tryParse(r['created_at']?.toString() ?? '');
+      if (at == null) continue;
+      final seen = _seenFor(convId);
+      if (seen == null || at.isAfter(seen)) n++;
+    }
     n += _officialUnread;
     if (count.value != n) count.value = n;
+  }
+
+  // ── Groupes ───────────────────────────────────────────────────────────────
+  // Les messages d'un groupe n'ont pas de destinataire (`recipient` vide) : le
+  // flux ci-dessus ne les voit jamais. Un second flux écoute les conversations
+  // de MES groupes, pour la bannière « nouveau message », la pastille de la
+  // barre de navigation et le rechargement de la liste.
+  static StreamSubscription<List<Map<String, dynamic>>>? _groupSub;
+  static Map<String, String> _groupNames = {};
+  static Set<String> _mutedGroups = {};
+  static List<Map<String, dynamic>> _groupRows = const [];
+  static bool _groupPrimed = false;
+
+  /// Écoute les groupes [names] (conversation → nom du groupe). [muted] : ceux
+  /// que j'ai mis en silence (ni bannière ni pastille). À rappeler quand la
+  /// liste des groupes change ; sans effet si rien n'a changé.
+  static Future<void> watchGroups(
+    Map<String, String> names, {
+    Set<String> muted = const {},
+  }) async {
+    if (_meId.isEmpty || !isSupabaseReady) return;
+    final same = _groupSub != null &&
+        names.length == _groupNames.length &&
+        names.keys.every(_groupNames.containsKey);
+    _groupNames = Map<String, String>.of(names);
+    _mutedGroups = Set<String>.of(muted);
+    if (same) {
+      _recount();
+      return;
+    }
+    await _groupSub?.cancel();
+    _groupSub = null;
+    _groupRows = const [];
+    _groupPrimed = false;
+    if (names.isEmpty) {
+      _recount();
+      return;
+    }
+    _groupSub = Supabase.instance.client
+        .from('messages')
+        .stream(primaryKey: ['id'])
+        .inFilter('conversation_id', names.keys.toList())
+        .order('created_at', ascending: false)
+        .limit(300)
+        .listen(
+          _onGroupRows,
+          onError: (e) => debugPrint('ChatUnread group stream error: $e'),
+        );
+  }
+
+  static void _onGroupRows(List<Map<String, dynamic>> all) {
+    // Les miens ne sont jamais « non lus ».
+    final rows = [
+      for (final r in all)
+        if ((r['sender'] ?? r['sender_id'])?.toString() != _meId) r,
+    ];
+    final previous = {for (final r in _groupRows) r['id']?.toString() ?? ''};
+    final skip = !_groupPrimed;
+    _groupPrimed = true;
+    _groupRows = rows;
+    _recount();
+    if (skip) return;
+    var fresh = false;
+    for (final r in rows) {
+      final id = r['id']?.toString() ?? '';
+      if (id.isEmpty || previous.contains(id)) continue;
+      final convId = r['conversation_id']?.toString() ?? '';
+      if (_mutedGroups.contains(convId)) continue;
+      fresh = true;
+      final name = _groupNames[convId] ?? '';
+      final sender = r['sender_name']?.toString().trim() ?? '';
+      final first = sender.split(RegExp(r'\s+')).first;
+      final imageUrl = r['image_url']?.toString() ?? '';
+      final body = r['body']?.toString().trim() ?? '';
+      final text = (r['audio_url']?.toString() ?? '').isNotEmpty
+          ? AppStrings.t('push_voice')
+          : imageUrl.isNotEmpty
+              ? AppStrings.t(isVideoUrl(imageUrl) ? 'push_video' : 'push_photo')
+              : body;
+      MessageBanner.offer(MessageBannerIntent(
+        conversationId: convId,
+        peerId: (r['sender'] ?? r['sender_id'])?.toString() ?? '',
+        senderName: name.isEmpty ? sender : name,
+        preview: first.isEmpty ? text : '$first : $text',
+        groupName: name,
+      ));
+    }
+    // La liste Messages se recharge tout de suite (aperçu, heure, pastille).
+    if (fresh) newInbound.value++;
   }
 
   /// Les messages non lus du compte officiel Swayco (guide d'accueil compris) :
@@ -248,6 +346,11 @@ abstract final class ChatUnread {
     _reactionSub = null;
     await _readsSub?.cancel();
     _readsSub = null;
+    await _groupSub?.cancel();
+    _groupSub = null;
+    _groupRows = const [];
+    _groupNames = {};
+    _groupPrimed = false;
     _meId = '';
     _knownReactionIds = {};
     _reactionsPrimed = false;

@@ -40,6 +40,7 @@ import '../widgets/swayco_popups_extra.dart';
 import 'call_screen.dart';
 import 'chat_screen.dart';
 import 'chat_thread_screen.dart';
+import 'official_thread_screen.dart';
 import 'discover_screen.dart';
 import 'friend_requests_screen.dart';
 import 'profile_screen.dart';
@@ -234,6 +235,22 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         // (les donnees portent `senderId` = l'autre personne).
         NavTab.select(NavTab.chat);
         unawaited(_openThreadFromPush(intent.data));
+      case 'official':
+        // Une annonce de l'équipe Swayco : l'onglet Messages, puis la
+        // conversation « Swayco ».
+        NavTab.select(NavTab.chat);
+        unawaited(() async {
+          NavigatorState? nav;
+          for (var i = 0; i < 40; i++) {
+            nav = rootNavigatorKey.currentState;
+            if (nav != null) break;
+            await Future<void>.delayed(const Duration(milliseconds: 150));
+          }
+          if (nav == null || !mounted) return;
+          await nav.push<void>(MaterialPageRoute<void>(
+            builder: (_) => const OfficialThreadScreen(),
+          ));
+        }());
       case 'pending_requests':
         NavTab.select(NavTab.demandes);
       case 'boost_ending':

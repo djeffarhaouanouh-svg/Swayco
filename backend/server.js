@@ -2455,6 +2455,53 @@ app.post('/api/notify', _limLite, async (req, res) => {
   }
 });
 
+// Annonce de l'équipe Swayco (compte officiel) : une notification à TOUS ceux qui
+// ont un appareil enregistré. Appelée par admin/scripts/post_official.mjs après
+// l'insertion du message. Header `x-broadcast-secret` = BROADCAST_SECRET.
+// Body : { title, body, dryRun }.
+app.post('/api/notify-official', async (req, res) => {
+  if (!BROADCAST_SECRET || req.get('x-broadcast-secret') !== BROADCAST_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  const { title, body, dryRun } = req.body || {};
+  if (!body && !title) return res.status(400).json({ error: 'missing_text' });
+  const sb = supabase();
+  if (!sb) return res.status(500).json({ error: 'supabase_not_configured' });
+  try {
+    const { data: targets, error } = await sb
+      .from('notification_targets')
+      .select('user_id');
+    if (error) return res.status(500).json({ error: error.message });
+    const uids = [...new Set((targets || []).map((t) => t.user_id))];
+    if (dryRun === true || dryRun === 'true') {
+      return res.json({ ok: true, dryRun: true, recipients: uids.length });
+    }
+    const payload = {
+      title: 'Swayco',
+      body: String(title ? `${title} — ${body || ''}` : body).slice(0, 200),
+      type: 'official',
+      data: { conversationId: 'official' },
+    };
+    let sent = 0;
+    for (let i = 0; i < uids.length; i += 25) {
+      await Promise.all(
+        uids.slice(i, i + 25).map(async (uid) => {
+          try {
+            await notifyUser(uid, payload);
+            sent += 1;
+          } catch (e) {
+            console.error('[notify-official] failed', uid, e?.message || e);
+          }
+        }),
+      );
+    }
+    return res.json({ ok: true, recipients: uids.length, sent });
+  } catch (e) {
+    console.error('/api/notify-official error', e);
+    return res.status(500).json({ error: 'notify_official_failed' });
+  }
+});
+
 // ── "X Japonaises en ligne" broadcast engine ─────────────────────────────────
 // For each push-registered user who is NOT currently in the app, find the
 // country with the most opposite-sex users online right now and nudge them with

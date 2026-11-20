@@ -32,6 +32,7 @@ import 'services/auth_service.dart';
 import 'services/call_alert.dart';
 import 'services/chat_unread.dart';
 import 'services/official_api.dart';
+import 'services/group_api.dart';
 import 'services/app_navigator.dart';
 import 'services/guest_invite_api.dart';
 import 'services/local_notifications.dart';
@@ -701,10 +702,21 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     // (23503 "key not present in table profiles"). Guarantee the row exists
     // now, insert-only so a shared account's language is never clobbered.
     unawaited(ProfileApi.ensureMyProfileRow());
-    unawaited(ChatUnread.start(uid));
+    unawaited(ChatUnread.start(uid).then((_) async {
+      // Les groupes : bannière + pastille aussi pour leurs messages.
+      final groups = await GroupApi.fetchMine(uid);
+      await ChatUnread.watchGroups(
+        {for (final g in groups) g.conversationId: g.name},
+        muted: {
+          for (final g in groups)
+            if (g.memberOf(uid)?.muted ?? false) g.conversationId,
+        },
+      );
+    }));
     // Le guide d'accueil du compte officiel Swayco arrive dès cette ouverture :
     // sa pastille s'ajoute à celle de Messages.
     unawaited(OfficialApi.refreshBadge());
+    OfficialApi.watch();
     // Apply the user's saved Settings preferences.
     final prefs = await SharedPreferences.getInstance();
     // In-app sounds: gate the CallAlert ring / dial tone.

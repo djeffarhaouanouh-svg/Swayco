@@ -556,6 +556,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _official = official;
         _officialSeen = officialSeen;
         ChatUnread.setOfficialUnread(OfficialApi.unread(official, officialSeen));
+        // Un groupe créé, rejoint, quitté ou mis en silence : le flux des
+        // groupes suit.
+        unawaited(ChatUnread.watchGroups(
+          {for (final g in groups) g.conversationId: g.name},
+          muted: {
+            for (final g in groups)
+              if (g.memberOf(id)?.muted ?? false) g.conversationId,
+          },
+        ));
         _specialHandled = specialHandled;
         _myId = id;
         _friends = friends;

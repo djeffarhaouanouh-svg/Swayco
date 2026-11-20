@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -155,6 +157,33 @@ abstract final class OfficialApi {
   static int unread(List<OfficialPost> posts, DateTime? seen) {
     if (seen == null) return posts.length + 1;
     return posts.where((p) => p.createdAt.isAfter(seen)).length;
+  }
+
+  static StreamSubscription<List<Map<String, dynamic>>>? _watch;
+  static int _knownPosts = -1;
+
+  /// Écoute les annonces de l'équipe EN DIRECT : un nouveau message met la
+  /// pastille à jour et recharge la liste Messages tout de suite, sans attendre
+  /// le prochain lancement. (La notification, elle, vient du serveur.)
+  static void watch() {
+    if (_watch != null) return;
+    try {
+      _watch = _client
+          .from('official_posts')
+          .stream(primaryKey: ['id'])
+          .listen(
+        (rows) {
+          final first = _knownPosts < 0;
+          final grew = rows.length != _knownPosts;
+          _knownPosts = rows.length;
+          unawaited(refreshBadge());
+          if (!first && grew) ChatUnread.newInbound.value++;
+        },
+        onError: (Object e) => debugPrint('OfficialApi.watch error: $e'),
+      );
+    } catch (e) {
+      debugPrint('OfficialApi.watch failed: $e');
+    }
   }
 
   /// Recalcule la pastille de la barre de navigation (Messages) à partir du

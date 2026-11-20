@@ -15,7 +15,11 @@ class MessageBannerIntent {
     required this.peerId,
     required this.senderName,
     required this.preview,
+    this.groupName = '',
   });
+
+  /// Groupe : son nom (la notification touchée ouvre le groupe, titré ainsi).
+  final String groupName;
 
   final String conversationId;
   final String peerId;
@@ -56,6 +60,7 @@ abstract final class MessageBanner {
             'type': 'message',
             'conversationId': intent.conversationId,
             'senderId': intent.peerId,
+            if (intent.groupName.isNotEmpty) 'groupName': intent.groupName,
           });
         },
         onDismiss: _dismiss,

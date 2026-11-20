@@ -57,10 +57,10 @@ if (args[0] === '--inbox') {
   const { error } = await sb.from('official_posts').delete().eq('id', args[1]);
   if (error) throw error;
   console.log('supprimé');
-} else if (args.length >= 2) {
+} else if (args.filter((a) => !a.startsWith('--')).length >= 2) {
   // Le 3e argument (optionnel) : l'URL d'un GIF / d'une image / d'une vidéo
   // posée en exemple sous le message.
-  const [title, body, media_url = ''] = args;
+  const [title, body, media_url = ''] = args.filter((a) => !a.startsWith('--'));
   const { data, error } = await sb
     .from('official_posts')
     .insert({ title, body, media_url })
@@ -68,6 +68,24 @@ if (args[0] === '--inbox') {
     .single();
   if (error) throw error;
   console.log('publié', data.id);
+
+  // La notification à tout le monde (--no-push pour s'en passer). Il faut
+  // BROADCAST_SECRET (le même que celui du backend) dans admin/.env.local ou dans
+  // l'environnement ; l'adresse du backend est API_BASE (défaut www.swayco.fr).
+  if (!args.includes('--no-push')) {
+    const secret = process.env.BROADCAST_SECRET || env.BROADCAST_SECRET;
+    const base = process.env.API_BASE || env.API_BASE || 'https://www.swayco.fr';
+    if (!secret) {
+      console.log('Pas de notification : BROADCAST_SECRET absent (admin/.env.local).');
+    } else {
+      const r = await fetch(`${base}/api/notify-official`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-broadcast-secret': secret },
+        body: JSON.stringify({ title, body }),
+      });
+      console.log('notification :', r.status, await r.text());
+    }
+  }
 } else {
   console.error('Usage : post_official.mjs "Titre" "Texte"  |  --list  |  --delete <id>');
   process.exit(1);
