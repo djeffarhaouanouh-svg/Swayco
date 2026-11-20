@@ -48,7 +48,7 @@ class OfficialPost {
 /// L'équipe y écrit depuis le back-office (admin/scripts/post_official.mjs) ;
 /// l'app ne fait que lire. Le « non lu » est un simple point de lecture local.
 abstract final class OfficialApi {
-  static const _seenKey = 'official_seen_iso';
+  static const _seenKey = 'official_seen_iso_v2';
 
   static SupabaseClient get _client => Supabase.instance.client;
 
@@ -134,7 +134,25 @@ abstract final class OfficialApi {
     ChatUnread.setOfficialUnread(0);
   }
 
-  static const _firstKey = 'official_first_seen_iso';
+  static const _firstKey = 'official_first_seen_iso_v2';
+  static const _guideDoneKey = 'official_guide_done_v2';
+
+  /// Le guide d'accueil a-t-il déjà fini d'arriver (message après message) ?
+  static Future<bool> guideDone() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      return p.getBool(_guideDoneKey) ?? false;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  static Future<void> markGuideDone() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setBool(_guideDoneKey, true);
+    } catch (_) {}
+  }
 
   /// Quand la ligne « Swayco » se range dans la liste : la date de son dernier
   /// message ; à défaut (que le guide) la première ouverture ; et tant qu'elle

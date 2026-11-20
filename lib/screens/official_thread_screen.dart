@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/analytics.dart';
+import '../services/swayco_sounds.dart';
 import '../services/app_strings.dart';
 import '../services/call_launcher.dart';
 import '../services/chat_api.dart' show isVideoUrl;
@@ -35,14 +39,58 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
   String _myName = '';
   bool _sending = false;
 
+  // Le guide d'accueil arrive UN MESSAGE À LA FOIS (avec son exemple) à la
+  // première ouverture de la conversation ; ensuite il est là en entier.
+  int _revealed = 0;
+  bool _animating = false;
+  Timer? _revealTimer;
+
   @override
   void initState() {
     super.initState();
     _load();
+    unawaited(_startGuide());
+  }
+
+  Future<void> _startGuide() async {
+    final done = await OfficialApi.guideDone();
+    if (!mounted) return;
+    if (done) {
+      setState(() => _revealed = officialGuide.length);
+      return;
+    }
+    setState(() {
+      _animating = true;
+      _revealed = 0;
+    });
+    void arrive() {
+      HapticFeedback.selectionClick();
+      SwaycoSounds.play(SwSound.msgReceived);
+      setState(() => _revealed++);
+    }
+
+    // Le premier après une courte pause, puis un toutes les 2 secondes.
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    arrive();
+    _revealTimer = Timer.periodic(const Duration(seconds: 2), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      if (_revealed >= officialGuide.length) {
+        t.cancel();
+        setState(() => _animating = false);
+        unawaited(OfficialApi.markGuideDone());
+        return;
+      }
+      arrive();
+    });
   }
 
   @override
   void dispose() {
+    _revealTimer?.cancel();
     _ctrl.dispose();
     super.dispose();
   }
@@ -178,22 +226,28 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
             child: ListView.builder(
               reverse: true,
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              itemCount: officialGuide.length + _items.length,
+              // Pendant l'arrivée du guide, seuls les messages déjà arrivés sont
+              // là ; les annonces de l'équipe viennent après.
+              itemCount: _revealed + (_animating ? 0 : _items.length),
               itemBuilder: (ctx, i) {
-                final items = _items;
-                final index = officialGuide.length + items.length - 1 - i;
-                if (index < officialGuide.length) {
+                final items = _animating ? const <OfficialPost>[] : _items;
+                final index = _revealed + items.length - 1 - i;
+                if (index < _revealed) {
                   final step = officialGuide[index];
-                  return _OfficialCard(
-                    title: step.titleKey == null
-                        ? ''
-                        : AppStrings.t(step.titleKey!),
-                    body: AppStrings.t(step.bodyKey),
-                    time: '',
-                    extra: step.example?.call(ctx),
+                  return _Arrival(
+                    key: ValueKey('guide-$index'),
+                    animate: _animating,
+                    child: _OfficialCard(
+                      title: step.titleKey == null
+                          ? ''
+                          : AppStrings.t(step.titleKey!),
+                      body: AppStrings.t(step.bodyKey),
+                      time: '',
+                      extra: step.example?.call(ctx),
+                    ),
                   );
                 }
-                final p = items[index - officialGuide.length];
+                final p = items[index - _revealed];
                 if (p.mine) {
                   return _MyBubble(text: p.body, time: _time(p.createdAt));
                 }
@@ -327,6 +381,30 @@ class _MyBubble extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// L'arrivée d'un message : un fondu et une petite montée, une seule fois, quand
+/// il vient d'arriver (le guide qui s'égrène message après message).
+class _Arrival extends StatelessWidget {
+  const _Arrival({super.key, required this.animate, required this.child});
+
+  final bool animate;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!animate) return child;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutCubic,
+      builder: (context, v, c) => Opacity(
+        opacity: v,
+        child: Transform.translate(offset: Offset(0, (1 - v) * 18), child: c),
+      ),
+      child: child,
     );
   }
 }
