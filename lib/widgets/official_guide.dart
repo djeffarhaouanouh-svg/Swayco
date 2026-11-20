@@ -13,6 +13,11 @@ import 'voice_note_player.dart';
 /// (bucket public `avatars`, dossier `guide/`). On peut REMPLACER le fichier à
 /// ce chemin à tout moment : l'app lit l'adresse, pas le contenu — aucun
 /// nouveau build nécessaire pour changer la vidéo.
+/// La vidéo du globe 3D (Découvrir → Filtrer), même dossier, même principe :
+/// remplaçable sans build.
+const String kGuideGlobeDemoUrl =
+    'https://rhxenzcdnfvpgjjefztx.supabase.co/storage/v1/object/public/avatars/guide/globe_demo.mp4';
+
 const String kGuideCallDemoUrl =
     'https://rhxenzcdnfvpgjjefztx.supabase.co/storage/v1/object/public/avatars/guide/call_demo.mp4';
 
@@ -62,7 +67,10 @@ final List<OfficialGuideStep> officialGuide = [
   OfficialGuideStep(
     titleKey: 'official_guide_t6',
     bodyKey: 'official_guide_b6',
-    example: (_) => const _ExampleGlobe(),
+    // La VRAIE vidéo du globe (6 s) : sa première image, un bouton lecture.
+    example: (_) => const _ExampleFrame(
+      child: VideoPreviewTile(url: kGuideGlobeDemoUrl),
+    ),
   ),
   OfficialGuideStep(
     titleKey: 'official_guide_t4',
@@ -147,151 +155,6 @@ class _WelcomeVoice extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Étape « globe » — la bulle « Filtrer » sur la photo, puis le globe 3D avec
-/// ses bulles de pays.
-class _ExampleGlobe extends StatelessWidget {
-  const _ExampleGlobe();
-
-  Widget _label(String t) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(99),
-        ),
-        child: Text(
-          t,
-          style: const TextStyle(
-            color: _kNavy,
-            fontSize: 10.5,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    return _ExampleFrame(
-      child: SizedBox(
-        height: 150,
-        child: Row(
-          children: [
-            // La carte Discover avec sa bulle « Filtrer ».
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF7A4DFF), Color(0xFF18DDEA)],
-                    ),
-                  ),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 9, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.28),
-                            borderRadius: BorderRadius.circular(99),
-                            border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.6)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.public_rounded,
-                                  size: 13, color: Colors.white),
-                              const SizedBox(width: 4),
-                              Text(
-                                AppStrings.t('globe_filter_cta'),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 8,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _circle(Icons.close_rounded, Colors.white),
-                            const SizedBox(width: 12),
-                            _circle(Icons.favorite_rounded, const Color(0xFFFF5C8A)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Icon(Icons.arrow_forward_rounded,
-                  color: _ink.withValues(alpha: 0.4)),
-            ),
-            // Le globe 3D et ses bulles de pays.
-            Expanded(
-              child: Center(
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            center: Alignment(-0.35, -0.4),
-                            radius: 0.95,
-                            colors: [Color(0xFF3F8CFF), Color(0xFF0B1A5C)],
-                          ),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.public_rounded,
-                            size: 92,
-                            color: Colors.white.withValues(alpha: 0.22),
-                          ),
-                        ),
-                      ),
-                      Positioned(top: 14, left: -4, child: _label('FR')),
-                      Positioned(top: 52, right: -6, child: _label('DE')),
-                      Positioned(bottom: 18, left: 6, child: _label('JP')),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _circle(IconData icon, Color color) => Container(
-        width: 30,
-        height: 30,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.22),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, size: 17, color: color),
-      );
 }
 
 Color get _panel => SC.light ? const Color(0xFFF3F4F8) : const Color(0xFF14141A);

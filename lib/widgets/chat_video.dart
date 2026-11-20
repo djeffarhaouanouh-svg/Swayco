@@ -191,3 +191,87 @@ class _ChatVideoScreenState extends State<_ChatVideoScreen> {
     );
   }
 }
+
+/// L'aperçu d'une vidéo dans une carte (le guide) : sa PREMIÈRE image, un bouton
+/// lecture dessus, et un toucher qui l'ouvre en plein écran. Si l'image ne
+/// vient pas (réseau, fichier absent), il reste une tuile sombre avec le même
+/// bouton : on peut toujours essayer de la lire.
+class VideoPreviewTile extends StatefulWidget {
+  const VideoPreviewTile({super.key, required this.url});
+
+  final String url;
+
+  @override
+  State<VideoPreviewTile> createState() => _VideoPreviewTileState();
+}
+
+class _VideoPreviewTileState extends State<VideoPreviewTile> {
+  VideoPlayerController? _ctrl;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    _ctrl = c;
+    c.initialize().then((_) {
+      if (!mounted) return;
+      // Pas de lecture : la première image suffit comme vignette.
+      setState(() => _ready = true);
+    }).catchError((Object _) {});
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _ctrl;
+    final ratio = (_ready && c != null && c.value.aspectRatio > 0)
+        ? c.value.aspectRatio
+        : 16 / 10;
+    return GestureDetector(
+      onTap: () => showChatVideo(context, widget.url),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: AspectRatio(
+          aspectRatio: ratio,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1B2250), Color(0xFF0B0E22)],
+                  ),
+                ),
+              ),
+              if (_ready && c != null) VideoPlayer(c),
+              Center(
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withValues(alpha: 0.45),
+                    border: Border.all(color: Colors.white70, width: 1.5),
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 36,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
