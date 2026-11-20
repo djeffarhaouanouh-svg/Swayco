@@ -2288,13 +2288,14 @@ class _CallScreenState extends State<CallScreen> {
       roomOptions: const RoomOptions(
         adaptiveStream: true,
         dynacast: true,
-        // Qualité d'un appel normal : 720p/30 fps, débit par défaut de LiveKit.
+        // 540p/30 fps, ~1 Mb/s : quasi indiscernable du 720p sur un écran de
+        // téléphone, mais bien moins de pixels à encoder/décoder (chauffe).
         defaultCameraCaptureOptions: CameraCaptureOptions(
-          params: VideoParametersPresets.h720_169,
+          params: VideoParametersPresets.h540_169,
         ),
         defaultVideoPublishOptions: VideoPublishOptions(
           simulcast: false,
-          videoEncoding: VideoEncoding(maxBitrate: 1700 * 1000, maxFramerate: 30),
+          videoEncoding: VideoEncoding(maxBitrate: 1000 * 1000, maxFramerate: 30),
         ),
       ),
     );
