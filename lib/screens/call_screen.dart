@@ -642,11 +642,11 @@ class _CallScreenState extends State<CallScreen> {
   static const double _kVoiceCeiling = 0.08;
 
   /// ~5 s de micro ouvert sans jamais une seule mesure : la sonde est muette.
-  static const int _kMicProbeGiveUp = 20;
+  static const int _kMicProbeGiveUp = 10;
 
   void _startMicProbe(Room room) {
     _micProbe?.cancel();
-    _micProbe = Timer.periodic(const Duration(milliseconds: 250), (_) async {
+    _micProbe = Timer.periodic(const Duration(milliseconds: 500), (_) async {
       if (!mounted || _micProbeDead) return;
       LocalAudioTrack? mic;
       for (final pub in room.localParticipant?.audioTrackPublications ??
@@ -2280,7 +2280,26 @@ class _CallScreenState extends State<CallScreen> {
       await Permission.bluetoothConnect.request();
     }
 
-    final room = Room();
+    // Vidéo allégée (chauffe) : capture 540p/24 fps au lieu de 720p/30, un seul
+    // encodage (pas de simulcast : appel 1-à-1) et dynacast/adaptiveStream pour
+    // ne plus encoder ni décoder ce que personne ne regarde. AUCUNE option
+    // audio ici : l'audio reste celui du Room() nu, qui est le réglage éprouvé.
+    final room = Room(
+      roomOptions: const RoomOptions(
+        adaptiveStream: true,
+        dynacast: true,
+        defaultCameraCaptureOptions: CameraCaptureOptions(
+          params: VideoParameters(
+            dimensions: VideoDimensionsPresets.h540_169,
+            encoding: VideoEncoding(maxBitrate: 700 * 1000, maxFramerate: 24),
+          ),
+        ),
+        defaultVideoPublishOptions: VideoPublishOptions(
+          simulcast: false,
+          videoEncoding: VideoEncoding(maxBitrate: 700 * 1000, maxFramerate: 24),
+        ),
+      ),
+    );
     try {
       await room.connect(widget.wsUrl, widget.jwt);
       // For the callee, the caller is already in the room at connect
@@ -5426,8 +5445,7 @@ class _TurnsBlockState extends State<_TurnsBlock>
                     topRight: Radius.circular(14),
                     bottomRight: Radius.circular(14),
                   ),
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: _Frost(
                     child: Container(
                       width: 20,
                       height: 64,
@@ -5536,12 +5554,11 @@ class _TurnsBlockState extends State<_TurnsBlock>
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+      child: _Frost(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.42),
+            color: Colors.black.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
           ),
@@ -5625,11 +5642,10 @@ class _ComposerPillState extends State<_ComposerPill>
               height: 46,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(23),
-                child: BackdropFilter(
-                  filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: _Frost(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.4),
+                      color: Colors.black.withValues(alpha: 0.58),
                       borderRadius: BorderRadius.circular(23),
                       // Fermé : le bouton crayon est cerclé de jaune (le même
                       // jaune que « À toi, tu peux reparler ») pour qu'on le
@@ -5821,15 +5837,14 @@ class _TurnBubble extends StatelessWidget {
     // suivante arrivait.
     final Color fill = onDark
         ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.42);
+        : Colors.black.withValues(alpha: 0.6);
     final Color ink = Colors.white.withValues(alpha: turn.mine ? 0.92 : 0.78);
     const double radius = 18;
 
     final bubble = Flexible(
       child: ClipRRect(
         borderRadius: BorderRadius.circular(radius),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: _Frost(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
@@ -6266,6 +6281,16 @@ class TranslationOrb extends StatefulWidget {
   State<TranslationOrb> createState() => TranslationOrbState();
 }
 
+/// Remplace l'ancien verre dépoli (BackdropFilter) des pastilles posées sur la
+/// vidéo : un flou refait à CHAQUE image vidéo faisait chauffer le GPU. Les
+/// appelants compensent avec un fond plus opaque.
+class _Frost extends StatelessWidget {
+  const _Frost({required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => child;
+}
+
 class TranslationOrbState extends State<TranslationOrb>
     with TickerProviderStateMixin {
   /// Six mouvements, six périodes sans rapport entre elles (9 s, 5 s, 6,5 s,
@@ -6274,7 +6299,6 @@ class TranslationOrbState extends State<TranslationOrb>
   /// contrôleurs sur le même vsync coûtent moins que ce saut.
   late final AnimationController _spin = _ctrl(9000);
   late final AnimationController _spec = _ctrl(5000);
-  late final AnimationController _ripple = _ctrl(3400);
   late final AnimationController _bars = _ctrl(1000);
   late final AnimationController _float = _ctrl(6500);
   late final AnimationController _breathe = _ctrl(3800);
@@ -6284,7 +6308,6 @@ class TranslationOrbState extends State<TranslationOrb>
   late final List<AnimationController> _all = [
     _spin,
     _spec,
-    _ripple,
     _bars,
     _float,
     _breathe,
@@ -6499,6 +6522,9 @@ class TranslationOrbState extends State<TranslationOrb>
         // Une transformation, pas une taille qui change : la boîte garde ses
         // dimensions, donc rien autour ne bouge quand le galet respire.
         scale: _swell.value,
+        // RepaintBoundary : le galet s'anime en continu, il ne doit pas
+        // entraîner le repaint de la vidéo autour.
+        child: RepaintBoundary(
         child: CustomPaint(
         painter: _OrbPainter(
           spin: _spin.value,
@@ -6507,17 +6533,18 @@ class TranslationOrbState extends State<TranslationOrb>
           // la lévitation et la respiration. Un contrôleur rend une rampe
           // droite — sans ça, l'onde part trop lentement et la lévitation
           // rebondit sèchement en haut et en bas.
-          ripple: Curves.easeOut.transform(_ripple.value),
+          // Plus d'ondes : ni pendant la traduction vocale, ni jamais (chauffe).
+          ripple: 0,
           bars: _bars.value,
           float: Curves.easeInOut.transform(_float.value),
           breathe: Curves.easeInOut.transform(_breathe.value),
           amp: _voice.value,
-          // Ondes coupées : leur amplitude tombe à zéro, le reste vit.
-          waveAmp: widget.ripples ? _tts.value : 0,
+          waveAmp: 0,
           // Le painter sait déjà se taire : poser une icône au centre à la
           // place des barres — la « pierre réduite » de la maquette — ne
           // demandera que de passer false ici et un Icon en enfant.
           showBars: true,
+        ),
         ),
         ),
         ),
@@ -6534,8 +6561,7 @@ class TranslationOrbState extends State<TranslationOrb>
         width: TranslationOrb.kSize * TranslationOrb.dormantRatio,
         height: TranslationOrb.kSize * TranslationOrb.dormantRatio,
         child: ClipOval(
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: _Frost(
             child: CustomPaint(
               painter: const _DormantOrbPainter(),
               child: Center(
@@ -7042,8 +7068,7 @@ class _RoundCallButton extends StatelessWidget {
               child: // Stable Flutter frosted-glass circle (NOT a platform
                   // view): the native glass flickered under the keyboard.
                   ClipOval(
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: _Frost(
                 child: AnimatedContainer(
                   // Court exprès : c'est un interrupteur, pas une transition.
                   // Au-delà, le blanc «arrive» au lieu d'être déjà là.
