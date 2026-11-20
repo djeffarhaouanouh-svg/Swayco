@@ -50,6 +50,8 @@ COPY backend/nationalities.js ./nationalities.js
 COPY backend/email.js ./email.js
 # Notifications d'engagement planifiees — required by server.js (require('./engagement')).
 COPY backend/engagement.js ./engagement.js
+# L'hôtesse d'accueil — required by server.js (require('./hostess')).
+COPY backend/hostess.js ./hostess.js
 # Comptes IA (file d'actions, repondeur) — required by server.js (require('./ai_agents')).
 COPY backend/ai_agents.js ./ai_agents.js
 # Transcription des vocaux du chat — required by server.js (require('./voice_transcribe')).
