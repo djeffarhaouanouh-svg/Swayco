@@ -376,7 +376,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     final idx = g == null
         ? userId.hashCode
         : g.members.indexWhere((m) => m.userId == userId);
-    return palette[(idx < 0 ? userId.hashCode : idx).abs() % palette.length];
+    final i = (idx < 0 ? userId.hashCode : idx).abs();
+    if (i < palette.length) return palette[i];
+    // Au-delà des 5 couleurs de la maquette : une teinte nouvelle par membre
+    // (angle d'or, 137,5°), claire et vive pour rester lisible sur le fond
+    // sombre. Chaque membre garde sa couleur, jusqu'à de grands groupes.
+    final hue = ((i - palette.length) * 137.508 + 20) % 360;
+    return HSLColor.fromAHSL(1, hue, 0.85, 0.68).toColor();
   }
 
   /// Ouvre les infos du groupe (nom, membres, photo, ajouter, quitter).
