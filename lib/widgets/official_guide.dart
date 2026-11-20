@@ -5,6 +5,7 @@ import '../theme/swayco_theme.dart';
 import 'chat_list_extras.dart';
 import 'chat_quiz.dart';
 import 'chat_video.dart';
+import 'voice_note_player.dart';
 
 /// La vidéo de démonstration de l'appel traduit, hébergée dans le stockage
 /// (bucket public `avatars`, dossier `guide/`). On peut REMPLACER le fichier à
@@ -39,7 +40,12 @@ class OfficialGuideStep {
 
 /// Les étapes, dans l'ordre où elles arrivent dans la conversation.
 final List<OfficialGuideStep> officialGuide = [
-  const OfficialGuideStep(titleKey: null, bodyKey: 'official_guide_welcome'),
+  // Le mot de bienvenue, avec un message VOCAL de l'équipe juste dessous.
+  OfficialGuideStep(
+    titleKey: null,
+    bodyKey: 'official_guide_welcome',
+    example: (_) => const _WelcomeVoice(),
+  ),
   OfficialGuideStep(
     titleKey: 'official_guide_t1',
     bodyKey: 'official_guide_b1',
@@ -83,6 +89,47 @@ final List<OfficialGuideStep> officialGuide = [
     ),
   ),
 ];
+
+/// Le message vocal de bienvenue de l'équipe (explique les messages vocaux).
+/// Anglais pour tout le monde ; FRANÇAIS pour les comptes dont l'interface est
+/// en anglais. Les deux fichiers sont dans le stockage (`guide/`) et peuvent être
+/// remplacés sans nouveau build.
+class _WelcomeVoice extends StatelessWidget {
+  const _WelcomeVoice();
+
+  static const _base =
+      'https://rhxenzcdnfvpgjjefztx.supabase.co/storage/v1/object/public/avatars/guide/';
+
+  @override
+  Widget build(BuildContext context) {
+    final ui = AppStrings.currentBcp47.value.trim().toLowerCase();
+    final english = ui == 'en' || ui.startsWith('en-') || ui.startsWith('en_');
+    final url = '$_base${english ? 'welcome_fr' : 'welcome_en'}.mp3';
+    return _ExampleFrame(
+      child: Row(
+        children: [
+          ClipOval(
+            child: Image.asset(
+              'assets/icon-app.png',
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: VoiceNotePlayer(
+              url: url,
+              color: _ink,
+              messageId: 'guide-welcome-${english ? 'fr' : 'en'}',
+              mine: false,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// Étape « globe » — la bulle « Filtrer » sur la photo, puis le globe 3D avec
 /// ses bulles de pays.
