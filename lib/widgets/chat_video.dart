@@ -216,11 +216,27 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
     final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
     _ctrl = c;
     c.addListener(_onTick);
-    c.initialize().then((_) {
-      if (mounted) setState(() => _ready = true);
+    c.initialize().then((_) async {
+      if (!mounted) return;
+      // Elle démarre TOUTE SEULE, en boucle, sans le son : c'est la seule façon
+      // que le navigateur accepte (un son non demandé est bloqué). Le haut-parleur
+      // en haut à droite le rend.
+      await c.setVolume(0);
+      await c.setLooping(true);
+      setState(() => _ready = true);
+      await c.play();
     }).catchError((Object _) {
       if (mounted) setState(() => _failed = true);
     });
+  }
+
+  bool _muted = true;
+
+  void _toggleSound() {
+    final c = _ctrl;
+    if (c == null || !_ready) return;
+    setState(() => _muted = !_muted);
+    c.setVolume(_muted ? 0 : 1);
   }
 
   void _onTick() {
@@ -242,8 +258,6 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
       c.pause();
       return;
     }
-    // Finie : on repart du début.
-    if (c.value.position >= c.value.duration) c.seekTo(Duration.zero);
     c.play();
   }
 
@@ -288,6 +302,30 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
                       Icons.play_arrow_rounded,
                       color: Colors.white,
                       size: 36,
+                    ),
+                  ),
+                ),
+              // Le son : coupé au départ, un toucher le rend.
+              if (_ready)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: _toggleSound,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _muted
+                            ? Icons.volume_off_rounded
+                            : Icons.volume_up_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                     ),
                   ),
                 ),
