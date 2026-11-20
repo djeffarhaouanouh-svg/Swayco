@@ -1389,7 +1389,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             onTap: _openOfficial,
                           )
                         else if (entry.group != null)
-                          FadeSlideIn(
+                          _RowEntrance(
                             key: ValueKey('grp-${entry.group!.id}'),
                             delay: Duration(milliseconds: i * 55),
                             child: GroupChatRow(
@@ -1421,7 +1421,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           )
                         else
                         for (final p in [entry.peer!])
-                        FadeSlideIn(
+                        _RowEntrance(
                           key: ValueKey(p.id),
                           delay: Duration(milliseconds: i * 55),
                           child: Column(
@@ -3153,4 +3153,20 @@ class _NoFriendsEmpty extends StatelessWidget {
       ),
     );
   }
+}
+
+/// L'entrée d'une ligne de la liste Messages (fondu + montée, en cascade).
+///
+/// Sur le WEB elle est supprimée : la liste s'y recharge à chaque retour sur
+/// l'onglet, et revoir toutes les lignes se rejouer à chaque fois était pénible.
+/// Sur téléphone, l'animation reste.
+class _RowEntrance extends StatelessWidget {
+  const _RowEntrance({super.key, this.delay = Duration.zero, required this.child});
+
+  final Duration delay;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      kIsWeb ? child : FadeSlideIn(delay: delay, child: child);
 }
