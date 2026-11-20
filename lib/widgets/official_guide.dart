@@ -80,8 +80,13 @@ final List<OfficialGuideStep> officialGuide = [
     titleKey: 'official_guide_t7',
     bodyKey: 'official_guide_b7',
     // La vraie carte « Invite tes amis » : la toucher ouvre le partage.
-    example: (context) => InviteFriendsCard(
-      onShare: () => shareSwayco(context),
+    // Dans un encart arrondi, comme les autres exemples (la ligne de la liste,
+    // seule, serait une bande plate collée au message).
+    example: (context) => _ExampleFrame(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: InviteFriendsCard(onShare: () => shareSwayco(context)),
+      ),
     ),
   ),
 ];
