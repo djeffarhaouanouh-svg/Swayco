@@ -12,7 +12,11 @@ class OfficialPost {
     required this.body,
     required this.createdAt,
     this.mediaUrl = '',
+    this.mine = false,
   });
+
+  /// Un message que J'ai écrit à l'équipe (et non un message de l'équipe).
+  final bool mine;
 
   final String id;
   final String title;
@@ -23,7 +27,7 @@ class OfficialPost {
   /// (`media_url`, migration 0087). Vide = pas d'exemple.
   final String mediaUrl;
 
-  static OfficialPost? fromRow(Map<String, dynamic> m) {
+  static OfficialPost? fromRow(Map<String, dynamic> m, {bool mine = false}) {
     final body = m['body']?.toString() ?? '';
     final at = DateTime.tryParse(m['created_at']?.toString() ?? '');
     if (body.isEmpty || at == null) return null;
@@ -33,6 +37,7 @@ class OfficialPost {
       body: body,
       createdAt: at.toLocal(),
       mediaUrl: m['media_url']?.toString() ?? '',
+      mine: mine,
     );
   }
 }
@@ -64,6 +69,44 @@ abstract final class OfficialApi {
       debugPrint('OfficialApi.fetch failed: $e');
       return const [];
     }
+  }
+
+  /// Mes messages à l'équipe (table `official_messages`, migration 0088), du
+  /// plus ancien au plus récent. Vide si la table n'est pas encore migrée.
+  static Future<List<OfficialPost>> fetchMine(String meId) async {
+    if (meId.isEmpty) return const [];
+    try {
+      final rows = await _client
+          .from('official_messages')
+          .select()
+          .eq('user_id', meId)
+          .order('created_at', ascending: false)
+          .limit(100);
+      final out = <OfficialPost>[
+        for (final r in rows as List)
+          ?OfficialPost.fromRow(Map<String, dynamic>.from(r as Map),
+              mine: true),
+      ];
+      out.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      return out;
+    } catch (e) {
+      debugPrint('OfficialApi.fetchMine failed: $e');
+      return const [];
+    }
+  }
+
+  /// Envoie un message à l'équipe : il est enregistré en base, l'équipe le lit
+  /// depuis le back-office. Lève en cas d'échec (le champ garde alors le texte).
+  static Future<void> send({
+    required String meId,
+    required String name,
+    required String body,
+  }) async {
+    await _client.from('official_messages').insert({
+      'user_id': meId,
+      'user_name': name,
+      'body': body,
+    });
   }
 
   static Future<DateTime?> seenAt() async {

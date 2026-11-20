@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../services/analytics.dart';
 import '../services/app_strings.dart';
+import '../services/call_launcher.dart';
 import '../services/chat_api.dart' show isVideoUrl;
+import '../services/device_id.dart';
+import '../services/friendly_error.dart';
 import '../services/official_api.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/chat_video.dart';
@@ -10,9 +14,9 @@ import '../widgets/official_guide.dart';
 import '../widgets/popup_kit.dart';
 
 /// La conversation du compte officiel Swayco (handoff messages_groupes_quiz,
-/// partie B, écran 1b) : les messages de l'équipe en cartes, et à la place du
-/// champ d'écriture une mention « Seule l'équipe Swayco peut écrire ici ».
-/// Pas de bouton d'appel : on ne peut que lire.
+/// partie B, écran 1b) : le guide et les messages de l'équipe en cartes. On peut
+/// aussi écrire à l'équipe : ces messages sont enregistrés en base (table
+/// `official_messages`) et lus depuis le back-office. Pas de bouton d'appel.
 class OfficialThreadScreen extends StatefulWidget {
   const OfficialThreadScreen({super.key, this.initial = const []});
 
@@ -25,6 +29,11 @@ class OfficialThreadScreen extends StatefulWidget {
 
 class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
   late List<OfficialPost> _posts = widget.initial;
+  List<OfficialPost> _mine = const [];
+  final _ctrl = TextEditingController();
+  String _myId = '';
+  String _myName = '';
+  bool _sending = false;
 
   @override
   void initState() {
@@ -32,13 +41,65 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  /// Messages de l'équipe et les miens, mêlés par date.
+  List<OfficialPost> get _items =>
+      [..._posts, ..._mine]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
   Future<void> _load() async {
     // Ouvrir la conversation = tout avoir vu : la pastille s'éteint tout de
     // suite, sans attendre le réseau.
     await OfficialApi.markSeen();
-    final posts = await OfficialApi.fetch();
+    _myId = await DeviceId.getOrCreate();
+    try {
+      _myName = (await CallLauncher.resolveMyIdentity()).name;
+    } catch (_) {}
+    final results = await Future.wait([
+      OfficialApi.fetch(),
+      OfficialApi.fetchMine(_myId),
+    ]);
     if (!mounted) return;
-    setState(() => _posts = posts);
+    setState(() {
+      _posts = results[0];
+      // Un envoi en cours n'est pas effacé par une relecture qui l'a devancé.
+      _mine = results[1];
+    });
+  }
+
+  Future<void> _send() async {
+    final text = _ctrl.text.trim();
+    if (text.isEmpty || _sending || _myId.isEmpty) return;
+    setState(() => _sending = true);
+    _ctrl.clear();
+    final optimistic = OfficialPost(
+      id: 'local-${DateTime.now().microsecondsSinceEpoch}',
+      title: '',
+      body: text,
+      createdAt: DateTime.now(),
+      mine: true,
+    );
+    setState(() => _mine = [..._mine, optimistic]);
+    try {
+      await OfficialApi.send(meId: _myId, name: _myName, body: text);
+      Analytics.track('official_message_sent');
+    } catch (e) {
+      if (!mounted) return;
+      // Pas parti : on retire la bulle et on rend le texte au champ.
+      setState(() => _mine = [
+            for (final m in _mine)
+              if (m.id != optimistic.id) m,
+          ]);
+      _ctrl.text = text;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   String _time(DateTime dt) {
@@ -68,8 +129,8 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
                       color: SC.textPrimary, size: 20),
                   onPressed: () => Navigator.of(context).maybePop(),
                 ),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                // L'icône de l'app, en photo de profil (ronde, comme les autres).
+                ClipOval(
                   child: Image.asset(
                     'assets/icon-app.png',
                     width: 42,
@@ -117,9 +178,10 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
             child: ListView.builder(
               reverse: true,
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              itemCount: officialGuide.length + _posts.length,
+              itemCount: officialGuide.length + _items.length,
               itemBuilder: (ctx, i) {
-                final index = officialGuide.length + _posts.length - 1 - i;
+                final items = _items;
+                final index = officialGuide.length + items.length - 1 - i;
                 if (index < officialGuide.length) {
                   final step = officialGuide[index];
                   return _OfficialCard(
@@ -131,7 +193,10 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
                     extra: step.example?.call(ctx),
                   );
                 }
-                final p = _posts[index - officialGuide.length];
+                final p = items[index - officialGuide.length];
+                if (p.mine) {
+                  return _MyBubble(text: p.body, time: _time(p.createdAt));
+                }
                 return _OfficialCard(
                   title: p.title,
                   body: p.body,
@@ -141,31 +206,126 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
               },
             ),
           ),
+          // Le champ d'écriture : les gens peuvent écrire à l'équipe.
           Container(
-            width: double.infinity,
-            padding: EdgeInsets.fromLTRB(20, 14, 20, 14 + safe.bottom),
-            decoration: BoxDecoration(
-              color: SC.menu,
-              border: Border(
-                top: BorderSide(color: SC.stroke.withValues(alpha: 0.10)),
-              ),
-            ),
+            padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + safe.bottom),
+            color: SC.tabBg,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Icon(Icons.lock_rounded, size: 15, color: SC.textMuted),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: SC.fill.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(
+                          color: SC.stroke.withValues(alpha: 0.16)),
+                    ),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      child: TextField(
+                        controller: _ctrl,
+                        minLines: 1,
+                        maxLines: 5,
+                        maxLength: 4000,
+                        textCapitalization: TextCapitalization.sentences,
+                        cursorColor: SC.accentFg,
+                        style: TextStyle(color: SC.textPrimary),
+                        onChanged: (_) => setState(() {}),
+                        decoration: InputDecoration(
+                          counterText: '',
+                          hintText: AppStrings.t('official_write_hint'),
+                          hintStyle: TextStyle(color: SC.fgA(0.5)),
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    AppStrings.t('official_readonly'),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: SC.textMuted, fontSize: 13),
+                GestureDetector(
+                  onTap: _ctrl.text.trim().isEmpty || _sending ? null : _send,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: _ctrl.text.trim().isEmpty
+                          ? SC.menu
+                          : const Color(0xFFF4FF1F),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.arrow_upward_rounded,
+                      color: _ctrl.text.trim().isEmpty
+                          ? SC.textMuted
+                          : const Color(0xFF04123A),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Mon message à l'équipe : une bulle à droite, au dégradé de la marque.
+class _MyBubble extends StatelessWidget {
+  const _MyBubble({required this.text, required this.time});
+
+  final String text;
+  final String time;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: SC.brandGradient,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 3, right: 6),
+                child: Text(
+                  time,
+                  style: GoogleFonts.ibmPlexMono(
+                    color: SC.textMuted,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

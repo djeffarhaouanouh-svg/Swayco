@@ -1,6 +1,7 @@
 // Poste un message du compte officiel Swayco (lecture seule dans l'app).
 //
 //   node admin/scripts/post_official.mjs "Titre" "Texte du message" ["URL du GIF/vidéo"]
+//   node admin/scripts/post_official.mjs --inbox      (messages écrits à l'équipe)
 //   node admin/scripts/post_official.mjs --list
 //   node admin/scripts/post_official.mjs --delete <id>
 //
@@ -33,7 +34,18 @@ const sb = createClient(url, key, { auth: { persistSession: false } });
 
 const args = process.argv.slice(2);
 
-if (args[0] === '--list') {
+if (args[0] === '--inbox') {
+  // Les messages que les gens ont écrits à l'équipe (les plus récents d'abord).
+  const { data, error } = await sb
+    .from('official_messages')
+    .select('user_id, user_name, body, created_at')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  for (const m of data) {
+    console.log(`${m.created_at}  ${m.user_name || '?'} (${m.user_id})\n   ${m.body}\n`);
+  }
+} else if (args[0] === '--list') {
   const { data, error } = await sb
     .from('official_posts')
     .select('id, title, body, created_at')

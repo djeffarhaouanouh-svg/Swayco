@@ -249,8 +249,8 @@ class OfficialChatRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+                // L'icône de l'app en photo de profil, ronde comme les autres.
+                ClipOval(
                   child: Image.asset(
                     'assets/icon-app.png',
                     width: 52,

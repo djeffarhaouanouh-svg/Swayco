@@ -245,6 +245,8 @@ flutter:
     - assets/swayco_logo_6d.svg
     # Transparent Ø-arrows mark — call connecting splash ("sas").
     - assets/icon-saas.png
+    # App icon — profile picture of the official Swayco account.
+    - assets/icon-app.png
     # Boot splash — Splash Sync Call "cassure nette" (same file as web/splash.json).
     - assets/splash.json
     - assets/glyph-white.png
