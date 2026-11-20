@@ -106,7 +106,18 @@ abstract final class GroupApi {
         final id = g['id']?.toString() ?? '';
         if (id.isEmpty) continue;
         final members = byGroup[id] ?? const <GroupMember>[];
-        members.sort((a, b) => a.joinedAt.compareTo(b.joinedAt));
+        // Un ordre STABLE : le créateur d'abord, puis par arrivée, puis par id.
+        // Les membres ajoutés à la création ont tous la même heure
+        // (`now()` d'une transaction) : sans le dernier critère, l'ordre
+        // changeait à chaque relecture et la mosaïque de la photo du groupe
+        // bougeait toute seule.
+        final creator = g['created_by']?.toString() ?? '';
+        members.sort((a, b) {
+          if (a.userId == creator && b.userId != creator) return -1;
+          if (b.userId == creator && a.userId != creator) return 1;
+          final c = a.joinedAt.compareTo(b.joinedAt);
+          return c != 0 ? c : a.userId.compareTo(b.userId);
+        });
         out.add(ChatGroup(
           id: id,
           name: g['name']?.toString() ?? '',
