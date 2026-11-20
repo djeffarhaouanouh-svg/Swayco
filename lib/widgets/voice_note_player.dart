@@ -26,7 +26,12 @@ class VoiceNotePlayer extends StatefulWidget {
     required this.messageId,
     required this.mine,
     this.durationMs = 0,
+    this.onPlay,
   });
+
+  /// Appelé à CHAQUE démarrage de la lecture (le guide s'en sert pour faire
+  /// apparaître la transcription quand on appuie sur lecture).
+  final VoidCallback? onPlay;
 
   /// Adresse publique du fichier audio (`messages.audio_url`).
   final String url;
@@ -125,6 +130,7 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
         unawaited(_active!._stop());
       }
       _active = this;
+      widget.onPlay?.call();
       unawaited(_markHeard());
       var player = _player;
       if (player == null) {

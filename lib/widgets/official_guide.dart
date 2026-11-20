@@ -103,8 +103,8 @@ final List<OfficialGuideStep> officialGuide = [
 
 /// Le message vocal de bienvenue de l'équipe, présenté comme un VOCAL NORMAL du
 /// chat : une bulle reçue, le lecteur en blanc dedans, et la transcription
-/// cachée jusqu'au toucher (« Voir la transcription »), dans la langue de
-/// l'interface. Anglais pour tout le monde ; FRANÇAIS pour les comptes dont
+/// qui apparaît quand on appuie sur LECTURE (dans la langue de l'interface),
+/// sans bouton pour la refermer. Anglais pour tout le monde ; FRANÇAIS pour les comptes dont
 /// l'interface est en anglais. Les deux fichiers sont dans le stockage
 /// (`guide/`) et peuvent être remplacés sans nouveau build.
 class _WelcomeVoice extends StatefulWidget {
@@ -160,39 +160,11 @@ class _WelcomeVoiceState extends State<_WelcomeVoice> {
                     color: fg,
                     messageId: 'guide-welcome-$audioLang',
                     mine: false,
-                  ),
-                  const SizedBox(height: 6),
-                  // La transcription : à la demande seulement.
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => setState(() => _open = !_open),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _open
-                                ? Icons.keyboard_arrow_up_rounded
-                                : Icons.keyboard_arrow_down_rounded,
-                            size: 18,
-                            color: fg.withValues(alpha: 0.6),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            AppStrings.t(_open
-                                ? 'voice_transcript_hide'
-                                : 'voice_transcript_show'),
-                            style: TextStyle(
-                              color: fg.withValues(alpha: 0.6),
-                              fontSize: 12.5,
-                              decoration: TextDecoration.underline,
-                              decorationColor: fg.withValues(alpha: 0.4),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    // La transcription apparaît quand on appuie sur LECTURE, et
+                    // reste (pas de bouton pour la refermer).
+                    onPlay: () {
+                      if (!_open) setState(() => _open = true);
+                    },
                   ),
                   AnimatedSize(
                     duration: const Duration(milliseconds: 280),
