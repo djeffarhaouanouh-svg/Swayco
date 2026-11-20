@@ -223,43 +223,47 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
           Expanded(
             // Le guide d'accueil d'abord (message, exemple, message,
             // exemple…), puis les messages de l'équipe.
-            child: ListView.builder(
+            // Une colonne dans un défilement inversé (le bas = le plus récent) :
+            // tous les messages arrivés sont construits d'emblée, aucun n'attend
+            // qu'on défile pour apparaître.
+            child: SingleChildScrollView(
               reverse: true,
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              // Pendant l'arrivée du guide, seuls les messages déjà arrivés sont
-              // là ; les annonces de l'équipe viennent après.
-              itemCount: _revealed + (_animating ? 0 : _items.length),
-              itemBuilder: (ctx, i) {
-                final items = _animating ? const <OfficialPost>[] : _items;
-                final index = _revealed + items.length - 1 - i;
-                if (index < _revealed) {
-                  final step = officialGuide[index];
-                  return _Arrival(
-                    key: ValueKey('guide-$index'),
-                    animate: _animating,
-                    child: _OfficialCard(
-                      title: step.titleKey == null
-                          ? ''
-                          : AppStrings.t(step.titleKey!),
-                      body: AppStrings.t(step.bodyKey),
-                      time: '',
-                      extra: step.example?.call(ctx),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Pendant l'arrivée du guide, seuls les messages déjà arrivés
+                  // sont là ; les annonces de l'équipe viennent après.
+                  for (var index = 0; index < _revealed; index++)
+                    _Arrival(
+                      key: ValueKey('guide-$index'),
+                      // Seul le DERNIER arrivé s'anime (fondu + montée).
+                      animate: _animating && index == _revealed - 1,
+                      child: _OfficialCard(
+                        title: officialGuide[index].titleKey == null
+                            ? ''
+                            : AppStrings.t(officialGuide[index].titleKey!),
+                        body: AppStrings.t(officialGuide[index].bodyKey),
+                        time: '',
+                        extra: officialGuide[index].example?.call(context),
+                      ),
                     ),
-                  );
-                }
-                final p = items[index - _revealed];
-                if (p.mine) {
-                  return _MyBubble(text: p.body, time: _time(p.createdAt));
-                }
-                return _OfficialCard(
-                  title: p.title,
-                  body: p.body,
-                  time: _time(p.createdAt),
-                  extra: p.mediaUrl.isEmpty ? null : _PostMedia(url: p.mediaUrl),
-                );
-              },
-            ),
-          ),
+                  if (!_animating)
+                    for (final p in _items)
+                      if (p.mine)
+                        _MyBubble(text: p.body, time: _time(p.createdAt))
+                      else
+                        _OfficialCard(
+                          title: p.title,
+                          body: p.body,
+                          time: _time(p.createdAt),
+                          extra: p.mediaUrl.isEmpty
+                              ? null
+                              : _PostMedia(url: p.mediaUrl),
+                        ),
+                ],
+              ),
+            ),          ),
           // Le champ d'écriture : les gens peuvent écrire à l'équipe.
           Container(
             padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + safe.bottom),
