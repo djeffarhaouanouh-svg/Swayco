@@ -2559,6 +2559,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
             key: ValueKey('quiz-card-${m.id}'),
             theme: m.quizTheme,
             index: m.quizIndex,
+            questionId: m.quizQuestionId,
             active: m.id == activeQuizCardId,
           );
         }

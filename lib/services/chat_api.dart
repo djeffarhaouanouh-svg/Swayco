@@ -174,6 +174,15 @@ class ChatMessage {
     return p.length > 2 ? int.tryParse(p[2]) ?? 0 : 0;
   }
 
+  /// Le numéro de la QUESTION tirée dans le thème (1 à 20) : 4e champ de la
+  /// carte `quiz|<thème>|<position>|<question>`. Une ancienne carte n'en a pas :
+  /// la position fait alors office de numéro.
+  int get quizQuestionId {
+    if (!isQuizQuestion) return 0;
+    final p = body.split('|');
+    return p.length > 3 ? int.tryParse(p[3]) ?? quizIndex : quizIndex;
+  }
+
   /// Qui a arrêté le quiz (ligne système `quiz_stop|<uid>`), sinon ''.
   String get quizStoppedBy =>
       body.startsWith('quiz_stop|') ? body.substring('quiz_stop|'.length) : '';

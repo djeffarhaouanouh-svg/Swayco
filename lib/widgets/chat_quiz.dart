@@ -306,10 +306,16 @@ class QuizQuestionCard extends StatelessWidget {
     required this.theme,
     required this.index,
     required this.active,
+    this.questionId = 0,
   });
 
   final String theme;
+
+  /// La position dans le quiz (« QUESTION 2 »).
   final int index;
+
+  /// Le numéro de la question dans le thème (0 = comme la position).
+  final int questionId;
 
   /// La carte de la question en cours : seule à avoir le contour qui tourne.
   final bool active;
@@ -351,7 +357,7 @@ class QuizQuestionCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  QuizApi.questionText(theme, index),
+                  QuizApi.questionText(theme, questionId > 0 ? questionId : index),
                   style: popupDisplay(
                     fontSize: 17,
                     height: 1.3,
