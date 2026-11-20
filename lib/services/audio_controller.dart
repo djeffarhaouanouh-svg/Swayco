@@ -42,18 +42,15 @@ class AudioController extends ChangeNotifier {
   /// réglage tient d'un appel à l'autre.
   static const double kStartTranslatedVolume = 0.9;
 
-  // Un appel normal démarre sur l'ÉCOUTEUR, comme n'importe quel téléphone :
-  // collé à l'oreille, le haut-parleur n'atteint pas le micro, donc la boucle
-  // de larsen n'a pas de chemin pour se refermer. La visio, elle, se tient à
-  // distance du visage — elle démarre sur le haut-parleur (voir [bind]).
+  // Un appel démarre sur le HAUT-PARLEUR (voir [bind]).
   AudioPrefs _prefs = const AudioPrefs(
     translatedVolume: kStartTranslatedVolume,
     originalVolume: kStartOriginalVolume,
     duckingEnabled: true,
-    speakerOn: false,
+    speakerOn: true,
   );
 
-  AudioRoute _route = AudioRoute.earpiece;
+  AudioRoute _route = AudioRoute.speaker;
   double _micLevel = 0;
   bool _isDucking = false;
   Timer? _duckRelease;
@@ -118,15 +115,18 @@ class AudioController extends ChangeNotifier {
     _prefs = await UserPrefs.loadAudio();
     // Chaque appel démarre pareil : TOUS les volumes au maximum, quoi qu'on ait
     // réglé à l'appel d'avant (décision produit : on entend tout de suite, sans
-    // chercher les curseurs). La route, elle, démarre sur l'ÉCOUTEUR : sur le
-    // haut-parleur, la voix de la traduction ne jouait plus du tout sur iPhone
-    // (testé : haut-parleur coupé, elle revient). On peut passer au haut-parleur
-    // d'un tap pendant l'appel ; ça ne tient que pour celui-là. Un casque ou un
-    // Bluetooth branché garde la main sur la route (voir [_applySpeaker]).
+    // chercher les curseurs). La route démarre sur le HAUT-PARLEUR, toujours
+    // (décision produit : on pose le téléphone et on parle). Un temps, elle
+    // démarrait sur l'écouteur parce que la voix de la traduction ne jouait plus
+    // sur iPhone en haut-parleur ; c'est réglé depuis par la relance de la voix
+    // au démarrage et à chaque changement de route (`_reprimeDeviceTts` dans
+    // l'écran d'appel). On peut passer à l'écouteur d'un tap pendant l'appel ;
+    // ça ne tient que pour celui-là. Un casque ou un Bluetooth branché garde la
+    // main sur la route (voir [_applySpeaker]).
     _prefs = _prefs.copyWith(
       translatedVolume: kStartTranslatedVolume,
       originalVolume: kStartOriginalVolume,
-      speakerOn: false,
+      speakerOn: true,
     );
 
     await _applySpeaker(_prefs.speakerOn);
