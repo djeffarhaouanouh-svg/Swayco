@@ -156,6 +156,7 @@ class _CallScreenState extends State<CallScreen> {
   /// itself only renders for [_isEgressAdmin], and the backend re-checks the
   /// caller's Supabase email regardless.
   String? _egressId;
+  DateTime? _egressStartedAt;
   bool _egressBusy = false;
   /// Réponse de la liste d'autorisation DU SERVEUR (`EGRESS_ADMIN_EMAILS`,
   /// plusieurs adresses). Donner l'accès à quelqu'un = ajouter son e-mail dans
@@ -2859,6 +2860,7 @@ class _CallScreenState extends State<CallScreen> {
           'egress': id ?? '',
           'room': room.name ?? widget.roomName,
         });
+        if (id != null) _egressStartedAt = DateTime.now();
         if (mounted) setState(() => _egressId = id);
         if (id == null && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -2866,6 +2868,23 @@ class _CallScreenState extends State<CallScreen> {
           );
         }
       } else {
+        // Un second toucher juste après le premier ARRÊTAIT l'enregistrement
+        // avant qu'il ait écrit quoi que ce soit (LiveKit le marque « ABORTED »,
+        // 2 s, sans fichier) : le bouton passe à STOP dès le départ, et le doigt
+        // y retombe. Pendant les premières secondes, on ignore l'arrêt.
+        final startedAt = _egressStartedAt;
+        if (startedAt != null &&
+            DateTime.now().difference(startedAt) < const Duration(seconds: 8)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Enregistrement en cours — attends quelques secondes avant STOP'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+          return;
+        }
         final id = _egressId!;
         final ok = await EgressApi.stop(id);
         Analytics.track('rec_stop', props: {
