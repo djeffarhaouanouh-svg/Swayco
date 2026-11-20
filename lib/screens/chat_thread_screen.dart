@@ -863,6 +863,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   String _suggestionsForId = '';
 
   void _refreshSuggestions() {
+    // Pas de propositions dans un groupe : ce sont des phrases d'accroche à UNE
+    // personne (« Ton style est top, non ? »), qui n'ont pas de sens à plusieurs.
+    if (_isGroup) return;
     if (_myLang.isEmpty) return;
     // Conversation vide : des phrases d'accroche pour écrire le premier.
     if (_messages.isEmpty) {
@@ -4997,7 +5000,15 @@ class _ComposerState extends State<_Composer>
   /// plain "Message" when their language is unknown.
   String get _composerHint {
     // Groupe : « Écris au groupe », sans langue du pair.
-    if (widget.hintOverride.isNotEmpty) return widget.hintOverride;
+    if (widget.hintOverride.isNotEmpty) {
+      // « Écris en français, chacun te lit dans sa langue » quand la traduction
+      // est active ; sinon « Écris au groupe ».
+      final mine = widget.myLang.trim().split('-').first;
+      if (widget.autoTranslate && mine.isNotEmpty) {
+        return AppStrings.t('group_hint_cross', args: {'me': _langName(mine)});
+      }
+      return widget.hintOverride;
+    }
     final me = widget.myLang.trim().split('-').first;
     final peer = widget.peerLang.trim().split('-').first;
     if (widget.autoTranslate &&
