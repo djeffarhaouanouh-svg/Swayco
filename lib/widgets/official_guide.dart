@@ -101,62 +101,135 @@ final List<OfficialGuideStep> officialGuide = [
   ),
 ];
 
-/// Le message vocal de bienvenue de l'équipe (explique les messages vocaux).
-/// Anglais pour tout le monde ; FRANÇAIS pour les comptes dont l'interface est
-/// en anglais. Les deux fichiers sont dans le stockage (`guide/`) et peuvent être
-/// remplacés sans nouveau build.
-class _WelcomeVoice extends StatelessWidget {
+/// Le message vocal de bienvenue de l'équipe, présenté comme un VOCAL NORMAL du
+/// chat : une bulle reçue, le lecteur en blanc dedans, et la transcription
+/// cachée jusqu'au toucher (« Voir la transcription »), dans la langue de
+/// l'interface. Anglais pour tout le monde ; FRANÇAIS pour les comptes dont
+/// l'interface est en anglais. Les deux fichiers sont dans le stockage
+/// (`guide/`) et peuvent être remplacés sans nouveau build.
+class _WelcomeVoice extends StatefulWidget {
   const _WelcomeVoice();
 
   static const _base =
       'https://rhxenzcdnfvpgjjefztx.supabase.co/storage/v1/object/public/avatars/guide/';
 
   @override
+  State<_WelcomeVoice> createState() => _WelcomeVoiceState();
+}
+
+class _WelcomeVoiceState extends State<_WelcomeVoice> {
+  bool _open = false;
+
+  @override
   Widget build(BuildContext context) {
     final ui = AppStrings.currentBcp47.value.trim().toLowerCase();
     final english = ui == 'en' || ui.startsWith('en-') || ui.startsWith('en_');
     final audioLang = english ? 'fr' : 'en';
-    final url = '$_base${english ? 'welcome_fr' : 'welcome_en'}.mp3';
-    // Le texte du vocal dans la langue de L'INTERFACE de l'utilisateur (comme un
-    // vrai vocal traduit : on lit dans sa langue, quelle que soit celle qu'on
-    // entend).
+    final url = '${_WelcomeVoice._base}${english ? 'welcome_fr' : 'welcome_en'}.mp3';
+    // Le texte du vocal dans la langue de L'INTERFACE de l'utilisateur.
     final text = AppStrings.t('guide_voice_text');
+    // Les couleurs d'un vocal reçu dans le chat : bulle grise (blanche en clair),
+    // lecteur et texte en blanc (encre en clair).
+    final bubble = SC.light ? Colors.white : const Color(0xFF2F333B);
+    final fg = SC.light ? _kNavy : Colors.white;
     return _ExampleFrame(
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              ClipOval(
-                child: Image.asset(
-                  'assets/icon-app.png',
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: VoiceNotePlayer(
-                  url: url,
-                  color: _ink,
-                  messageId: 'guide-welcome-$audioLang',
-                  mine: false,
-                ),
-              ),
-            ],
+          ClipOval(
+            child: Image.asset(
+              'assets/icon-app.png',
+              width: 36,
+              height: 36,
+              fit: BoxFit.cover,
+            ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            text,
-            style: TextStyle(color: _ink, fontSize: 13.5, height: 1.4),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
+              decoration: BoxDecoration(
+                color: bubble,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  VoiceNotePlayer(
+                    url: url,
+                    color: fg,
+                    messageId: 'guide-welcome-$audioLang',
+                    mine: false,
+                  ),
+                  const SizedBox(height: 6),
+                  // La transcription : à la demande seulement.
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => setState(() => _open = !_open),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _open
+                                ? Icons.keyboard_arrow_up_rounded
+                                : Icons.keyboard_arrow_down_rounded,
+                            size: 18,
+                            color: fg.withValues(alpha: 0.6),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            AppStrings.t(_open
+                                ? 'voice_transcript_hide'
+                                : 'voice_transcript_show'),
+                            style: TextStyle(
+                              color: fg.withValues(alpha: 0.6),
+                              fontSize: 12.5,
+                              decoration: TextDecoration.underline,
+                              decorationColor: fg.withValues(alpha: 0.4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topLeft,
+                    child: _open
+                        ? Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(top: 6),
+                            padding: const EdgeInsets.only(top: 9),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                top: BorderSide(
+                                  color: fg.withValues(alpha: 0.12),
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              text,
+                              style: TextStyle(
+                                color: fg.withValues(alpha: 0.88),
+                                fontSize: 14,
+                                height: 1.4,
+                              ),
+                            ),
+                          )
+                        : const SizedBox(width: double.infinity, height: 0),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 }
-
 Color get _panel => SC.light ? const Color(0xFFF3F4F8) : const Color(0xFF14141A);
 Color get _ink => SC.light ? _kNavy : Colors.white;
 
