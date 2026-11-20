@@ -1,4 +1,6 @@
 import 'dart:async';
+
+import '../services/notif_enable_flow.dart';
 import 'dart:math' as math;
 import 'dart:math' show Random;
 import 'dart:ui';
@@ -753,6 +755,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       if (f != null) {
         setState(() => _myFriendships = [..._myFriendships, f]);
       }
+      // Premier like : « On te prévient dès qu'elle ou il te répond » (une fois).
+      if (!res.matched) unawaited(NotifEnableFlow.askAfterFirstLike(context));
       if (res.matched) {
         // Back on a match already celebrated (undo, then like again): no replay.
         if (!MatchCelebration.shown.contains(peer.id)) {
