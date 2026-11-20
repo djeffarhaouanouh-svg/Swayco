@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import 'viewport_trigger.dart';
+
 /// La vignette d'une vidéo dans une bulle du chat : une tuile sombre avec un
 /// bouton lecture. Elle n'ouvre rien elle-même — le fil lui met son geste
 /// (toucher = lire, appui long = réactions), comme pour une photo.
@@ -224,13 +226,22 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
       await c.setVolume(0);
       await c.setLooping(true);
       setState(() => _ready = true);
-      await c.play();
+      // Elle ne part que si la personne est déjà arrivée dessus.
+      if (_inView) await c.play();
     }).catchError((Object _) {
       if (mounted) setState(() => _failed = true);
     });
   }
 
   bool _muted = true;
+  bool _inView = false;
+
+  /// La personne vient de passer sur la vidéo : elle démarre (une fois prête).
+  void _onInView() {
+    _inView = true;
+    final c = _ctrl;
+    if (_ready && c != null && !c.value.isPlaying) c.play();
+  }
 
   void _toggleSound() {
     final c = _ctrl;
@@ -268,7 +279,9 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
     final ratio = (_ready && c != null && c.value.aspectRatio > 0)
         ? c.value.aspectRatio
         : 16 / 10;
-    return GestureDetector(
+    return OnVisible(
+      onVisible: _onInView,
+      child: GestureDetector(
       onTap: _toggle,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
@@ -349,6 +362,7 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

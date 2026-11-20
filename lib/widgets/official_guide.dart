@@ -7,6 +7,7 @@ import '../theme/swayco_theme.dart';
 import 'chat_list_extras.dart';
 import 'chat_quiz.dart';
 import 'chat_video.dart';
+import 'viewport_trigger.dart';
 import 'voice_note_player.dart';
 
 /// La vidéo de démonstration de l'appel traduit, hébergée dans le stockage
@@ -291,9 +292,12 @@ class _ExampleTranslationState extends State<_ExampleTranslation> {
   bool _reply = false;
   final List<Timer> _timers = [];
 
-  @override
-  void initState() {
-    super.initState();
+  bool _started = false;
+
+  /// La scène ne démarre que quand la personne ARRIVE dessus (voir [OnVisible]).
+  void _start() {
+    if (_started || !mounted) return;
+    _started = true;
     void at(int ms, VoidCallback f) =>
         _timers.add(Timer(Duration(milliseconds: ms), () {
           if (mounted) setState(f);
@@ -327,7 +331,9 @@ class _ExampleTranslationState extends State<_ExampleTranslation> {
   @override
   Widget build(BuildContext context) {
     final bubbleColor = SC.light ? Colors.white : const Color(0xFF2F333B);
-    return _ExampleFrame(
+    return OnVisible(
+      onVisible: _start,
+      child: _ExampleFrame(
       child: SizedBox(
         height: 122,
         child: Column(
@@ -397,6 +403,7 @@ class _ExampleTranslationState extends State<_ExampleTranslation> {
             _appear(_reply, _bubble('Great, thanks! 😊', mine: true)),
           ],
         ),
+      ),
       ),
     );
   }
