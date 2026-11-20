@@ -249,20 +249,27 @@ class GroupChatRow extends StatelessWidget {
   }
 }
 
-/// La conversation « Swayco » épinglée en première ligne : l'icône de l'app,
-/// la pastille jaune « Équipe », une épingle, un léger fond bleu.
+/// La conversation « Swayco » : une LIGNE de chat comme les autres (pas
+/// épinglée, pas une carte). Elle se range par date : elle descend au fil des
+/// nouvelles conversations, et remonte quand l'équipe écrit. Icône de l'app en
+/// photo ronde, pastille jaune « Équipe », heure en mono jaune et point jaune
+/// quand il y a du nouveau, léger fond bleu.
 class OfficialChatRow extends StatelessWidget {
   const OfficialChatRow({
     super.key,
     required this.last,
     required this.unreadCount,
     required this.onTap,
+    required this.time,
     this.welcome = false,
   });
 
   final OfficialPost? last;
   final int unreadCount;
   final VoidCallback onTap;
+
+  /// La date qui range la ligne, et qu'elle affiche.
+  final DateTime time;
 
   /// Jamais ouvert (ou rien d'autre que le guide) : l'aperçu est le mot de
   /// bienvenue.
@@ -274,119 +281,116 @@ class OfficialChatRow extends StatelessWidget {
     final preview = (welcome || last == null)
         ? AppStrings.t('official_guide_welcome')
         : (last!.title.isNotEmpty ? last!.title : last!.body);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-      child: Material(
-        color: const Color(0xFF1F5EFF).withValues(alpha: SC.light ? 0.08 : 0.14),
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                // L'icône de l'app en photo de profil, ronde comme les autres.
-                ClipOval(
-                  child: Image.asset(
-                    'assets/icon-app.png',
-                    width: 52,
-                    height: 52,
-                    fit: BoxFit.cover,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: unread
+              ? const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0x292B7FFF), Color(0x002B7FFF)],
                   ),
+                )
+              : null,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Row(
+            children: [
+              // L'icône de l'app en photo de profil, ronde comme les autres.
+              ClipOval(
+                child: Image.asset(
+                  'assets/icon-app.png',
+                  width: 52,
+                  height: 52,
+                  fit: BoxFit.cover,
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Swayco',
-                            style: TextStyle(
-                              fontSize: 16.5,
-                              fontWeight: FontWeight.w700,
-                              color: SC.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _kYellow,
-                              borderRadius: BorderRadius.circular(99),
-                            ),
-                            child: Text(
-                              AppStrings.t('official_team'),
-                              style: const TextStyle(
-                                color: _kNavy,
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        preview,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: unread ? SC.textPrimary : SC.textMuted,
-                          fontWeight:
-                              unread ? FontWeight.w600 : FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Column(
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Icon(Icons.push_pin_rounded,
-                        size: 15, color: SC.textMuted),
-                    if (unread) ...[
-                      const SizedBox(height: 6),
-                      Container(
-                        constraints: const BoxConstraints(minWidth: 20),
-                        height: 20,
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: SC.accent,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          '$unreadCount',
-                          style: const TextStyle(
-                            color: SC.bgDeep,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            height: 1,
+                    Row(
+                      children: [
+                        Text(
+                          'Swayco',
+                          style: TextStyle(
+                            fontSize: 16.5,
+                            height: 1.2,
+                            fontWeight:
+                                unread ? FontWeight.w700 : FontWeight.w500,
+                            color: unread ? SC.textPrimary : SC.textSecondary,
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _kYellow,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            AppStrings.t('official_team'),
+                            style: const TextStyle(
+                              color: _kNavy,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      preview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.3,
+                        color: unread ? SC.textPrimary : SC.textMuted,
+                        fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
                       ),
-                    ],
+                    ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _hm(time),
+                    style: GoogleFonts.ibmPlexMono(
+                      color: unread ? _kYellow : SC.fg.withValues(alpha: 0.5),
+                      fontSize: 11,
+                    ),
+                  ),
+                  if (unread) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: _kYellow,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
-
 /// « Invite tes amis » (handoff messages_inviter) : UNE LIGNE à la fin de la
 /// liste, comme les autres conversations (pas une carte). Avatar rond au
 /// dégradé de la marque avec `group_add`, titre + pastille jaune, sous-titre

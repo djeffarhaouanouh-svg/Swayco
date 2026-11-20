@@ -122,9 +122,30 @@ abstract final class OfficialApi {
   static Future<void> markSeen() async {
     try {
       final p = await SharedPreferences.getInstance();
-      await p.setString(_seenKey, DateTime.now().toUtc().toIso8601String());
+      final now = DateTime.now().toUtc().toIso8601String();
+      await p.setString(_seenKey, now);
+      // La toute première ouverture date la ligne dans la liste : elle ne
+      // remonte plus ensuite à chaque ouverture, elle descend au fil des
+      // nouvelles conversations.
+      if (p.getString(_firstKey) == null) await p.setString(_firstKey, now);
     } catch (_) {}
     ChatUnread.setOfficialUnread(0);
+  }
+
+  static const _firstKey = 'official_first_seen_iso';
+
+  /// Quand la ligne « Swayco » se range dans la liste : la date de son dernier
+  /// message ; à défaut (que le guide) la première ouverture ; et tant qu'elle
+  /// n'a jamais été ouverte, maintenant (en tête, comme une conversation qui
+  /// vient d'arriver).
+  static Future<DateTime> rowTime(List<OfficialPost> posts) async {
+    if (posts.isNotEmpty) return posts.last.createdAt;
+    try {
+      final p = await SharedPreferences.getInstance();
+      final first = DateTime.tryParse(p.getString(_firstKey) ?? '');
+      if (first != null) return first.toLocal();
+    } catch (_) {}
+    return DateTime.now();
   }
 
   /// Combien de messages n'ont pas encore été vus : ceux de l'équipe plus le

@@ -105,6 +105,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Le compte officiel Swayco (B) : ses messages et ce que j'en ai vu.
   List<OfficialPost> _official = const [];
   DateTime? _officialSeen;
+
+  /// La date qui range la ligne « Swayco » dans la liste (comme une conversation).
+  DateTime _officialTime = DateTime.now();
   bool _loading = true;
   String? _error;
   /// UI lock while a guest-invite link is being minted (prevents double-tap).
@@ -539,8 +542,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // Lecture locale, sans réseau : sans elle un échec ci-dessus ferait
       // repasser le guide pour « jamais ouvert ».
       officialSeen ??= await OfficialApi.seenAt();
+      // Jamais ouverte : en tête, comme une conversation qui vient d'arriver.
+      final officialTime = officialSeen == null
+          ? DateTime.now()
+          : await OfficialApi.rowTime(official);
       if (!mounted || seq != _reloadSeq) return;
       setState(() {
+        _officialTime = officialTime;
         _groups = groups;
         _groupLatest = groupLatest;
         _groupInbound = groupInbound;
@@ -746,28 +754,31 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return n;
   }
 
-  /// Les rangées de conversations : amis et groupes mêlés, du plus récent au
-  /// plus ancien. Les amis sans message restent en bas, après les groupes.
-  List<({RemoteProfile? peer, ChatGroup? group})> _listEntries() {
+  /// Les rangées de conversations : amis, groupes et la ligne « Swayco » mêlés,
+  /// du plus récent au plus ancien. Les amis sans message restent en bas.
+  List<({RemoteProfile? peer, ChatGroup? group, bool official})> _listEntries() {
     final dms = _friends.where((p) => !_isSpecialPending(p)).toList();
-    final groups = [..._groups]
-      ..sort((a, b) => _groupTime(b).compareTo(_groupTime(a)));
-    final out = <({RemoteProfile? peer, ChatGroup? group})>[];
+    // Groupes et Swayco : classés par leur date, comme les conversations.
+    final extras = <({ChatGroup? group, bool official, DateTime t})>[
+      for (final g in _groups) (group: g, official: false, t: _groupTime(g)),
+      (group: null, official: true, t: _officialTime),
+    ]..sort((a, b) => b.t.compareTo(a.t));
+    final out = <({RemoteProfile? peer, ChatGroup? group, bool official})>[];
     var gi = 0;
     for (final p in dms) {
       final t = _latestByConv[_conversationIdFor(p.id)]?.createdAt;
-      while (gi < groups.length &&
-          (t == null || _groupTime(groups[gi]).isAfter(t))) {
-        out.add((peer: null, group: groups[gi++]));
+      while (gi < extras.length && (t == null || extras[gi].t.isAfter(t))) {
+        out.add((peer: null, group: extras[gi].group, official: extras[gi].official));
+        gi++;
       }
-      out.add((peer: p, group: null));
+      out.add((peer: p, group: null, official: false));
     }
-    while (gi < groups.length) {
-      out.add((peer: null, group: groups[gi++]));
+    while (gi < extras.length) {
+      out.add((peer: null, group: extras[gi].group, official: extras[gi].official));
+      gi++;
     }
     return out;
   }
-
   Future<void> _openThread(RemoteProfile peer) async {
     final convId = _conversationIdFor(peer.id);
     final title = peer.displayName.isNotEmpty
@@ -1325,15 +1336,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                      // Le compte officiel Swayco, épinglé en première ligne.
-                      OfficialChatRow(
-                          welcome: _officialSeen == null || _official.isEmpty,
-                          last: _official.isEmpty ? null : _official.last,
-                          unreadCount:
-                              OfficialApi.unread(_official, _officialSeen),
-                          onTap: _openOfficial,
-                        ),
-                      // Messages speciaux recus : section a part, en tete.
+                                      // Messages speciaux recus : section a part, en tete.
                       if (_friends.any(_isSpecialPending)) ...[
                         _SectionHeader(
                           label: AppStrings.t('special_section'),
@@ -1360,7 +1363,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       // Conversation rows (amis et groupes, du plus récent au
                       // plus ancien).
                       for (final (i, entry) in _listEntries().indexed)
-                        if (entry.group != null)
+                        if (entry.official)
+                          OfficialChatRow(
+                            key: const ValueKey('official'),
+                            time: _officialTime,
+                            welcome: _officialSeen == null || _official.isEmpty,
+                            last: _official.isEmpty ? null : _official.last,
+                            unreadCount:
+                                OfficialApi.unread(_official, _officialSeen),
+                            onTap: _openOfficial,
+                          )
+                        else if (entry.group != null)
                           FadeSlideIn(
                             key: ValueKey('grp-${entry.group!.id}'),
                             delay: Duration(milliseconds: i * 55),
