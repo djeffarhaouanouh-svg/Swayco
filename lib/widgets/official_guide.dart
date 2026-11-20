@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/app_strings.dart';
@@ -364,24 +366,132 @@ Widget _bubble(String text, {required bool mine, String? translated}) {
   );
 }
 
-/// Étape 1 — deux bulles : une reçue, traduite, et ma réponse.
-class _ExampleTranslation extends StatelessWidget {
+/// Étape 1 — une petite scène qui se joue : le message arrive dans la langue de
+/// l'autre (japonais), puis il SE TRADUIT sous les yeux (le texte se fond en
+/// français/anglais et l'original passe en petit dessous), puis ma réponse
+/// arrive. Rien ne bouge de place : la hauteur est réservée d'emblée.
+class _ExampleTranslation extends StatefulWidget {
   const _ExampleTranslation();
 
   @override
+  State<_ExampleTranslation> createState() => _ExampleTranslationState();
+}
+
+class _ExampleTranslationState extends State<_ExampleTranslation> {
+  bool _received = false;
+  bool _translated = false;
+  bool _reply = false;
+  final List<Timer> _timers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    void at(int ms, VoidCallback f) =>
+        _timers.add(Timer(Duration(milliseconds: ms), () {
+          if (mounted) setState(f);
+        }));
+    at(450, () => _received = true);
+    at(1900, () => _translated = true);
+    at(3300, () => _reply = true);
+  }
+
+  @override
+  void dispose() {
+    for (final t in _timers) {
+      t.cancel();
+    }
+    super.dispose();
+  }
+
+  Widget _appear(bool shown, Widget child, {double dy = 14}) =>
+      AnimatedSlide(
+        offset: shown ? Offset.zero : Offset(0, dy / 40),
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeOutCubic,
+        child: AnimatedOpacity(
+          opacity: shown ? 1 : 0,
+          duration: const Duration(milliseconds: 380),
+          child: child,
+        ),
+      );
+
+  @override
   Widget build(BuildContext context) {
+    final bubbleColor = SC.light ? Colors.white : const Color(0xFF2F333B);
     return _ExampleFrame(
-      child: Column(
-        children: [
-          _bubble('こんにちは！元気？ 🇯🇵', mine: false, translated: 'Hello! How are you? 🇯🇵'),
-          const SizedBox(height: 8),
-          _bubble('Great, thanks! 😊', mine: true),
-        ],
+      child: SizedBox(
+        height: 122,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _appear(
+              _received,
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 230),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: bubbleColor,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Le texte : le japonais, qui se fond en traduction.
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 450),
+                        child: Text(
+                          _translated
+                              ? 'Hello! How are you? 🇯🇵'
+                              : 'こんにちは！元気？ 🇯🇵',
+                          key: ValueKey(_translated),
+                          style: TextStyle(color: _ink, fontSize: 14),
+                        ),
+                      ),
+                      // « L'original » apparaît dessous, une fois traduit.
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 380),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topLeft,
+                        child: _translated
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.translate_rounded,
+                                        size: 11,
+                                        color: _ink.withValues(alpha: 0.5)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'こんにちは！元気？ 🇯🇵',
+                                      style: TextStyle(
+                                        color: _ink.withValues(alpha: 0.5),
+                                        fontSize: 11.5,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : const SizedBox(width: 0, height: 0),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _appear(_reply, _bubble('Great, thanks! 😊', mine: true)),
+          ],
+        ),
       ),
     );
   }
 }
-
 /// Étape 2 — un mini écran d'appel : visage, sous-titre d'origine et traduction.
 class _ExampleCall extends StatelessWidget {
   const _ExampleCall();
