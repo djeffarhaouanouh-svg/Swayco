@@ -2852,6 +2852,13 @@ class _CallScreenState extends State<CallScreen> {
     try {
       if (_egressId == null) {
         final id = await EgressApi.start(room.name ?? widget.roomName);
+        // Une trace de chaque démarrage : sans elle, un enregistrement qui ne
+        // sort jamais ne laisse rien à examiner.
+        Analytics.track('rec_start', props: {
+          'ok': id != null,
+          'egress': id ?? '',
+          'room': room.name ?? widget.roomName,
+        });
         if (mounted) setState(() => _egressId = id);
         if (id == null && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -2861,6 +2868,11 @@ class _CallScreenState extends State<CallScreen> {
       } else {
         final id = _egressId!;
         final ok = await EgressApi.stop(id);
+        Analytics.track('rec_stop', props: {
+          'ok': ok,
+          'egress': id,
+          'how': 'button',
+        });
         if (mounted) setState(() => _egressId = null);
         if (!ok && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -3032,7 +3044,13 @@ class _CallScreenState extends State<CallScreen> {
     final egressId = _egressId;
     if (egressId != null) {
       _egressId = null;
-      unawaited(EgressApi.stop(egressId));
+      unawaited(EgressApi.stop(egressId).then((ok) {
+        Analytics.track('rec_stop', props: {
+          'ok': ok,
+          'egress': egressId,
+          'how': 'hangup',
+        });
+      }));
     }
     // EN PREMIER : iOS doit savoir tout de suite que l'appel est fini.
     //
