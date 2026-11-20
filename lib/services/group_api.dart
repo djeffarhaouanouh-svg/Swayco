@@ -31,7 +31,11 @@ class ChatGroup {
     required this.createdBy,
     required this.createdAt,
     required this.members,
+    this.photoUrl = '',
   });
+
+  /// La photo choisie pour le groupe ('' = mosaïque des membres).
+  final String photoUrl;
 
   final String id;
   final String name;
@@ -106,6 +110,7 @@ abstract final class GroupApi {
         out.add(ChatGroup(
           id: id,
           name: g['name']?.toString() ?? '',
+          photoUrl: g['photo_url']?.toString() ?? '',
           createdBy: g['created_by']?.toString() ?? '',
           createdAt: DateTime.tryParse(g['created_at']?.toString() ?? '')
                   ?.toLocal() ??
@@ -160,6 +165,29 @@ abstract final class GroupApi {
 
   static Future<void> leave(String groupId) =>
       _client.rpc('group_leave', params: {'p_group': groupId});
+
+  /// Change la photo du groupe : l'image part dans le stockage (`avatars`,
+  /// dossier `groups/`), son URL publique est rangée sur le groupe.
+  static Future<String> setPhoto(
+    String groupId,
+    Uint8List bytes, {
+    String contentType = 'image/jpeg',
+  }) async {
+    final ext = contentType.endsWith('png') ? 'png' : 'jpg';
+    final path =
+        'groups/$groupId/${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await _client.storage.from('avatars').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
+        );
+    final url = _client.storage.from('avatars').getPublicUrl(path);
+    await _client.rpc('group_set_photo', params: {
+      'p_group': groupId,
+      'p_url': url,
+    });
+    return url;
+  }
 
   static Future<void> setMuted(String groupId, bool muted) =>
       _client.rpc('group_set_muted', params: {

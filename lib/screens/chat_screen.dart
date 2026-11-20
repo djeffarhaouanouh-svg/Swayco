@@ -689,7 +689,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
     await Navigator.of(context).push<void>(
       chatThreadRoute(
-        builder: (_) => GroupThreadScreen(groupId: groupId, initialGroup: g),
+        // La même page qu'un chat (GIF, photos, vocaux, traduction…), en mode
+        // groupe : ni appel, ni ville, ni quiz.
+        builder: (_) => ChatThreadScreen(
+          conversationId: '$kGroupConvPrefix$groupId',
+          title: g?.name ?? '',
+          peerDeviceId: '',
+          group: g,
+          translation: widget.translation,
+        ),
       ),
     );
     if (mounted) _reload(silent: true);
@@ -1358,6 +1366,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             delay: Duration(milliseconds: i * 55),
                             child: GroupChatRow(
                               name: entry.group!.name,
+                              photoUrl: entry.group!.photoUrl,
                               members: [
                                 for (final m in entry.group!.members)
                                   if (_groupProfiles[m.userId] != null)

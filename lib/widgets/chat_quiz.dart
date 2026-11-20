@@ -82,7 +82,7 @@ class _QuizThemeSheet extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 1.55,
+            childAspectRatio: 1.12,
             children: [
               for (final t in QuizApi.themes)
                 _ThemeTile(
@@ -184,13 +184,30 @@ class _ThemeTile extends StatelessWidget {
               QuizApi.themeEmoji[theme] ?? '❓',
               style: const TextStyle(fontSize: 34, height: 1),
             ),
-            Text(
-              AppStrings.t('quiz_theme_$theme'),
-              style: TextStyle(
-                color: _ink,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  AppStrings.t('quiz_theme_$theme'),
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  AppStrings.t('quiz_theme_sub_$theme'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _ink.withValues(alpha: 0.6),
+                    fontSize: 11.5,
+                    height: 1.25,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

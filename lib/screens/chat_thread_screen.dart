@@ -45,7 +45,11 @@ import '../swayco/realtime_translation_port.dart';
 import '../widgets/chat_reply_widgets.dart';
 import '../widgets/chat_video.dart';
 import '../widgets/chat_quiz.dart';
+import '../widgets/group_avatar.dart';
 import '../services/quiz_api.dart';
+import '../services/group_api.dart';
+import '../services/locations.dart' show countryFlagFor;
+import 'group_screens.dart' show GroupInfoScreen;
 import '../widgets/gif_picker_sheet.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/liquid_glass_button.dart';
@@ -158,7 +162,13 @@ class ChatThreadScreen extends StatefulWidget {
     required this.title,
     required this.peerDeviceId,
     this.translation = const NoOpRealtimeTranslation(),
+    this.group,
   });
+
+  /// Non nul = la conversation d'un GROUPE : la même page qu'un chat (GIF,
+  /// photos, vocaux, réponses, réactions, traduction), sans appel, sans ville
+  /// ni quiz, avec le nom de l'auteur au-dessus de chaque bulle reçue.
+  final ChatGroup? group;
 
   final String conversationId;
   final String title;
@@ -175,7 +185,7 @@ class ChatThreadScreen extends StatefulWidget {
 }
 
 /// Ce que la personne veut joindre à son message (la feuille « photo / vidéo »).
-enum _MediaChoice { photoCamera, photoGallery, videoCamera }
+enum _MediaChoice { photoCamera, photoGallery, videoCamera, gif }
 
 class _ChatThreadScreenState extends State<ChatThreadScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
@@ -229,6 +239,112 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   String _myGender = '';
 
   RemoteProfile? _peer;
+
+  // ── Mode groupe ──────────────────────────────────────────────────────────
+  bool get _isGroup => widget.group != null;
+  ChatGroup? _group;
+
+  /// Les profils des membres (nom, drapeau, langue de chaque auteur).
+  Map<String, RemoteProfile> _members = const {};
+  Timer? _groupTimer;
+  bool _leftGroup = false;
+
+  /// Prénom d'un membre (« Aiko »), ou celui écrit sur le message.
+  String _memberFirst(String id, {String fallback = ''}) {
+    final n = (_members[id]?.displayName ?? fallback).trim();
+    return n.isEmpty ? '' : n.split(RegExp(r'\s+')).first;
+  }
+
+  /// Relit le groupe et ses membres. Si je n'en fais plus partie (retiré), la
+  /// page se referme.
+  Future<void> _refreshGroup() async {
+    if (!_isGroup || _myId.isEmpty || !isSupabaseReady) return;
+    final gid = widget.group!.id;
+    final all = await GroupApi.fetchMine(_myId);
+    if (!mounted || _leftGroup) return;
+    ChatGroup? g;
+    for (final x in all) {
+      if (x.id == gid) g = x;
+    }
+    // Une liste vide peut être une panne : on ne ferme que si la lecture a
+    // répondu SANS ce groupe alors qu'elle en rend d'autres.
+    if (g == null) {
+      if (all.isNotEmpty) {
+        _leftGroup = true;
+        Navigator.of(context).maybePop();
+      }
+      return;
+    }
+    final ps = await ProfileApi.fetchByIds([for (final m in g.members) m.userId]);
+    if (!mounted) return;
+    setState(() {
+      _group = g;
+      _members = {for (final p in ps) p.id: p};
+    });
+  }
+
+  /// Notifie les autres membres (au mieux), chacun dans sa langue.
+  void _notifyGroup(String preview) {
+    final g = _group ?? widget.group;
+    if (g == null) return;
+    unawaited(GroupApi.notifyMembers(
+      group: g,
+      meId: _myId,
+      senderName: _myName,
+      preview: preview,
+    ));
+  }
+
+  /// « Tu as créé le groupe » / « Aiko a créé le groupe ».
+  String _groupCreatedLine() {
+    final g = _group ?? widget.group;
+    if (g == null) return '';
+    if (g.createdBy == _myId) return AppStrings.t('group_created_me');
+    final name = _memberFirst(g.createdBy);
+    return AppStrings.t(
+      'group_created_by',
+      args: {'name': name.isEmpty ? AppStrings.t('incoming_someone') : name},
+    );
+  }
+
+  /// « 5 membres · 🇧🇷 🇪🇸 🇯🇵 » sous le nom du groupe (drapeaux des pays
+  /// présents).
+  String _groupSubtitle() {
+    final g = _group ?? widget.group;
+    if (g == null) return '';
+    final flags = <String>[];
+    for (final m in g.members) {
+      final f = countryFlagFor(_members[m.userId]?.country ?? '');
+      if (f != null && !flags.contains(f)) flags.add(f);
+      if (flags.length >= 5) break;
+    }
+    final count =
+        AppStrings.t('group_members_count', args: {'n': '${g.members.length}'});
+    return flags.isEmpty ? count : '$count · ${flags.join(' ')}';
+  }
+
+  /// Ouvre les infos du groupe (nom, membres, photo, ajouter, quitter).
+  Future<void> _openGroupInfo() async {
+    final g = _group ?? widget.group;
+    if (g == null) return;
+    final left = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => GroupInfoScreen(
+          group: g,
+          profiles: _members,
+          myId: _myId,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (left == true) {
+      _leftGroup = true;
+      Navigator.of(context).pop();
+      return;
+    }
+    await _refreshGroup();
+  }
+
   bool _sending = false;
 
   /// Photo choisie, pas encore envoyée : elle s'affiche dans le champ (avec une
@@ -265,6 +381,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// mes propres messages.
   String _quoteAuthor(ChatMessage q) {
     if (q.senderId == _myId) return AppStrings.t('chat_reply_me').toUpperCase();
+    if (_isGroup) {
+      return _memberFirst(q.senderId, fallback: q.senderName).toUpperCase();
+    }
     // Le prénom seul : le drapeau est déjà sur l'avatar de l'en-tête.
     return _peerFirstName.toUpperCase();
   }
@@ -874,6 +993,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   String _messageLang(ChatMessage m) {
     if (m.language.isNotEmpty) return m.language;
     if (m.senderId == _myId) return _myLang;
+    if (_isGroup) return _members[m.senderId]?.language.trim() ?? '';
     return _peer?.language.trim() ?? '';
   }
 
@@ -887,7 +1007,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   Future<void> _bootstrap() async {
     final id = await DeviceId.getOrCreate();
     final profile = await UserPrefs.loadProfile();
-    final peer = isSupabaseReady
+    final peer = isSupabaseReady && !_isGroup
         ? await ProfileApi.fetchById(widget.peerDeviceId)
         : null;
     // Load my own remote profile so we can read my subscription_tier
@@ -900,12 +1020,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         mine = await ProfileApi.fetchById(id);
       } catch (_) {}
     }
-    final blocked = isSupabaseReady && id.isNotEmpty
+    final blocked = isSupabaseReady && id.isNotEmpty && !_isGroup
         ? await BlockApi.isBlocked(blockerId: id, otherId: widget.peerDeviceId)
         : false;
     // Has the peer blocked ME? Disables the composer + call button below.
     var blockedMe = false;
-    if (isSupabaseReady && id.isNotEmpty) {
+    if (isSupabaseReady && id.isNotEmpty && !_isGroup) {
       try {
         blockedMe = (await BlockApi.fetchMyBlockerIds()).contains(
           widget.peerDeviceId,
@@ -933,6 +1053,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       } catch (_) {}
     }
     if (!mounted) return;
+    // Groupe : les profils des membres (noms, drapeaux, langues des auteurs).
+    if (_isGroup && isSupabaseReady) {
+      _group = widget.group;
+      try {
+        final ps = await ProfileApi.fetchByIds(
+          [for (final m in widget.group!.members) m.userId],
+        );
+        if (!mounted) return;
+        _members = {for (final p in ps) p.id: p};
+      } catch (_) {}
+      _groupTimer = AppPoll.every(const Duration(seconds: 20), _refreshGroup);
+    }
     // « … en train d'écrire » dans les deux sens, tant que le fil est ouvert.
     _typing = TypingSignal(
       conversationId: widget.conversationId,
@@ -1012,18 +1144,21 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
 
     // Le quiz de ce fil : état lu une fois, puis suivi en direct (l'autre peut
     // l'avancer ou l'arrêter).
-    unawaited(QuizApi.fetch(widget.conversationId).then((q) {
-      if (mounted && q != null) setState(() => _quiz = q);
-    }));
-    try {
-      _quizSub = QuizApi.watch(widget.conversationId).listen(
-        (q) {
-          if (mounted && q != null) setState(() => _quiz = q);
-        },
-        onError: (Object e) => debugPrint('quiz stream error: $e'),
-      );
-    } catch (e) {
-      debugPrint('quiz watch failed: $e');
+    // (Pas de quiz dans un groupe.)
+    if (!_isGroup) {
+      unawaited(QuizApi.fetch(widget.conversationId).then((q) {
+        if (mounted && q != null) setState(() => _quiz = q);
+      }));
+      try {
+        _quizSub = QuizApi.watch(widget.conversationId).listen(
+          (q) {
+            if (mounted && q != null) setState(() => _quiz = q);
+          },
+          onError: (Object e) => debugPrint('quiz stream error: $e'),
+        );
+      } catch (e) {
+        debugPrint('quiz watch failed: $e');
+      }
     }
 
     _sub = ChatApi.subscribeMessages(widget.conversationId).listen(
@@ -1118,6 +1253,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
 
     // Jusqu'où le pair a lu, en direct : le « Lu » doit apparaître au moment
     // où il ouvre le fil, pas au prochain rechargement.
+    // (Un groupe n'a pas de « Lu » : il n'y a pas UN pair.)
+    if (!_isGroup) {
     _peerReadSub = ChatReads.watchPeerLastRead(
       conversationId: widget.conversationId,
       peerId: widget.peerDeviceId,
@@ -1129,6 +1266,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       if (cur != null && !at.isAfter(cur)) return;
       setState(() => _peerLastRead = at);
     });
+    }
 
     // La présence du pair, rafraîchie sur toutes les plateformes (sur le web
     // aussi : le poll ci-dessous ne relit que les messages).
@@ -1267,6 +1405,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _pollTimer?.cancel();
     _voiceTextTimer?.cancel();
     _presenceTimer?.cancel();
+    _groupTimer?.cancel();
     _clockTimer?.cancel();
     _flashTimer?.cancel();
     _inputCtrl.dispose();
@@ -1376,6 +1515,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           props: {'source': 'chat', 'type': 'text'},
         );
       }
+      if (_isGroup) _notifyGroup(body);
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.msgSent);
       _inputCtrl.clear();
@@ -1426,6 +1566,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                   AppStrings.t('chat_photo_gallery'), _MediaChoice.photoGallery),
               row(Icons.videocam_rounded, AppStrings.t('chat_video_take'),
                   _MediaChoice.videoCamera),
+              // Les GIF se choisissent ici, avec le « + » (plus de pastille
+              // GIF à côté du champ).
+              row(Icons.gif_box_rounded, 'GIF', _MediaChoice.gif),
             ],
           ),
         ),
@@ -1444,6 +1587,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     if (choice == null || !mounted) return;
     if (choice == _MediaChoice.videoCamera) {
       await _filmAndSendVideo();
+      return;
+    }
+    if (choice == _MediaChoice.gif) {
+      await _sendGif();
       return;
     }
     final source = choice == _MediaChoice.photoCamera
@@ -1564,6 +1711,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         'message_sent',
         props: {'source': 'chat', 'type': 'video'},
       );
+      if (_isGroup) _notifyGroup('');
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.msgSent);
       if (mounted) setState(() => _replyTo = null);
@@ -1620,6 +1768,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         'message_sent',
         props: {'source': 'chat', 'type': 'gif'},
       );
+      if (_isGroup) _notifyGroup('');
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.msgSent);
       if (mounted) setState(() => _replyTo = null);
@@ -1658,6 +1807,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         'message_sent',
         props: {'source': 'chat', 'type': 'voice'},
       );
+      if (_isGroup) _notifyGroup(AppStrings.t('voice_message'));
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.msgSent);
       if (mounted) setState(() => _replyTo = null);
@@ -1825,8 +1975,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     final peerPrimary =
         (_peer?.language ?? '').trim().split(RegExp(r'[-_]')).first.toLowerCase();
     final myPrimary = _myLang.trim().split(RegExp(r'[-_]')).first.toLowerCase();
-    final showPill =
-        peerPrimary.isEmpty || myPrimary.isEmpty || peerPrimary != myPrimary;
+    // Un groupe parle plusieurs langues : la pastille y est toujours posée.
+    final showPill = _isGroup ||
+        peerPrimary.isEmpty ||
+        myPrimary.isEmpty ||
+        peerPrimary != myPrimary;
     final pillH = showPill ? _TranslatePill.blockHeight : 0.0;
     final headerH = safeTop +
         _ThreadHeader.height +
@@ -1896,20 +2049,38 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _ThreadHeader(
-                          title: widget.title,
+                          title: _isGroup
+                              ? (_group ?? widget.group)!.name
+                              : widget.title,
+                          // Groupe : photo du groupe + « 5 membres · 🇧🇷 🇪🇸 »,
+                          // et ni appel ni ville.
+                          groupAvatar: _isGroup
+                              ? GroupAvatar(
+                                  members: [
+                                    for (final m in (_group ?? widget.group)!.members)
+                                      if (_members[m.userId] != null)
+                                        _members[m.userId]!,
+                                  ],
+                                  photoUrl: (_group ?? widget.group)!.photoUrl,
+                                  size: 44,
+                                )
+                              : null,
+                          subtitle: _isGroup ? _groupSubtitle() : null,
                           peer: _peer,
-                          clock: peerClock,
+                          clock: _isGroup ? null : peerClock,
                           place: (_peer?.city.trim().isNotEmpty ?? false)
                               ? _peer!.city
                               : (_peer?.country ?? ''),
                           blockedByPeer: _peerBlockedMe,
-                          onCall: _startCall,
-                          onViewProfile: () => Navigator.of(context).push<void>(
-                            MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  ProfileScreen(userId: widget.peerDeviceId),
-                            ),
-                          ),
+                          onCall: _isGroup ? null : _startCall,
+                          onViewProfile: _isGroup
+                              ? _openGroupInfo
+                              : () => Navigator.of(context).push<void>(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => ProfileScreen(
+                                          userId: widget.peerDeviceId),
+                                    ),
+                                  ),
                           peerBlocked: _peerBlocked,
                           onToggleBlock: _toggleBlockPeer,
                           onReport: _reportPeer,
@@ -2012,14 +2183,14 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             onClearPhoto: () =>
                                 setState(() => _pendingPhoto = null),
                             onSendGif: _sendGif,
-                            onQuiz: _openQuiz,
+                            onQuiz: _isGroup ? null : _openQuiz,
                             quizActive: _quizActive || _quizBusy,
                             onSendVoice: _sendVoice,
                             autoTranslate: _autoTranslate,
                             onTypingChanged: (t) => _typing?.setTyping(t),
                             myLang: _myLang,
                             peerLang: _peer?.language ?? '',
-                            peerFirstName: _peerFirstName,
+                            peerFirstName: _isGroup ? '' : _peerFirstName,
                             replyTo: _replyTo,
                             replyLabel: _replyTo == null
                                 ? ''
@@ -2029,8 +2200,14 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                                     : AppStrings.t(
                                         'chat_reply_to',
                                         args: {
-                                          'name':
-                                              _peerFirstName.toUpperCase(),
+                                          'name': (_isGroup
+                                                  ? _memberFirst(
+                                                      _replyTo!.senderId,
+                                                      fallback:
+                                                          _replyTo!.senderName,
+                                                    )
+                                                  : _peerFirstName)
+                                              .toUpperCase(),
                                         },
                                       ).toUpperCase()),
                             replyPreview:
@@ -2162,6 +2339,17 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     if (_messages.isEmpty) {
       // Still loading: nothing rather than a "no messages" flash.
       if (!_messagesLoaded) return const SizedBox.shrink();
+      // Groupe vide : juste « Tu as créé le groupe », pas l'écran d'accueil d'un
+      // premier échange à deux.
+      if (_isGroup) {
+        return Padding(
+          padding: EdgeInsets.only(top: topInset + 12),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: _GroupSystemLine(text: _groupCreatedLine()),
+          ),
+        );
+      }
       return Padding(
         padding: EdgeInsets.only(
           top: topInset,
@@ -2194,6 +2382,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     // day so a long thread reads as "MERCREDI / JEUDI / …" instead of one
     // unbroken scroll of timestamps.
     final items = <_ThreadListItem>[];
+    if (_isGroup) items.add(_ThreadListItem.system(_groupCreatedLine()));
     DateTime? lastDay;
     for (final m in _messages) {
       final day = DateTime(m.createdAt.year, m.createdAt.month, m.createdAt.day);
@@ -2287,6 +2476,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           i -= 1;
         }
         final item = items[items.length - 1 - i];
+        if (item.system != null) return _GroupSystemLine(text: item.system!);
         if (item.isDay) {
           return _DaySeparator(day: item.day!);
         }
@@ -2323,6 +2513,19 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         // Une carte spéciale reçue a ses propres boutons : on n'y répond pas.
         // Un message supprimé n'est plus une cible : ni réponse, ni menu.
         final replyable = !(m.isSpecial && !mine) && !m.isDeleted;
+        // Groupe : le prénom + drapeau de l'auteur au-dessus de la première
+        // bulle d'une série du même auteur.
+        final authorFirst = _isGroup
+            ? _memberFirst(m.senderId, fallback: m.senderName)
+            : _peerFirstName;
+        var showAuthor = false;
+        if (_isGroup && !mine && !m.isDeleted) {
+          final at = _messages.indexWhere((x) => x.id == m.id);
+          showAuthor = at <= 0 || _messages[at - 1].senderId != m.senderId;
+        }
+        final authorFlag = showAuthor
+            ? (countryFlagFor(_members[m.senderId]?.country ?? '') ?? '')
+            : '';
         // Le message cité : dans la fenêtre chargée, sinon lu une fois.
         ChatMessage? quoted;
         var quotedMissing = false;
@@ -2343,7 +2546,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         final bubble = _MessageBubble(
           onReply: replyable ? () => _startReply(m, via: 'menu') : null,
           onEdit: _canEdit(m) ? () => _startEdit(m) : null,
-          onReport: mine ? null : _reportPeer,
+          onReport: mine || _isGroup ? null : _reportPeer,
           quoted: quoted,
           quotedMissing: quotedMissing,
           quotedName: quoted == null ? '' : _quoteAuthor(quoted),
@@ -2393,11 +2596,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       mine: mine,
                       text: mine
                           ? AppStrings.t('msg_deleted_mine')
-                          : (_peerFirstName.isEmpty
+                          : (authorFirst.isEmpty
                               ? AppStrings.t('msg_deleted_peer_anon')
                               : AppStrings.t(
                                   'msg_deleted_peer',
-                                  args: {'name': _peerFirstName},
+                                  args: {'name': authorFirst},
                                 )),
                       time: '${m.createdAt.hour.toString().padLeft(2, '0')}:'
                           '${m.createdAt.minute.toString().padLeft(2, '0')}',
@@ -2406,7 +2609,26 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       key: const ValueKey('live'),
                       enabled: replyable,
                       onReply: () => _startReply(m, via: 'swipe'),
-                      child: bubble,
+                      child: showAuthor
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(14, 8, 14, 2),
+                                  child: Text(
+                                    '$authorFirst $authorFlag'.trim(),
+                                    style: TextStyle(
+                                      color: SC.fg.withValues(alpha: 0.6),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                bubble,
+                              ],
+                            )
+                          : bubble,
                     ),
             ),
           ),
@@ -2416,16 +2638,44 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   }
 }
 
+/// « Tu as créé le groupe » : une ligne mono centrée, au tout début du fil.
+class _GroupSystemLine extends StatelessWidget {
+  const _GroupSystemLine({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: Text(
+          text,
+          style: GoogleFonts.ibmPlexMono(
+            color: SC.fg.withValues(alpha: 0.5),
+            fontSize: 11.5,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// One row of the thread list: either a day label or a message bubble.
 class _ThreadListItem {
-  const _ThreadListItem._({this.day, this.message});
+  const _ThreadListItem._({this.day, this.message, this.system});
 
   factory _ThreadListItem.day(DateTime day) => _ThreadListItem._(day: day);
   factory _ThreadListItem.message(ChatMessage m) =>
       _ThreadListItem._(message: m);
 
+  /// Une ligne système centrée (« Tu as créé le groupe »).
+  factory _ThreadListItem.system(String text) =>
+      _ThreadListItem._(system: text);
+
   final DateTime? day;
   final ChatMessage? message;
+  final String? system;
 
   bool get isDay => day != null;
 }
@@ -2502,9 +2752,16 @@ class _ThreadHeader extends StatelessWidget {
     this.blockedByPeer = false,
     this.onToggleBlock,
     this.onReport,
+    this.groupAvatar,
+    this.subtitle,
   });
   final String title;
   final RemoteProfile? peer;
+
+  /// Page d'un groupe : sa photo à la place de celle du pair, et une ligne
+  /// « 5 membres · 🇧🇷 🇪🇸 » à la place de l'heure locale. Pas de bouton d'appel.
+  final Widget? groupAvatar;
+  final String? subtitle;
 
   /// Local time at the peer's place — rendered as an orange line under the
   /// first name (not a floating pill over the messages).
@@ -2516,8 +2773,9 @@ class _ThreadHeader extends StatelessWidget {
   /// True when the peer has blocked ME — greys out the call button.
   final bool blockedByPeer;
 
-  /// Téléphone : lance l'appel, caméra allumée des deux côtés.
-  final VoidCallback onCall;
+  /// Téléphone : lance l'appel, caméra allumée des deux côtés. Null (groupe) :
+  /// pas de bouton.
+  final VoidCallback? onCall;
 
   final VoidCallback onViewProfile;
 
@@ -2563,7 +2821,7 @@ class _ThreadHeader extends StatelessWidget {
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onViewProfile,
-              child: Stack(
+              child: groupAvatar ?? Stack(
                 clipBehavior: Clip.none,
                 children: [
                   ProfileAvatar(
@@ -2638,6 +2896,16 @@ class _ThreadHeader extends StatelessWidget {
                             ),
                           ],
                         ),
+                        if (subtitle != null && subtitle!.isNotEmpty)
+                          Text(
+                            subtitle!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: SC.fg.withValues(alpha: 0.65),
+                              fontSize: 12.5,
+                            ),
+                          ),
                         if (peerClock != null)
                           _PeerClockLine(
                             clock: peerClock,
@@ -2656,7 +2924,9 @@ class _ThreadHeader extends StatelessWidget {
             // plus de rebond, plus rien à toucher — il ne reste que l'icône en
             // creux. Un bouton grisé se presse quand même ; une icône nue, non.
             // Ce qu'on peut encore faire est en bas.
-            if (blockedByPeer)
+            if (onCall == null)
+              const SizedBox.shrink()
+            else if (blockedByPeer)
               const _DeadCallIcon(icon: Icons.phone_rounded)
             else
               LiquidGlassButton(
@@ -2665,7 +2935,7 @@ class _ThreadHeader extends StatelessWidget {
                 size: 44,
                 iconSize: 19,
                 semanticLabel: 'Call',
-                onTap: onCall,
+                onTap: onCall!,
               ),
           ],
         ),
@@ -4844,7 +5114,30 @@ class _ComposerState extends State<_Composer>
                         ),
                       ),
                     ),
-                    // Le quiz : un bouton à part, avant le GIF et la photo.
+                    // À droite, DANS le champ : le « + » (rond gris : photo,
+                    // galerie, vidéo ou GIF) puis le quiz (rond jaune). Masqués
+                    // pendant une modification : un texte ne se remplace pas.
+                    if (widget.editing == null)
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: widget.sending ? null : widget.onSendImage,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 6, bottom: 5),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: SC.fg.withValues(alpha: 0.14),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.add_rounded,
+                              size: 24,
+                              color: SC.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
                     if (widget.editing == null && widget.onQuiz != null)
                       GestureDetector(
                         key: const ValueKey('quizButton'),
@@ -4853,87 +5146,25 @@ class _ComposerState extends State<_Composer>
                             ? null
                             : widget.onQuiz,
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 8,
-                          ),
-                          child: Icon(
-                            Icons.quiz_rounded,
-                            size: 23,
-                            color: SC.fg.withValues(
-                              alpha: widget.quizActive ? 0.3 : 0.75,
+                          padding: const EdgeInsets.only(left: 6, bottom: 5),
+                          child: Opacity(
+                            opacity: widget.quizActive ? 0.4 : 1,
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF4FF1F),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.quiz_rounded,
+                                size: 22,
+                                color: Color(0xFF04123A),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    // La pastille GIF (1b) : dans le champ, avant la photo,
-                    // seulement tant que le champ est vide.
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 180),
-                      child: _micMode
-                          ? GestureDetector(
-                              key: const ValueKey('gifChip'),
-                              behavior: HitTestBehavior.opaque,
-                              onTap: widget.sending ? null : widget.onSendGif,
-                              child: Padding(
-                                // Centré sur l'icône photo voisine (39 de haut).
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 9,
-                                    vertical: 5,
-                                  ),
-                                  // MODE CLAIR seulement : les couleurs de l'ancien
-                                  // rond GIF (jaune plein, texte bleu foncé) — un
-                                  // contour jaune ne se voyait pas sur blanc. Le
-                                  // mode sombre garde le contour jaune de la
-                                  // maquette.
-                                  decoration: BoxDecoration(
-                                    color: SC.light ? SC.accent : null,
-                                    borderRadius: BorderRadius.circular(99),
-                                    border: SC.light
-                                        ? null
-                                        : Border.all(
-                                            color: SC.accent
-                                                .withValues(alpha: 0.6),
-                                            width: 1.2,
-                                          ),
-                                  ),
-                                  child: Text(
-                                    'GIF',
-                                    style: popupDisplay(
-                                      fontSize: 11,
-                                      letterSpacing: 0.2,
-                                      color:
-                                          SC.light ? SC.onAccent : SC.accent,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            )
-                          : const SizedBox.shrink(key: ValueKey('noGif')),
-                    ),
-                    // La photo, à droite DANS le champ — la place de l'emoji
-                    // de la maquette 1b (le chat n'a pas de sélecteur
-                    // d'emoji ; il a l'envoi de photo). Masquée pendant une
-                    // modification : un texte ne se remplace pas par une image.
-                    if (widget.editing == null)
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: widget.sending ? null : widget.onSendImage,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 8,
-                        ),
-                        child: Icon(
-                          Icons.add_photo_alternate_outlined,
-                          size: 23,
-                          color: SC.fg.withValues(alpha: 0.75),
-                        ),
-                      ),
-                    ),
-                  ],
+                      ),                  ],
                 ),
                   ],
                 ),

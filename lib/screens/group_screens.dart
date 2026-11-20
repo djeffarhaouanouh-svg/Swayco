@@ -1,26 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
-import '../services/call_launcher.dart';
-import '../services/chat_api.dart';
-import '../services/chat_unread.dart';
-import '../services/device_id.dart';
 import '../services/friendly_error.dart';
 import '../services/friendship_api.dart';
 import '../services/group_api.dart';
 import '../services/locations.dart';
 import '../services/profile_api.dart';
-import '../services/translation_api.dart';
-import '../services/translation_cache.dart';
 import '../theme/swayco_theme.dart';
-import '../widgets/chat_video.dart';
-import '../widgets/gif_picker_sheet.dart';
 import '../widgets/group_avatar.dart';
 import '../widgets/popup_kit.dart';
 import '../widgets/swayco_dialog.dart';
@@ -56,8 +47,7 @@ String _flagsLine(Iterable<RemoteProfile> members) {
   return seen.join(' ');
 }
 
-String _base(String lang) =>
-    lang.trim().split(RegExp(r'[-_]')).first.toLowerCase();
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Nouveau groupe (1b)
@@ -372,683 +362,6 @@ class _PickMembersSheetState extends State<_PickMembersSheet> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Conversation de groupe (1c)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class GroupThreadScreen extends StatefulWidget {
-  const GroupThreadScreen({
-    super.key,
-    required this.groupId,
-    this.initialGroup,
-  });
-
-  final String groupId;
-  final ChatGroup? initialGroup;
-
-  @override
-  State<GroupThreadScreen> createState() => _GroupThreadScreenState();
-}
-
-class _GroupThreadScreenState extends State<GroupThreadScreen> {
-  ChatGroup? _group;
-  Map<String, RemoteProfile> _profiles = const {};
-  List<ChatMessage> _messages = const [];
-  String _myId = '';
-  String _myName = '';
-  String _myLang = '';
-  final _input = TextEditingController();
-  final _scroll = ScrollController();
-  final Map<String, String> _tr = {};
-  final Set<String> _trBusy = {};
-  StreamSubscription<List<ChatMessage>>? _sub;
-  Timer? _poll;
-  bool _sending = false;
-  bool _loaded = false;
-  bool _closing = false;
-
-  String get _conv => '$kGroupConvPrefix${widget.groupId}';
-
-  @override
-  void initState() {
-    super.initState();
-    _group = widget.initialGroup;
-    _boot();
-  }
-
-  @override
-  void dispose() {
-    _sub?.cancel();
-    _poll?.cancel();
-    _input.dispose();
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  Future<void> _boot() async {
-    _myId = await DeviceId.getOrCreate();
-    try {
-      final me = await CallLauncher.resolveMyIdentity();
-      _myName = me.name;
-      _myLang = me.sourceLang;
-    } catch (_) {}
-    if (!mounted) return;
-    final cached = await TranslationCache.load(_conv, _myLang);
-    _tr.addAll(cached);
-    await _refreshGroup();
-    if (!mounted) return;
-    _sub = ChatApi.subscribeMessages(_conv).listen(
-      (rows) {
-        if (!mounted) return;
-        final incoming = _loaded &&
-            rows.any((m) =>
-                m.senderId != _myId && !_messages.any((x) => x.id == m.id));
-        setState(() {
-          _messages = rows;
-          _loaded = true;
-        });
-        if (incoming) HapticFeedback.selectionClick();
-        unawaited(ChatUnread.markConversationSeen(_conv));
-        for (final m in rows) {
-          _maybeTranslate(m);
-        }
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scroll.hasClients) _scroll.jumpTo(0);
-        });
-      },
-      onError: (Object e) => debugPrint('group stream error: $e'),
-    );
-    _poll = Timer.periodic(const Duration(seconds: 20), (_) => _refreshGroup());
-  }
-
-  /// Relit le groupe et ses membres. Si je n'en suis plus membre (retiré), on
-  /// referme l'écran.
-  Future<void> _refreshGroup() async {
-    if (_myId.isEmpty) return;
-    final g = await GroupApi.fetchOne(_myId, widget.groupId);
-    if (!mounted) return;
-    if (g == null) {
-      // Une lecture qui échoue rend aussi null : on ne ferme que si on avait
-      // déjà vu le groupe ET que la lecture dit « plus membre ».
-      if (_group != null && !_closing) {
-        final all = await GroupApi.fetchMine(_myId);
-        if (!mounted) return;
-        if (all.isNotEmpty || _group != null) {
-          // fetchMine vide = aussi une panne possible ; on ne ferme que si la
-          // liste a répondu SANS ce groupe.
-          if (all.isNotEmpty && !all.any((x) => x.id == widget.groupId)) {
-            _closing = true;
-            Navigator.of(context).maybePop();
-          }
-        }
-      }
-      return;
-    }
-    final ids = [for (final m in g.members) m.userId];
-    final ps = await ProfileApi.fetchByIds(ids);
-    if (!mounted) return;
-    setState(() {
-      _group = g;
-      _profiles = {for (final p in ps) p.id: p};
-    });
-  }
-
-  void _maybeTranslate(ChatMessage m) {
-    if (m.senderId == _myId || m.isDeleted || m.isQuiz) return;
-    if (m.body.trim().isEmpty || _myLang.isEmpty) return;
-    if (_tr.containsKey(m.id) || _trBusy.contains(m.id)) return;
-    final from = m.language.isNotEmpty
-        ? m.language
-        : (_profiles[m.senderId]?.language ?? '');
-    if (from.isNotEmpty && _base(from) == _base(_myLang)) return;
-    _trBusy.add(m.id);
-    () async {
-      try {
-        final out = await fetchTextTranslation(
-          text: m.body,
-          to: _myLang,
-          from: from.isEmpty ? null : from,
-        );
-        if (!mounted) return;
-        setState(() {
-          _trBusy.remove(m.id);
-          if (out.isNotEmpty && out != m.body) _tr[m.id] = out;
-        });
-        if (out.isNotEmpty && out != m.body) {
-          unawaited(TranslationCache.put(
-            convId: _conv,
-            lang: _myLang,
-            messageId: m.id,
-            translated: out,
-          ));
-        }
-      } catch (_) {
-        if (mounted) setState(() => _trBusy.remove(m.id));
-      }
-    }();
-  }
-
-  Future<void> _afterSend(String type, String preview) async {
-    Analytics.track('message_sent', props: {'source': 'group', 'type': type});
-    final g = _group;
-    if (g != null) {
-      unawaited(GroupApi.notifyMembers(
-        group: g,
-        meId: _myId,
-        senderName: _myName,
-        preview: preview,
-      ));
-    }
-    HapticFeedback.lightImpact();
-  }
-
-  Future<void> _sendText() async {
-    final text = _input.text.trim();
-    if (text.isEmpty || _sending || _myId.isEmpty) return;
-    setState(() => _sending = true);
-    _input.clear();
-    try {
-      await ChatApi.sendMessage(
-        conversationId: _conv,
-        senderId: _myId,
-        senderName: _myName.isEmpty ? 'Moi' : _myName,
-        recipientId: '',
-        body: text,
-        language: _myLang,
-      );
-      await _afterSend('text', text);
-    } catch (e) {
-      if (!mounted) return;
-      _input.text = text;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  Future<void> _sendGif() async {
-    if (_sending || _myId.isEmpty) return;
-    final gif = await showGifPicker(context);
-    if (gif == null || !mounted) return;
-    setState(() => _sending = true);
-    try {
-      await ChatApi.sendGif(
-        conversationId: _conv,
-        senderId: _myId,
-        senderName: _myName.isEmpty ? 'Moi' : _myName,
-        recipientId: '',
-        gifUrl: gif.sendUrl,
-      );
-      await _afterSend('gif', '');
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
-      }
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  Future<void> _sendPhoto() async {
-    if (_sending || _myId.isEmpty) return;
-    final file = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1600,
-      maxHeight: 1600,
-      imageQuality: 85,
-    );
-    if (file == null || !mounted) return;
-    setState(() => _sending = true);
-    try {
-      final bytes = await file.readAsBytes();
-      await ChatApi.sendImage(
-        conversationId: _conv,
-        senderId: _myId,
-        senderName: _myName.isEmpty ? 'Moi' : _myName,
-        recipientId: '',
-        bytes: bytes,
-        contentType: file.name.toLowerCase().endsWith('.png')
-            ? 'image/png'
-            : 'image/jpeg',
-      );
-      await _afterSend('image', '');
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
-      }
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  Future<void> _openInfo() async {
-    final g = _group;
-    if (g == null) return;
-    final left = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => GroupInfoScreen(
-          group: g,
-          profiles: _profiles,
-          myId: _myId,
-        ),
-      ),
-    );
-    if (!mounted) return;
-    if (left == true) {
-      _closing = true;
-      Navigator.of(context).pop();
-      return;
-    }
-    await _refreshGroup();
-  }
-
-  String _time(DateTime d) =>
-      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-
-  @override
-  Widget build(BuildContext context) {
-    final g = _group;
-    final safe = MediaQuery.paddingOf(context);
-    final members = [
-      if (g != null)
-        for (final m in g.members)
-          if (_profiles[m.userId] != null) _profiles[m.userId]!,
-    ];
-    final name = g?.name ?? '';
-    final count = g?.members.length ?? 0;
-    final creator = g == null ? null : _profiles[g.createdBy];
-    final creatorName =
-        creator == null ? AppStrings.t('incoming_someone') : _first(creator);
-    final sys = g == null
-        ? ''
-        : (g.createdBy == _myId
-            ? AppStrings.t('group_created_me')
-            : AppStrings.t('group_created_by', args: {'name': creatorName}));
-    return Scaffold(
-      backgroundColor: SC.tabBg,
-      body: Column(
-        children: [
-          // En-tête : toucher le nom ouvre les infos du groupe.
-          Padding(
-            padding: EdgeInsets.fromLTRB(4, safe.top + 8, 12, 8),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: Icon(Icons.arrow_back_ios_new_rounded,
-                      color: SC.textPrimary, size: 20),
-                  onPressed: () => Navigator.of(context).maybePop(),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _openInfo,
-                    child: Row(
-                      children: [
-                        GroupAvatar(members: members, size: 42),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: popupDisplay(
-                                  fontSize: 17,
-                                  color: SC.textPrimary,
-                                ),
-                              ),
-                              Text(
-                                '${AppStrings.t('group_members_count', args: {
-                                      'n': '$count'
-                                    })} · ${_flagsLine(members)}'
-                                    .trim(),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: SC.textMuted,
-                                  fontSize: 12.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // La pastille « Traduction » : visible, non réglable (elle suit la
-          // langue de chacun).
-          Container(
-            margin: const EdgeInsets.only(bottom: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: SC.menu,
-              borderRadius: BorderRadius.circular(99),
-              border: Border.all(color: SC.stroke.withValues(alpha: 0.14)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.translate_rounded, size: 14, color: SC.accentFg),
-                const SizedBox(width: 6),
-                Text(
-                  AppStrings.t('group_translation'),
-                  style: TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: SC.stroke.withValues(alpha: 0.10)),
-          Expanded(child: _buildList(sys)),
-          _buildComposer(safe.bottom),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildList(String systemLine) {
-    // Liste inversée : index 0 = le plus récent. La ligne système (« Tu as créé
-    // le groupe ») est tout en haut, donc le dernier index.
-    return ListView.builder(
-      controller: _scroll,
-      reverse: true,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      itemCount: _messages.length + (systemLine.isEmpty ? 0 : 1),
-      itemBuilder: (_, i) {
-        if (i == _messages.length) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Center(
-              child: Text(
-                systemLine,
-                style: TextStyle(color: SC.textMuted, fontSize: 12.5),
-              ),
-            ),
-          );
-        }
-        final m = _messages[_messages.length - 1 - i];
-        final mine = m.senderId == _myId;
-        final prev = i + 1 < _messages.length
-            ? _messages[_messages.length - 2 - i]
-            : null;
-        // Le prénom (et le drapeau) n'ouvre qu'une série de messages du même
-        // auteur.
-        final showName = !mine && (prev == null || prev.senderId != m.senderId);
-        final p = _profiles[m.senderId];
-        return _GroupBubble(
-          message: m,
-          mine: mine,
-          authorName: showName
-              ? (p != null ? _first(p) : m.senderName)
-              : '',
-          authorFlag: showName ? _flagOf(p) : '',
-          translated: _tr[m.id],
-          time: _time(m.createdAt),
-        );
-      },
-    );
-  }
-
-  Widget _buildComposer(double bottom) {
-    final ink = SC.textPrimary;
-    return Container(
-      padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + bottom),
-      color: SC.tabBg,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.only(left: 16, right: 4),
-              decoration: BoxDecoration(
-                color: SC.fill.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: SC.stroke.withValues(alpha: 0.16)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 48),
-                      child: TextField(
-                        controller: _input,
-                        minLines: 1,
-                        maxLines: 5,
-                        textCapitalization: TextCapitalization.sentences,
-                        cursorColor: SC.accentFg,
-                        style: TextStyle(color: ink),
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: AppStrings.t('group_write_hint'),
-                          hintStyle: TextStyle(color: SC.fgA(0.5)),
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _sending ? null : _sendGif,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(6, 0, 6, 14),
-                      child: Text(
-                        'GIF',
-                        style: popupDisplay(fontSize: 11, color: SC.accentFg),
-                      ),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _sending ? null : _sendPhoto,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 0, 8, 12),
-                      child: Icon(
-                        Icons.add_photo_alternate_outlined,
-                        size: 23,
-                        color: SC.fg.withValues(alpha: 0.75),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: _input.text.trim().isEmpty || _sending ? null : _sendText,
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: _input.text.trim().isEmpty ? SC.menu : _kYellow,
-                shape: BoxShape.circle,
-              ),
-              child: _sending
-                  ? const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: _kNavy,
-                      ),
-                    )
-                  : Icon(
-                      Icons.arrow_upward_rounded,
-                      color: _input.text.trim().isEmpty
-                          ? SC.textMuted
-                          : _kNavy,
-                    ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GroupBubble extends StatelessWidget {
-  const _GroupBubble({
-    required this.message,
-    required this.mine,
-    required this.authorName,
-    required this.authorFlag,
-    required this.translated,
-    required this.time,
-  });
-
-  final ChatMessage message;
-  final bool mine;
-  final String authorName;
-  final String authorFlag;
-  final String? translated;
-  final String time;
-
-  @override
-  Widget build(BuildContext context) {
-    final light = SC.light;
-    final bubbleColor = light ? Colors.white : const Color(0xFF2F333B);
-    final textColor = mine ? Colors.white : SC.textPrimary;
-    final shown = (translated ?? message.body);
-    Widget content;
-    if (message.isDeleted) {
-      content = Text(
-        AppStrings.t('msg_deleted_peer_anon'),
-        style: TextStyle(
-          color: textColor.withValues(alpha: 0.6),
-          fontStyle: FontStyle.italic,
-        ),
-      );
-    } else if (message.isImage) {
-      content = GestureDetector(
-        onTap: () => message.isVideo
-            ? showChatVideo(context, message.imageUrl)
-            : _showImage(context, message.imageUrl),
-        child: message.isVideo
-            ? const ChatVideoTile()
-            : ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  message.imageUrl,
-                  width: 220,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const SizedBox(
-                    width: 220,
-                    height: 120,
-                    child: Icon(Icons.broken_image_outlined),
-                  ),
-                ),
-              ),
-      );
-    } else if (message.isVoice) {
-      content = Text(
-        AppStrings.t('voice_message'),
-        style: TextStyle(color: textColor),
-      );
-    } else {
-      content = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            shown,
-            style: TextStyle(color: textColor, fontSize: 15, height: 1.3),
-          ),
-          if (translated != null && !mine)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                message.body,
-                style: TextStyle(
-                  color: textColor.withValues(alpha: 0.55),
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-        ],
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Align(
-        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-          ),
-          child: Column(
-            crossAxisAlignment:
-                mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              if (authorName.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 3),
-                  child: Text(
-                    '$authorName $authorFlag'.trim(),
-                    style: TextStyle(
-                      color: SC.textMuted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              Container(
-                padding: message.isImage && !message.isDeleted
-                    ? const EdgeInsets.all(4)
-                    : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: mine ? null : bubbleColor,
-                  gradient: mine ? SC.brandGradient : null,
-                  borderRadius: BorderRadius.circular(20),
-                  border: !mine && light
-                      ? Border.all(color: SC.stroke.withValues(alpha: 0.12))
-                      : null,
-                ),
-                child: content,
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 2, 8, 0),
-                child: Text(
-                  time,
-                  style: GoogleFonts.ibmPlexMono(
-                    color: SC.textMuted.withValues(alpha: 0.8),
-                    fontSize: 10,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showImage(BuildContext context, String url) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => GestureDetector(
-        onTap: () => Navigator.of(ctx).pop(),
-        child: InteractiveViewer(child: Center(child: Image.network(url))),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Infos du groupe (2a) et retirer un membre (2b / 2c)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1084,6 +397,40 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       _group = g;
       _profiles = {..._profiles, for (final p in ps) p.id: p};
     });
+  }
+
+  bool _photoBusy = false;
+
+  /// Change la photo du groupe (n'importe quel membre).
+  Future<void> _changePhoto() async {
+    if (_photoBusy) return;
+    try {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (file == null || !mounted) return;
+      setState(() => _photoBusy = true);
+      final bytes = await file.readAsBytes();
+      await GroupApi.setPhoto(
+        _group.id,
+        bytes,
+        contentType: file.name.toLowerCase().endsWith('.png')
+            ? 'image/png'
+            : 'image/jpeg',
+      );
+      Analytics.track('group_photo_changed');
+      await _reload();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+      }
+    } finally {
+      if (mounted) setState(() => _photoBusy = false);
+    }
   }
 
   Future<void> _add() async {
@@ -1249,7 +596,45 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
               onPressed: () => Navigator.of(context).maybePop(),
             ),
           ),
-          Center(child: GroupAvatar(members: members, size: 96)),
+          // La photo du groupe : un toucher pour la changer.
+          Center(
+            child: GestureDetector(
+              onTap: _changePhoto,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  GroupAvatar(
+                    members: members,
+                    size: 96,
+                    photoUrl: _group.photoUrl,
+                  ),
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: _kYellow,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: SC.tabBg, width: 2.5),
+                      ),
+                      child: _photoBusy
+                          ? const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: _kNavy,
+                              ),
+                            )
+                          : const Icon(Icons.photo_camera_rounded,
+                              size: 16, color: _kNavy),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 14),
           Text(
             _group.name,

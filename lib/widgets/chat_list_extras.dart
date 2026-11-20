@@ -90,9 +90,11 @@ class GroupChatRow extends StatelessWidget {
     required this.lastAuthor,
     required this.unreadCount,
     required this.onTap,
+    this.photoUrl = '',
   });
 
   final String name;
+  final String photoUrl;
   final List<RemoteProfile> members;
   final ChatMessage? lastMessage;
 
@@ -138,7 +140,7 @@ class GroupChatRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           child: Row(
             children: [
-              GroupAvatar(members: members, size: 52),
+              GroupAvatar(members: members, size: 52, photoUrl: photoUrl),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -350,8 +352,10 @@ class OfficialChatRow extends StatelessWidget {
   }
 }
 
-/// « Invite tes amis sur Swayco » : sous la dernière conversation. Carte de
-/// rayon 20, fond blanc 7 %, bordure blanche 12 %, bouton jaune « Partager ».
+/// « Invite tes amis » (handoff messages_inviter) : UNE LIGNE à la fin de la
+/// liste, comme les autres conversations (pas une carte). Avatar rond au
+/// dégradé de la marque avec `group_add`, titre + pastille jaune, sous-titre
+/// d'une ligne, bouton jaune « Inviter » à droite. Ni heure ni compteur.
 class InviteFriendsCard extends StatelessWidget {
   const InviteFriendsCard({super.key, required this.onShare});
 
@@ -359,68 +363,102 @@ class InviteFriendsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = SC.light ? _kNavy : Colors.white;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 14, 8, 8),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-        decoration: BoxDecoration(
-          color: base.withValues(alpha: 0.07),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: base.withValues(alpha: 0.12)),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [Color(0x292B7FFF), Color(0x002B7FFF)],
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppStrings.t('invite_friends_title'),
-                    style: TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    AppStrings.t('invite_friends_sub'),
-                    style: TextStyle(color: SC.textMuted, fontSize: 13),
-                  ),
-                ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF1F5EFF), Color(0xFF2B7FFF), Color(0xFF18DDEA)],
+                stops: [0, 0.55, 1],
               ),
             ),
-            const SizedBox(width: 10),
-            GestureDetector(
-              onTap: onShare,
-              child: Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: _kYellow,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+            child: const Icon(Icons.group_add_rounded,
+                color: Colors.white, size: 26),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
                   children: [
-                    const Icon(Icons.ios_share_rounded,
-                        size: 17, color: _kNavy),
-                    const SizedBox(width: 6),
-                    Text(
-                      AppStrings.t('invite_friends_cta'),
-                      style: const TextStyle(
-                        color: _kNavy,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
+                    Flexible(
+                      child: Text(
+                        AppStrings.t('invite_friends_title'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: SC.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _kYellow,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0x2604123A),
+                        ),
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  AppStrings.t('invite_friends_sub'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF8086A0),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: onShare,
+            child: Container(
+              height: 34,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _kYellow,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Text(
+                AppStrings.t('invite_friends_cta'),
+                style: const TextStyle(
+                  color: _kNavy,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

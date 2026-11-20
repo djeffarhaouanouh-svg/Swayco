@@ -6,15 +6,38 @@ import '../theme/swayco_theme.dart';
 /// La photo d'un groupe (handoff messages_groupes_quiz, A6) : automatique, une
 /// mosaïque des photos de profil des 4 premiers membres. Pas de choix manuel.
 class GroupAvatar extends StatelessWidget {
-  const GroupAvatar({super.key, required this.members, this.size = 52});
+  const GroupAvatar({
+    super.key,
+    required this.members,
+    this.size = 52,
+    this.photoUrl = '',
+  });
 
   /// Les profils des membres, dans l'ordre : seuls les 4 premiers comptent.
   final List<RemoteProfile> members;
   final double size;
 
+  /// La photo choisie pour le groupe : si elle est là, elle remplace la
+  /// mosaïque.
+  final String photoUrl;
+
   @override
   Widget build(BuildContext context) {
     final shown = members.take(4).toList();
+    if (photoUrl.isNotEmpty) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: ClipOval(
+          child: Image.network(
+            photoUrl,
+            fit: BoxFit.cover,
+            // Photo morte : retour à la mosaïque.
+            errorBuilder: (_, _, _) => GroupAvatar(members: members, size: size),
+          ),
+        ),
+      );
+    }
     return SizedBox(
       width: size,
       height: size,
