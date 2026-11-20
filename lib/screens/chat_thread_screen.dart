@@ -241,7 +241,15 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   RemoteProfile? _peer;
 
   // ── Mode groupe ──────────────────────────────────────────────────────────
-  bool get _isGroup => widget.group != null;
+  bool get _isGroup =>
+      widget.group != null || widget.conversationId.startsWith(kGroupConvPrefix);
+
+  /// L'id du groupe (grp-<uuid> → <uuid>).
+  String get _groupId =>
+      widget.group?.id ?? widget.conversationId.substring(kGroupConvPrefix.length);
+
+  /// Le groupe connu à cet instant (relu, sinon celui reçu à l'ouverture).
+  ChatGroup? get _g => _group ?? widget.group;
   ChatGroup? _group;
 
   /// Les profils des membres (nom, drapeau, langue de chaque auteur).
@@ -259,7 +267,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// page se referme.
   Future<void> _refreshGroup() async {
     if (!_isGroup || _myId.isEmpty || !isSupabaseReady) return;
-    final gid = widget.group!.id;
+    final gid = _groupId;
     final all = await GroupApi.fetchMine(_myId);
     if (!mounted || _leftGroup) return;
     ChatGroup? g;
@@ -1104,9 +1112,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     // Groupe : les profils des membres (noms, drapeaux, langues des auteurs).
     if (_isGroup && isSupabaseReady) {
       _group = widget.group;
+      // Ouvert sans le groupe (notification, ou création trop rapide) : on le
+      // relit, au lieu de tomber sur une page de chat à une personne.
+      _group ??= await GroupApi.fetchOne(id, _groupId);
       try {
         final ps = await ProfileApi.fetchByIds(
-          [for (final m in widget.group!.members) m.userId],
+          [for (final m in (_group?.members ?? const <GroupMember>[])) m.userId],
         );
         if (!mounted) return;
         _members = {for (final p in ps) p.id: p};
@@ -2098,18 +2109,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       children: [
                         _ThreadHeader(
                           title: _isGroup
-                              ? (_group ?? widget.group)!.name
+                              ? (_g?.name ?? widget.title)
                               : widget.title,
                           // Groupe : photo du groupe + « 5 membres · 🇧🇷 🇪🇸 »,
                           // et ni appel ni ville.
                           groupAvatar: _isGroup
                               ? GroupAvatar(
                                   members: [
-                                    for (final m in (_group ?? widget.group)!.members)
+                                    for (final m in (_g?.members ?? const <GroupMember>[]))
                                       if (_members[m.userId] != null)
                                         _members[m.userId]!,
                                   ],
-                                  photoUrl: (_group ?? widget.group)!.photoUrl,
+                                  photoUrl: _g?.photoUrl ?? '',
                                   size: 44,
                                 )
                               : null,

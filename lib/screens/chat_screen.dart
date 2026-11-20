@@ -685,16 +685,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     HapticFeedback.lightImpact();
     final gid = await showNewGroupSheet(context, friends: _friends);
     if (gid == null || gid.isEmpty || !mounted) return;
-    await _reload(silent: true);
     if (!mounted) return;
-    await _openGroup(gid);
+    // On relit le groupe qu'on vient de créer (la liste, elle, n'est pas encore
+    // à jour) : sans lui, la page s'ouvrait comme un chat à une personne.
+    final fresh = await GroupApi.fetchOne(_myId, gid);
+    if (!mounted) return;
+    await _openGroup(gid, group: fresh);
+    unawaited(_reload(silent: true));
   }
 
-  Future<void> _openGroup(String groupId) async {
-    ChatGroup? g;
+  Future<void> _openGroup(String groupId, {ChatGroup? group}) async {
+    ChatGroup? g = group;
     for (final x in _groups) {
-      if (x.id == groupId) g = x;
+      if (g == null && x.id == groupId) g = x;
     }
+    g ??= await GroupApi.fetchOne(_myId, groupId);
+    if (!mounted) return;
     await Navigator.of(context).push<void>(
       chatThreadRoute(
         // La même page qu'un chat (GIF, photos, vocaux, traduction…), en mode
