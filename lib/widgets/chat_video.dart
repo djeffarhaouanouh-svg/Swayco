@@ -192,10 +192,10 @@ class _ChatVideoScreenState extends State<_ChatVideoScreen> {
   }
 }
 
-/// L'aperçu d'une vidéo dans une carte (le guide) : sa PREMIÈRE image, un bouton
-/// lecture dessus, et un toucher qui l'ouvre en plein écran. Si l'image ne
-/// vient pas (réseau, fichier absent), il reste une tuile sombre avec le même
-/// bouton : on peut toujours essayer de la lire.
+/// Une vidéo qui se LIT DANS la carte (le guide), sans ouvrir de fenêtre : sa
+/// première image et un bouton lecture ; un toucher la lance sur place, un
+/// second la met en pause. Arrivée au bout, le bouton revient. Si le fichier ne
+/// vient pas (réseau, absent), la tuile sombre reste, sans erreur.
 class VideoPreviewTile extends StatefulWidget {
   const VideoPreviewTile({super.key, required this.url});
 
@@ -208,33 +208,54 @@ class VideoPreviewTile extends StatefulWidget {
 class _VideoPreviewTileState extends State<VideoPreviewTile> {
   VideoPlayerController? _ctrl;
   bool _ready = false;
+  bool _failed = false;
 
   @override
   void initState() {
     super.initState();
     final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
     _ctrl = c;
+    c.addListener(_onTick);
     c.initialize().then((_) {
-      if (!mounted) return;
-      // Pas de lecture : la première image suffit comme vignette.
-      setState(() => _ready = true);
-    }).catchError((Object _) {});
+      if (mounted) setState(() => _ready = true);
+    }).catchError((Object _) {
+      if (mounted) setState(() => _failed = true);
+    });
+  }
+
+  void _onTick() {
+    // Rafraîchit le bouton (lecture / pause / fin).
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _ctrl?.removeListener(_onTick);
     _ctrl?.dispose();
     super.dispose();
+  }
+
+  void _toggle() {
+    final c = _ctrl;
+    if (c == null || !_ready) return;
+    if (c.value.isPlaying) {
+      c.pause();
+      return;
+    }
+    // Finie : on repart du début.
+    if (c.value.position >= c.value.duration) c.seekTo(Duration.zero);
+    c.play();
   }
 
   @override
   Widget build(BuildContext context) {
     final c = _ctrl;
+    final playing = _ready && (c?.value.isPlaying ?? false);
     final ratio = (_ready && c != null && c.value.aspectRatio > 0)
         ? c.value.aspectRatio
         : 16 / 10;
     return GestureDetector(
-      onTap: () => showChatVideo(context, widget.url),
+      onTap: _toggle,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: AspectRatio(
@@ -252,22 +273,41 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
                 ),
               ),
               if (_ready && c != null) VideoPlayer(c),
-              Center(
-                child: Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black.withValues(alpha: 0.45),
-                    border: Border.all(color: Colors.white70, width: 1.5),
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 36,
+              // Le bouton lecture : seulement à l'arrêt.
+              if (!playing && !_failed)
+                Center(
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withValues(alpha: 0.45),
+                      border: Border.all(color: Colors.white70, width: 1.5),
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 36,
+                    ),
                   ),
                 ),
-              ),
+              // Un filet de progression en bas, pendant la lecture.
+              if (_ready && c != null)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: VideoProgressIndicator(
+                    c,
+                    allowScrubbing: false,
+                    padding: EdgeInsets.zero,
+                    colors: const VideoProgressColors(
+                      playedColor: Colors.white,
+                      bufferedColor: Colors.white24,
+                      backgroundColor: Colors.white12,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
