@@ -49,7 +49,7 @@ import '../widgets/group_avatar.dart';
 import '../services/quiz_api.dart';
 import '../services/group_api.dart';
 import '../services/locations.dart' show countryFlagFor;
-import 'group_screens.dart' show GroupInfoScreen;
+import 'group_screens.dart' show GroupInfoScreen, showAddMembersSheet;
 import '../widgets/gif_picker_sheet.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/liquid_glass_button.dart';
@@ -321,6 +321,54 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     final count =
         AppStrings.t('group_members_count', args: {'n': '${g.members.length}'});
     return flags.isEmpty ? count : '$count · ${flags.join(' ')}';
+  }
+
+  /// Le bouton « ajouter une personne » de l'en-tête : le sélecteur d'amis qui
+  /// ne sont pas encore dans le groupe.
+  Future<void> _addGroupMembers() async {
+    final g = _group ?? widget.group;
+    if (g == null || _myId.isEmpty) return;
+    List<RemoteProfile> friends;
+    try {
+      final rows = await FriendshipApi.fetchMatchesNewestFirst(_myId);
+      friends = [for (final r in rows) r.profile];
+    } catch (_) {
+      friends = const [];
+    }
+    final already = {for (final m in g.members) m.userId};
+    final candidates = [
+      for (final p in friends)
+        if (!already.contains(p.id)) p,
+    ];
+    if (!mounted) return;
+    final ids = await showAddMembersSheet(context, candidates: candidates);
+    if (ids == null || ids.isEmpty) return;
+    try {
+      await GroupApi.addMembers(g.id, ids);
+      await _refreshGroup();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+      }
+    }
+  }
+
+  /// La couleur du prénom d'un auteur (maquette : cyan, jaune, orange…),
+  /// stable pour une même personne.
+  Color _authorColor(String userId) {
+    const palette = [
+      Color(0xFF18DDEA),
+      Color(0xFFF4FF1F),
+      Color(0xFFFF9F43),
+      Color(0xFFFF7EB6),
+      Color(0xFF7CFFB2),
+    ];
+    final g = _group ?? widget.group;
+    final idx = g == null
+        ? userId.hashCode
+        : g.members.indexWhere((m) => m.userId == userId);
+    return palette[(idx < 0 ? userId.hashCode : idx).abs() % palette.length];
   }
 
   /// Ouvre les infos du groupe (nom, membres, photo, ajouter, quitter).
@@ -2066,6 +2114,16 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                                 )
                               : null,
                           subtitle: _isGroup ? _groupSubtitle() : null,
+                          trailing: _isGroup
+                              ? LiquidGlassButton(
+                                  icon: Icons.person_add_alt_1_rounded,
+                                  sfSymbol: 'person.badge.plus',
+                                  size: 44,
+                                  iconSize: 21,
+                                  semanticLabel: AppStrings.t('group_add'),
+                                  onTap: _addGroupMembers,
+                                )
+                              : null,
                           peer: _peer,
                           clock: _isGroup ? null : peerClock,
                           place: (_peer?.city.trim().isNotEmpty ?? false)
@@ -2184,6 +2242,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                                 setState(() => _pendingPhoto = null),
                             onSendGif: _sendGif,
                             onQuiz: _isGroup ? null : _openQuiz,
+                            hintOverride:
+                                _isGroup ? AppStrings.t('group_write_hint') : '',
                             quizActive: _quizActive || _quizBusy,
                             onSendVoice: _sendVoice,
                             autoTranslate: _autoTranslate,
@@ -2609,23 +2669,42 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       key: const ValueKey('live'),
                       enabled: replyable,
                       onReply: () => _startReply(m, via: 'swipe'),
-                      child: showAuthor
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      child: showAuthor || (_isGroup && !mine)
+                          ? Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
+                                // La photo de l'auteur, à gauche de sa bulle.
                                 Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(14, 8, 14, 2),
-                                  child: Text(
-                                    '$authorFirst $authorFlag'.trim(),
-                                    style: TextStyle(
-                                      color: SC.fg.withValues(alpha: 0.6),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                  padding: const EdgeInsets.only(right: 8, bottom: 2),
+                                  child: GroupAvatar(
+                                    members: [
+                                      if (_members[m.senderId] != null)
+                                        _members[m.senderId]!,
+                                    ],
+                                    size: 32,
                                   ),
                                 ),
-                                bubble,
+                                Flexible(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (showAuthor)
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                              6, 8, 14, 3),
+                                          child: Text(
+                                            '$authorFirst $authorFlag'.trim(),
+                                            style: TextStyle(
+                                              color: _authorColor(m.senderId),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                      bubble,
+                                    ],
+                                  ),
+                                ),
                               ],
                             )
                           : bubble,
@@ -2754,7 +2833,11 @@ class _ThreadHeader extends StatelessWidget {
     this.onReport,
     this.groupAvatar,
     this.subtitle,
+    this.trailing,
   });
+
+  /// Bouton à droite quand il n'y a pas d'appel (groupe : « ajouter »).
+  final Widget? trailing;
   final String title;
   final RemoteProfile? peer;
 
@@ -2925,7 +3008,7 @@ class _ThreadHeader extends StatelessWidget {
             // creux. Un bouton grisé se presse quand même ; une icône nue, non.
             // Ce qu'on peut encore faire est en bas.
             if (onCall == null)
-              const SizedBox.shrink()
+              trailing ?? const SizedBox.shrink()
             else if (blockedByPeer)
               const _DeadCallIcon(icon: Icons.phone_rounded)
             else
@@ -4445,6 +4528,7 @@ class _Composer extends StatefulWidget {
     required this.myLang,
     this.onQuiz,
     this.quizActive = false,
+    this.hintOverride = '',
     this.onTypingChanged,
     this.peerLang = '',
     this.peerFirstName = '',
@@ -4504,6 +4588,9 @@ class _Composer extends StatefulWidget {
   /// est en cours (il redevient actif à l'arrêt ou à la fin).
   final Future<void> Function()? onQuiz;
   final bool quizActive;
+
+  /// Texte d'aide imposé (groupe : « Écris au groupe »).
+  final String hintOverride;
 
   /// Envoie le vocal enregistré (octets, durée, format).
   final Future<void> Function(VoiceRecording recording) onSendVoice;
@@ -4897,6 +4984,8 @@ class _ComposerState extends State<_Composer>
   /// language — "Écrivez en Français" for a French user — falling back to the
   /// plain "Message" when their language is unknown.
   String get _composerHint {
+    // Groupe : « Écris au groupe », sans langue du pair.
+    if (widget.hintOverride.isNotEmpty) return widget.hintOverride;
     final me = widget.myLang.trim().split('-').first;
     final peer = widget.peerLang.trim().split('-').first;
     if (widget.autoTranslate &&

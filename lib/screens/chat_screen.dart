@@ -1367,6 +1367,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             child: GroupChatRow(
                               name: entry.group!.name,
                               photoUrl: entry.group!.photoUrl,
+                              memberCount: entry.group!.members.length,
                               members: [
                                 for (final m in entry.group!.members)
                                   if (_groupProfiles[m.userId] != null)

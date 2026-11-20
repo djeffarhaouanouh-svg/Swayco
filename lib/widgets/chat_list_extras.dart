@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../services/analytics.dart';
@@ -91,10 +92,14 @@ class GroupChatRow extends StatelessWidget {
     required this.unreadCount,
     required this.onTap,
     this.photoUrl = '',
+    this.memberCount = 0,
   });
 
   final String name;
   final String photoUrl;
+
+  /// Nombre de membres du groupe (la pastille « 👥 5 »).
+  final int memberCount;
   final List<RemoteProfile> members;
   final ChatMessage? lastMessage;
 
@@ -147,16 +152,50 @@ class GroupChatRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 16.5,
-                        height: 1.2,
-                        fontWeight: unread ? FontWeight.w600 : FontWeight.w500,
-                        color: unread ? SC.textPrimary : SC.textSecondary,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 16.5,
+                              height: 1.2,
+                              fontWeight:
+                                  unread ? FontWeight.w600 : FontWeight.w500,
+                              color: unread ? SC.textPrimary : SC.textSecondary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // La pastille « 👥 5 » : le nombre de membres.
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: SC.fg.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.group_rounded,
+                                  size: 12,
+                                  color: SC.fg.withValues(alpha: 0.75)),
+                              const SizedBox(width: 3),
+                              Text(
+                                '${members.length > memberCount ? members.length : memberCount}',
+                                style: TextStyle(
+                                  color: SC.fg.withValues(alpha: 0.75),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -177,30 +216,26 @@ class GroupChatRow extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  // L'heure en mono (jaune quand il y a du nouveau) et la
+                  // pastille jaune de 10 px.
                   if (m != null)
                     Text(
                       _hm(m.createdAt),
-                      style: TextStyle(color: SC.textMuted, fontSize: 12),
+                      style: GoogleFonts.ibmPlexMono(
+                        color: unread
+                            ? const Color(0xFFF4FF1F)
+                            : SC.fg.withValues(alpha: 0.5),
+                        fontSize: 11,
+                      ),
                     ),
                   if (unread) ...[
                     const SizedBox(height: 6),
                     Container(
-                      constraints: const BoxConstraints(minWidth: 20),
-                      height: 20,
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: SC.accent,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        unreadCount > 99 ? '99+' : '$unreadCount',
-                        style: const TextStyle(
-                          color: SC.bgDeep,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          height: 1,
-                        ),
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF4FF1F),
+                        shape: BoxShape.circle,
                       ),
                     ),
                   ],
