@@ -255,7 +255,8 @@ class _ExampleTranslationState extends State<_ExampleTranslation> {
         }));
     at(450, () => _received = true);
     at(1900, () => _translated = true);
-    at(3300, () => _reply = true);
+    // La réponse se fait attendre : le temps de LIRE la traduction.
+    at(5200, () => _reply = true);
   }
 
   @override
