@@ -2746,6 +2746,142 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   }
 }
 
+/// Copier une PARTIE d'un message, sans viser avec le doigt : le texte est
+/// découpé en mots que l'on touche — un premier toucher pose le début, un
+/// second le bout, et tout ce qui est entre les deux est sélectionné. Le bouton
+/// copie la sélection (ou tout le message si rien n'est choisi).
+class _SelectTextSheet extends StatefulWidget {
+  const _SelectTextSheet({required this.text});
+
+  final String text;
+
+  @override
+  State<_SelectTextSheet> createState() => _SelectTextSheetState();
+}
+
+class _SelectTextSheetState extends State<_SelectTextSheet> {
+  late final List<String> _words =
+      widget.text.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  int? _anchor;
+  int? _from;
+  int? _to;
+
+  void _tap(int i) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_anchor == null || (_from != null && _to != null && _anchor == null)) {
+        _anchor = i;
+        _from = i;
+        _to = i;
+      } else {
+        _from = i < _anchor! ? i : _anchor;
+        _to = i > _anchor! ? i : _anchor;
+        _anchor = null; // le suivant repart d'un nouveau début
+      }
+    });
+  }
+
+  bool _inRange(int i) => _from != null && _to != null && i >= _from! && i <= _to!;
+
+  Future<void> _copy() async {
+    final picked = (_from != null && _to != null)
+        ? _words.sublist(_from!, _to! + 1).join(' ')
+        : widget.text;
+    await Clipboard.setData(ClipboardData(text: picked));
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    Navigator.of(context).pop();
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(AppStrings.t('chat_copied')),
+        duration: const Duration(milliseconds: 1400),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                AppStrings.t('chat_select_hint'),
+                style: TextStyle(color: SC.textMuted, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 4,
+                    runSpacing: 6,
+                    children: [
+                      for (var i = 0; i < _words.length; i++)
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _tap(i),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _inRange(i)
+                                  ? const Color(0xFFF4FF1F)
+                                  : SC.fg.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                            child: Text(
+                              _words[i],
+                              style: TextStyle(
+                                color: _inRange(i)
+                                    ? const Color(0xFF04123A)
+                                    : SC.textPrimary,
+                                fontSize: 17,
+                                height: 1.25,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              GestureDetector(
+                onTap: _copy,
+                child: Container(
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4FF1F),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    AppStrings.t('chat_copy'),
+                    style: const TextStyle(
+                      color: Color(0xFF04123A),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// « Tu as créé le groupe » : une ligne mono centrée, au tout début du fil.
 class _GroupSystemLine extends StatelessWidget {
   const _GroupSystemLine({required this.text});
@@ -3349,24 +3485,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
               shape: const RoundedRectangleBorder(
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              builder: (ctx) => SafeArea(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.sizeOf(ctx).height * 0.6,
-                  ),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(22, 22, 22, 26),
-                    child: SelectableText(
-                      displayBody,
-                      style: TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 18,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              builder: (ctx) => _SelectTextSheet(text: displayBody),
             );
           },
         ),
