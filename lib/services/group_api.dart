@@ -287,6 +287,7 @@ abstract final class GroupApi {
           data: {
             'conversationId': group.conversationId,
             'groupId': group.id,
+            'groupName': group.name,
             'senderId': meId,
           },
         ));

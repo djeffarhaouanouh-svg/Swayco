@@ -184,9 +184,15 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         chatThreadRoute(
           builder: (_) => ChatThreadScreen(
             conversationId: convId,
-            title: (peer?.displayName.trim().isNotEmpty ?? false)
-                ? peer!.displayName.trim()
-                : AppStrings.t('profile_anonymous'),
+            // Notification de GROUPE (`grp-…`) : la page s'ouvre en mode groupe
+            // (elle relit le groupe) ; le titre est le nom du groupe, pas celui
+            // de l'auteur du message.
+            title: convId.startsWith('grp-') &&
+                    (data['groupName']?.toString().isNotEmpty ?? false)
+                ? data['groupName'].toString()
+                : ((peer?.displayName.trim().isNotEmpty ?? false)
+                    ? peer!.displayName.trim()
+                    : AppStrings.t('profile_anonymous')),
             peerDeviceId: senderId,
             translation: widget.translation,
           ),
