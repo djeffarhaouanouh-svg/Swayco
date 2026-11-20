@@ -2686,11 +2686,17 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       onReply: () => _startReply(m, via: 'swipe'),
                       child: showAuthor || (_isGroup && !mine)
                           ? Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                              // En haut : sous la bulle il y a l'heure, « traduit »
+                              // et les réactions rapides — la photo reste à côté
+                              // de la bulle, pas tout en bas de la colonne.
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 // La photo de l'auteur, à gauche de sa bulle.
                                 Padding(
-                                  padding: const EdgeInsets.only(right: 8, bottom: 2),
+                                  padding: EdgeInsets.only(
+                                    right: 8,
+                                    top: showAuthor ? 26 : 2,
+                                  ),
                                   child: GroupAvatar(
                                     members: [
                                       if (_members[m.senderId] != null)
