@@ -2280,7 +2280,7 @@ class _CallScreenState extends State<CallScreen> {
       await Permission.bluetoothConnect.request();
     }
 
-    // Vidéo allégée (chauffe) : capture 540p/24 fps au lieu de 720p/30, un seul
+    // Vidéo allégée (chauffe) : même qualité qu'avant, mais un seul
     // encodage (pas de simulcast : appel 1-à-1) et dynacast/adaptiveStream pour
     // ne plus encoder ni décoder ce que personne ne regarde. AUCUNE option
     // audio ici : l'audio reste celui du Room() nu, qui est le réglage éprouvé.
@@ -2288,15 +2288,13 @@ class _CallScreenState extends State<CallScreen> {
       roomOptions: const RoomOptions(
         adaptiveStream: true,
         dynacast: true,
+        // Qualité d'un appel normal : 720p/30 fps, débit par défaut de LiveKit.
         defaultCameraCaptureOptions: CameraCaptureOptions(
-          params: VideoParameters(
-            dimensions: VideoDimensionsPresets.h540_169,
-            encoding: VideoEncoding(maxBitrate: 700 * 1000, maxFramerate: 24),
-          ),
+          params: VideoParametersPresets.h720_169,
         ),
         defaultVideoPublishOptions: VideoPublishOptions(
           simulcast: false,
-          videoEncoding: VideoEncoding(maxBitrate: 700 * 1000, maxFramerate: 24),
+          videoEncoding: VideoEncoding(maxBitrate: 1700 * 1000, maxFramerate: 30),
         ),
       ),
     );
