@@ -3333,6 +3333,43 @@ class _MessageBubbleState extends State<_MessageBubble> {
             );
           },
         ),
+      // Copier une PARTIE du texte : une feuille avec le texte sélectionnable
+      // (la bulle elle-même réserve le toucher aux réactions et au menu).
+      if (displayBody.trim().isNotEmpty)
+        ChatMenuItem(
+          label: AppStrings.t('chat_select_text'),
+          icon: Icons.text_fields_rounded,
+          onTap: () {
+            close();
+            if (!mounted) return;
+            showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: SC.menu,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              builder: (ctx) => SafeArea(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(ctx).height * 0.6,
+                  ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(22, 22, 22, 26),
+                    child: SelectableText(
+                      displayBody,
+                      style: TextStyle(
+                        color: SC.textPrimary,
+                        fontSize: 18,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
       if (onLongPressDelete != null)
         ChatMenuItem(
           label: AppStrings.t('delete'),
