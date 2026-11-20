@@ -40,12 +40,7 @@ class OfficialGuideStep {
 
 /// Les étapes, dans l'ordre où elles arrivent dans la conversation.
 final List<OfficialGuideStep> officialGuide = [
-  // Le mot de bienvenue, avec un message VOCAL de l'équipe juste dessous.
-  OfficialGuideStep(
-    titleKey: null,
-    bodyKey: 'official_guide_welcome',
-    example: (_) => const _WelcomeVoice(),
-  ),
+  const OfficialGuideStep(titleKey: null, bodyKey: 'official_guide_welcome'),
   OfficialGuideStep(
     titleKey: 'official_guide_t1',
     bodyKey: 'official_guide_b1',
@@ -59,7 +54,8 @@ final List<OfficialGuideStep> officialGuide = [
   OfficialGuideStep(
     titleKey: 'official_guide_t3',
     bodyKey: 'official_guide_b3',
-    example: (_) => const _ExampleVoice(),
+    // L'exemple : le VRAI message vocal de l'équipe qui présente la fonction.
+    example: (_) => const _WelcomeVoice(),
   ),
   OfficialGuideStep(
     titleKey: 'official_guide_t6',
@@ -493,70 +489,6 @@ class _ExampleCall extends StatelessWidget {
           style: TextStyle(color: fg, fontSize: size, fontWeight: FontWeight.w700),
         ),
       );
-}
-
-/// Étape 3 — un vocal : lecture, onde, durée, et sa traduction dessous.
-class _ExampleVoice extends StatelessWidget {
-  const _ExampleVoice();
-
-  @override
-  Widget build(BuildContext context) {
-    const bars = [6.0, 12.0, 18.0, 10.0, 22.0, 14.0, 8.0, 20.0, 16.0, 9.0, 13.0, 7.0];
-    return _ExampleFrame(
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 250),
-          padding: const EdgeInsets.fromLTRB(10, 10, 14, 10),
-          decoration: BoxDecoration(
-            color: SC.light ? Colors.white : const Color(0xFF2F333B),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: const BoxDecoration(
-                      color: _kYellow,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.play_arrow_rounded,
-                        color: _kNavy, size: 24),
-                  ),
-                  const SizedBox(width: 10),
-                  for (final h in bars)
-                    Container(
-                      width: 3,
-                      height: h,
-                      margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                      decoration: BoxDecoration(
-                        color: _ink.withValues(alpha: 0.55),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                  const SizedBox(width: 10),
-                  Text('0:07',
-                      style: TextStyle(
-                          color: _ink.withValues(alpha: 0.6), fontSize: 12)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Hi! Are you free this weekend? 🌴',
-                style: TextStyle(color: _ink, fontSize: 13.5),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// Étape 5 — le « + » jaune et une ligne de groupe.
