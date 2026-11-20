@@ -642,11 +642,11 @@ class _CallScreenState extends State<CallScreen> {
   static const double _kVoiceCeiling = 0.08;
 
   /// ~5 s de micro ouvert sans jamais une seule mesure : la sonde est muette.
-  static const int _kMicProbeGiveUp = 10;
+  static const int _kMicProbeGiveUp = 7;
 
   void _startMicProbe(Room room) {
     _micProbe?.cancel();
-    _micProbe = Timer.periodic(const Duration(milliseconds: 500), (_) async {
+    _micProbe = Timer.periodic(const Duration(milliseconds: 750), (_) async {
       if (!mounted || _micProbeDead) return;
       LocalAudioTrack? mic;
       for (final pub in room.localParticipant?.audioTrackPublications ??
