@@ -102,10 +102,10 @@ class _WelcomeVoice extends StatelessWidget {
     final english = ui == 'en' || ui.startsWith('en-') || ui.startsWith('en_');
     final audioLang = english ? 'fr' : 'en';
     final url = '$_base${english ? 'welcome_fr' : 'welcome_en'}.mp3';
-    // Comme un vrai vocal : ce qui est DIT (transcription, dans la langue de
-    // l'audio), puis la traduction dans la langue de l'interface.
-    final transcript = AppStrings.tIn(audioLang, 'guide_voice_text');
-    final translated = AppStrings.t('guide_voice_text');
+    // Le texte du vocal dans la langue de L'INTERFACE de l'utilisateur (comme un
+    // vrai vocal traduit : on lit dans sa langue, quelle que soit celle qu'on
+    // entend).
+    final text = AppStrings.t('guide_voice_text');
     return _ExampleFrame(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,34 +133,9 @@ class _WelcomeVoice extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            transcript,
+            text,
             style: TextStyle(color: _ink, fontSize: 13.5, height: 1.4),
           ),
-          if (translated != transcript) ...[
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Icon(Icons.translate_rounded,
-                      size: 13, color: _ink.withValues(alpha: 0.5)),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    translated,
-                    style: TextStyle(
-                      color: _ink.withValues(alpha: 0.6),
-                      fontSize: 12.5,
-                      height: 1.4,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
