@@ -2490,7 +2490,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     // je n'y ai pas encore réagi : c'est une invitation à répondre, pas un
     // décor à répéter sous chaque bulle.
     String? quickReactId;
-    if (_messages.isNotEmpty && _messages.last.senderId != _myId) {
+    // (Pas dans un groupe : la rangée de réactions rapides y est trop envahissante.
+    // On réagit toujours par un appui long sur la bulle.)
+    if (!_isGroup && _messages.isNotEmpty && _messages.last.senderId != _myId) {
       final last = _messages.last;
       final reacted = (_reactionsByMessage[last.id] ?? const [])
           .any((r) => r.userId == _myId);
