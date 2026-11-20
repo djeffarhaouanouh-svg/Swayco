@@ -4,6 +4,14 @@ import '../services/app_strings.dart';
 import '../theme/swayco_theme.dart';
 import 'chat_list_extras.dart';
 import 'chat_quiz.dart';
+import 'chat_video.dart';
+
+/// La vidéo de démonstration de l'appel traduit, hébergée dans le stockage
+/// (bucket public `avatars`, dossier `guide/`). On peut REMPLACER le fichier à
+/// ce chemin à tout moment : l'app lit l'adresse, pas le contenu — aucun
+/// nouveau build nécessaire pour changer la vidéo.
+const String kGuideCallDemoUrl =
+    'https://rhxenzcdnfvpgjjefztx.supabase.co/storage/v1/object/public/avatars/guide/call_demo.mp4';
 
 // Le guide d'accueil du compte officiel Swayco : une suite de messages qui
 // expliquent l'app, chacun suivi d'un EXEMPLE dessiné juste en dessous
@@ -317,7 +325,9 @@ class _ExampleCall extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ExampleFrame(
+    return GestureDetector(
+      onTap: () => showChatVideo(context, kGuideCallDemoUrl),
+      child: _ExampleFrame(
       child: AspectRatio(
         aspectRatio: 16 / 10,
         child: ClipRRect(
@@ -399,10 +409,28 @@ class _ExampleCall extends StatelessWidget {
                     ),
                   ),
                 ),
+                // Le bouton lecture : toucher l'exemple ouvre la VRAIE vidéo de
+                // démonstration de l'appel traduit.
+                Positioned.fill(
+                  child: Center(
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.45),
+                        border: Border.all(color: Colors.white70, width: 1.5),
+                      ),
+                      child: const Icon(Icons.play_arrow_rounded,
+                          color: Colors.white, size: 36),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ),
+      ),
       ),
     );
   }
