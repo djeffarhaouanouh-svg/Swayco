@@ -2862,6 +2862,14 @@ class _CallScreenState extends State<CallScreen> {
         });
         if (id != null) _egressStartedAt = DateTime.now();
         if (mounted) setState(() => _egressId = id);
+        if (id != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('● Enregistrement démarré'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
         if (id == null && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Egress: échec du démarrage')),
@@ -4624,8 +4632,23 @@ class _CallScreenState extends State<CallScreen> {
                                                 ? 'REC'
                                                 : 'STOP',
                                             active: _egressId != null,
+                                            // Pas de toucher « muet » : pendant le
+                                            // démarrage, on le DIT (sinon on croit
+                                            // que rien ne s'est passé et on
+                                            // re-touche — ce qui arrêtait tout).
                                             onTap: _egressBusy
-                                                ? () {}
+                                                ? () => ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text(
+                                                          'Enregistrement en cours de démarrage…',
+                                                        ),
+                                                        duration: Duration(
+                                                          seconds: 2,
+                                                        ),
+                                                      ),
+                                                    )
                                                 : () {
                                                     _armControlsIdle();
                                                     _toggleEgress();
