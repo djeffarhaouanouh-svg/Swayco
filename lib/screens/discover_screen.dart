@@ -3447,7 +3447,7 @@ class _TinderCardState extends State<_TinderCard> {
                 // Etincelles sur « POPULAIRE » : la carte de Discover, et donc
                 // aussi l'apercu de l'oeil.
                 child: Sparkles(
-                  color: Colors.white,
+                  color: SC.onAccent,
                   count: 5,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
