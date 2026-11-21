@@ -51,9 +51,17 @@ abstract final class ActivitySignal {
 
   // ── Publier ────────────────────────────────────────────────────────────────
 
+  /// Un compteur et non un simple booléen : quand un écran d'appel en remplace un
+  /// autre (sonnerie → appel), le nouveau s'ouvre AVANT que l'ancien ne se ferme ;
+  /// avec un booléen, la fermeture de l'ancien éteignait « en appel » pour toute
+  /// la durée de l'appel.
+  static int _callScreens = 0;
+
   static void setCall(bool on) {
-    if (_call == on) return;
-    _call = on;
+    _callScreens = on ? _callScreens + 1 : (_callScreens > 0 ? _callScreens - 1 : 0);
+    final now = _callScreens > 0;
+    if (_call == now) return;
+    _call = now;
     _changed();
   }
 
