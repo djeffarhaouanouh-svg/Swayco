@@ -23,7 +23,7 @@ const Color _kYellow = Color(0xFFF4FF1F);
 const Color _kNavy = Color(0xFF04123A);
 const Color _kOrange = Color(0xFFFF9F43);
 const Color _kRed = Color(0xFFFF6B6B);
-const double _kBubble = 58;
+const double _kBubble = 64;
 
 /// La rangée de bulles : titre « Friends » + compteur, puis les amis en ligne.
 /// Une personne qui se connecte entre en PREMIÈRE place (les autres glissent),
