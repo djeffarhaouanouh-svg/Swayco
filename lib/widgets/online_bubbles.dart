@@ -266,12 +266,14 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
           )
         else
         SizedBox(
-          height: _kBubble + 6 + 16 + 8,
+          height: _kBubble + 6 + 16 + 20,
           child: AnimatedList(
             key: _listKey,
             scrollDirection: Axis.horizontal,
             clipBehavior: Clip.none,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            // Marge en bout de file et en haut : le dernier drapeau / badge ne
+            // doit jamais être rogné par le bord de la liste.
+            padding: const EdgeInsets.fromLTRB(8, 6, 24, 6),
             initialItemCount: _shown.length,
             itemBuilder: (ctx, i, anim) {
               if (i >= _shown.length) return const SizedBox.shrink();
@@ -335,7 +337,7 @@ class _Bubble extends StatelessWidget {
         onLongPress(topLeft & box.size);
       },
       child: SizedBox(
-        width: _kBubble + 8,
+        width: _kBubble + 12,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
