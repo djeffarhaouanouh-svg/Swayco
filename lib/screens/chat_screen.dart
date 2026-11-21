@@ -1448,17 +1448,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                 setState(() => _notifBannerDismissed = true),
                           ),
                         ),
-                      // « Appelle n'importe qui » — l'appel par lien, sans
-                      // compte, en tête de page (maquette Messages).
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 4, 8, 14),
-                        child: _TopCarousel(
-                          helper: _CallAnyoneBanner(
-                            busy: _creatingInvite,
-                            onTap: _shareCallInvite,
-                          ),
-                        ),
-                      ),
+                      // (Le carrousel « Appelle n'importe qui » + pub est remplacé par la
+                      // rangée « Friends » ci-dessous.)
                       // « Friends » : les amis en ligne, en bulles (appui long = menu).
                       OnlineBubblesRow(
                         friends: _friends,
