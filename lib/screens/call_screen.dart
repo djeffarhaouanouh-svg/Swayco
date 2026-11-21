@@ -3488,6 +3488,7 @@ class _CallScreenState extends State<CallScreen> {
                                     avatarUrl: profile?.avatarUrl,
                                     fallbackUrl: profile?.fallbackPhotoUrl,
                                     size: 140,
+                                    popular: (profile?.isPro ?? false) || (profile?.isPlus ?? false),
                                   ),
                                 ),
                               ),

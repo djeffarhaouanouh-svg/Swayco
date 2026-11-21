@@ -1654,6 +1654,7 @@ class _SpecialChatRow extends StatelessWidget {
                           avatarUrl: profile.avatarUrl,
                           fallbackUrl: profile.fallbackPhotoUrl,
                           size: 50,
+                          popular: profile.isPro || profile.isPlus,
                           // Le drapeau du pays, à la place de la pastille.
                           flagIso: profileFlagIso(
                             country: profile.country,
@@ -2270,6 +2271,7 @@ class _SearchResultRow extends StatelessWidget {
               avatarUrl: profile.avatarUrl,
               fallbackUrl: profile.fallbackPhotoUrl,
               size: 46,
+              popular: profile.isPro || profile.isPlus,
               flagIso: profileFlagIso(
                 country: profile.country,
                 language: profile.language,

@@ -182,6 +182,7 @@ class _SwaycoDirectMessageSheetState extends State<SwaycoDirectMessageSheet> {
                           avatarUrl: widget.peer?.avatarUrl,
                           fallbackUrl: widget.peer?.fallbackPhotoUrl,
                           size: 24,
+                          popular: (widget.peer?.isPro ?? false) || (widget.peer?.isPlus ?? false),
                         ),
                         const SizedBox(width: 8),
                         Text(
