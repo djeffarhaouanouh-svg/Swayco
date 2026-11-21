@@ -103,8 +103,13 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
               if (m.id != optimistic.id) m,
           ]);
       _ctrl.text = text;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+      // Limite de 5 messages par jour (déclencheur en base, migration 0095).
+      final limited = e.toString().contains('official_rate_limited');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          limited ? AppStrings.t('official_limit') : friendlyError(e),
+        ),
+      ));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
