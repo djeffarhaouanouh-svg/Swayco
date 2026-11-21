@@ -128,6 +128,7 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
           opacity: anim,
           child: SizeTransition(
             axis: Axis.horizontal,
+            clipBehavior: Clip.none,
             sizeFactor: anim,
             child: _slot(gone),
           ),
@@ -250,7 +251,7 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
           )
         else
         SizedBox(
-          height: _kBubble + 6 + 16 + 20,
+          height: _kBubble + 12 + 6 + 16 + 14,
           child: AnimatedList(
             key: _listKey,
             scrollDirection: Axis.horizontal,
@@ -269,6 +270,7 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
                   ),
                   child: SizeTransition(
                     axis: Axis.horizontal,
+                    clipBehavior: Clip.none,
                     sizeFactor: CurvedAnimation(
                       parent: anim,
                       curve: Curves.easeOutCubic,
@@ -318,7 +320,8 @@ class _Bubble extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 4),
+            // De la place au-dessus de la photo pour les badges (appel / écrit).
+            const SizedBox(height: 12),
             ValueListenableBuilder<int>(
               valueListenable: ActivitySignal.revision,
               builder: (_, _, _) => BubbleFace(
