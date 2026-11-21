@@ -727,6 +727,60 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
     );
     if (mounted) _reload(silent: true);
+    _showLeftBanner();
+  }
+
+  /// 3c — après avoir quitté un groupe : la pastille « Tu as quitté {nom} »
+  /// en bas de la liste, qui s'efface seule au bout de ~3 s.
+  void _showLeftBanner() {
+    final name = GroupApi.justLeftName;
+    GroupApi.justLeftName = '';
+    if (name.isEmpty || !mounted) return;
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return;
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) => Positioned(
+        left: 16,
+        right: 16,
+        bottom: 40 + MediaQuery.paddingOf(ctx).bottom,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            height: 56,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1C1C1C),
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded,
+                    size: 22, color: Color(0xFFF4FF1F)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    AppStrings.t('group_left_toast', args: {'name': name}),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(entry);
+    Timer(const Duration(seconds: 3), () {
+      if (entry.mounted) entry.remove();
+    });
   }
 
   Future<void> _openOfficial() async {
@@ -3160,9 +3214,7 @@ class _NoFriendsEmpty extends StatelessWidget {
 
 /// L'entrée d'une ligne de la liste Messages (fondu + montée, en cascade).
 ///
-/// Sur le WEB elle est supprimée : la liste s'y recharge à chaque retour sur
-/// l'onglet, et revoir toutes les lignes se rejouer à chaque fois était pénible.
-/// Sur téléphone, l'animation reste.
+/// Identique sur le web et sur téléphone (l'animation en ligne est remise).
 class _RowEntrance extends StatelessWidget {
   const _RowEntrance({super.key, this.delay = Duration.zero, required this.child});
 
@@ -3171,5 +3223,5 @@ class _RowEntrance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      kIsWeb ? child : FadeSlideIn(delay: delay, child: child);
+      FadeSlideIn(delay: delay, child: child);
 }

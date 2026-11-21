@@ -150,6 +150,10 @@ class ChatMessage {
   /// True when this message references a Discover photo (reaction / intro).
   bool get hasDiscoverPhoto => discoverPhoto.isNotEmpty;
 
+  /// La ligne système « X a quitté le groupe » (corps `group_left`, écrite au
+  /// nom de celui qui part). Ni bulle, ni traduction, ni réponse, ni push.
+  bool get isGroupLeft => body == 'group_left';
+
   /// Une carte question du quiz (`quiz|<thème>|<n>`).
   bool get isQuizQuestion => body.startsWith('quiz|');
 

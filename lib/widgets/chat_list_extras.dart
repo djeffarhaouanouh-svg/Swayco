@@ -115,6 +115,9 @@ class GroupChatRow extends StatelessWidget {
     String preview;
     if (m == null) {
       preview = AppStrings.t('group_empty_preview');
+    } else if (m.isGroupLeft) {
+      final first = m.senderName.trim().split(RegExp(r'\s+')).first;
+      preview = AppStrings.t('group_member_left', args: {'name': first});
     } else if (m.isDeleted) {
       preview = AppStrings.t('chat_preview_deleted_peer');
     } else if (m.isVideo) {
@@ -126,7 +129,9 @@ class GroupChatRow extends StatelessWidget {
     } else {
       preview = m.body;
     }
-    if (m != null && lastAuthor.isNotEmpty) preview = '$lastAuthor : $preview';
+    if (m != null && !m.isGroupLeft && lastAuthor.isNotEmpty) {
+      preview = '$lastAuthor : $preview';
+    }
     return Material(
       color: Colors.transparent,
       child: InkWell(

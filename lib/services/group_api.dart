@@ -69,6 +69,10 @@ bool isGroupConversation(String conversationId) =>
 abstract final class GroupApi {
   static SupabaseClient get _client => Supabase.instance.client;
 
+  /// Le nom du groupe que je viens de QUITTER, le temps que la liste Messages
+  /// affiche la bannière « Tu as quitté … » (puis elle le vide).
+  static String justLeftName = '';
+
   /// Mes groupes, avec leurs membres. Vide si la table n'est pas migrée.
   static Future<List<ChatGroup>> fetchMine(String meId) async {
     if (meId.isEmpty) return const [];

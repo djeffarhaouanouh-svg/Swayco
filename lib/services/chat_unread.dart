@@ -285,7 +285,11 @@ abstract final class ChatUnread {
     // Les miens ne sont jamais « non lus ».
     final rows = [
       for (final r in all)
-        if ((r['sender'] ?? r['sender_id'])?.toString() != _meId) r,
+        // Les miens, et la ligne « X a quitté le groupe » (pas une vraie
+        // nouvelle : ni bandeau ni pastille), ne comptent pas.
+        if ((r['sender'] ?? r['sender_id'])?.toString() != _meId &&
+            r['body']?.toString() != 'group_left')
+          r,
     ];
     final previous = {for (final r in _groupRows) r['id']?.toString() ?? ''};
     final skip = !_groupPrimed;

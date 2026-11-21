@@ -979,7 +979,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
 
   void _maybeFetchTranslation(ChatMessage m) {
     if (!_autoTranslate || _myLang.isEmpty) return;
-    if (m.isDeleted || m.isQuiz) return;
+    if (m.isDeleted || m.isQuiz || m.isGroupLeft) return;
     final id = _tKey(m);
     if (m.id.isEmpty) return;
     // Pas de texte (un vocal pas encore transcrit, une image) : rien à traduire.
@@ -1234,6 +1234,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         if (!mounted) return;
         if (_messagesLoaded) {
           final known = _messages.map((x) => x.id).toSet();
+          // Un membre vient de partir : le compteur et la mosaïque se
+          // recalculent tout de suite.
+          if (_isGroup &&
+              rows.any((x) => x.isGroupLeft && !known.contains(x.id))) {
+            unawaited(_refreshGroup());
+          }
           final incoming = rows.any(
             (x) => x.id.isNotEmpty && x.senderId != _myId && !known.contains(x.id),
           );
@@ -2470,6 +2476,15 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         items.add(_ThreadListItem.day(day));
         lastDay = day;
       }
+      if (m.isGroupLeft) {
+        // « Lucas a quitté le groupe » : une ligne système, pas une bulle.
+        final first = m.senderName.trim().split(RegExp(r'\s+')).first;
+        items.add(_ThreadListItem.system(
+          AppStrings.t('group_member_left', args: {'name': first}),
+          left: true,
+        ));
+        continue;
+      }
       items.add(_ThreadListItem.message(m));
     }
     // Les messages déjà là à l'ouverture ne s'animent pas (une seule fois).
@@ -2558,7 +2573,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           i -= 1;
         }
         final item = items[items.length - 1 - i];
-        if (item.system != null) return _GroupSystemLine(text: item.system!);
+        if (item.system != null) {
+          return _GroupSystemLine(text: item.system!, left: item.left);
+        }
         if (item.isDay) {
           return _DaySeparator(day: item.day!);
         }
@@ -2884,12 +2901,47 @@ class _SelectTextSheetState extends State<_SelectTextSheet> {
 
 /// « Tu as créé le groupe » : une ligne mono centrée, au tout début du fil.
 class _GroupSystemLine extends StatelessWidget {
-  const _GroupSystemLine({required this.text});
+  const _GroupSystemLine({required this.text, this.left = false});
 
   final String text;
 
+  /// Vrai pour « X a quitté le groupe » : pastille avec l'icône de sortie.
+  final bool left;
+
   @override
   Widget build(BuildContext context) {
+    if (left) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.logout_rounded,
+                    size: 16, color: SC.fg.withValues(alpha: 0.65)),
+                const SizedBox(width: 7),
+                Flexible(
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      color: SC.fg.withValues(alpha: 0.65),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Center(
@@ -2907,16 +2959,17 @@ class _GroupSystemLine extends StatelessWidget {
 
 /// One row of the thread list: either a day label or a message bubble.
 class _ThreadListItem {
-  const _ThreadListItem._({this.day, this.message, this.system});
+  const _ThreadListItem._({this.day, this.message, this.system, this.left = false});
 
   factory _ThreadListItem.day(DateTime day) => _ThreadListItem._(day: day);
   factory _ThreadListItem.message(ChatMessage m) =>
       _ThreadListItem._(message: m);
 
   /// Une ligne système centrée (« Tu as créé le groupe »).
-  factory _ThreadListItem.system(String text) =>
-      _ThreadListItem._(system: text);
+  factory _ThreadListItem.system(String text, {bool left = false}) =>
+      _ThreadListItem._(system: text, left: left);
 
+  final bool left;
   final DateTime? day;
   final ChatMessage? message;
   final String? system;

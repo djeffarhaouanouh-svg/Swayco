@@ -575,16 +575,122 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     } catch (_) {}
   }
 
-  Future<void> _leave() async {
-    final ok = await _confirm(
-      title: AppStrings.t('group_leave_q'),
-      body: AppStrings.t('group_leave_body'),
-      confirmLabel: AppStrings.t('group_leave'),
+  /// 3a — « Quitter le groupe ? » : la fenêtre du handoff « Quitter un groupe »
+  /// (pastille logout rouge, texte avec le nom du groupe, « Rester dans le
+  /// groupe » en jaune, « Quitter » en contour rouge). Rend vrai pour quitter.
+  Future<bool> _confirmLeave() async {
+    final res = await showDialog<bool>(
+      context: context,
+      barrierColor: const Color(0xB3040A1E),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(22, 26, 22, 22),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1A2040), Color(0xFF16161E)],
+            ),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x99000000),
+                blurRadius: 60,
+                offset: Offset(0, 30),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: _kRed.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.logout_rounded,
+                    size: 26, color: _kRedText),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                AppStrings.t('group_leave_q'),
+                textAlign: TextAlign.center,
+                style: _unbounded(20).copyWith(height: 1.2),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                AppStrings.t('group_leave_body2', args: {'name': _group.name}),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _kText.withValues(alpha: 0.7),
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 20),
+              // L'action principale : rester.
+              GestureDetector(
+                onTap: () => Navigator.of(ctx).pop(false),
+                child: Container(
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _kYellow,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    AppStrings.t('group_stay'),
+                    style: const TextStyle(
+                      color: _kNavy,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: () => Navigator.of(ctx).pop(true),
+                child: Container(
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(
+                        color: _kRed.withValues(alpha: 0.55), width: 1.2),
+                  ),
+                  child: Text(
+                    AppStrings.t('group_leave_btn'),
+                    style: const TextStyle(
+                      color: _kRedText,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
+    return res == true;
+  }
+
+  Future<void> _leave() async {
+    final ok = await _confirmLeave();
     if (!ok) return;
     try {
+      final name = _group.name;
       await GroupApi.leave(_group.id);
       Analytics.track('group_left');
+      // La liste Messages affichera « Tu as quitté <nom> » en revenant.
+      GroupApi.justLeftName = name;
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
@@ -593,7 +699,6 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       }
     }
   }
-
   /// 2c — la confirmation : avatar + pastille rouge ✕, titre, texte, bouton
   /// rouge et « Annuler ». [face] = la personne concernée (retrait), sinon
   /// une confirmation simple sans visage.
