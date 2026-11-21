@@ -503,21 +503,6 @@ class BubbleFace extends StatelessWidget {
                 ),
               ),
             ),
-          // Le point vert : cette personne est en ligne.
-          if (isPeerOnline(profile))
-            Positioned(
-              right: 1,
-              top: 1,
-              child: Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: SC.online,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: SC.bg, width: 2.5),
-                ),
-              ),
-            ),
           if (activity != null)
             Positioned(
               left: activity == PeerActivity.typing ? -2 : -4,
