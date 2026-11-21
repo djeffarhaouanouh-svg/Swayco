@@ -22,7 +22,7 @@ enum PeerActivity { call, typing, discover }
 /// • Une annonce sans nouvelles pendant [_expiry] s'éteint toute seule.
 /// • Confidentialité : qui masque son statut (`hideOnlineLocal`) ne publie rien et
 ///   ne voit rien (réciprocité, comme `isPeerOnline`).
-/// • « Écrit » n'est visible que par la personne à qui l'on écrit.
+/// • « Écrit » est visible de tous mes amis, peu importe à qui l'on écrit.
 abstract final class ActivitySignal {
   static const _heartbeat = Duration(seconds: 3);
   static const _expiry = Duration(seconds: 8);
@@ -136,15 +136,16 @@ abstract final class ActivitySignal {
     }
   }
 
-  /// Ce que fait [peerId] — ou null. [meId] : « écrit » ne se voit que si c'est à
-  /// moi que la personne écrit.
+  /// Ce que fait [peerId] — ou null. [meId] n'est plus utilisé pour « écrit » :
+  /// on voit qu'une personne écrit, peu importe à qui.
   static PeerActivity? of(String peerId, String meId) {
     if (AppSettings.hideOnlineLocal.value) return null;
     final e = _peers[peerId];
     if (e == null) return null;
     if (DateTime.now().difference(e.at) > _expiry) return null;
     if (e.call) return PeerActivity.call;
-    if (e.typingTo.isNotEmpty && e.typingTo == meId) return PeerActivity.typing;
+    // « Écrit » se voit peu importe à qui la personne écrit.
+    if (e.typingTo.isNotEmpty) return PeerActivity.typing;
     if (e.discover) return PeerActivity.discover;
     return null;
   }
