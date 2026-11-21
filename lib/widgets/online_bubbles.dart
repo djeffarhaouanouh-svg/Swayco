@@ -13,7 +13,7 @@ import '../services/presence_service.dart';
 import '../services/profile_api.dart';
 import '../theme/swayco_theme.dart';
 import 'popup_kit.dart' show popupDisplay;
-import 'profile_avatar.dart' show profileFlagIso;
+import 'profile_avatar.dart' show ProfileAvatar, profileFlagIso;
 
 // Handoff « messages_bulles » : la rangée « Friends » de la page Messages (les
 // amis EN LIGNE), les états d'activité sur la bulle et le menu d'appui long.
@@ -390,15 +390,16 @@ class BubbleFace extends StatelessWidget {
       language: profile.language,
     );
     final popular = profile.isPro || profile.isPlus;
-    Widget photo() => url.isEmpty
-        ? const ColoredBox(color: Color(0xFF3A3A40))
-        : Image.network(
-            url,
-            fit: BoxFit.cover,
-            alignment: const Alignment(0, -0.5),
-            errorBuilder: (_, _, _) =>
-                const ColoredBox(color: Color(0xFF3A3A40)),
-          );
+    // La photo, ou à défaut la lettre du prénom sur une couleur (comme partout
+    // ailleurs dans l'app) : jamais un rond gris vide.
+    Widget photo({double size = _kBubble}) => ProfileAvatar(
+          displayName: profile.displayName.isNotEmpty
+              ? profile.displayName
+              : profile.handle,
+          avatarUrl: profile.avatarUrl,
+          fallbackUrl: profile.fallbackPhotoUrl,
+          size: size,
+        );
     return SizedBox(
       width: _kBubble,
       height: _kBubble,
@@ -423,7 +424,7 @@ class BubbleFace extends StatelessWidget {
                   ),
                 ],
               ),
-              child: ClipOval(child: photo()),
+              child: ClipOval(child: photo(size: _kBubble * 0.82)),
             )
           else
             Container(
