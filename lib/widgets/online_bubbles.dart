@@ -389,7 +389,7 @@ class _LocalClockState extends State<_LocalClock> {
         label,
         maxLines: 1,
         style: GoogleFonts.ibmPlexMono(
-          fontSize: 10.5,
+          fontSize: 9.5,
           color: SC.fg.withValues(alpha: 0.65),
         ),
       ),
