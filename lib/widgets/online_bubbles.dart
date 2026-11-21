@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -302,13 +303,6 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // L'heure locale seulement pour ceux vus dans les dernières 24 h.
-    final seen = profile.lastSeen;
-    final recent = seen != null &&
-        DateTime.now().difference(seen) < const Duration(hours: 24);
-    final clock = recent
-        ? resolvePeerLocalTime(city: profile.city, country: profile.country)
-        : null;
     final photoKey = GlobalKey();
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -334,19 +328,59 @@ class _Bubble extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            SizedBox(
-              height: 16,
-              child: Text(
-                clock?.hhmm ?? '',
-                maxLines: 1,
-                style: GoogleFonts.ibmPlexMono(
-                  fontSize: 11,
-                  color: SC.fg.withValues(alpha: 0.65),
-                ),
-              ),
-            ),
+            SizedBox(height: 16, child: _LocalClock(profile: profile)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// L'heure locale de l'ami sous sa bulle, seulement s'il a été vu dans les 24
+/// dernières heures. Elle se met à jour TOUTE SEULE (toutes les 15 s) : avant,
+/// elle ne se recalculait que quand la page se redessinait, et restait figée.
+class _LocalClock extends StatefulWidget {
+  const _LocalClock({required this.profile});
+
+  final RemoteProfile profile;
+
+  @override
+  State<_LocalClock> createState() => _LocalClockState();
+}
+
+class _LocalClockState extends State<_LocalClock> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => mounted ? setState(() {}) : null,
+    );
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.profile;
+    final seen = p.lastSeen;
+    final recent = seen != null &&
+        DateTime.now().difference(seen) < const Duration(hours: 24);
+    final clock = recent
+        ? resolvePeerLocalTime(city: p.city, country: p.country)
+        : null;
+    return Text(
+      clock?.hhmm ?? '',
+      maxLines: 1,
+      style: GoogleFonts.ibmPlexMono(
+        fontSize: 11,
+        color: SC.fg.withValues(alpha: 0.65),
       ),
     );
   }
@@ -370,9 +404,6 @@ class BubbleFace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final url = profile.avatarUrl.isNotEmpty
-        ? profile.avatarUrl
-        : profile.fallbackPhotoUrl;
     final iso = profileFlagIso(
       country: profile.country,
       language: profile.language,
