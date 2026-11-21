@@ -17,6 +17,7 @@ import '../services/analytics.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
+import '../services/activity_signal.dart';
 import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
@@ -24,6 +25,7 @@ import '../services/debug_overlay.dart';
 import '../services/device_id.dart';
 import '../services/last_interaction.dart';
 import '../services/muted_calls.dart';
+import '../widgets/online_bubbles.dart';
 import '../services/friendship_api.dart';
 import '../services/guest_invite_api.dart';
 import '../services/nav_tab.dart';
@@ -196,6 +198,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // immediately, without waiting for the 7 s poll.
     AppSettings.hideOnlineLocal.addListener(_onHideOnlineChanged);
     NavTab.index.addListener(_onNavTabChanged);
+    ActivitySignal.setWatching(NavTab.index.value == NavTab.chat);
     // A thread can be marked read from OUTSIDE this list's own _openThread
     // (a push-notification tap pushes ChatThreadScreen straight from
     // RootShell) — repaint the rows whenever ChatUnread's read pointer
@@ -217,7 +220,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // Sur le web, le rechargement complet ci-dessus s'en charge déjà.
     if (!kIsWeb) {
       _presenceTimer = AppPoll.every(
-        const Duration(seconds: 30),
+        // Plus court : une personne qui se connecte doit apparaître vite dans la
+        // rangée « Friends ».
+        const Duration(seconds: 15),
         _refreshPresence,
       );
     }
@@ -242,6 +247,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     AppSettings.hideOnlineLocal.removeListener(_onHideOnlineChanged);
     NavTab.index.removeListener(_onNavTabChanged);
+    ActivitySignal.setWatching(false);
     ChatUnread.revision.removeListener(_onUnreadRevisionChanged);
     ChatUnread.newInbound.removeListener(_onNewInbound);
     _pollTimer?.cancel();
@@ -351,6 +357,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   void _onNavTabChanged() {
     if (!mounted) return;
+    // Le signal d'activité n'est écouté que page Messages sous les yeux.
+    ActivitySignal.setWatching(NavTab.index.value == NavTab.chat);
     if (NavTab.index.value == NavTab.chat) {
       // This screen lives in an IndexedStack, so it is built once at launch.
       // Without this, a match made while the user was on Discover only shows
@@ -875,6 +883,49 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       }
     }
     _reload(silent: true);
+  }
+
+  /// Appel depuis le menu d'une bulle (même chemin que le bouton du fil).
+  void _callPeer(RemoteProfile peer) {
+    CallLauncher.startCall(
+      context,
+      peerDeviceId: peer.id,
+      translation: widget.translation,
+      startWithCamera: true,
+    );
+  }
+
+  /// « Bloquer ou signaler » : le choix, puis les écrans existants.
+  Future<void> _blockOrReport(RemoteProfile peer) async {
+    final pick = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: SC.menu,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.block, color: Color(0xFFE53935)),
+              title: Text(AppStrings.t('block'),
+                  style: TextStyle(color: SC.textPrimary)),
+              onTap: () => Navigator.of(ctx).pop('block'),
+            ),
+            ListTile(
+              leading: Icon(Icons.flag_outlined, color: SC.textPrimary),
+              title: Text(AppStrings.t('report'),
+                  style: TextStyle(color: SC.textPrimary)),
+              onTap: () => Navigator.of(ctx).pop('report'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || pick == null) return;
+    if (pick == 'block') await _blockPeer(peer);
+    if (pick == 'report') await _reportPeer(peer);
   }
 
   void _viewProfile(RemoteProfile peer) {
@@ -1408,7 +1459,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                                      // Messages speciaux recus : section a part, en tete.
+                      // « Friends » : les amis en ligne, en bulles (appui long = menu).
+                      OnlineBubblesRow(
+                        friends: _friends,
+                        myId: _myId,
+                        onMessage: _openThread,
+                        onCall: _callPeer,
+                        onProfile: _viewProfile,
+                        onToggleMute: (p) => MutedCalls.setMuted(
+                          p.id,
+                          !MutedCalls.ids.value.contains(p.id),
+                        ),
+                        onBlockReport: _blockOrReport,
+                      ),
+                      // Messages speciaux recus : section a part, en tete.
                       if (_friends.any(_isSpecialPending)) ...[
                         _SectionHeader(
                           label: AppStrings.t('special_section'),

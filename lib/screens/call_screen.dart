@@ -23,6 +23,7 @@ import '../config/app_config.dart';
 import '../services/analytics.dart';
 import '../services/attribution.dart';
 import '../services/app_strings.dart';
+import '../services/activity_signal.dart';
 import '../services/swayco_sounds.dart';
 import '../services/auth_service.dart';
 import '../services/egress_api.dart';
@@ -2035,6 +2036,7 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void initState() {
     super.initState();
+    ActivitySignal.setCall(true);
     widget.translation.localTranscript?.addListener(_onMyTranscript);
     Analytics.track('screen_view', props: {'screen': 'live'});
     // Zone messages : côté choisi, démonstration déjà vue, repli de la saisie.
@@ -3678,6 +3680,7 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    ActivitySignal.setCall(false);
     SwaycoSounds.callActive = false;
     widget.translation.localTranscript?.removeListener(_onMyTranscript);
     AsrService.osRefusedKey.removeListener(_onSttRefused);

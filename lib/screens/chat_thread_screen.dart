@@ -15,6 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
+import '../services/activity_signal.dart';
 import '../services/swayco_sounds.dart';
 import '../services/block_api.dart';
 import '../services/call_launcher.dart';
@@ -1473,6 +1474,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _reactionSub?.cancel();
     _peerReadSub?.cancel();
     _typing?.dispose();
+    if (!_isGroup) ActivitySignal.setTypingTo('');
     WidgetsBinding.instance.removeObserver(this);
     _catchUpTimer?.cancel();
     _nativePollTimer?.cancel();
@@ -2273,7 +2275,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             quizActive: _quizActive || _quizBusy,
                             onSendVoice: _sendVoice,
                             autoTranslate: _autoTranslate,
-                            onTypingChanged: (t) => _typing?.setTyping(t),
+                            onTypingChanged: (t) {
+                              _typing?.setTyping(t);
+                              if (!_isGroup) {
+                                ActivitySignal.setTypingTo(
+                                    t ? widget.peerDeviceId : '');
+                              }
+                            },
                             myLang: _myLang,
                             peerLang: _peer?.language ?? '',
                             peerFirstName: _isGroup ? '' : _peerFirstName,

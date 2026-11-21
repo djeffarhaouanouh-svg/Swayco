@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Swayco — Messages : rangée de bulles</title>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&amp;display=block" rel="stylesheet">
+<style>html,body{margin:0;background:#E4E2DD}*{box-sizing:border-box}a{color:#04123A}a:hover{color:#1F5EFF}</style>
+</helmet>
+<section style="display:flex;flex-direction:column;gap:32px;padding:64px;width:1480px;font-family:'Plus Jakarta Sans',sans-serif;color:#04123A">
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:1px;color:#555">MESSAGES · RANGÉE DE BULLES</span><span style="font-family:'Unbounded',sans-serif;font-weight:800;font-size:30px;letter-spacing:-.03em;line-height:1.1">Trois usages pour la rangée du haut.</span></div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<sc-for list="{{ screens }}" as="s" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:12px;width:390px"><span style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:12px;background:#F4FF1F;color:#04123A;padding:5px 11px;border-radius:99px">{{ s.tag }}</span>
+<div style="position:relative;width:390px;height:844px;border-radius:52px;border:10px solid #000;overflow:hidden;background:#0E0E0E;color:#F5F7FF">
+<div style="height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 26px;font-size:14px;font-weight:700"><span>9:41</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px">●●● ▮</span></div>
+<div style="padding:8px 18px 0;display:flex;align-items:center;gap:8px"><span style="flex:1;font-family:'Unbounded';font-weight:800;font-size:22px;letter-spacing:-.03em">Messages</span><span style="width:40px;height:40px;border-radius:99px;background:#2B2B2B;border:1.2px solid rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#fff">search</span></span></div>
+<div style="padding:18px 18px 8px;display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1.4px;color:rgba(245,247,255,.65)">{{ s.label }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#F4FF1F">{{ s.count }}</span></div>
+<div style="display:flex;gap:10px;padding:0 18px;overflow:hidden">
+<sc-for list="{{ s.items }}" as="b" hint-placeholder-count="5">
+<div style="flex:none;width:58px;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="position:relative;width:58px;height:58px;display:block"><span style="position:absolute;inset:0;border-radius:99px;padding:2.5px;background:{{ b.ring }};display:flex"><span style="flex:1;border-radius:99px;border:2.5px solid #0E0E0E;background:#3A3A40 url({{ b.img }}) 50% 25%/cover"></span></span><span style="position:absolute;right:-4px;bottom:-3px;width:24px;height:24px;border-radius:50%;overflow:hidden;border:2px solid #0E0E0E;background:#161D30 url({{ b.flag }}) 50% 50%/cover"></span><sc-if value="{{ b.isCall }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:-4px;top:-3px;width:24px;height:24px;border-radius:50%;background:#F4FF1F;border:2px solid #0E0E0E;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:14px;line-height:1;color:#04123A">call</span></span></sc-if><sc-if value="{{ b.isEye }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:-4px;top:-3px;width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#1F5EFF,#18DDEA);border:2px solid #0E0E0E;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:14px;line-height:1;color:#fff">visibility</span></span></sc-if><sc-if value="{{ b.isTyping }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:-6px;top:-8px;height:22px;padding:0 8px;border-radius:99px;background:#fff;border:2px solid #0E0E0E;display:flex;gap:3px;align-items:center"><span style="width:4px;height:4px;border-radius:99px;background:#04123A"></span><span style="width:4px;height:4px;border-radius:99px;background:#04123A;opacity:.6"></span><span style="width:4px;height:4px;border-radius:99px;background:#04123A;opacity:.3"></span></span></sc-if></span><sc-if value="{{ b.hasLast }}" hint-placeholder-val="{{ false }}"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:rgba(245,247,255,.65);white-space:nowrap">{{ b.last }}</span></sc-if></div>
+</sc-for></div>
+<div style="padding:20px 18px 4px;font-size:13px;font-weight:700;color:rgba(245,247,255,.7)">Messages</div>
+<div style="display:flex;gap:12px;align-items:center;padding:10px 18px"><span style="flex:none;width:50px;height:50px;border-radius:99px;background:#3A3A40 url(assets/face_homme1.png) 50% 25%/cover"></span><div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0"><strong style="font-size:15px">Lucas</strong><span style="font-size:13px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Viens au carnaval l'an prochain !</span></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#F4FF1F">10:02</span><span style="width:10px;height:10px;border-radius:99px;background:#F4FF1F"></span></div></div>
+<div style="display:flex;gap:12px;align-items:center;padding:10px 18px"><span style="flex:none;width:50px;height:50px;border-radius:99px;background:#3A3A40 url(assets/face_alice.png) 50% 25%/cover"></span><div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0"><strong style="font-size:15px">Alice</strong><span style="font-size:13px;color:rgba(245,247,255,.6);white-space:nowrap">À demain !</span></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(245,247,255,.5)">Hier</span></div>
+<div style="display:flex;gap:12px;align-items:center;padding:10px 18px"><span style="flex:none;width:50px;height:50px;border-radius:99px;background:#3A3A40 url(assets/face_lenny.png) 50% 25%/cover"></span><div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0"><strong style="font-size:15px">Lenny</strong><span style="font-size:13px;color:rgba(245,247,255,.6);white-space:nowrap">Merci pour hier 😄</span></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(245,247,255,.5)">Mar</span></div>
+</div></div>
+</sc-for>
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const B = 'transparent', Y = '#F4FF1F', W = 'rgba(255,255,255,.28)';
+    const f = c => 'https://flagcdn.com/w80/' + c + '.png';
+    const mk = (img, flag, name, sub, ring, subColor, st, last) => ({ img, flag: f(flag), name, sub: st === 'call' ? 'En appel' : st === 'typing' ? 'écrit…' : st === 'eye' ? 'sur Discover' : sub, ring, subColor: st ? '#F4FF1F' : subColor, isCall: st === 'call', last, hasLast: !!last, isTyping: st === 'typing', isEye: st === 'eye' });
+    const aiko = 'uploads/0005_japanese.jpg', lou = 'uploads/40ce19fb57c1d239c823f417e96b517c.jpg';
+    return { screens: [
+      { tag: '1 · Nouveaux matchs', label: 'NOUVEAUX MATCHS', count: '4', items: [
+        mk('assets/face_claire.png', 'br', 'Claire', 'il y a 5 min', B, 'rgba(245,247,255,.65)'),
+        mk(aiko, 'jp', 'Aiko', 'il y a 1 h', B, 'rgba(245,247,255,.65)'),
+        mk('assets/face_homme2.png', 'se', 'Erik', 'il y a 2 h', B, 'rgba(245,247,255,.65)'),
+        mk(lou, 'es', 'Lou', 'hier', B, 'rgba(245,247,255,.65)') ] },
+      { tag: '2 · Éveillés maintenant', label: 'ÉVEILLÉS MAINTENANT', count: '5', items: [
+        mk(aiko, 'jp', 'Aiko', '22:40', B, 'rgba(245,247,255,.65)', 'call'),
+        mk('assets/face_claire.png', 'br', 'Claire', '18:40', B, 'rgba(245,247,255,.65)', 'typing'),
+        mk(lou, 'es', 'Lou', '14:40', B, 'rgba(245,247,255,.65)', 'eye'),
+        mk('assets/face_homme2.png', 'se', 'Erik', '14:40', B, 'rgba(245,247,255,.65)'),
+        mk('assets/face_man1.png', 'mx', 'Diego', '07:40', B, 'rgba(245,247,255,.65)') ] },
+      { tag: '4 · Favoris', label: 'FAVORIS', count: '', items: [
+        mk('assets/face_homme1.png', 'fr', 'Lucas', '', W, W, 'typing'),
+        mk('assets/face_alice.png', 'br', 'Alice', '', W, W, '', '20 min'),
+        mk('assets/face_lenny.png', 'fr', 'Lenny', '', W, W, 'call'),
+        mk(aiko, 'jp', 'Aiko', '', W, W, 'eye') ] }
+    ] };
+  }
+}
+</script>
+</body>
+</html>
