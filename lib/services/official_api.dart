@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -32,7 +34,8 @@ class OfficialPost {
   static OfficialPost? fromRow(Map<String, dynamic> m, {bool mine = false}) {
     final body = m['body']?.toString() ?? '';
     final at = DateTime.tryParse(m['created_at']?.toString() ?? '');
-    if (body.isEmpty || at == null) return null;
+    final media = m['media_url']?.toString() ?? '';
+    if ((body.isEmpty && media.isEmpty) || at == null) return null;
     return OfficialPost(
       id: m['id']?.toString() ?? '',
       title: m['title']?.toString() ?? '',
@@ -109,6 +112,38 @@ abstract final class OfficialApi {
       'user_name': name,
       'body': body,
     });
+  }
+
+  /// Envoie une PHOTO ou une VIDÉO à l'équipe (pas de GIF) : le fichier part dans
+  /// le stockage (vatars/team/<moi>/…), son URL publique dans media_url. Compte
+  /// dans la limite de 3 messages par jour, comme le texte. Renvoie l'URL.
+  static Future<String> sendMedia({
+    required String meId,
+    required String name,
+    required Uint8List bytes,
+    required String extension,
+    required String contentType,
+    String caption = '',
+  }) async {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final path = 'team/$meId/$stamp.$extension';
+    await _client.storage.from('avatars').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            upsert: true,
+            contentType: contentType,
+            cacheControl: '3600',
+          ),
+        );
+    final url = _client.storage.from('avatars').getPublicUrl(path);
+    await _client.from('official_messages').insert({
+      'user_id': meId,
+      'user_name': name,
+      'body': caption,
+      'media_url': url,
+    });
+    return url;
   }
 
   static Future<DateTime?> seenAt() async {

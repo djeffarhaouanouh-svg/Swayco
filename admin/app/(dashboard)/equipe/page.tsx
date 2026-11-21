@@ -11,6 +11,7 @@ type Msg = {
   user_id: string;
   user_name: string | null;
   body: string;
+  media_url: string | null;
   created_at: string;
 };
 
@@ -39,7 +40,7 @@ export default async function EquipePage() {
 
   const { data, error } = await svc
     .from("official_messages")
-    .select("id, user_id, user_name, body, created_at")
+    .select("id, user_id, user_name, body, media_url, created_at")
     .order("created_at", { ascending: false })
     .limit(500);
   const missingTable = Boolean(error);
@@ -92,7 +93,7 @@ export default async function EquipePage() {
       {missingTable ? (
         <p className="rounded-2xl bg-[rgba(209,43,43,.08)] px-4 py-3 text-sm font-semibold text-sc-danger">
           La table official_messages n&apos;existe pas encore : applique la
-          migration 0088.
+          migration 0088 (et 0096 pour les photos / vidéos).
         </p>
       ) : null}
 
@@ -151,9 +152,28 @@ export default async function EquipePage() {
                       <div className="text-[12px] text-sc-text-muted">
                         {fmt(m.created_at)}
                       </div>
-                      <div className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
-                        {m.body}
-                      </div>
+                      {m.body ? (
+                        <div className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
+                          {m.body}
+                        </div>
+                      ) : null}
+                      {m.media_url ? (
+                        /\.(mp4|mov)(\?|$)/i.test(m.media_url) ? (
+                          <video
+                            src={m.media_url}
+                            controls
+                            preload="metadata"
+                            className="mt-2 max-h-[360px] rounded-xl"
+                          />
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={m.media_url}
+                            alt="Photo envoyée à la team"
+                            className="mt-2 max-h-[360px] rounded-xl border border-sc-line"
+                          />
+                        )
+                      ) : null}
                     </div>
                   ))}
                 </div>

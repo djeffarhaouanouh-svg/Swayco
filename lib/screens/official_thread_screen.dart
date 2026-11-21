@@ -1,12 +1,14 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
 import '../services/call_launcher.dart';
-import '../services/chat_api.dart' show isVideoUrl;
+import '../services/chat_api.dart' show ChatApi, isVideoUrl;
 import '../services/device_id.dart';
 import '../services/friendly_error.dart';
 import '../services/official_api.dart';
@@ -104,6 +106,90 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
           ]);
       _ctrl.text = text;
       // Limite de 5 messages par jour (déclencheur en base, migration 0095).
+      final limited = e.toString().contains('official_rate_limited');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          limited ? AppStrings.t('official_limit') : friendlyError(e),
+        ),
+      ));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  /// Une PHOTO ou une VIDÉO pour l'équipe (pas de GIF). Elle part tout de suite et
+  /// compte dans la limite de 3 messages par jour.
+  Future<void> _attach() async {
+    if (_sending || _myId.isEmpty) return;
+    final XFile? file;
+    try {
+      file = await ImagePicker().pickMedia(
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+    } catch (_) {
+      return;
+    }
+    if (file == null) return;
+    final lower = file.name.toLowerCase();
+    final isGif = lower.endsWith('.gif');
+    if (isGif) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.t('official_no_gif'))),
+        );
+      }
+      return;
+    }
+    final isVideo = (file.mimeType ?? '').startsWith('video/') ||
+        isVideoUrl(file.name);
+    if (isVideo && await file.length() > ChatApi.maxVideoBytes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.t('chat_video_too_big'))),
+        );
+      }
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      final Uint8List bytes = await file.readAsBytes();
+      final String ext;
+      final String type;
+      if (isVideo) {
+        final mov = lower.endsWith('.mov');
+        ext = mov ? 'mov' : 'mp4';
+        type = mov ? 'video/quicktime' : 'video/mp4';
+      } else if (lower.endsWith('.png')) {
+        ext = 'png';
+        type = 'image/png';
+      } else {
+        ext = 'jpg';
+        type = 'image/jpeg';
+      }
+      final url = await OfficialApi.sendMedia(
+        meId: _myId,
+        name: _myName,
+        bytes: bytes,
+        extension: ext,
+        contentType: type,
+      );
+      Analytics.track('official_message_sent', props: {'type': isVideo ? 'video' : 'photo'});
+      if (!mounted) return;
+      setState(() => _mine = [
+            ..._mine,
+            OfficialPost(
+              id: 'local-${DateTime.now().microsecondsSinceEpoch}',
+              title: '',
+              body: '',
+              createdAt: DateTime.now(),
+              mediaUrl: url,
+              mine: true,
+            ),
+          ]);
+    } catch (e) {
+      if (!mounted) return;
       final limited = e.toString().contains('official_rate_limited');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
@@ -217,7 +303,11 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
                   if (!_animating)
                     for (final p in _items)
                       if (p.mine)
-                        _MyBubble(text: p.body, time: _time(p.createdAt))
+                        _MyBubble(
+                          text: p.body,
+                          mediaUrl: p.mediaUrl,
+                          time: _time(p.createdAt),
+                        )
                       else
                         _OfficialCard(
                           title: p.title,
@@ -237,6 +327,20 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                // Photo ou vidéo (pas de GIF).
+                GestureDetector(
+                  onTap: _sending ? null : _attach,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: SC.menu,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.add_rounded, color: SC.textPrimary),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -303,9 +407,10 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
 
 /// Mon message à l'équipe : une bulle à droite, au dégradé de la marque.
 class _MyBubble extends StatelessWidget {
-  const _MyBubble({required this.text, required this.time});
+  const _MyBubble({required this.text, required this.time, this.mediaUrl = ''});
 
   final String text;
+  final String mediaUrl;
   final String time;
 
   @override
@@ -328,13 +433,21 @@ class _MyBubble extends StatelessWidget {
                   gradient: SC.brandGradient,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(
-                  text,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    height: 1.3,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (text.isNotEmpty)
+                      Text(
+                        text,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          height: 1.3,
+                        ),
+                      ),
+                    if (mediaUrl.isNotEmpty) _PostMedia(url: mediaUrl),
+                  ],
                 ),
               ),
               Padding(
