@@ -442,6 +442,17 @@ class _ExampleTranslationState extends State<_ExampleTranslation> {
 
   @override
   Widget build(BuildContext context) {
+    // La scène parle la langue de l'INTERFACE : le gras est la traduction dans
+    // cette langue, le petit gris l'original dans la langue de l'AUTRE (japonais,
+    // espagnol). Si l'interface est justement le japonais ou l'espagnol, l'autre
+    // parle coréen / portugais pour que la traduction serve à quelque chose.
+    final ui = AppStrings.currentBcp47.value.trim().toLowerCase().split(RegExp(r'[-_]')).first;
+    final first = ui == 'ja'
+        ? '안녕하세요! 잘 지내요? 🇰🇷'
+        : 'こんにちは！元気？ 🇯🇵';
+    final second = ui == 'es'
+        ? 'Vamos conversar por vídeo? 🇧🇷'
+        : '¿Hablamos por vídeo? 🇪🇸';
     return OnVisible(
       onVisible: _start,
       child: _ExampleFrame(
@@ -453,20 +464,20 @@ class _ExampleTranslationState extends State<_ExampleTranslation> {
               _incoming(
                 shown: _r1,
                 translated: _t1,
-                original: 'こんにちは！元気？ 🇯🇵',
-                result: 'Hello! How are you? 🇯🇵',
+                original: first,
+                result: AppStrings.t('guide_scene_m1'),
               ),
               const SizedBox(height: 8),
-              _appear(_a1, _bubble('Great, thanks! 😊', mine: true)),
+              _appear(_a1, _bubble(AppStrings.t('guide_scene_r1'), mine: true)),
               const SizedBox(height: 14),
               _incoming(
                 shown: _r2,
                 translated: _t2,
-                original: '¿Hablamos por vídeo? 🇪🇸',
-                result: 'Shall we talk on video? 🇪🇸',
+                original: second,
+                result: AppStrings.t('guide_scene_m2'),
               ),
               const SizedBox(height: 8),
-              _appear(_a2, _bubble('Yes, let\'s go! 🙌', mine: true)),
+              _appear(_a2, _bubble(AppStrings.t('guide_scene_r2'), mine: true)),
             ],
           ),
         ),
