@@ -314,7 +314,7 @@ class _Bubble extends StatelessWidget {
         onLongPress(topLeft & box.size);
       },
       child: SizedBox(
-        width: _kBubble + 12,
+        width: _kBubble + 22,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -336,8 +336,8 @@ class _Bubble extends StatelessWidget {
   }
 }
 
-/// Sous la bulle : l'heure de la dernière connexion de l'ami, s'il est hors ligne
-/// et a été vu dans les 24 dernières heures.
+/// Sous la bulle : « il y a 14 min » / « il y a 3 h » (dernière connexion), pour
+/// un ami hors ligne vu dans les 24 dernières heures.
 class _LocalClock extends StatefulWidget {
   const _LocalClock({required this.profile});
 
@@ -374,16 +374,24 @@ class _LocalClockState extends State<_LocalClock> {
     final show = seen != null &&
         !isPeerOnline(p) &&
         DateTime.now().difference(seen) < const Duration(hours: 24);
-    final label = !show
-        ? ''
-        : '${seen.hour.toString().padLeft(2, '0')}:'
-            '${seen.minute.toString().padLeft(2, '0')}';
-    return Text(
-      label,
-      maxLines: 1,
-      style: GoogleFonts.ibmPlexMono(
-        fontSize: 11,
-        color: SC.fg.withValues(alpha: 0.65),
+    // « il y a 14 min » / « il y a 3 h » : on comprend tout de suite que c'est la
+    // dernière connexion.
+    String label = '';
+    if (show) {
+      final mins = DateTime.now().difference(seen).inMinutes;
+      label = mins < 60
+          ? AppStrings.t('friends_seen_min', args: {'n': '${mins < 1 ? 1 : mins}'})
+          : AppStrings.t('friends_seen_h', args: {'n': '${mins ~/ 60}'});
+    }
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        label,
+        maxLines: 1,
+        style: GoogleFonts.ibmPlexMono(
+          fontSize: 10.5,
+          color: SC.fg.withValues(alpha: 0.65),
+        ),
       ),
     );
   }
