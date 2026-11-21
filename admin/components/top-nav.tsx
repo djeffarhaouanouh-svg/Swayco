@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   BadgeCheck,
   Bot,
+  Inbox,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -28,6 +29,7 @@ const NAV = [
   { href: "/agents", label: "Comptes IA", icon: Bot },
   { href: "/audios", label: "Audios", icon: Mic },
   { href: "/verifications", label: "Vérifications", icon: BadgeCheck },
+  { href: "/equipe", label: "Messages team", icon: Inbox },
 ];
 
 export function TopNav({ adminEmail }: { adminEmail: string }) {
