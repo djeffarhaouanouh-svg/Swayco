@@ -13,6 +13,11 @@ String profileFlagIso({required String country, required String language}) {
   return findLanguageByCode(language)?.countryCode ?? '';
 }
 
+/// La couleur par défaut d'une personne sans photo, tirée de son prénom (la même
+/// partout : avatars, mosaïque des groupes, bulles).
+Color avatarFallbackColor(String name) =>
+    ProfileAvatar._fallbackColor(name.trim().isEmpty ? '?' : name);
+
 /// Reusable circular avatar: shows the network photo when [avatarUrl] is
 /// provided, falls back to the first letter of [displayName] on a colored
 /// background otherwise. Used by every screen that renders a user (chat

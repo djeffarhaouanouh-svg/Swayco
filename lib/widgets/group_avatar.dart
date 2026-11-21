@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/profile_api.dart';
 import '../theme/swayco_theme.dart';
+import 'profile_avatar.dart' show avatarFallbackColor;
 
 /// La photo d'un groupe (handoff messages_groupes_quiz, A6) : automatique, une
 /// mosaïque des photos de profil des 4 premiers membres. Pas de choix manuel.
@@ -124,13 +125,14 @@ class GroupAvatar extends StatelessWidget {
     final initial = p.displayName.trim().isEmpty
         ? '?'
         : p.displayName.trim().characters.first.toUpperCase();
+    // Une couleur par défaut propre au prénom + la lettre (jamais un gris vide).
     final fallback = ColoredBox(
-      color: SC.fg.withValues(alpha: 0.12),
+      color: avatarFallbackColor(p.displayName),
       child: Center(
         child: Text(
           initial,
           style: TextStyle(
-            color: SC.textPrimary,
+            color: Colors.white,
             fontSize: size * 0.28,
             fontWeight: FontWeight.w800,
           ),
