@@ -70,10 +70,14 @@ abstract final class ActivitySignal {
     _changed();
   }
 
-  static bool get _hasState => _call || _discover || _typingTo.isNotEmpty;
+  /// Ce que je publie vraiment : un APPEL continue même app en arrière-plan
+  /// (écran verrouillé, autre app au premier plan) ; Discover et « écrit »
+  /// seulement quand l'app est au premier plan.
+  static bool get _hasState =>
+      _call || (_foreground && (_discover || _typingTo.isNotEmpty));
 
   static bool get _mayPublish =>
-      _foreground && !AppSettings.hideOnlineLocal.value && _myId.isNotEmpty;
+      !AppSettings.hideOnlineLocal.value && _myId.isNotEmpty;
 
   static void _changed() {
     _lifecycle ??= _Lifecycle()..attach();
@@ -101,8 +105,8 @@ abstract final class ActivitySignal {
           .sendBroadcastMessage(event: 'act', payload: {
             'user': _myId,
             'call': idle ? false : _call,
-            'discover': idle ? false : _discover,
-            'typingTo': idle ? '' : _typingTo,
+            'discover': idle ? false : (_foreground && _discover),
+            'typingTo': idle ? '' : (_foreground ? _typingTo : ''),
           })
           .catchError((Object e) {
             debugPrint('ActivitySignal send failed: $e');
@@ -211,8 +215,8 @@ abstract final class ActivitySignal {
     final fg = s == AppLifecycleState.resumed;
     if (fg == _foreground) return;
     _foreground = fg;
-    // En arrière-plan : on se tait. Au retour, on reprend si besoin.
-    if (_hasState || !fg) _changed();
+    // En arrière-plan : Discover et « écrit » se taisent, l'appel continue.
+    _changed();
   }
 }
 
