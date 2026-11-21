@@ -205,6 +205,7 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
                             : AppStrings.t(officialGuide[index].titleKey!),
                         body: AppStrings.t(officialGuide[index].bodyKey),
                         time: '',
+                        icon: officialGuide[index].icon,
                         extra: officialGuide[index].example?.call(context),
                       ),
                     ),
@@ -411,7 +412,11 @@ class _OfficialCard extends StatelessWidget {
     required this.body,
     required this.time,
     this.extra,
+    this.icon = '',
   });
+
+  /// L'emoji devant le titre ('' = aucun).
+  final String icon;
 
   final String title;
   final String body;
@@ -442,13 +447,24 @@ class _OfficialCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (title.isNotEmpty) ...[
-                  Text(
-                    title,
-                    style: popupDisplay(
-                      fontSize: 15,
-                      height: 1.25,
-                      color: SC.textPrimary,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (icon.isNotEmpty) ...[
+                        Text(icon, style: const TextStyle(fontSize: 28, height: 1)),
+                        const SizedBox(width: 10),
+                      ],
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: popupDisplay(
+                            fontSize: 20,
+                            height: 1.2,
+                            color: SC.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                 ],

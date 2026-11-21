@@ -38,7 +38,11 @@ class OfficialGuideStep {
     required this.titleKey,
     required this.bodyKey,
     this.example,
+    this.icon = '',
   });
+
+  /// L'emoji posé devant le titre (Apple sur iPhone, celui du système ailleurs).
+  final String icon;
 
   final String? titleKey;
   final String bodyKey;
@@ -49,25 +53,29 @@ class OfficialGuideStep {
 
 /// Les étapes, dans l'ordre où elles arrivent dans la conversation.
 final List<OfficialGuideStep> officialGuide = [
-  const OfficialGuideStep(titleKey: null, bodyKey: 'official_guide_welcome'),
+  const OfficialGuideStep(titleKey: null, bodyKey: 'official_guide_welcome', icon: '👋'),
   OfficialGuideStep(
     titleKey: 'official_guide_t1',
+    icon: '💬',
     bodyKey: 'official_guide_b1',
     example: (_) => const _ExampleTranslation(),
   ),
   OfficialGuideStep(
     titleKey: 'official_guide_t2',
+    icon: '📞',
     bodyKey: 'official_guide_b2',
     example: (_) => const _ExampleCall(),
   ),
   OfficialGuideStep(
     titleKey: 'official_guide_t3',
+    icon: '🎙️',
     bodyKey: 'official_guide_b3',
     // L'exemple : le VRAI message vocal de l'équipe qui présente la fonction.
     example: (_) => const _WelcomeVoice(),
   ),
   OfficialGuideStep(
     titleKey: 'official_guide_t6',
+    icon: '🌍',
     bodyKey: 'official_guide_b6',
     // La VRAIE vidéo du globe (6 s) : sa première image, un bouton lecture.
     example: (_) => const _ExampleFrame(
@@ -76,6 +84,7 @@ final List<OfficialGuideStep> officialGuide = [
   ),
   OfficialGuideStep(
     titleKey: 'official_guide_t4',
+    icon: '🎯',
     bodyKey: 'official_guide_b4',
     example: (_) => const QuizQuestionCard(
       theme: 'travel',
@@ -85,11 +94,13 @@ final List<OfficialGuideStep> officialGuide = [
   ),
   OfficialGuideStep(
     titleKey: 'official_guide_t5',
+    icon: '👥',
     bodyKey: 'official_guide_b5',
     example: (_) => const _ExampleGroup(),
   ),
   OfficialGuideStep(
     titleKey: 'official_guide_t7',
+    icon: '💌',
     bodyKey: 'official_guide_b7',
     // La vraie carte « Invite tes amis » : la toucher ouvre le partage.
     // Dans un encart arrondi, comme les autres exemples (la ligne de la liste,
