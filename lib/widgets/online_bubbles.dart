@@ -145,7 +145,6 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
 
   @override
   Widget build(BuildContext context) {
-    if (_shown.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -165,7 +164,8 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
                   color: SC.fg.withValues(alpha: 0.45),
                 ),
               ),
-              const SizedBox(width: 8),
+              if (_shown.isNotEmpty) const SizedBox(width: 8),
+              if (_shown.isNotEmpty)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
@@ -184,6 +184,18 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
             ],
           ),
         ),
+        if (_shown.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+            child: Text(
+              AppStrings.t('friends_none_online'),
+              style: TextStyle(
+                color: SC.fg.withValues(alpha: 0.5),
+                fontSize: 14,
+              ),
+            ),
+          )
+        else
         SizedBox(
           height: _kBubble + 6 + 16 + 8,
           child: AnimatedList(
