@@ -2086,7 +2086,7 @@ class _PopularPill extends StatelessWidget {
   Widget _pill() {
     // Les mêmes étincelles que le Boost et que « POPULAIRE » sur Discover.
     return Sparkles(
-      color: const Color(0xFF04123A),
+      color: Colors.white,
       count: 5,
       child: _pillBody(),
     );
