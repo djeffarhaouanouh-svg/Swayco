@@ -3130,6 +3130,7 @@ class _ThreadHeader extends StatelessWidget {
                     avatarUrl: peer?.avatarUrl,
                     fallbackUrl: peer?.fallbackPhotoUrl,
                     size: 44,
+                    popular: (peer?.isPro ?? false) || (peer?.isPlus ?? false),
                     // Le drapeau du pays, à la place de la pastille certifiée.
                     flagIso: profileFlagIso(
                       country: peer?.country ?? '',
