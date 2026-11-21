@@ -31,6 +31,7 @@ class OnlineBubblesRow extends StatefulWidget {
   const OnlineBubblesRow({
     super.key,
     required this.friends,
+    this.lastTalk = const {},
     required this.myId,
     required this.onMessage,
     required this.onCall,
@@ -41,6 +42,10 @@ class OnlineBubblesRow extends StatefulWidget {
 
   /// Tous mes amis : la rangée garde ceux qui sont en ligne ([isPeerOnline]).
   final List<RemoteProfile> friends;
+
+  /// Date du dernier message échangé avec chaque ami (id → date) : classe les
+  /// amis hors ligne.
+  final Map<String, DateTime> lastTalk;
   final String myId;
   final void Function(RemoteProfile) onMessage;
   final void Function(RemoteProfile) onCall;
@@ -54,7 +59,23 @@ class OnlineBubblesRow extends StatefulWidget {
 
 class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
-  late final List<RemoteProfile> _shown = _ordered(widget.friends);
+  late final List<RemoteProfile> _shown = _initial();
+
+  List<RemoteProfile> _initial() {
+    final online = [for (final p in _ordered(widget.friends)) if (isPeerOnline(p)) p];
+    final talk = widget.lastTalk;
+    final offline = [for (final p in widget.friends) if (!isPeerOnline(p)) p]
+      ..sort((a, b) {
+        final ta = talk[a.id];
+        final tb = talk[b.id];
+        if (ta != null && tb != null) return tb.compareTo(ta);
+        if (ta != null) return -1;
+        if (tb != null) return 1;
+        return (b.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0))
+            .compareTo(a.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0));
+      });
+    return [...online, ...offline];
+  }
 
   /// TOUS mes amis : les personnes EN LIGNE d'abord (connexion la plus récente
   /// en tête), puis les autres, dans l'ordre de leur dernier passage.
@@ -71,12 +92,45 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
     return out;
   }
 
+  /// Ceux qui étaient en ligne au dernier tour : sert à repérer qui VIENT de se
+  /// connecter (il passe devant) sans que le simple battement de présence
+  /// (last_seen rafraîchi toutes les 90 s) ne mélange l'ordre des autres.
+  late Set<String> _onlineIds = {
+    for (final p in widget.friends)
+      if (isPeerOnline(p)) p.id,
+  };
+
   int get _onlineCount => _shown.where(isPeerOnline).length;
 
   @override
   void didUpdateWidget(OnlineBubblesRow old) {
     super.didUpdateWidget(old);
-    final target = _ordered(widget.friends);
+    final base = _ordered(widget.friends);
+    final nowOnline = {for (final p in base) if (isPeerOnline(p)) p.id};
+    final justArrived = nowOnline.difference(_onlineIds);
+    // Devant : ceux qui viennent d'arriver (le plus récent d'abord). Puis ceux
+    // déjà là, dans l'ordre où ils étaient. Enfin les hors ligne.
+    final pos = {for (var i = 0; i < _shown.length; i++) _shown[i].id: i};
+    final arrived = [for (final p in base) if (justArrived.contains(p.id)) p];
+    final stayed = [
+      for (final p in base)
+        if (nowOnline.contains(p.id) && !justArrived.contains(p.id)) p,
+    ]..sort((a, b) => (pos[a.id] ?? 1 << 30).compareTo(pos[b.id] ?? 1 << 30));
+    // Hors ligne : par dernier message échangé (le plus récent d'abord), puis
+    // par dernier passage.
+    final talk = widget.lastTalk;
+    final offline = [for (final p in base) if (!nowOnline.contains(p.id)) p]
+      ..sort((a, b) {
+        final ta = talk[a.id];
+        final tb = talk[b.id];
+        if (ta != null && tb != null) return tb.compareTo(ta);
+        if (ta != null) return -1;
+        if (tb != null) return 1;
+        return (b.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0))
+            .compareTo(a.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0));
+      });
+    final target = [...arrived, ...stayed, ...offline];
+    _onlineIds = nowOnline;
     final byId = {for (final p in target) p.id: p};
 
     // Plus mes amis : fondu, la file se referme.

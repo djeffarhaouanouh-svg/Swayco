@@ -1453,6 +1453,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       // « Friends » : les amis en ligne, en bulles (appui long = menu).
                       OnlineBubblesRow(
                         friends: _friends,
+                        lastTalk: {
+                          for (final p in _friends)
+                            if (_latestByConv[_conversationIdFor(p.id)] != null)
+                              p.id: _latestByConv[_conversationIdFor(p.id)]!.createdAt,
+                        },
                         myId: _myId,
                         onMessage: _openThread,
                         onCall: _callPeer,
