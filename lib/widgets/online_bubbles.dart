@@ -876,9 +876,7 @@ class _BubbleMenu extends StatelessWidget {
                         if (place.isNotEmpty)
                           TextSpan(
                             text: place,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.65),
-                            ),
+                            style: const TextStyle(color: _kOrange),
                           ),
                         if (place.isNotEmpty && clock != null)
                           TextSpan(
