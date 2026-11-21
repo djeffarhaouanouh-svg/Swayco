@@ -4614,6 +4614,27 @@ class _LinkifiedTextState extends State<_LinkifiedText> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  /// Un emoji (avec sa variante, son teint, ses liaisons ZWJ) ou un drapeau.
+  static final _emojiRegex = RegExp(
+    r'(?:\p{Regional_Indicator}{2}|\p{Extended_Pictographic}'
+    r'(?:\uFE0F|[\u{1F3FB}-\u{1F3FF}])*'
+    r'(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|[\u{1F3FB}-\u{1F3FF}])*)*)',
+    unicode: true,
+  );
+
+  /// Les emojis d'une bulle sont affichés à 18 px (le texte reste à 15).
+  List<InlineSpan> _withBigEmoji(String s) {
+    final out = <InlineSpan>[];
+    var at = 0;
+    for (final m in _emojiRegex.allMatches(s)) {
+      if (m.start > at) out.add(TextSpan(text: s.substring(at, m.start)));
+      out.add(TextSpan(text: m.group(0), style: const TextStyle(fontSize: 18)));
+      at = m.end;
+    }
+    if (at < s.length) out.add(TextSpan(text: s.substring(at)));
+    return out;
+  }
+
   @override
   Widget build(BuildContext context) {
     _clearRecognizers();
@@ -4621,7 +4642,7 @@ class _LinkifiedTextState extends State<_LinkifiedText> {
     var last = 0;
     for (final m in _urlRegex.allMatches(widget.text)) {
       if (m.start > last) {
-        spans.add(TextSpan(text: widget.text.substring(last, m.start)));
+        spans.addAll(_withBigEmoji(widget.text.substring(last, m.start)));
       }
       // Trailing punctuation ('.', ',', ')', '!', '?') usually closes the
       // sentence rather than belonging to the URL — keep it out of the link.
@@ -4643,11 +4664,11 @@ class _LinkifiedTextState extends State<_LinkifiedText> {
           ),
         ),
       );
-      if (trail.isNotEmpty) spans.add(TextSpan(text: trail));
+      if (trail.isNotEmpty) spans.addAll(_withBigEmoji(trail));
       last = m.end;
     }
     if (last < widget.text.length) {
-      spans.add(TextSpan(text: widget.text.substring(last)));
+      spans.addAll(_withBigEmoji(widget.text.substring(last)));
     }
     return Text.rich(TextSpan(style: widget.style, children: spans));
   }
