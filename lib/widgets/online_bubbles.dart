@@ -63,17 +63,9 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
 
   List<RemoteProfile> _initial() {
     final online = [for (final p in _ordered(widget.friends)) if (isPeerOnline(p)) p];
-    final talk = widget.lastTalk;
     final offline = [for (final p in widget.friends) if (!isPeerOnline(p)) p]
-      ..sort((a, b) {
-        final ta = talk[a.id];
-        final tb = talk[b.id];
-        if (ta != null && tb != null) return tb.compareTo(ta);
-        if (ta != null) return -1;
-        if (tb != null) return 1;
-        return (b.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0))
-            .compareTo(a.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0));
-      });
+      ..sort((a, b) => (b.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0))
+          .compareTo(a.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0)));
     return [...online, ...offline];
   }
 
@@ -116,19 +108,10 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
       for (final p in base)
         if (nowOnline.contains(p.id) && !justArrived.contains(p.id)) p,
     ]..sort((a, b) => (pos[a.id] ?? 1 << 30).compareTo(pos[b.id] ?? 1 << 30));
-    // Hors ligne : par dernier message échangé (le plus récent d'abord), puis
-    // par dernier passage.
-    final talk = widget.lastTalk;
+    // Hors ligne : par dernière connexion (la plus récente d'abord).
     final offline = [for (final p in base) if (!nowOnline.contains(p.id)) p]
-      ..sort((a, b) {
-        final ta = talk[a.id];
-        final tb = talk[b.id];
-        if (ta != null && tb != null) return tb.compareTo(ta);
-        if (ta != null) return -1;
-        if (tb != null) return 1;
-        return (b.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0))
-            .compareTo(a.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0));
-      });
+      ..sort((a, b) => (b.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0))
+          .compareTo(a.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0)));
     final target = [...arrived, ...stayed, ...offline];
     _onlineIds = nowOnline;
     final byId = {for (final p in target) p.id: p};
