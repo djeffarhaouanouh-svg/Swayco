@@ -227,7 +227,10 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
       await c.setLooping(true);
       setState(() => _ready = true);
       // Elle ne part que si la personne est déjà arrivée dessus.
-      if (_inView) await c.play();
+      if (_inView) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        if (mounted && !_userPaused) await c.play();
+      }
     }).catchError((Object _) {
       if (mounted) setState(() => _failed = true);
     });
@@ -236,13 +239,20 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
   bool _muted = true;
   bool _inView = false;
 
-  /// La personne vient de passer sur la vidéo : elle démarre (une fois prête).
+  /// La personne l'a arrêtée elle-même : on ne la relance plus toute seule.
+  bool _userPaused = false;
+
+  /// La personne vient de passer sur la vidéo : elle démarre (une fois prête),
+  /// après un court instant.
   void _onInView() {
     _inView = true;
     final c = _ctrl;
-    if (_ready && c != null && !c.value.isPlaying) c.play();
+    if (_ready && c != null && !c.value.isPlaying) {
+      Future<void>.delayed(const Duration(milliseconds: 500), () {
+        if (mounted && !_userPaused && !c.value.isPlaying) c.play();
+      });
+    }
   }
-
   void _toggleSound() {
     final c = _ctrl;
     if (c == null || !_ready) return;
@@ -266,9 +276,11 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
     final c = _ctrl;
     if (c == null || !_ready) return;
     if (c.value.isPlaying) {
+      _userPaused = true;
       c.pause();
       return;
     }
+    _userPaused = false;
     c.play();
   }
 
@@ -315,6 +327,26 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
                       Icons.play_arrow_rounded,
                       color: Colors.white,
                       size: 36,
+                    ),
+                  ),
+                ),
+              // Un bouton ARRÊT bien visible pendant la lecture (le toucher sur
+              // l'image arrête aussi, mais ça ne se devine pas).
+              if (_ready && playing)
+                Positioned(
+                  left: 8,
+                  top: 8,
+                  child: GestureDetector(
+                    onTap: _toggle,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.pause_rounded,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                 ),

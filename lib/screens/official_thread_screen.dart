@@ -1,11 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/analytics.dart';
-import '../services/swayco_sounds.dart';
 import '../services/app_strings.dart';
 import '../services/call_launcher.dart';
 import '../services/chat_api.dart' show isVideoUrl;
@@ -39,62 +37,24 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
   String _myName = '';
   bool _sending = false;
 
-  // Le guide d'accueil arrive UN MESSAGE À LA FOIS (avec son exemple) à la
-  // première ouverture de la conversation ; ensuite il est là en entier.
-  int _revealed = 0;
-  bool _animating = false;
-  Timer? _revealTimer;
+  // Le guide d'accueil est affiché EN ENTIER dès l'ouverture : la personne
+  // défile à son rythme, et chaque exemple animé (traduction, vidéo) ne se joue
+  // que quand elle arrive dessus (voir OnVisible).
+  final int _revealed = officialGuide.length;
+  final bool _animating = false;
 
   @override
   void initState() {
     super.initState();
     _load();
-    unawaited(_startGuide());
-  }
-
-  Future<void> _startGuide() async {
-    final done = await OfficialApi.guideDone();
-    if (!mounted) return;
-    if (done) {
-      setState(() => _revealed = officialGuide.length);
-      return;
-    }
-    setState(() {
-      _animating = true;
-      _revealed = 0;
-    });
-    void arrive() {
-      HapticFeedback.selectionClick();
-      SwaycoSounds.play(SwSound.msgReceived);
-      setState(() => _revealed++);
-    }
-
-    // Le premier après une courte pause, puis un toutes les 2 secondes.
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    arrive();
-    _revealTimer = Timer.periodic(const Duration(seconds: 2), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
-      if (_revealed >= officialGuide.length) {
-        t.cancel();
-        setState(() => _animating = false);
-        unawaited(OfficialApi.markGuideDone());
-        return;
-      }
-      arrive();
-    });
+    unawaited(OfficialApi.markGuideDone());
   }
 
   @override
   void dispose() {
-    _revealTimer?.cancel();
     _ctrl.dispose();
     super.dispose();
   }
-
   /// Messages de l'équipe et les miens, mêlés par date.
   List<OfficialPost> get _items =>
       [..._posts, ..._mine]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
