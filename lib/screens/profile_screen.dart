@@ -2042,13 +2042,22 @@ class _PopularPill extends StatelessWidget {
       preferBelow: true,
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [BoxShadow(color: Color(0x40000000), blurRadius: 12)],
-      ),
-      textStyle: const TextStyle(
-        color: Color(0xFF04123A),
+      // Sombre : bulle blanche. Clair : l'ancienne bulle sombre, inchangée.
+      decoration: SC.light
+          ? BoxDecoration(
+              color: const Color(0xF2161A2C),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+            )
+          : BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [
+                BoxShadow(color: Color(0x40000000), blurRadius: 12),
+              ],
+            ),
+      textStyle: TextStyle(
+        color: SC.light ? Colors.white : const Color(0xFF04123A),
         fontSize: 13,
         fontWeight: FontWeight.w600,
         height: 1.4,
