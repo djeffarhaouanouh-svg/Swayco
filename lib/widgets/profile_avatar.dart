@@ -174,8 +174,8 @@ class ProfileAvatar extends StatelessWidget {
               border: Border.all(color: const Color(0xFFF4FF1F), width: ringW),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFF4FF1F).withValues(alpha: 0.45),
-                  blurRadius: size * 0.28,
+                  color: const Color(0xFFF4FF1F).withValues(alpha: 0.16),
+                  blurRadius: size * 0.16,
                 ),
               ],
             ),
