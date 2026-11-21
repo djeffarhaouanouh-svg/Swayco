@@ -1,6 +1,6 @@
 -- 0095_official_messages_rate_limit.sql
 --
--- Limite d'envoi vers la team Swayco : 5 messages par personne sur 24 h glissantes.
+-- Limite d'envoi vers la team Swayco : 3 messages par personne sur 24 h glissantes (tout compris : texte, et photo le jour où elle sera permise, passent par cette même table).
 -- Posée en base (déclencheur) : l'app ne peut pas la contourner. Au-delà, l'insertion
 -- échoue avec le message `official_rate_limited`, que l'app traduit pour la personne.
 
@@ -16,7 +16,7 @@ begin
       from public.official_messages
      where user_id = new.user_id
        and created_at > now() - interval '24 hours'
-  ) >= 5 then
+  ) >= 3 then
     raise exception 'official_rate_limited' using errcode = 'P0001';
   end if;
   return new;
