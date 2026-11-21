@@ -317,10 +317,13 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final clock = resolvePeerLocalTime(
-      city: profile.city,
-      country: profile.country,
-    );
+    // L'heure locale seulement pour ceux vus dans les dernières 24 h.
+    final seen = profile.lastSeen;
+    final recent = seen != null &&
+        DateTime.now().difference(seen) < const Duration(hours: 24);
+    final clock = recent
+        ? resolvePeerLocalTime(city: profile.city, country: profile.country)
+        : null;
     final photoKey = GlobalKey();
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
