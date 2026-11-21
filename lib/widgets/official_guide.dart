@@ -318,10 +318,12 @@ Widget _bubble(String text, {required bool mine, String? translated}) {
   );
 }
 
-/// Étape 1 — une petite scène qui se joue : le message arrive dans la langue de
-/// l'autre (japonais), puis il SE TRADUIT sous les yeux (le texte se fond en
-/// français/anglais et l'original passe en petit dessous), puis ma réponse
-/// arrive. Rien ne bouge de place : la hauteur est réservée d'emblée.
+/// Étape 1 — une petite scène qui se joue quand on arrive dessus : DEUX
+/// échanges. Le message de l'autre arrive dans sa langue, SE TRADUIT sous les
+/// yeux (l'original passe en petit dessous), puis ma réponse arrive ; et on
+/// recommence avec un second message (en espagnol) pour que ce soit bien
+/// compris. Rythme serré : une étape toutes les ~1 s. La hauteur est réservée
+/// d'emblée, rien ne saute.
 class _ExampleTranslation extends StatefulWidget {
   const _ExampleTranslation();
 
@@ -330,11 +332,10 @@ class _ExampleTranslation extends StatefulWidget {
 }
 
 class _ExampleTranslationState extends State<_ExampleTranslation> {
-  bool _received = false;
-  bool _translated = false;
-  bool _reply = false;
+  // r = reçu, t = traduit, a = ma réponse ; 1 = premier échange, 2 = second.
+  bool _r1 = false, _t1 = false, _a1 = false;
+  bool _r2 = false, _t2 = false, _a2 = false;
   final List<Timer> _timers = [];
-
   bool _started = false;
 
   /// La scène ne démarre que quand la personne ARRIVE dessus (voir [OnVisible]).
@@ -345,10 +346,12 @@ class _ExampleTranslationState extends State<_ExampleTranslation> {
         _timers.add(Timer(Duration(milliseconds: ms), () {
           if (mounted) setState(f);
         }));
-    at(450, () => _received = true);
-    at(1900, () => _translated = true);
-    // La réponse se fait attendre : le temps de LIRE la traduction.
-    at(5200, () => _reply = true);
+    at(250, () => _r1 = true);
+    at(1250, () => _t1 = true);
+    at(2250, () => _a1 = true);
+    at(3250, () => _r2 = true);
+    at(4250, () => _t2 = true);
+    at(5250, () => _a2 = true);
   }
 
   @override
@@ -359,94 +362,114 @@ class _ExampleTranslationState extends State<_ExampleTranslation> {
     super.dispose();
   }
 
-  Widget _appear(bool shown, Widget child, {double dy = 14}) =>
-      AnimatedSlide(
-        offset: shown ? Offset.zero : Offset(0, dy / 40),
-        duration: const Duration(milliseconds: 380),
+  Widget _appear(bool shown, Widget child) => AnimatedSlide(
+        offset: shown ? Offset.zero : const Offset(0, 0.35),
+        duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
         child: AnimatedOpacity(
           opacity: shown ? 1 : 0,
-          duration: const Duration(milliseconds: 380),
+          duration: const Duration(milliseconds: 320),
           child: child,
         ),
       );
 
+  /// Un message reçu : l'original d'abord, puis la traduction par-dessus (et
+  /// l'original en petit, dessous).
+  Widget _incoming({
+    required bool shown,
+    required bool translated,
+    required String original,
+    required String result,
+  }) {
+    final bubbleColor = SC.light ? Colors.white : const Color(0xFF2F333B);
+    return _appear(
+      shown,
+      Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 230),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+          decoration: BoxDecoration(
+            color: bubbleColor,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 350),
+                child: Text(
+                  translated ? result : original,
+                  key: ValueKey(translated),
+                  style: TextStyle(color: _ink, fontSize: 14),
+                ),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topLeft,
+                child: translated
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.translate_rounded,
+                                size: 11, color: _ink.withValues(alpha: 0.5)),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                original,
+                                style: TextStyle(
+                                  color: _ink.withValues(alpha: 0.5),
+                                  fontSize: 11.5,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox(width: 0, height: 0),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bubbleColor = SC.light ? Colors.white : const Color(0xFF2F333B);
     return OnVisible(
       onVisible: _start,
       child: _ExampleFrame(
-      child: SizedBox(
-        height: 122,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _appear(
-              _received,
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 230),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: bubbleColor,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Le texte : le japonais, qui se fond en traduction.
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 450),
-                        child: Text(
-                          _translated
-                              ? 'Hello! How are you? 🇯🇵'
-                              : 'こんにちは！元気？ 🇯🇵',
-                          key: ValueKey(_translated),
-                          style: TextStyle(color: _ink, fontSize: 14),
-                        ),
-                      ),
-                      // « L'original » apparaît dessous, une fois traduit.
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 380),
-                        curve: Curves.easeOutCubic,
-                        alignment: Alignment.topLeft,
-                        child: _translated
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.translate_rounded,
-                                        size: 11,
-                                        color: _ink.withValues(alpha: 0.5)),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'こんにちは！元気？ 🇯🇵',
-                                      style: TextStyle(
-                                        color: _ink.withValues(alpha: 0.5),
-                                        fontSize: 11.5,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : const SizedBox(width: 0, height: 0),
-                      ),
-                    ],
-                  ),
-                ),
+        child: SizedBox(
+          height: 238,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _incoming(
+                shown: _r1,
+                translated: _t1,
+                original: 'こんにちは！元気？ 🇯🇵',
+                result: 'Hello! How are you? 🇯🇵',
               ),
-            ),
-            const SizedBox(height: 8),
-            _appear(_reply, _bubble('Great, thanks! 😊', mine: true)),
-          ],
+              const SizedBox(height: 8),
+              _appear(_a1, _bubble('Great, thanks! 😊', mine: true)),
+              const SizedBox(height: 14),
+              _incoming(
+                shown: _r2,
+                translated: _t2,
+                original: '¿Hablamos por vídeo? 🇪🇸',
+                result: 'Shall we talk on video? 🇪🇸',
+              ),
+              const SizedBox(height: 8),
+              _appear(_a2, _bubble('Yes, let\'s go! 🙌', mine: true)),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
