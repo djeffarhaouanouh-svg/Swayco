@@ -11,7 +11,12 @@ class GroupAvatar extends StatelessWidget {
     required this.members,
     this.size = 52,
     this.photoUrl = '',
+    this.ring = true,
   });
+
+  /// Une seule personne Pro / Plus : l'anneau jaune des profils populaires, autour
+  /// de la photo seule. Faux pour le poser soi-même (évite la récursion).
+  final bool ring;
 
   /// Les profils des membres, dans l'ordre : seuls les 4 premiers comptent.
   final List<RemoteProfile> members;
@@ -24,6 +29,34 @@ class GroupAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shown = members.take(4).toList();
+    if (ring &&
+        photoUrl.isEmpty &&
+        shown.length == 1 &&
+        (shown[0].isPro || shown[0].isPlus)) {
+      final ringW = size * 0.05;
+      final gapW = size * 0.04;
+      return Container(
+        width: size,
+        height: size,
+        padding: EdgeInsets.all(gapW),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: SC.bg,
+          border: Border.all(color: const Color(0xFFF4FF1F), width: ringW),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFF4FF1F).withValues(alpha: 0.16),
+              blurRadius: size * 0.16,
+            ),
+          ],
+        ),
+        child: GroupAvatar(
+          members: shown,
+          size: size - 2 * (ringW + gapW),
+          ring: false,
+        ),
+      );
+    }
     if (photoUrl.isNotEmpty) {
       return SizedBox(
         width: size,
