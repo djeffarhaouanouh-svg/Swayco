@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -242,6 +244,11 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
   /// La personne l'a arrêtée elle-même : on ne la relance plus toute seule.
   bool _userPaused = false;
 
+  /// Le bouton pause AU MILIEU, comme sur toutes les vidéos : il apparaît au
+  /// toucher pendant la lecture, puis s'efface seul.
+  bool _showPause = false;
+  Timer? _pauseTimer;
+
   /// La personne vient de passer sur la vidéo : elle démarre (une fois prête),
   /// après un court instant.
   void _onInView() {
@@ -267,21 +274,39 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
 
   @override
   void dispose() {
+    _pauseTimer?.cancel();
     _ctrl?.removeListener(_onTick);
     _ctrl?.dispose();
     super.dispose();
   }
 
+  /// Un toucher sur l'image : à l'arrêt il lance ; en lecture il montre (ou
+  /// cache) le bouton pause du milieu.
   void _toggle() {
     final c = _ctrl;
     if (c == null || !_ready) return;
     if (c.value.isPlaying) {
-      _userPaused = true;
-      c.pause();
+      _pauseTimer?.cancel();
+      setState(() => _showPause = !_showPause);
+      if (_showPause) {
+        _pauseTimer = Timer(const Duration(milliseconds: 2500), () {
+          if (mounted) setState(() => _showPause = false);
+        });
+      }
       return;
     }
     _userPaused = false;
     c.play();
+  }
+
+  /// Le bouton pause du milieu.
+  void _pause() {
+    final c = _ctrl;
+    if (c == null) return;
+    _userPaused = true;
+    _pauseTimer?.cancel();
+    setState(() => _showPause = false);
+    c.pause();
   }
 
   @override
@@ -312,7 +337,25 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
                 ),
               ),
               if (_ready && c != null) VideoPlayer(c),
-              // Le bouton lecture : seulement à l'arrêt.
+              // Le bouton du MILIEU : lecture à l'arrêt ; pause au toucher en
+              // lecture (puis il s'efface).
+              if (playing && _showPause)
+                Center(
+                  child: GestureDetector(
+                    onTap: _pause,
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.45),
+                        border: Border.all(color: Colors.white70, width: 1.5),
+                      ),
+                      child: const Icon(Icons.pause_rounded,
+                          color: Colors.white, size: 34),
+                    ),
+                  ),
+                ),
               if (!playing && !_failed)
                 Center(
                   child: Container(
@@ -327,26 +370,6 @@ class _VideoPreviewTileState extends State<VideoPreviewTile> {
                       Icons.play_arrow_rounded,
                       color: Colors.white,
                       size: 36,
-                    ),
-                  ),
-                ),
-              // Un bouton ARRÊT bien visible pendant la lecture (le toucher sur
-              // l'image arrête aussi, mais ça ne se devine pas).
-              if (_ready && playing)
-                Positioned(
-                  left: 8,
-                  top: 8,
-                  child: GestureDetector(
-                    onTap: _toggle,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.pause_rounded,
-                          color: Colors.white, size: 20),
                     ),
                   ),
                 ),
