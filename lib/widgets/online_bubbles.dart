@@ -54,26 +54,32 @@ class OnlineBubblesRow extends StatefulWidget {
 
 class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
-  late final List<RemoteProfile> _shown = _onlineSorted(widget.friends);
+  late final List<RemoteProfile> _shown = _ordered(widget.friends);
 
-  static List<RemoteProfile> _onlineSorted(List<RemoteProfile> all) {
-    final out = [for (final p in all) if (isPeerOnline(p)) p];
-    // Connexion la plus récente d'abord.
+  /// TOUS mes amis : les personnes EN LIGNE d'abord (connexion la plus récente
+  /// en tête), puis les autres, dans l'ordre de leur dernier passage.
+  static List<RemoteProfile> _ordered(List<RemoteProfile> all) {
+    DateTime seen(RemoteProfile p) =>
+        p.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final out = [...all];
     out.sort((a, b) {
-      final x = a.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final y = b.lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return y.compareTo(x);
+      final oa = isPeerOnline(a);
+      final ob = isPeerOnline(b);
+      if (oa != ob) return oa ? -1 : 1;
+      return seen(b).compareTo(seen(a));
     });
     return out;
   }
 
+  int get _onlineCount => _shown.where(isPeerOnline).length;
+
   @override
   void didUpdateWidget(OnlineBubblesRow old) {
     super.didUpdateWidget(old);
-    final online = _onlineSorted(widget.friends);
-    final byId = {for (final p in online) p.id: p};
+    final target = _ordered(widget.friends);
+    final byId = {for (final p in target) p.id: p};
 
-    // Sortis : fondu, la file se referme.
+    // Plus mes amis : fondu, la file se referme.
     for (var i = _shown.length - 1; i >= 0; i--) {
       final gone = _shown[i];
       if (byId.containsKey(gone.id)) continue;
@@ -91,23 +97,32 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
         duration: const Duration(milliseconds: 200),
       );
     }
-    // Profils rafraîchis (heure, ville…), à leur place.
-    for (var i = 0; i < _shown.length; i++) {
-      _shown[i] = byId[_shown[i].id] ?? _shown[i];
-    }
-    // Arrivés : en PREMIÈRE position, les autres glissent vers la droite.
-    final known = {for (final p in _shown) p.id};
-    final fresh = [for (final p in online) if (!known.contains(p.id)) p];
-    for (final p in fresh.reversed) {
-      _shown.insert(0, p);
+    // Remet chacun à sa place. Quelqu'un qui se connecte (ou qui part) change
+    // de place : il glisse à sa nouvelle position (280 ms), les autres se
+    // décalent d'un cran.
+    for (var i = 0; i < target.length; i++) {
+      final want = target[i];
+      if (i < _shown.length && _shown[i].id == want.id) {
+        _shown[i] = want; // profil rafraîchi (heure, ville…)
+        continue;
+      }
+      final j = _shown.indexWhere((p) => p.id == want.id);
+      if (j >= 0) {
+        final moved = _shown.removeAt(j);
+        _listKey.currentState?.removeItem(
+          j,
+          (ctx, anim) => _slot(moved),
+          duration: Duration.zero,
+        );
+      }
+      _shown.insert(i, want);
       _listKey.currentState?.insertItem(
-        0,
+        i,
         duration: const Duration(milliseconds: 280),
       );
     }
     setState(() {});
   }
-
   Widget _slot(RemoteProfile p) => Padding(
         padding: const EdgeInsets.only(right: 10),
         child: _Bubble(
@@ -164,8 +179,8 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
                   color: SC.fg.withValues(alpha: 0.45),
                 ),
               ),
-              if (_shown.isNotEmpty) const SizedBox(width: 8),
-              if (_shown.isNotEmpty)
+              if (_onlineCount > 0) const SizedBox(width: 8),
+              if (_onlineCount > 0)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
@@ -173,7 +188,7 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  '${_shown.length}',
+                  '$_onlineCount',
                   style: GoogleFonts.ibmPlexMono(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
