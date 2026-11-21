@@ -459,6 +459,82 @@ class _ProfileScreenState extends State<ProfileScreen>
     return _local?.sourceLang.trim() ?? '';
   }
 
+  /// Un tap sur « POPULAIRE » : pourquoi cette personne a la pastille.
+  void _showPopularInfo() {
+    final name = (_remote?.displayName ?? '').trim().split(RegExp(r'\s+')).first;
+    showDialog<void>(
+      context: context,
+      barrierColor: const Color(0xB3040A1E),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(22, 26, 22, 22),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1A2040), Color(0xFF16161E)],
+            ),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4FF1F).withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.favorite_rounded,
+                    size: 26, color: Color(0xFFF4FF1F)),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                AppStrings.t('profile_popular_title'),
+                textAlign: TextAlign.center,
+                style: popupDisplay(fontSize: 20, color: Colors.white),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                AppStrings.t('profile_popular_body', args: {'name': name}),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 20),
+              GestureDetector(
+                onTap: () => Navigator.of(ctx).pop(),
+                child: Container(
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4FF1F),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    AppStrings.t('profile_popular_ok'),
+                    style: const TextStyle(
+                      color: Color(0xFF04123A),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   String get _handle {
     final h = _remote?.handle.trim() ?? '';
     if (h.isNotEmpty) return '@$h';
@@ -1166,7 +1242,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         if ((_remote?.isPro ?? false) ||
                             (_remote?.isPlus ?? false)) ...[
                           const SizedBox(width: 10),
-                          const _PopularPill(),
+                          _PopularPill(onTap: _showPopularInfo),
                         ],
                         const Spacer(),
                         // En aperÃ§u de mon propre profil : pas de menu â®
@@ -2020,10 +2096,20 @@ class _IdentitySection extends StatelessWidget {
 /// boutons posés sur la couverture.
 /// « POPULAIRE » : pastille jaune posée à côté de la flèche retour d'un profil.
 class _PopularPill extends StatelessWidget {
-  const _PopularPill();
+  const _PopularPill({this.onTap});
+
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: _pill(),
+    );
+  }
+
+  Widget _pill() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
       decoration: BoxDecoration(
