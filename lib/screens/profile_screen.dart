@@ -1163,6 +1163,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                           icon: Icons.arrow_back_rounded,
                           onTap: () => Navigator.of(context).maybePop(),
                         ),
+                        if ((_remote?.isPro ?? false) ||
+                            (_remote?.isPlus ?? false)) ...[
+                          const SizedBox(width: 10),
+                          const _PopularPill(),
+                        ],
                         const Spacer(),
                         // En aperÃ§u de mon propre profil : pas de menu â®
                         // (rien Ã  signaler / bloquer sur soi-mÃªme).
@@ -1684,32 +1689,6 @@ class _IdentitySection extends StatelessWidget {
                 ),
               ),
             ),
-            if (popular && !editableName) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF4FF1F),
-                  borderRadius: BorderRadius.circular(999),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFF4FF1F).withValues(alpha: 0.35),
-                      blurRadius: 10,
-                    ),
-                  ],
-                ),
-                child: Text(
-                  AppStrings.t('paywall_popular').toUpperCase(),
-                  style: const TextStyle(
-                    color: Color(0xFF04123A),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ],
@@ -2039,6 +2018,37 @@ class _IdentitySection extends StatelessWidget {
 }
 /// Rond de 44 en verre (blanc 13 %, bord blanc 30 % de 1,2 px, flou 20) — les
 /// boutons posés sur la couverture.
+/// « POPULAIRE » : pastille jaune posée à côté de la flèche retour d'un profil.
+class _PopularPill extends StatelessWidget {
+  const _PopularPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4FF1F),
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF4FF1F).withValues(alpha: 0.2),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Text(
+        AppStrings.t('paywall_popular').toUpperCase(),
+        style: const TextStyle(
+          color: Color(0xFF04123A),
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
 class _GlassCircle extends StatelessWidget {
   const _GlassCircle({required this.icon, this.onTap, this.tooltip});
 
