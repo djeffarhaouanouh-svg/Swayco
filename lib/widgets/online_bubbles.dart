@@ -126,9 +126,8 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
         i,
         (ctx, anim) => FadeTransition(
           opacity: anim,
-          child: SizeTransition(
+          child: _GrowWidth(
             axis: Axis.horizontal,
-            clipBehavior: Clip.none,
             sizeFactor: anim,
             child: _slot(gone),
           ),
@@ -268,9 +267,8 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
                   scale: Tween<double>(begin: 0.8, end: 1).animate(
                     CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
                   ),
-                  child: SizeTransition(
+                  child: _GrowWidth(
                     axis: Axis.horizontal,
-                    clipBehavior: Clip.none,
                     sizeFactor: CurvedAnimation(
                       parent: anim,
                       curve: Curves.easeOutCubic,
@@ -286,6 +284,31 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
       ],
     );
   }
+}
+
+/// Comme SizeTransition horizontal, mais SANS rogner ce qui dépasse (les badges
+/// d'appel / écrit dépassent de la photo).
+class _GrowWidth extends StatelessWidget {
+  const _GrowWidth({
+    required this.axis,
+    required this.sizeFactor,
+    required this.child,
+  });
+
+  final Axis axis;
+  final Animation<double> sizeFactor;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: sizeFactor,
+        builder: (_, ch) => Align(
+          alignment: Alignment.centerLeft,
+          widthFactor: sizeFactor.value.clamp(0.0, 1.0),
+          child: ch,
+        ),
+        child: child,
+      );
 }
 
 /// Une bulle : photo ronde, drapeau, badge d'activité, heure locale dessous.
