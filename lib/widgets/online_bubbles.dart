@@ -825,11 +825,46 @@ class _BubbleMenu extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: popupDisplay(fontSize: 17, color: Colors.white),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: popupDisplay(fontSize: 17, color: Colors.white),
+                      ),
+                    ),
+                    // Profil Pro / Plus : le badge, à 10 px du prénom.
+                    if (profile.isPro || profile.isPlus) ...[
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _kYellow,
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _kYellow.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          AppStrings.t('paywall_popular').toUpperCase(),
+                          style: const TextStyle(
+                            color: _kNavy,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 if (place.isNotEmpty || clock != null) ...[
                   const SizedBox(height: 4),
