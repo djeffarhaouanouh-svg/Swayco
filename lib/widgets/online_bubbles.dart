@@ -336,9 +336,8 @@ class _Bubble extends StatelessWidget {
   }
 }
 
-/// L'heure locale de l'ami sous sa bulle, seulement s'il a été vu dans les 24
-/// dernières heures. Elle se met à jour TOUTE SEULE (toutes les 15 s) : avant,
-/// elle ne se recalculait que quand la page se redessinait, et restait figée.
+/// Sous la bulle : l'heure de la dernière connexion de l'ami, s'il est hors ligne
+/// et a été vu dans les 24 dernières heures.
 class _LocalClock extends StatefulWidget {
   const _LocalClock({required this.profile});
 
@@ -369,14 +368,18 @@ class _LocalClockState extends State<_LocalClock> {
   @override
   Widget build(BuildContext context) {
     final p = widget.profile;
-    final seen = p.lastSeen;
-    final recent = seen != null &&
+    final seen = p.lastSeen?.toLocal();
+    // L'heure de SA DERNIÈRE CONNEXION (à mon heure), pour ceux vus dans les 24
+    // dernières heures. Rien pour ceux qui sont en ligne : ils sont là.
+    final show = seen != null &&
+        !isPeerOnline(p) &&
         DateTime.now().difference(seen) < const Duration(hours: 24);
-    final clock = recent
-        ? resolvePeerLocalTime(city: p.city, country: p.country)
-        : null;
+    final label = !show
+        ? ''
+        : '${seen.hour.toString().padLeft(2, '0')}:'
+            '${seen.minute.toString().padLeft(2, '0')}';
     return Text(
-      clock?.hhmm ?? '',
+      label,
       maxLines: 1,
       style: GoogleFonts.ibmPlexMono(
         fontSize: 11,
