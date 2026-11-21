@@ -8,6 +8,7 @@ import 'chat_list_extras.dart';
 import 'chat_quiz.dart';
 import 'chat_video.dart';
 import 'viewport_trigger.dart';
+import '../services/voice_heard.dart';
 import 'voice_note_player.dart';
 
 /// La vidéo de démonstration de l'appel traduit, hébergée dans le stockage
@@ -121,18 +122,49 @@ class _WelcomeVoice extends StatefulWidget {
 class _WelcomeVoiceState extends State<_WelcomeVoice> {
   bool _open = false;
 
+  /// Comme dans le chat : un vocal reçu PAS ENCORE ÉCOUTÉ est dans une bulle
+  /// BLANCHE (texte foncé, point cyan sur le lecteur) ; une fois écouté, la bulle
+  /// passe au gris habituel. Le numéro 2 repart d'un vocal « jamais écouté ».
+  bool _heard = true;
+  String _id = '';
+
+  String _voiceId() {
+    final ui = AppStrings.currentBcp47.value.trim().toLowerCase();
+    final english = ui == 'en' || ui.startsWith('en-') || ui.startsWith('en_');
+    return 'guide-welcome-v2-${english ? 'fr' : 'en'}';
+  }
+
+  void _syncHeard() {
+    final h = VoiceHeard.cached(_id);
+    if (h != null && h != _heard && mounted) setState(() => _heard = h);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _id = _voiceId();
+    _heard = VoiceHeard.cached(_id) ?? true;
+    VoiceHeard.changed.addListener(_syncHeard);
+    unawaited(VoiceHeard.isHeard(_id));
+  }
+
+  @override
+  void dispose() {
+    VoiceHeard.changed.removeListener(_syncHeard);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final ui = AppStrings.currentBcp47.value.trim().toLowerCase();
     final english = ui == 'en' || ui.startsWith('en-') || ui.startsWith('en_');
-    final audioLang = english ? 'fr' : 'en';
     final url = '${_WelcomeVoice._base}${english ? 'welcome_fr' : 'welcome_en'}.mp3';
     // Le texte du vocal dans la langue de L'INTERFACE de l'utilisateur.
     final text = AppStrings.t('guide_voice_text');
     // Les couleurs d'un vocal reçu dans le chat : bulle grise (blanche en clair),
     // lecteur et texte en blanc (encre en clair).
-    final bubble = SC.light ? Colors.white : const Color(0xFF2F333B);
-    final fg = SC.light ? _kNavy : Colors.white;
+    final bubble = !_heard ? Colors.white : SC.msgInBg;
+    final fg = !_heard ? SC.onAccent : SC.msgInText;
     return _ExampleFrame(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,7 +191,7 @@ class _WelcomeVoiceState extends State<_WelcomeVoice> {
                   VoiceNotePlayer(
                     url: url,
                     color: fg,
-                    messageId: 'guide-welcome-$audioLang',
+                    messageId: _id,
                     mine: false,
                     // La transcription apparaît quand on appuie sur LECTURE, et
                     // reste (pas de bouton pour la refermer).
