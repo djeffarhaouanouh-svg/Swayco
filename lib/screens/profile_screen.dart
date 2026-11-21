@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import '../widgets/sparkles.dart';
 import '../widgets/failure_sheet.dart';
 import '../widgets/tap_pad.dart';
 import 'package:flutter/services.dart';
@@ -143,8 +144,13 @@ class _ProfileScreenState extends State<ProfileScreen>
     });
   }
 
+  /// Le défilement de la page d'un pair : la barre du haut (retour, badge, ⋮)
+  /// le suit, pour partir avec la couverture au lieu de rester collée aux photos.
+  final ScrollController _peerScroll = ScrollController();
+
   @override
   void dispose() {
+    _peerScroll.dispose();
     WidgetsBinding.instance.removeObserver(this);
     NavTab.addPhotoTick.removeListener(_onAddPhotoRequest);
     _pollTimer?.cancel();
@@ -1075,6 +1081,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ],
                       )
                     : ListView(
+                        controller: _peerScroll,
                         physics: const AlwaysScrollableScrollPhysics(),
                         // Reserve room for the floating bottom nav (height 54 + 12 gap)
                         // plus the device's bottom safe-area inset, otherwise the last
@@ -1151,7 +1158,16 @@ class _ProfileScreenState extends State<ProfileScreen>
                 top: 0,
                 left: 0,
                 right: 0,
-                child: SafeArea(
+                child: AnimatedBuilder(
+                  animation: _peerScroll,
+                  builder: (context, child) => Transform.translate(
+                    offset: Offset(
+                      0,
+                      -(_peerScroll.hasClients ? _peerScroll.offset : 0.0),
+                    ),
+                    child: child,
+                  ),
+                  child: SafeArea(
                   bottom: false,
                   child: Padding(
                     // Un peu d'air : le retour ne colle plus au bord (sans
@@ -1260,6 +1276,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                       ],
                     ),
+                  ),
                   ),
                 ),
               ),
@@ -2067,6 +2084,15 @@ class _PopularPill extends StatelessWidget {
   }
 
   Widget _pill() {
+    // Les mêmes étincelles que le Boost et que « POPULAIRE » sur Discover.
+    return Sparkles(
+      color: const Color(0xFF04123A),
+      count: 5,
+      child: _pillBody(),
+    );
+  }
+
+  Widget _pillBody() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
       decoration: BoxDecoration(
