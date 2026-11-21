@@ -29,7 +29,17 @@ class ProfileAvatar extends StatelessWidget {
     this.showSeal = false,
     this.sealRingColor,
     this.flagIso = '',
+    this.popular = false,
+    this.gapColor,
   });
+
+  /// Profil populaire (Pro / Plus) : un anneau jaune autour de la PHOTO seule,
+  /// jamais autour de la bulle du pays. La taille totale ([size]) ne change pas.
+  final bool popular;
+
+  /// Couleur du fond de la ligne : le liseré entre l'anneau et la photo, et celui
+  /// de la bulle du pays. Défaut : SC.bg.
+  final Color? gapColor;
 
   /// Code ISO d'un pays (`jp`) : pose son drapeau rond, cerclé de blanc, sur le
   /// coin bas-droit de la photo. Il prend la place de la pastille [showSeal]
@@ -100,9 +110,13 @@ class ProfileAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final letterFontSize = fontSize ?? size * 0.42;
-    final circle = Container(
-      width: size,
-      height: size,
+    final ringW = popular ? size * 0.05 : 0.0;
+    final gapW = popular ? size * 0.04 : 0.0;
+    final photoD = size - 2 * (ringW + gapW);
+    final bg = gapColor ?? SC.bg;
+    final photo = Container(
+      width: photoD,
+      height: photoD,
       alignment: Alignment.center,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -113,8 +127,8 @@ class ProfileAvatar extends StatelessWidget {
           ? Image.network(
               _photoUrl!,
               fit: BoxFit.cover,
-              width: size,
-              height: size,
+              width: photoD,
+              height: photoD,
               errorBuilder: (_, _, _) {
                 // Primary failed → try the fallback once, else initials.
                 if (_photoUrl == _primary &&
@@ -123,12 +137,12 @@ class ProfileAvatar extends StatelessWidget {
                   return Image.network(
                     _fallback,
                     fit: BoxFit.cover,
-                    width: size,
-                    height: size,
-                    errorBuilder: (_, _, _) => _letterFallback(letterFontSize),
+                    width: photoD,
+                    height: photoD,
+                    errorBuilder: (_, _, _) => _letterFallback(letterFontSize, photoD),
                   );
                 }
-                return _letterFallback(letterFontSize);
+                return _letterFallback(letterFontSize, photoD);
               },
               loadingBuilder: (ctx, child, progress) {
                 if (progress == null) return child;
@@ -136,8 +150,8 @@ class ProfileAvatar extends StatelessWidget {
                   color: SC.menu,
                   alignment: Alignment.center,
                   child: SizedBox(
-                    width: size * 0.4,
-                    height: size * 0.4,
+                    width: photoD * 0.4,
+                    height: photoD * 0.4,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: SC.accentFg,
@@ -146,26 +160,45 @@ class ProfileAvatar extends StatelessWidget {
                 );
               },
             )
-          : _letterFallback(letterFontSize),
+          : _letterFallback(letterFontSize, photoD),
     );
+    final Widget circle = !popular
+        ? photo
+        : Container(
+            width: size,
+            height: size,
+            padding: EdgeInsets.all(gapW),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: bg,
+              border: Border.all(color: const Color(0xFFF4FF1F), width: ringW),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFF4FF1F).withValues(alpha: 0.45),
+                  blurRadius: size * 0.28,
+                ),
+              ],
+            ),
+            child: photo,
+          );
 
     // La pastille déborde de la photo (-12, -3) : le cercle rogne ses enfants,
     // donc elle vit dans une pile à part qui, elle, ne rogne pas.
-    final flagD = (size * 0.42).clamp(18.0, 30.0);
+    final flagD = popular ? size * 0.44 : (size * 0.42).clamp(18.0, 30.0);
     final Widget avatar = flagIso.isNotEmpty
         ? Stack(
             clipBehavior: Clip.none,
             children: [
               circle,
               Positioned(
-                right: -3,
+                right: popular ? -4 : -3,
                 bottom: -3,
                 child: Container(
                   width: flagD,
                   height: flagD,
                   padding: const EdgeInsets.all(2),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    color: popular ? bg : Colors.white,
                     shape: BoxShape.circle,
                   ),
                   child: ClipOval(
@@ -210,10 +243,10 @@ class ProfileAvatar extends StatelessWidget {
     );
   }
 
-  Widget _letterFallback(double letterFontSize) {
+  Widget _letterFallback(double letterFontSize, double d) {
     return Container(
-      width: size,
-      height: size,
+      width: d,
+      height: d,
       alignment: Alignment.center,
       decoration: BoxDecoration(shape: BoxShape.circle, color: _bg),
       child: Text(

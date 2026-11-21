@@ -1098,6 +1098,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                             country: _remote?.country ?? '',
                             handle: _handle,
                             online: _peerOnline,
+                            popular: _isViewingOther &&
+                                ((_remote?.isPro ?? false) ||
+                                    (_remote?.isPlus ?? false)),
                             bio: _remote?.bio ?? '',
                             interests: _remote?.interests ?? const [],
                             photos: _remote?.photos ?? const [],
@@ -1325,6 +1328,7 @@ class _IdentitySection extends StatelessWidget {
     this.country = '',
     required this.handle,
     this.online = false,
+    this.popular = false,
     required this.bio,
     required this.interests,
     required this.photos,
@@ -1369,6 +1373,10 @@ class _IdentitySection extends StatelessWidget {
 
   /// Viewer-mode only: show a green "online" line under the handle.
   final bool online;
+
+  /// Viewer-mode only: la personne est populaire (Pro / Plus) → pastille
+  /// « POPULAIRE » à droite du @pseudo et lueur jaune derrière le nom.
+  final bool popular;
   final String bio;
 
   /// "Centres d'intÃ©rÃªt" the user picked (predefined tags). Rendered as
@@ -1544,6 +1552,24 @@ class _IdentitySection extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           image,
+          if (popular && !editable)
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 240,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: Alignment(-0.4, 0.7),
+                      radius: 1.0,
+                      colors: [Color(0x33F4FF1F), Color(0x00F4FF1F)],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -1658,6 +1684,32 @@ class _IdentitySection extends StatelessWidget {
                 ),
               ),
             ),
+            if (popular && !editableName) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4FF1F),
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFF4FF1F).withValues(alpha: 0.35),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+                child: Text(
+                  AppStrings.t('paywall_popular').toUpperCase(),
+                  style: const TextStyle(
+                    color: Color(0xFF04123A),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ],

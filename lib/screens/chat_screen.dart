@@ -2073,6 +2073,7 @@ class _FriendChatRow extends StatelessWidget {
                     avatarUrl: profile.avatarUrl,
                     fallbackUrl: profile.fallbackPhotoUrl,
                     size: 52,
+                    popular: profile.isPro || profile.isPlus,
                     flagIso: profileFlagIso(
                       country: profile.country,
                       language: profile.language,

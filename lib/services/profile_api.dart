@@ -1,4 +1,4 @@
-﻿import 'dart:math';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,6 +8,7 @@ import 'continents.dart';
 import 'debug_overlay.dart';
 import 'looking_for.dart';
 import 'app_settings.dart';
+import 'presence_service.dart';
 import 'supabase_service.dart';
 import 'user_prefs.dart';
 
@@ -1455,6 +1456,9 @@ abstract final class ProfileApi {
     // Un VRAI compte passe devant les comptes IA, quel que soit le reste du score
     // (langue, pays, intérêts…) : quand il y en a, on les voit d'abord.
     if (!p.isAi) s += kDiscoverHumanBonus;
+    // Et les personnes EN LIGNE passent devant tout le monde (sauf un boost) :
+    // quelqu'un qui peut répondre tout de suite vaut mieux qu'un profil endormi.
+    if (isPeerOnline(p)) s += kDiscoverOnlineBonus;
 
     // Same persona category ("what defines you most", e.g. both "Sportif")
     // — one flat bonus, the strongest single "who you are" signal, on par
@@ -1735,6 +1739,10 @@ const double kDiscoverMinContinentShare = 0.2;
 /// Bonus de score d'un vrai compte (non IA) dans Discover : bien plus que tous les
 /// autres critères réunis, donc il passe devant.
 const double kDiscoverHumanBonus = 1000;
+
+/// Une personne en ligne (règle isPeerOnline) : au-dessus d'un vrai compte hors
+/// ligne, sous un boost. Un vrai compte en ligne cumule les deux.
+const double kDiscoverOnlineBonus = 3000;
 
 /// Bonus de score d'un profil boosté : au-dessus du bonus d'un vrai compte et de
 /// tous les autres critères réunis. Le boost passe donc devant tout le monde.

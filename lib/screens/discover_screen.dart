@@ -29,6 +29,7 @@ import '../services/match_celebration.dart';
 import '../services/persona_categories.dart';
 import '../services/nav_chrome.dart';
 import '../services/nav_tab.dart';
+import '../services/presence_service.dart';
 import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
 import '../services/rewarded_video.dart';
@@ -36,7 +37,6 @@ import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
-import '../widgets/swayco_seal.dart';
 import '../widgets/ad_info_sheet.dart';
 import '../widgets/boost_button.dart';
 import '../widgets/country_silhouette.dart';
@@ -3470,16 +3470,15 @@ class _TinderCardState extends State<_TinderCard> {
                   ),
                 ),
               ),
-            )
-          // Seulement un profil vérifié (profiles.is_verified), et pas sur
-          // l'aperçu de ma carte (l'œil du profil).
-          else if (p.isVerified && !widget.preview)
+            ),
+          // « En ligne » : en haut à gauche, sous « POPULAIRE » quand il y est.
+          // La règle de présence est unique (isPeerOnline). Pas sur l'aperçu de
+          // ma carte. La pastille « vérifié », elle, est à côté du prénom.
+          if (!widget.preview && isPeerOnline(p))
             Positioned(
-              top: 14,
+              top: (p.isPro || p.isPlus) ? 50 : 14,
               left: 14,
-              child: IgnorePointer(
-                child: SwaycoSealCapsule(label: AppStrings.t('seal_verified')),
-              ),
+              child: const IgnorePointer(child: _OnlinePill()),
             ),
 
           // ── Dégradé noir en bas (style Tinder) — transparent sur le haut,
@@ -3566,7 +3565,12 @@ class _TinderCardState extends State<_TinderCard> {
                           ),
                         ),
                       ),
-                      // Aperçu de ma carte : pas de drapeau (le mien).
+                      // Pastille « vérifié » à côté du prénom (pas sur l'aperçu
+                      // de ma carte).
+                      if (p.isVerified && !widget.preview) ...[
+                        const SizedBox(width: 10),
+                        const _VerifiedDot(),
+                      ],
                     ],
                   ),
                 ),
@@ -3639,6 +3643,76 @@ class _TinderCardState extends State<_TinderCard> {
             ),
         ],
       );
+  }
+}
+
+/// « En ligne » : pilule de verre, point vert lumineux (handoff « pastille »).
+class _OnlinePill extends StatelessWidget {
+  const _OnlinePill();
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF4ADE80),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(color: Color(0xFF4ADE80), blurRadius: 8),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 7),
+              Text(
+                AppStrings.t('discover_online'),
+                style: GoogleFonts.plusJakartaSans(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// La pastille « vérifié » à côté du prénom : rond bleu, coche blanche.
+class _VerifiedDot extends StatelessWidget {
+  const _VerifiedDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1F5EFF), Color(0xFF2B7FFF), Color(0xFF18DDEA)],
+        ),
+      ),
+      child: const Icon(Icons.verified_rounded, size: 17, color: Colors.white),
+    );
   }
 }
 
