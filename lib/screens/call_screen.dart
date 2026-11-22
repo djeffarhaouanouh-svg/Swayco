@@ -3489,6 +3489,29 @@ class _CallScreenState extends State<CallScreen> {
 
   // ── Le rail de droite et la carte de messages ─────────────────────────────
 
+  /// Un tap sur le fond (vidéo, fond de la carte) : le clavier se referme, le
+  /// rail revient. Il n'échange PAS les deux images au passage.
+  void _tapBackground() {
+    if (_chatFocus.hasFocus) _chatFocus.unfocus();
+    _wakeDock();
+  }
+
+  /// Place verticale que la carte peut prendre en bas (marge + en-tête + deux
+  /// messages), servant à garder le rail au-dessus d'elle.
+  static const double _kCardReserve = 28 + 190;
+
+  /// Le diamètre des touches du rail : 48, réduit (jamais sous 40) quand
+  /// l'écran est trop court pour que le rail entier tienne entre la vignette et
+  /// la carte.
+  double _railDiameter(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final h = mq.size.height - mq.viewPadding.top - mq.viewPadding.bottom;
+    final top = MediaQuery.paddingOf(context).top + 40 + 176 + 12;
+    final avail = h - top - _kCardReserve;
+    const gaps = 4 * 10.0; // 5 touches, 4 espaces
+    return ((avail - gaps) / 5).clamp(40.0, 48.0).toDouble();
+  }
+
   /// Le rail : haut-parleur, caméra, micro, réglage du son, puis raccrocher
   /// (et REC pour l'admin). Posé à droite, JUSTE sous la vignette caméra. Rangé
   /// par défaut : il apparaît au tap sur l'écran et s'efface après 2 s sans
@@ -3497,7 +3520,8 @@ class _CallScreenState extends State<CallScreen> {
     final visible = !_dockDimmed && !_sheetOpen;
     // La vignette : top = paddingTop + 40, hauteur 176 ; 12 px d'air dessous.
     final top = MediaQuery.paddingOf(context).top + 40 + 176 + 12;
-    const gap = SizedBox(height: 12);
+    final d = _railDiameter(context);
+    const gap = SizedBox(height: 10);
     return Positioned(
       key: const ValueKey('call_rail'),
       right: 20,
@@ -3514,6 +3538,7 @@ class _CallScreenState extends State<CallScreen> {
               // Blanc plein = ce qu'on veut voir d'un coup d'œil : le
               // haut-parleur ACTIF, la caméra et le micro COUPÉS.
               _RailButton(
+                diameter: d,
                 label: AppStrings.t(
                   _audio.speakerOn ? 'call_speaker' : 'call_earpiece',
                 ),
@@ -3528,6 +3553,7 @@ class _CallScreenState extends State<CallScreen> {
               ),
               gap,
               _RailButton(
+                diameter: d,
                 label: AppStrings.t(_camOn ? 'call_camera' : 'call_video_off'),
                 icon: _camOn
                     ? Icons.videocam_rounded
@@ -3540,6 +3566,7 @@ class _CallScreenState extends State<CallScreen> {
               ),
               gap,
               _RailButton(
+                diameter: d,
                 label: AppStrings.t(_micOn ? 'call_mic' : 'call_mute'),
                 icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
                 active: !_micOn,
@@ -3551,6 +3578,7 @@ class _CallScreenState extends State<CallScreen> {
               gap,
               // Ouvre un panneau : blanc pendant qu'il est ouvert.
               _RailButton(
+                diameter: d,
                 label: AppStrings.t('call_audio'),
                 icon: Icons.tune_rounded,
                 active: _audioSheetOpen,
@@ -3561,6 +3589,7 @@ class _CallScreenState extends State<CallScreen> {
               // n'a plus sa rangée du bas ; il suit le rail en attendant la
               // décision.
               _RailButton(
+                diameter: d,
                 label: AppStrings.t('call_end'),
                 icon: Icons.call_end_rounded,
                 fill: const Color(0xFFE53935),
@@ -3581,7 +3610,7 @@ class _CallScreenState extends State<CallScreen> {
     return Positioned(
       key: const ValueKey('call_rec'),
       // Le rail : right 20 + 48 de large ; 12 d'air.
-      right: 20 + _RailButton.size + 12,
+      right: 20 + _railDiameter(context) + 12,
       top: top,
       child: IgnorePointer(
         ignoring: !visible,
@@ -3590,6 +3619,7 @@ class _CallScreenState extends State<CallScreen> {
           curve: Curves.easeInOut,
           opacity: visible ? 1 : 0,
           child: _RailButton(
+            diameter: _railDiameter(context),
             label: _egressId == null ? 'REC' : 'STOP',
             icon: Icons.fiber_manual_record,
             active: _egressId != null,
@@ -3742,6 +3772,7 @@ class _CallScreenState extends State<CallScreen> {
       right: 14,
       bottom: bottom,
       child: _CallCard(
+        onTapBackground: _tapBackground,
         showHeader: showHeader,
         composerOpen: _composerOpen,
         header: Row(
@@ -3983,20 +4014,20 @@ class _CallScreenState extends State<CallScreen> {
                 // l'atteindre, rail rangé ou non. Une couche plein écran posée
                 // par-dessus l'avalait — c'était le « je tape 10 fois, ça ne
                 // retourne pas ».
-                if (_dockDimmed || _composerOpen)
-                  Positioned.fill(
-                    key: const ValueKey('dock_wake'),
+                //
+                // Toujours dans l'arbre (il cesse seulement d'attraper les taps) :
+                // une couche qui apparaît / disparaît devant une vignette sans clé
+                // la faisait recréer — et clignoter — à chaque rangement du rail.
+                Positioned.fill(
+                  key: const ValueKey('dock_wake'),
+                  child: IgnorePointer(
+                    ignoring: !(_dockDimmed || _composerOpen),
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: () {
-                        // Clavier levé : un tap ailleurs le referme ; sinon il
-                        // ne fait QUE rappeler le rail (il n'échange pas les
-                        // deux images au passage).
-                        if (_chatFocus.hasFocus) _chatFocus.unfocus();
-                        _wakeDock();
-                      },
+                      onTap: _tapBackground,
                     ),
                   ),
+                ),
                 // PiP: shows whichever feed is NOT the main one. Tap to
                 // swap. Always rendered when the corresponding party
                 // exists, even if their camera is off â€” falls back to a
@@ -4004,6 +4035,7 @@ class _CallScreenState extends State<CallScreen> {
                 if (_pipFeedAvailable(
                     local: local, remote: remote, hasRemote: remoteCount > 0))
                   AnimatedPositioned(
+                    key: const ValueKey('call_pip'),
                     duration: const Duration(milliseconds: 350),
                     curve: Curves.easeOutCubic,
                     // Toujours en haut à droite : les messages sont en bas, dans
@@ -4118,12 +4150,15 @@ class _CallScreenState extends State<CallScreen> {
                 // Le rail (4 boutons + raccrocher) et la carte de messages.
                 // Clés stables : un voisin inséré / retiré ne doit jamais
                 // re-mapper le champ de saisie (b2f3293).
-                _buildCallRail(context),
-                if (_isEgressAdmin) _buildCallRec(context),
                 _buildCallCard(
                   context,
                   peerFirstName: peerFirstName ?? '',
                 ),
+                // Le rail est posé APRÈS la carte : sur un petit écran son bas
+                // (raccrocher) peut chevaucher la carte, et c'est lui qui doit
+                // gagner le tap, jamais le fond de la carte.
+                _buildCallRail(context),
+                if (_isEgressAdmin) _buildCallRec(context),
                 // Brand watermark — top-centre, always on top of whatever
                 // call layout is showing (full-screen, PiP, split…).
                 Align(
@@ -4175,6 +4210,7 @@ class _RailButton extends StatelessWidget {
     required this.onTap,
     this.active = false,
     this.fill,
+    this.diameter = 48,
   });
 
   final String label;
@@ -4185,7 +4221,8 @@ class _RailButton extends StatelessWidget {
   /// Une couleur de fond propre (raccrocher), icône blanche.
   final Color? fill;
 
-  static const double size = 48;
+  /// 48 ; réduit (jamais sous 40) sur un écran court.
+  final double diameter;
 
   @override
   Widget build(BuildContext context) {
@@ -4201,8 +4238,8 @@ class _RailButton extends StatelessWidget {
         child: AnimatedContainer(
           // Court exprès : c'est un interrupteur, pas une transition.
           duration: const Duration(milliseconds: 90),
-          width: size,
-          height: size,
+          width: diameter,
+          height: diameter,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: bg,
@@ -4246,7 +4283,14 @@ class _CallCard extends StatelessWidget {
     required this.messages,
     required this.composer,
     required this.composerOpen,
+    required this.onTapBackground,
   });
+
+  /// Un tap sur le fond de la carte (en-tête, marges) : même effet qu'un tap sur
+  /// l'écran. Sans ça le fond de la carte, qui reçoit les taps, les avalait sans
+  /// rien faire. Les messages, le crayon, le champ et la pastille de langue ont
+  /// leurs propres taps, plus profonds : ce sont eux qui gagnent.
+  final VoidCallback onTapBackground;
 
   final Widget header;
   final bool showHeader;
@@ -4256,7 +4300,10 @@ class _CallCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTapBackground,
+      child: DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(28),
@@ -4300,6 +4347,7 @@ class _CallCard extends StatelessWidget {
             child: Align(alignment: Alignment.centerRight, child: composer),
           ),
         ],
+      ),
       ),
     );
   }
@@ -4436,11 +4484,17 @@ class _CardMessagesState extends State<_CardMessages> {
                   fontWeight: FontWeight.w600,
                   fontStyle:
                       turn.delivered ? FontStyle.normal : FontStyle.italic,
+                  // Deux ombres : la douce de la maquette (0 1 8, 55 %) + un
+                  // liseré serré, pour que le blanc se lise sur une image claire.
                   shadows: [
                     Shadow(
                       color: Colors.black.withValues(alpha: 0.55),
                       blurRadius: 8,
                       offset: const Offset(0, 1),
+                    ),
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      blurRadius: 2,
                     ),
                   ],
                 ),
