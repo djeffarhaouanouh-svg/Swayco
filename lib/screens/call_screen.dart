@@ -4215,6 +4215,17 @@ class _RailButton extends StatelessWidget {
             icon,
             size: 24,
             color: (fill != null || !active) ? Colors.white : Colors.black,
+            // Au repos le rond est presque transparent : sur une image très
+            // claire l'icône blanche se perdrait. Une ombre douce la détache
+            // sans changer le style (rien sur le blanc plein ni le rouge).
+            shadows: (fill == null && !active)
+                ? [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      blurRadius: 6,
+                    ),
+                  ]
+                : null,
           ),
         ),
       ),
