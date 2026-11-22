@@ -60,6 +60,9 @@ COPY --from=flutter-build /app/build/web ./web
 # Static legal site (Terms / Privacy / Help) — served by server.js at
 # /terms, /privacy, /help, /legal alongside the Flutter web bundle.
 COPY legal-site ./legal-site
+# Landing page, served by server.js at /bienvenue (a new folder needs its own
+# COPY line: nothing is copied by wildcard here).
+COPY landing ./landing
 
 EXPOSE 8080
 ENV PORT=8080

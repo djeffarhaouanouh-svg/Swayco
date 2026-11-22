@@ -335,6 +335,9 @@ const hasWebUi = fs.existsSync(webIndex);
 // this folder, NOT fall through to the Flutter SPA fallback.
 const legalPath = path.join(__dirname, 'legal-site');
 const hasLegalSite = fs.existsSync(path.join(legalPath, 'terms.html'));
+// Landing page (download page for ads / the web) — served at /bienvenue.
+const landingPath = path.join(__dirname, 'landing');
+const hasLanding = fs.existsSync(path.join(landingPath, 'index.html'));
 
 
 function assertEnv() {
@@ -2647,6 +2650,22 @@ app.post('/api/notify-online-broadcast', async (req, res) => {
   }
 });
 
+// Landing page: /bienvenue (index.html + its assets). express.static adds the
+// trailing slash itself (/bienvenue -> /bienvenue/), which the page's relative
+// asset URLs need. Registered BEFORE the Flutter SPA fallback, like the legal
+// pages; the web app itself stays at the root.
+if (hasLanding) {
+  app.use(
+    '/bienvenue',
+    express.static(landingPath, {
+      maxAge: '1h',
+      setHeaders(res, filePath) {
+        if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+      },
+    }),
+  );
+}
+
 // Legal site — Terms, Privacy, Help. Must be registered BEFORE the
 // Flutter SPA fallback so /terms etc. serve the HTML files rather
 // than falling through to the Flutter index.html.
@@ -2755,6 +2774,8 @@ if (hasWebUi) {
       p.startsWith('/translation') ||
       p.startsWith('/api') ||
       p.startsWith('/legal-assets') ||
+      p === '/bienvenue' ||
+      p.startsWith('/bienvenue/') ||
       p === '/legal' ||
       p === '/terms' ||
       p === '/privacy' ||
