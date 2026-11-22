@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_strings.dart';
+import '../services/attribution.dart';
 import '../services/call_alert.dart';
 import '../services/call_launcher.dart';
 import '../services/chat_unread.dart';
@@ -317,6 +318,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         return;
       }
       final fresh = ids.difference(_knownMatchIds);
+      // Someone accepted my request (or a like was reciprocated): a new
+      // confirmed friend may complete the `engaged_user` conditions.
+      if (fresh.isNotEmpty) Attribution.checkEngaged();
       // Ceux qui ne sont plus mes matchs sont oubliés : s'ils reviennent, c'est
       // un NOUVEAU match, avec son animation des deux côtés.
       MatchCelebration.forgetEnded(ids);

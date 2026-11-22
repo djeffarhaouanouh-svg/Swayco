@@ -598,7 +598,9 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     PresenceService.start(uid);
     // Tie store purchases to this account (no-op on web / unconfigured).
     unawaited(RevenueCat.identify(uid));
-    unawaited(Attribution.identify(uid));
+    unawaited(
+      Attribution.identify(uid).whenComplete(Attribution.checkEngaged),
+    );
     final profile = await UserPrefs.loadProfile();
     // The ACCOUNT (remote profile) is the source of truth for the interface
     // language: a change made on another device / the web syncs DOWN here

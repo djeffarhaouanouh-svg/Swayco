@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_strings.dart';
+import 'attribution.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
 import 'review_prompt.dart';
@@ -394,11 +395,13 @@ abstract final class ChatApi {
           final inserted =
               await _client.from('messages').insert(row).select('id').single();
           unawaited(ReviewPrompt.noteMessageSent());
+          Attribution.checkEngaged();
           return inserted['id']?.toString() ?? '';
         }
         await _client.from('messages').insert(row);
         // Un message de la personne est parti : au 10e, la demande d'avis.
         unawaited(ReviewPrompt.noteMessageSent());
+        Attribution.checkEngaged();
         return '';
       } on PostgrestException catch (e) {
         final present = [for (final c in optional) if (row.containsKey(c)) c];

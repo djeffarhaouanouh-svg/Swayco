@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_strings.dart';
+import 'attribution.dart';
 import 'demonyms.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
@@ -296,6 +297,8 @@ abstract final class FriendshipApi {
         .select()
         .maybeSingle();
     if (row == null) return null;
+    // A confirmed friendship may complete the `engaged_user` conditions.
+    Attribution.checkEngaged();
     return Friendship.fromMap(Map<String, dynamic>.from(row));
   }
 

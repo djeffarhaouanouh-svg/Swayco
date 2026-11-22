@@ -4,7 +4,10 @@ import 'package:appsflyer_sdk/appsflyer_sdk.dart';
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'revenue_cat.dart';
+import 'supabase_service.dart';
 
 /// AppsFlyer install attribution on **iOS / Android** — which campaign or ad
 /// brought each install, so Snapchat Ads (and any other network) can be
@@ -159,4 +162,62 @@ abstract final class Attribution {
     'call_ended',
     {'kind': kind, 'duration_ms': durationMs},
   );
+
+  // ─── engaged_user ──────────────────────────────────────────────────────────
+  // Once per account, ever: ≥1 CONFIRMED friend AND ≥1 message sent (DM or
+  // group; not the Swayco team, not calls). The database decides — the RPC
+  // `claim_engaged_user` (migration 0097) checks both conditions and hands the
+  // send to exactly one caller, atomically, with a 10-minute lease. The app
+  // then fires the event and calls `confirm_engaged_user_sent`. A crash between
+  // the two just lets the lease expire, so the next launch retries: no loss,
+  // and no duplicate from concurrent devices / rapid-fire triggers.
+
+  static bool _engagedInFlight = false;
+
+  /// Cheap to call from anywhere (after a message, after a friendship is
+  /// confirmed, at boot). Never throws, never blocks the caller.
+  static void checkEngaged() {
+    if (!_initialized || !isSupported || !isSupabaseReady) return;
+    final client = Supabase.instance.client;
+    if (client.auth.currentUser == null) return;
+    unawaited(
+      runEngagedCheck(
+        claim: () async =>
+            (await client.rpc('claim_engaged_user')) == true,
+        send: () => logEvent('engaged_user'),
+        confirm: () async {
+          await client.rpc('confirm_engaged_user_sent');
+        },
+      ),
+    );
+  }
+
+  /// The claim → send → confirm sequence, with its collaborators injected so it
+  /// can be tested. A single in-flight run at a time absorbs bursts of triggers
+  /// on this device; the server lease covers other devices.
+  @visibleForTesting
+  static Future<void> runEngagedCheck({
+    required Future<bool> Function() claim,
+    required void Function() send,
+    required Future<void> Function() confirm,
+  }) async {
+    if (_engagedInFlight) return;
+    _engagedInFlight = true;
+    try {
+      if (!await claim()) return;
+      send();
+      try {
+        await confirm();
+      } catch (e) {
+        // Event is out; if the confirmation is lost the lease expires and a
+        // later launch may re-send once — AppsFlyer-side that is a rare extra
+        // count, which beats losing the conversion.
+        debugPrint('Attribution: engaged confirm failed: $e');
+      }
+    } catch (e) {
+      debugPrint('Attribution: engaged check failed: $e');
+    } finally {
+      _engagedInFlight = false;
+    }
+  }
 }
