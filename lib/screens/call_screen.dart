@@ -3708,7 +3708,6 @@ class _CallScreenState extends State<CallScreen> {
   Widget _buildCallCard(
     BuildContext context, {
     required String peerFirstName,
-    required bool hideOrb,
   }) {
     final mq = MediaQuery.of(context);
     final kb = mq.viewInsets.bottom;
@@ -3726,8 +3725,10 @@ class _CallScreenState extends State<CallScreen> {
         composerOpen: _composerOpen,
         header: Row(
           children: [
-            // Caméra coupée : fond noir et prénom, PAS de galet.
-            if (!hideOrb) ...[_cardOrb(), const SizedBox(width: 10)],
+            // Le galet reste toujours dans l'en-tête de la carte, caméra
+            // coupée comprise (fond noir + prénom au-dessus).
+            _cardOrb(),
+            const SizedBox(width: 10),
             Expanded(child: _cardStatus(peerFirstName)),
             const SizedBox(width: 8),
             _cardLangPill(),
@@ -3831,12 +3832,6 @@ class _CallScreenState extends State<CallScreen> {
     final localFirstName = widget.displayName.trim().isEmpty
         ? null
         : widget.displayName.trim().split(' ').first;
-
-    // Caméra coupée : le fond noir avec le prénom, SANS galet.
-    final hideOrb = remoteCount > 0 &&
-        (_selfMain
-            ? !(local != null && _camOn)
-            : remote == null);
 
     return Stack(
       fit: StackFit.expand,
@@ -4106,7 +4101,6 @@ class _CallScreenState extends State<CallScreen> {
                 _buildCallCard(
                   context,
                   peerFirstName: peerFirstName ?? '',
-                  hideOrb: hideOrb,
                 ),
                 // Brand watermark — top-centre, always on top of whatever
                 // call layout is showing (full-screen, PiP, split…).
