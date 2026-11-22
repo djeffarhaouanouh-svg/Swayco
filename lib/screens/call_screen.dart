@@ -2701,7 +2701,13 @@ class _CallScreenState extends State<CallScreen> {
 
   void _openAudioSheet() {
     _audioSheetOpen = true;
-    unawaited(_showCallSheet((ctx) => _AudioSettingsSheet(controller: _audio)));
+    unawaited(_showCallSheet(
+      (ctx) => _AudioSettingsSheet(
+        controller: _audio,
+        translationOn: _translationEnabled,
+        onToggleTranslation: () => unawaited(_toggleTranslation()),
+      ),
+    ));
   }
 
   /// Les deux langues de l'appel, dans un seul panneau : à gauche celle que je
@@ -2717,8 +2723,6 @@ class _CallScreenState extends State<CallScreen> {
     var heard = _myOutputLang;
     unawaited(_showCallSheet(
       (ctx) => _LanguagePairSheet(
-        translationOn: _translationEnabled,
-        onToggleTranslation: () => unawaited(_toggleTranslation()),
         spokenCode: _mySourceLang,
         heardCode: _myOutputLang,
         onChanged: (s, h) {
@@ -3552,29 +3556,6 @@ class _CallScreenState extends State<CallScreen> {
                 active: _audioSheetOpen,
                 onTap: _openAudioSheet,
               ),
-              // Dev-only : capture de pub via LiveKit Egress. Jamais montré à
-              // un utilisateur normal ([_isEgressAdmin]).
-              if (_isEgressAdmin) ...[
-                gap,
-                _RailButton(
-                  label: _egressId == null ? 'REC' : 'STOP',
-                  icon: Icons.fiber_manual_record,
-                  active: _egressId != null,
-                  onTap: _egressBusy
-                      ? () => ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Enregistrement en cours de démarrage…',
-                              ),
-                              duration: Duration(seconds: 2),
-                            ),
-                          )
-                      : () {
-                          _wakeDock();
-                          _toggleEgress();
-                        },
-                ),
-              ],
               gap,
               // Raccrocher : gardé tel quel (rouge, même action qu'avant). Il
               // n'a plus sa rangée du bas ; il suit le rail en attendant la
@@ -3586,6 +3567,46 @@ class _CallScreenState extends State<CallScreen> {
                 onTap: _hangUp,
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Le bouton REC (admin seulement), posé À CÔTÉ du rail, à sa gauche, au
+  /// niveau de sa première touche : il suit le rail (même fondu, même rangement).
+  Widget _buildCallRec(BuildContext context) {
+    final visible = !_dockDimmed && !_sheetOpen;
+    final top = MediaQuery.paddingOf(context).top + 40 + 176 + 12;
+    return Positioned(
+      key: const ValueKey('call_rec'),
+      // Le rail : right 20 + 48 de large ; 12 d'air.
+      right: 20 + _RailButton.size + 12,
+      top: top,
+      child: IgnorePointer(
+        ignoring: !visible,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeInOut,
+          opacity: visible ? 1 : 0,
+          child: _RailButton(
+            label: _egressId == null ? 'REC' : 'STOP',
+            icon: Icons.fiber_manual_record,
+            active: _egressId != null,
+            // Pas de toucher « muet » : pendant le démarrage, on le DIT (sinon
+            // on croit que rien ne s'est passé et on re-touche — ce qui
+            // arrêtait tout).
+            onTap: _egressBusy
+                ? () => ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Enregistrement en cours de démarrage…'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    )
+                : () {
+                    _wakeDock();
+                    _toggleEgress();
+                  },
           ),
         ),
       ),
@@ -4098,6 +4119,7 @@ class _CallScreenState extends State<CallScreen> {
                 // Clés stables : un voisin inséré / retiré ne doit jamais
                 // re-mapper le champ de saisie (b2f3293).
                 _buildCallRail(context),
+                if (_isEgressAdmin) _buildCallRec(context),
                 _buildCallCard(
                   context,
                   peerFirstName: peerFirstName ?? '',
@@ -5449,14 +5471,7 @@ class _LanguagePairSheet extends StatelessWidget {
     required this.spokenCode,
     required this.heardCode,
     required this.onChanged,
-    required this.translationOn,
-    required this.onToggleTranslation,
   });
-
-  /// La traduction tourne ? Le galet n'est plus cliquable : couper / reprendre
-  /// la traduction se fait d'ici.
-  final bool translationOn;
-  final VoidCallback onToggleTranslation;
 
   final String spokenCode;
   final String heardCode;
@@ -5489,33 +5504,7 @@ class _LanguagePairSheet extends StatelessWidget {
               heardCode: heardCode,
               onChanged: onChanged,
             ),
-            const SizedBox(height: 10),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.of(context).maybePop();
-                onToggleTranslation();
-              },
-              icon: Icon(
-                translationOn
-                    ? Icons.pause_circle_outline_rounded
-                    : Icons.play_circle_outline_rounded,
-                size: 20,
-                color: Colors.white70,
-              ),
-              label: Text(
-                AppStrings.t(
-                  translationOn
-                      ? 'call_translation_cut'
-                      : 'call_translation_resume',
-                ),
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 18),
             // Le panneau s'appliquait déjà en se refermant, quel qu'ait été le
             // geste. Ce bouton ne fait donc que refermer — mais il dit qu'on a
             // fini, ce qu'un panneau qu'on fait glisser ne dit jamais vraiment.
@@ -5800,10 +5789,26 @@ class _FlagWheelState extends State<_FlagWheel> {
 /// In-call audio panel — just the sliders: mic level, translation volume and
 /// original-voice volume. (The ducking toggle + speaker/earpiece route were
 /// dropped on request.)
-class _AudioSettingsSheet extends StatelessWidget {
-  const _AudioSettingsSheet({required this.controller});
+class _AudioSettingsSheet extends StatefulWidget {
+  const _AudioSettingsSheet({
+    required this.controller,
+    required this.translationOn,
+    required this.onToggleTranslation,
+  });
 
   final AudioController controller;
+
+  /// La traduction tourne à l'ouverture du panneau (interrupteur coché). Le
+  /// galet n'est plus cliquable : couper / reprendre la traduction se fait ici.
+  final bool translationOn;
+  final VoidCallback onToggleTranslation;
+
+  @override
+  State<_AudioSettingsSheet> createState() => _AudioSettingsSheetState();
+}
+
+class _AudioSettingsSheetState extends State<_AudioSettingsSheet> {
+  late bool _on = widget.translationOn;
 
   @override
   Widget build(BuildContext context) {
@@ -5816,7 +5821,29 @@ class _AudioSettingsSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const _SheetHandle(),
-            _AudioControls(controller: controller),
+            _AudioControls(controller: widget.controller),
+            const SizedBox(height: 6),
+            // Couper la traduction : l'interrupteur est coché tant qu'elle
+            // tourne ; le décocher la coupe (et le recocher la reprend).
+            Row(
+              children: [
+                Expanded(
+                  child: _SheetLabel(
+                    icon: Icons.translate_rounded,
+                    text: AppStrings.t('call_lang_translation'),
+                  ),
+                ),
+                Switch(
+                  value: _on,
+                  activeThumbColor: Colors.black,
+                  activeTrackColor: SC.accent,
+                  onChanged: (v) {
+                    setState(() => _on = v);
+                    widget.onToggleTranslation();
+                  },
+                ),
+              ],
+            ),
           ],
         ),
       ),
