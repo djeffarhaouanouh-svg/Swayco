@@ -3968,7 +3968,8 @@ class _CallScreenState extends State<CallScreen> {
                   )
                 else
                   Container(
-                    color: SC.dMenu,
+                    // Noir, comme l'écran « caméra coupée ».
+                    color: Colors.black,
                     alignment: Alignment.center,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
