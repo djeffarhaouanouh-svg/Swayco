@@ -187,21 +187,9 @@ class _CallScreenState extends State<CallScreen> {
   /// Wraps the shareable part of the summary card so it can be captured to a
   /// PNG and shared ("partager la page").
   final GlobalKey _shareCardKey = GlobalKey();
-  /// The blue control rail is folded away behind the chevron until the user
-  /// asks for it — the video stays clean. Hang up is never hidden.
-  bool _controlsOpen = false;
   /// Ce qui est DIT, transcrit — chaque device dans sa langue. Les lignes ne
   /// vivent que le temps de l'appel (rien n'est persisté).
   final List<_SpokenTurn> _turns = [];
-
-  /// La zone est dépliée : les deux derniers tours et la saisie, tout le reste
-  /// de l'appel s'efface le temps qu'elle est là.
-  bool _turnsOpen = false;
-
-  /// Les messages sont COUPÉS (touche Messages) : ni bulles, ni languette, ni
-  /// crayon. Sinon ils sont permanents — rien d'autre ne les ferme. La touche
-  /// Messages les remet.
-  bool _messagesCut = false;
 
   /// La saisie de la conversation. Ce qui est tapé part comme une phrase dite :
   /// traduit chez le pair, écrit et lu à voix haute. Rien n'est persisté, ça ne
@@ -210,15 +198,7 @@ class _CallScreenState extends State<CallScreen> {
   final FocusNode _chatFocus = FocusNode();
   bool _chatSending = false;
 
-  // Les messages au repos sont PERMANENTS : ni délai, ni retrait au doigt. Un tap
-  // sur eux ne fait que ranger / afficher la barre de boutons.
-
-  // ── Zone messages : côté, saisie repliée, démonstration ────────────────
-  /// Les messages sont rangés EN HAUT de l'écran (sinon en bas, par défaut).
-  /// Choisi en glissant (ou touchant) la languette ; valable pour CET appel
-  /// seulement : chaque appel repart avec les bulles en bas.
-  bool _msgTop = false;
-
+  // ── La carte de messages (permanente, en bas) ───────────────────────────
   /// La saisie est dépliée (sinon : un rond crayon).
   bool _composerOpen = false;
   Timer? _composerIdle;
@@ -226,158 +206,22 @@ class _CallScreenState extends State<CallScreen> {
   /// Combien la saisie dépliée reste ouverte sans focus ni geste.
   static const Duration _kComposerIdle = Duration(seconds: 4);
 
-  /// La démonstration de la languette tourne (première ouverture de l'appel).
-  bool _tabHint = false;
-  bool _tabHintSeen = false;
+  /// Un tap dans la zone des messages masque l'en-tête de la carte (galet,
+  /// statut, drapeau) ; un second le ramène.
+  bool _cardHeaderHidden = false;
 
-  /// Distance entre le bas de l'écran et le bas de la vignette caméra quand
-  /// des bulles au repos sont en haut et que la barre d'appel est visible :
-  /// la barre (~112 px) et un peu d'air. Zone Messages ouverte, la barre est
-  /// effacée et la vignette se pose au ras du bas.
-  static const double _kPipBottomLift = 128;
+  /// L'étape du texte d'état (0 « Parle normalement », 1 « Patiente… », 2 « a
+  /// reçu ta traduction », 3 « À toi »). Le galet de l'en-tête s'estompe à 1.
+  final ValueNotifier<int> _trStep = ValueNotifier<int>(0);
 
-  /// Où se pose le galet (alignement vertical) pour que ni le disque ni le texte
-  /// dessous ne touchent ce qui est en dessous : la barre de boutons (raccrocher,
-  /// micro…), la rangée de réglages dépliée, et les deux premiers messages quand
-  /// ils sont affichés. Calculé depuis leurs hauteurs :
-  ///   texte  = 36 px sous le bas du disque, qui fait 84 ;
-  ///   le bloc galet+texte a son centre 14 px sous celui du disque.
-  double _orbY(double h) {
-    if (h <= 0) return 0.80;
-    final showBubbles =
-        !_turnsOpen && !_msgTop && _turns.isNotEmpty && !_messagesCut;
-    final n = _restTurns.length.clamp(1, 2);
-    final dockShown = _turnsOpen ? _topControls : !_dockDimmed;
-    final dockH = dockShown ? 96.0 : 0.0; // la barre, hors marge basse
-    final railH = _controlsOpen ? 92.0 : 0.0; // la rangée de réglages
-    final controlsTop = 16.0 + dockH + railH; // haut des boutons, depuis le bas
-    // Les bulles se posent juste au-dessus des boutons (10 px d'air).
-    final top = showBubbles ? controlsTop + 10 + 22 + 50.0 * n : controlsTop;
-    // Rien au-dessus du bord bas : la place habituelle, tout en bas.
-    if (top <= 40) return 0.80;
-    final discBottom = top + 8 + 36;
-    final centerFromTop = h - discBottom - 42 + 14;
-    return (2 * centerFromTop / h - 1).clamp(-0.9, 0.80).toDouble();
-  }
-  /// Les tours montrés au repos : les deux dernières phrases si elles sont
-  /// courtes, sinon la dernière seule (voir [_lastTurnsToShow]).
-  List<_SpokenTurn> get _restTurns => _lastTurnsToShow(_turns);
-
-  /// Des bulles (au repos ou la zone ouverte) sont affichées EN HAUT.
-  bool get _topMessagesShown =>
-      _msgTop &&
-      !_messagesCut &&
-      (_camOffMode
-          // Caméra coupée : les messages sont permanents, le silence ou un tap
-          // ne les retire pas.
-          ? _turns.isNotEmpty
-          : (_turnsOpen || _turns.isNotEmpty));
-
-  /// v4 : le pair est connecté mais sa caméra est coupée, et son tile occupe la
-  /// vue principale. Les 2 dernières bulles y restent en permanence, un tap
-  /// ne fait que ranger / afficher la barre, et le crayon reste présent.
-  /// Désactivé tant que l'ancien panneau Messages est ouvert (jamais les deux).
-  bool get _camOffMode {
-    final r = _room;
-    if (r == null || _selfMain || _turnsOpen) return false;
-    return r.remoteParticipants.isNotEmpty && _remoteVideo(r) == null;
-  }
-
-  /// Valeurs de la maquette v4 (écran de 760 de haut utile). Les distances au
-  /// bas de l'écran gardent leurs dp (elles suivent la hauteur de la barre et du
-  /// rail déplié) ; celles mesurées depuis le haut (galet, tile) passent en
-  /// proportion de [h], PUIS sont corrigées pour que rien ne se touche : le
-  /// galet reste au-dessus de la bulle, et le groupe icône + prénom au-dessus
-  /// du galet (ses ondes comprises).
-  ({
-    double bubbles,
-    double field,
-    double orbC,
-    double orbScale,
-    double tile,
-    double zoneMax,
-  }) _camOffGeo(BuildContext context, double h) {
-    final kb = MediaQuery.viewInsetsOf(context).bottom;
-    final sb = MediaQuery.viewPaddingOf(context).bottom;
-    // Le rail déplié (Messages, Langue, Audio…) prend de la place au-dessus de
-    // la barre : les bulles se posent AU-DESSUS, jamais dessous.
-    final rail = _controlsOpen ? 92.0 : 0.0;
-    final double bubbles;
-    final double field;
-    if (_composerOpen && kb == 0 && _dockDimmed) {
-      // Pas de clavier à l'écran (ordinateur) et barre rangée : le champ reste
-      // à la place du crayon. À 138 px il flotterait au-dessus d'une barre
-      // absente, avec un grand vide dessous.
-      field = 44 + sb + rail;
-      bubbles = field + 60;
-    } else if (_composerOpen) {
-      // Clavier levé : barre rangée, champ posé au ras du clavier.
-      field = kb > 0 ? kb + 12 : 138 + sb + rail;
-      bubbles = field + 60;
-    } else if (!_dockDimmed) {
-      bubbles = field = 146 + sb + rail;
-    } else {
-      // Au niveau du crayon (centre à 67 px du bas) ; au-dessus du rail s'il
-      // est déplié.
-      bubbles = rail > 0 ? 80 + sb + rail : 47 + sb;
-      field = 44 + sb;
-    }
-    // Le galet NE BOUGE PAS : il reste où l'ancien affichage le posait
-    // ([_orbY]). Le bloc galet + texte a son centre 14 px sous celui du disque.
-    final orbC = (_orbY(h) + 1) * h / 2 - 14;
-    // C'est le groupe icône + prénom qui remonte, juste assez pour ne pas
-    // toucher le galet et ses ondes (28 px) — 49 px = sa demi-hauteur.
-    const r = 42.0;
-    final tile = math.max(
-      -(h / 2 - 100),
-      math.min(0.0, orbC - r - 28 - 49 - h / 2),
-    );
-    // La zone Messages grandit vers le haut, pour les très longs messages
-    // (audio), jusqu'au galet et son texte (~36 px sous le disque) sans le
-    // recouvrir. Au-delà, on fait défiler dans la zone.
-    final zoneMax =
-        (h - bubbles - (orbC + r + 40)).clamp(66.0, 280.0).toDouble();
-    return (
-      bubbles: bubbles,
-      field: field,
-      orbC: orbC,
-      orbScale: 1.0,
-      tile: tile,
-      zoneMax: zoneMax,
-    );
-  }
-  /// v4 : un tap sur l'écran (ou une bulle) ne fait QUE ranger ou afficher la
-  /// barre de boutons. Les messages, eux, ne se ferment jamais.
-  void _toggleDockCamOff() {
+  /// Un tap dans la zone des messages : masque / ramène l'en-tête de la carte.
+  void _toggleCardHeader() {
     if (!mounted) return;
-    if (_tabHint) _endTabHint();
     if (_chatFocus.hasFocus) {
       _chatFocus.unfocus();
       return;
     }
-    if (_dockDimmed) {
-      _wakeDock();
-    } else {
-      _dockIdleTimer?.cancel();
-      setState(() => _dockDimmed = true);
-    }
-  }
-
-  void _setMessagesSide(bool top) {
-    if (top == _msgTop) return;
-    _topControlsTimer?.cancel();
-    setState(() {
-      _msgTop = top;
-      _topControls = false;
-    });
-  }
-
-  // La démonstration de la languette joue à CHAQUE appel (au premier message) :
-  // plus de compteur d'appels.
-
-  void _endTabHint() {
-    if (!_tabHint) return;
-    setState(() => _tabHint = false);
+    setState(() => _cardHeaderHidden = !_cardHeaderHidden);
   }
 
   /// Déplie la saisie (le rond crayon touché) et monte le clavier.
@@ -386,19 +230,6 @@ class _CallScreenState extends State<CallScreen> {
     setState(() => _composerOpen = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _composerOpen) _chatFocus.requestFocus();
-    });
-  }
-
-  /// À l'ouverture de la conversation, la saisie se montre dépliée un instant
-  /// (sans clavier) puis se referme en rond crayon : c'est la démonstration
-  /// qu'elle se ferme et qu'un tap sur le crayon la rouvre. Un tap dessus entre
-  /// temps (focus) annule le repli.
-  void _foldComposerSoon() {
-    _composerIdle?.cancel();
-    _composerIdle = Timer(const Duration(milliseconds: 1400), () {
-      if (!mounted || !_composerOpen) return;
-      if (_chatFocus.hasFocus || _chatSending) return;
-      setState(() => _composerOpen = false);
     });
   }
 
@@ -421,55 +252,34 @@ class _CallScreenState extends State<CallScreen> {
   void _onChatFocusChanged() {
     if (_chatFocus.hasFocus) {
       _composerIdle?.cancel();
-      // v4 : le clavier monte, la barre se range d'elle-même.
-      if (_camOffMode && mounted && !_dockDimmed) {
-        _dockIdleTimer?.cancel();
-        setState(() => _dockDimmed = true);
-      }
     } else {
       _armComposerIdle();
     }
   }
 
-  /// Referme la conversation ET le clavier, et emporte les phrases au repos
-  /// avec. Les trois vont ensemble : un tap qui ne ferme que le panneau laisse
-  /// les bulles derrière, et l'écran a l'air de ne jamais se rendre — c'est
-  /// exactement ce qu'on reprochait à la version d'avant.
+  /// Un panneau est ouvert par-dessus l'appel (langues, son).
   ///
-  /// Les phrases au repos, elles, restent : les messages sont permanents.
-  void _closeTurns() {
-    _chatFocus.unfocus();
-    _composerIdle?.cancel();
-    _topControlsTimer?.cancel();
-    if (!mounted) return;
-    if (_tabHint) _endTabHint();
-    setState(() {
-      _topControls = false;
-      _turnsOpen = false;
-      _composerOpen = false;
-      _messagesCut = true;
-    });
-  }
-
-  /// Un panneau est ouvert par-dessus l'appel (langues, son, réglages).
-  ///
-  /// Ce n'est pas une affaire de panneau des langues : le galet doit remonter
-  /// et la vidéo se flouter pour N'IMPORTE lequel, sinon chaque panneau se
-  /// comporte à sa façon — l'un recouvrait le galet, l'autre le remplaçait par
-  /// un second.
+  /// La carte et le rail se rangent simplement DERRIÈRE lui : ni flou de la
+  /// vidéo, ni galet qui bouge.
   bool _sheetOpen = false;
 
-  /// Ouvre [body] par-dessus l'appel en faisant remonter le galet et flouter la
-  /// vidéo, et remet tout en place à la fermeture — quelle qu'en soit la
-  /// manière, y compris un balayage.
+  /// Le panneau « Son » est ouvert (la touche du rail est alors blanche).
+  bool _audioSheetOpen = false;
+
+  /// Ouvre [body] par-dessus l'appel et remet tout en place à la fermeture —
+  /// quelle qu'en soit la manière, y compris un balayage.
   Future<void> _showCallSheet(WidgetBuilder body) {
-    setState(() => _sheetOpen = true);
+    // Le rail se ferme à l'ouverture d'un panneau.
+    _dockIdleTimer?.cancel();
+    setState(() {
+      _sheetOpen = true;
+      _dockDimmed = true;
+    });
     return showModalBottomSheet<void>(
       context: context,
       // L'appel reste sombre en toute apparence : surface figée.
       backgroundColor: const Color(0xFF16161B),
-      // Pas de voile : c'est l'écran d'appel qui floute, sous le galet. Un
-      // voile par-dessus le flouterait lui aussi.
+      // Pas de voile : rien ne doit flouter ni assombrir l'écran d'appel.
       barrierColor: Colors.transparent,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -480,94 +290,30 @@ class _CallScreenState extends State<CallScreen> {
       if (!mounted) return;
       setState(() {
         _sheetOpen = false;
-        // Et le rail avec : c'est lui qui a ouvert ce panneau, le laisser
-        // déplié obligeait à un second geste pour revenir à l'appel. Les
-        // messages, eux, restent : seule la touche Messages les coupe.
-        _controlsOpen = false;
+        _audioSheetOpen = false;
       });
     });
   }
 
-  /// Plus personne ne parle : le dock s'efface presque entièrement et il ne
-  /// reste que la pastille, comme la pilule de Gemini qui se replie en pastille.
-  /// Un tap n'importe où dessus le ramène.
+  /// Le rail de droite est RANGÉ par défaut : il apparaît au tap sur l'écran et
+  /// s'efface après [_kDockIdle] sans geste. Rangé, il ne répond plus aux taps.
   bool _dockDimmed = false;
   Timer? _dockIdleTimer;
 
-  /// Le silence au bout duquel le dock disparaît.
+  /// Le silence au bout duquel le rail disparaît.
   static const Duration _kDockIdle = Duration(seconds: 2);
 
-  /// Messages EN HAUT, zone ouverte : la barre de boutons est effacée. Un tap
-  /// sur l'écran ne referme PAS tout ; il la réaffiche (et la vignette caméra
-  /// remonte un peu au-dessus), puis elle se range seule au bout de quelques
-  /// secondes. Les messages, eux, restent en haut.
-  bool _topControls = false;
-  Timer? _topControlsTimer;
-  static const Duration _kTopControlsIdle = Duration(seconds: 4);
-
-  void _showTopControls() {
-    if (!mounted) return;
-    setState(() => _topControls = true);
-    _armTopControls();
-    _wakeDock();
-  }
-
-  void _armTopControls() {
-    _topControlsTimer?.cancel();
-    _topControlsTimer = Timer(_kTopControlsIdle, () {
-      if (!mounted) return;
-      // Pas sous les doigts de quelqu'un qui s'en sert : réglages dépliés.
-      if (_controlsOpen) {
-        _armTopControls();
-        return;
-      }
-      if (_topControls) setState(() => _topControls = false);
-    });
-  }
-
-  /// Le rail déplié (Messages, Langue, Audio, REC) se referme seul après ce délai
-  /// sans toucher. Il ne repart QUE sur un geste sur le rail : pas sur la voix
-  /// ni les phrases, qui rallument le dock en continu pendant une conversation
-  /// et le garderaient ouvert pour toujours.
-  Timer? _controlsIdleTimer;
-  static const Duration _kControlsIdle = Duration(seconds: 5);
-
-  void _armControlsIdle() {
-    _controlsIdleTimer?.cancel();
-    _controlsIdleTimer = Timer(_kControlsIdle, () {
-      if (!mounted || !_controlsOpen) return;
-      // Un panneau (langues, son) est ouvert par-dessus : ce n'est pas du repos.
-      if (_sheetOpen) {
-        _armControlsIdle();
-        return;
-      }
-      setState(() => _controlsOpen = false);
-    });
-  }
-
-  /// Quelque chose vient de se passer (une voix, une phrase, un tap) : le dock
-  /// se rallume et repart pour [_kDockIdle] de sursis.
+  /// Un tap sur l'écran, sur le rail : il se rallume et repart pour
+  /// [_kDockIdle] de sursis.
   void _wakeDock() {
     _armDockIdle();
-    // v4 : clavier levé, la barre reste rangée (elle recouvrirait le champ).
-    if (_dockDimmed && mounted && !(_camOffMode && _chatFocus.hasFocus)) {
-      setState(() => _dockDimmed = false);
-    }
-    if (_topControls) _armTopControls();
+    if (_dockDimmed && mounted) setState(() => _dockDimmed = false);
   }
 
-  /// Le sursis avant que le dock s'efface. Reconduit TOUT SEUL tant que quelqu'un
-  /// s'en sert — sans passer par [_wakeDock] : il rallumait aussi le délai de la
-  /// barre rappelée par un tap ([_armTopControls]), qui ne s'éteignait plus
-  /// jamais puisque la section Messages est ouverte en permanence.
   void _armDockIdle() {
     _dockIdleTimer?.cancel();
     _dockIdleTimer = Timer(_kDockIdle, () {
       if (!mounted || _dockDimmed) return;
-      if (_turnsOpen || _controlsOpen || (_camOffMode && _composerOpen)) {
-        _armDockIdle();
-        return;
-      }
       setState(() => _dockDimmed = true);
     });
   }
@@ -771,12 +517,6 @@ class _CallScreenState extends State<CallScreen> {
     //
     // Permanente : la dernière phrase reste affichée, sans délai ni retrait.
     setState(() {
-      // Le premier message de l'appel (« Bonjour ») lance l'animation de la
-      // languette : la section monte, la vignette descend, puis tout revient.
-      if (_turns.isEmpty && _turnsOpen && !_tabHintSeen) {
-        _tabHintSeen = true;
-        _tabHint = true;
-      }
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
       if (_turns.length > 60) _turns.removeRange(0, _turns.length - 60);
@@ -1753,11 +1493,6 @@ class _CallScreenState extends State<CallScreen> {
   /// metadata) and is overridden the moment they tap their own language button.
   String _peerListenLang = '';
 
-  /// Les textes d'explication sous le galet : affichés tant qu'aucune de mes
-  /// phrases n'est jamais partie sur cet appareil (puis pour le reste de cet
-  /// appel-là).
-  bool _trCaptions = false;
-
   /// The output language we last announced to the peer, so a re-announce on
   /// their (re)connect doesn't republish on every metadata event.
   String _announcedOutputLang = '';
@@ -2041,11 +1776,6 @@ class _CallScreenState extends State<CallScreen> {
     Analytics.track('screen_view', props: {'screen': 'live'});
     // Zone messages : côté choisi, démonstration déjà vue, repli de la saisie.
     _chatFocus.addListener(_onChatFocusChanged);
-    // Les textes d'explication sous le galet : tant qu'on n'a jamais vu une
-    // phrase partir (voir [TranslationStepCaption]).
-    // Toujours affichés : ils ne s'effacent plus après la première phrase
-    // envoyée (c'était un réglage que personne n'avait demandé).
-    _trCaptions = true;
     // Le bouton REC : autorisé par la liste du serveur (en plus de l'e-mail
     // compilé). Silencieux en cas d'erreur : le bouton reste simplement caché.
     unawaited(EgressApi.checkAllowed().then((ok) {
@@ -2464,9 +2194,6 @@ class _CallScreenState extends State<CallScreen> {
           _connecting = false;
           _micOn = true;
           _camOn = _startCam;
-          // La section Messages s'ouvre dès l'arrivée sur la page live, avec sa
-          // languette ; seule la touche Messages la referme.
-          _turnsOpen = true;
           _composerOpen = false;
         });
       }
@@ -2817,6 +2544,15 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
+  /// La caméra qui filme est l'ARRIÈRE (sinon l'avant, celle de départ).
+  bool _camFacingBack = false;
+
+  /// Un retournement est en cours. Sans ce verrou, taper plusieurs fois de suite
+  /// relançait la capture (stop → getUserMedia → replaceTrack) PAR-DESSUS la
+  /// précédente : les redémarrages se marchaient dessus et la caméra restait
+  /// bloquée.
+  bool _flipBusy = false;
+
   /// Retourner la caméra, avant / arrière.
   ///
   /// LiveKit expose l'échange sur la piste elle-même, pas sur le participant :
@@ -2824,20 +2560,30 @@ class _CallScreenState extends State<CallScreen> {
   /// basculer. Sans piste — caméra coupée, ou pas encore publiée — il n'y a
   /// rien à retourner et on ne fait rien plutôt que de lever.
   Future<void> _flipCamera() async {
+    if (_flipBusy) return;
     final room = _room;
     if (room == null) return;
     final track = _localVideo(room);
-    if (track is! LocalVideoTrack) return;
+    if (track is! LocalVideoTrack) {
+      DebugOverlay.log('flip camera: no local video track');
+      return;
+    }
+    // Ce que dit la piste fait foi ; à défaut, notre propre mémoire.
+    final opts = track.currentOptions;
+    final facingBack = opts is CameraCaptureOptions
+        ? opts.cameraPosition == CameraPosition.back
+        : _camFacingBack;
+    final next = facingBack ? CameraPosition.front : CameraPosition.back;
+    _flipBusy = true;
     try {
-      await track.setCameraPosition(
-        track.currentOptions is CameraCaptureOptions &&
-                (track.currentOptions as CameraCaptureOptions).cameraPosition ==
-                    CameraPosition.front
-            ? CameraPosition.back
-            : CameraPosition.front,
-      );
+      await track.setCameraPosition(next);
+      if (mounted) {
+        setState(() => _camFacingBack = next == CameraPosition.back);
+      }
     } catch (e) {
       DebugOverlay.log('flip camera failed: $e');
+    } finally {
+      _flipBusy = false;
     }
   }
 
@@ -2954,6 +2700,7 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _openAudioSheet() {
+    _audioSheetOpen = true;
     unawaited(_showCallSheet((ctx) => _AudioSettingsSheet(controller: _audio)));
   }
 
@@ -2970,6 +2717,8 @@ class _CallScreenState extends State<CallScreen> {
     var heard = _myOutputLang;
     unawaited(_showCallSheet(
       (ctx) => _LanguagePairSheet(
+        translationOn: _translationEnabled,
+        onToggleTranslation: () => unawaited(_toggleTranslation()),
         spokenCode: _mySourceLang,
         heardCode: _myOutputLang,
         onChanged: (s, h) {
@@ -2990,32 +2739,6 @@ class _CallScreenState extends State<CallScreen> {
     }));
   }
 
-  /// Les deux panneaux de l'appel d'un coup — le son à gauche, les langues à
-  /// droite. C'est l'appui long sur la pastille qui l'ouvre : le geste rapide
-  /// reste réservé à couper la traduction.
-  void _openCallSettingsSheet() {
-    var spoken = _mySourceLang;
-    var heard = _myOutputLang;
-    unawaited(_showCallSheet(
-      (ctx) => _CallSettingsSheet(
-        controller: _audio,
-        spokenCode: _mySourceLang,
-        heardCode: _myOutputLang,
-        onLanguagesChanged: (sp, hd) {
-          spoken = sp;
-          heard = hd;
-        },
-      ),
-    ).whenComplete(() {
-      if (!mounted) return;
-      if (_baseLang(spoken) != _baseLang(_mySourceLang)) {
-        unawaited(_changeSpokenLanguage(spoken));
-      }
-      if (_baseLang(heard) != _baseLang(_myOutputLang)) {
-        unawaited(_changeOutputLanguage(heard));
-      }
-    }));
-  }
 
   /// `fr-FR` et `fr` sont la même langue : comparer les tags bruts ferait
   /// repartir le pipeline pour rien.
@@ -3725,8 +3448,7 @@ class _CallScreenState extends State<CallScreen> {
     _myVoiceLevel.dispose();
     _composerIdle?.cancel();
     _dockIdleTimer?.cancel();
-    _controlsIdleTimer?.cancel();
-    _topControlsTimer?.cancel();
+    _trStep.dispose();
     _micProbe?.cancel();
     final declineCh = _declineChannel;
     _declineChannel = null;
@@ -3759,6 +3481,285 @@ class _CallScreenState extends State<CallScreen> {
     } catch (_) {
       // Pas de wakelock disponible (plateforme, test) : l'appel continue.
     }
+  }
+
+  // ── Le rail de droite et la carte de messages ─────────────────────────────
+
+  /// Le rail : haut-parleur, caméra, micro, réglage du son, puis raccrocher
+  /// (et REC pour l'admin). Posé à droite, JUSTE sous la vignette caméra. Rangé
+  /// par défaut : il apparaît au tap sur l'écran et s'efface après 2 s sans
+  /// geste ; rangé, il ne répond plus aux taps.
+  Widget _buildCallRail(BuildContext context) {
+    final visible = !_dockDimmed && !_sheetOpen;
+    // La vignette : top = paddingTop + 40, hauteur 176 ; 12 px d'air dessous.
+    final top = MediaQuery.paddingOf(context).top + 40 + 176 + 12;
+    const gap = SizedBox(height: 12);
+    return Positioned(
+      key: const ValueKey('call_rail'),
+      right: 20,
+      top: top,
+      child: IgnorePointer(
+        ignoring: !visible,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeInOut,
+          opacity: visible ? 1 : 0,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Blanc plein = ce qu'on veut voir d'un coup d'œil : le
+              // haut-parleur ACTIF, la caméra et le micro COUPÉS.
+              _RailButton(
+                label: AppStrings.t(
+                  _audio.speakerOn ? 'call_speaker' : 'call_earpiece',
+                ),
+                icon: _audio.speakerOn
+                    ? Icons.volume_up_rounded
+                    : Icons.phone_in_talk_rounded,
+                active: _audio.speakerOn,
+                onTap: () {
+                  _wakeDock();
+                  _toggleSpeaker();
+                },
+              ),
+              gap,
+              _RailButton(
+                label: AppStrings.t(_camOn ? 'call_camera' : 'call_video_off'),
+                icon: _camOn
+                    ? Icons.videocam_rounded
+                    : Icons.videocam_off_rounded,
+                active: !_camOn,
+                onTap: () {
+                  _wakeDock();
+                  _toggleCam();
+                },
+              ),
+              gap,
+              _RailButton(
+                label: AppStrings.t(_micOn ? 'call_mic' : 'call_mute'),
+                icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
+                active: !_micOn,
+                onTap: () {
+                  _wakeDock();
+                  _toggleMic();
+                },
+              ),
+              gap,
+              // Ouvre un panneau : blanc pendant qu'il est ouvert.
+              _RailButton(
+                label: AppStrings.t('call_audio'),
+                icon: Icons.tune_rounded,
+                active: _audioSheetOpen,
+                onTap: _openAudioSheet,
+              ),
+              // Dev-only : capture de pub via LiveKit Egress. Jamais montré à
+              // un utilisateur normal ([_isEgressAdmin]).
+              if (_isEgressAdmin) ...[
+                gap,
+                _RailButton(
+                  label: _egressId == null ? 'REC' : 'STOP',
+                  icon: Icons.fiber_manual_record,
+                  active: _egressId != null,
+                  onTap: _egressBusy
+                      ? () => ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Enregistrement en cours de démarrage…',
+                              ),
+                              duration: Duration(seconds: 2),
+                            ),
+                          )
+                      : () {
+                          _wakeDock();
+                          _toggleEgress();
+                        },
+                ),
+              ],
+              gap,
+              // Raccrocher : gardé tel quel (rouge, même action qu'avant). Il
+              // n'a plus sa rangée du bas ; il suit le rail en attendant la
+              // décision.
+              _RailButton(
+                label: AppStrings.t('call_end'),
+                icon: Icons.call_end_rounded,
+                fill: const Color(0xFFE53935),
+                onTap: _hangUp,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Le galet de l'en-tête : 30 px, sans ondes, NON cliquable. Réduit par une
+  /// transformation (son encombrement est kSize × 1,9) et posé dans une boîte
+  /// de 30 px. Il s'estompe à l'étape 2 du texte d'état (« Patiente… »).
+  Widget _cardOrb() {
+    const double size = 30;
+    return ValueListenableBuilder<int>(
+      valueListenable: _trStep,
+      builder: (context, step, child) => AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: step == 1 ? 0.55 : 1,
+        child: child,
+      ),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: IgnorePointer(
+          child: OverflowBox(
+            minWidth: TranslationOrb.box,
+            maxWidth: TranslationOrb.box,
+            minHeight: TranslationOrb.box,
+            maxHeight: TranslationOrb.box,
+            child: Transform.scale(
+              scale: size / TranslationOrb.kSize,
+              child: TranslationOrb(
+                ripples: false,
+                on: _translationEnabled,
+                micOn: _micOn,
+                ttsSpeaking: ttsSpeaking,
+                voiceLevel: _voiceLevel,
+                onTap: () {},
+                onLongPress: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Le statut : les 4 étapes de la traduction (TranslationStepCaption), sans
+  /// pastille noire. Coupée, la traduction le DIT.
+  Widget _cardStatus(String peerFirstName) {
+    if (!_translationEnabled) {
+      return Text(
+        AppStrings.t('call_translation_paused'),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.65),
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+          shadows: const [Shadow(color: Colors.black, blurRadius: 8)],
+        ),
+      );
+    }
+    return TranslationStepCaption(
+      bare: true,
+      peerName: peerFirstName,
+      myVoice: _myVoiceLevel,
+      myLines: widget.translation.localTranscript,
+      onStep: (s) => _trStep.value = s,
+    );
+  }
+
+  /// La pastille de langue : le drapeau rond de la langue d'écoute + un chevron.
+  /// Un tap ouvre le panneau des langues.
+  Widget _cardLangPill() {
+    final code = findCallLanguageByCode(
+          _myOutputLang.isNotEmpty
+              ? _myOutputLang
+              : AppStrings.currentBcp47.value,
+        )?.countryCode ??
+        '';
+    return Semantics(
+      label: AppStrings.t('call_language'),
+      button: true,
+      child: Pressable(
+        bounce: true,
+        onTap: _openLanguagePairSheet,
+        child: Container(
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (code.isNotEmpty)
+                ClipOval(
+                  child: CountryFlag.fromCountryCode(
+                    code,
+                    theme: const ImageTheme(
+                      width: 22,
+                      height: 22,
+                      shape: Circle(),
+                    ),
+                  ),
+                )
+              else
+                const Icon(Icons.translate_rounded, size: 18, color: Colors.white),
+              const SizedBox(width: 4),
+              const Icon(Icons.unfold_more_rounded, size: 18, color: Colors.white),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// La carte de messages, PERMANENTE : toujours en bas, jamais rangée avec le
+  /// rail. En-tête (galet + statut + drapeau), deux messages au plus, crayon.
+  Widget _buildCallCard(
+    BuildContext context, {
+    required String peerFirstName,
+    required bool hideOrb,
+  }) {
+    final mq = MediaQuery.of(context);
+    final kb = mq.viewInsets.bottom;
+    final sb = mq.viewPadding.bottom;
+    // 28 de marge ; clavier levé, la carte se pose juste au-dessus de lui.
+    final bottom = kb > 0 ? math.max(0.0, kb - sb) + 12 : 28.0;
+    final showHeader = !_composerOpen && !_cardHeaderHidden;
+    return Positioned(
+      key: const ValueKey('call_card'),
+      left: 14,
+      right: 14,
+      bottom: bottom,
+      child: _CallCard(
+        showHeader: showHeader,
+        composerOpen: _composerOpen,
+        header: Row(
+          children: [
+            // Caméra coupée : fond noir et prénom, PAS de galet.
+            if (!hideOrb) ...[_cardOrb(), const SizedBox(width: 10)],
+            Expanded(child: _cardStatus(peerFirstName)),
+            const SizedBox(width: 8),
+            _cardLangPill(),
+          ],
+        ),
+        messages: _CardMessages(
+          key: const ValueKey('card_msgs'),
+          turns: _turns,
+          myName: widget.displayName,
+          myAvatarUrl: _myAvatarUrl,
+          peerName: _peerProfile?.displayName ?? '',
+          peerAvatarUrl: _peerProfile?.bestAvatarUrl ?? '',
+          holdFade: _composerOpen,
+          reservePencil: !_composerOpen,
+          onTapZone: _toggleCardHeader,
+        ),
+        // Clé stable, position stable : ne JAMAIS re-mapper le champ de
+        // saisie, le clavier y perdrait le focus (b2f3293).
+        composer: _ComposerPill(
+          key: const ValueKey('call_composer'),
+          controller: _chatCtrl,
+          focusNode: _chatFocus,
+          sending: _chatSending,
+          onSend: _sendCaption,
+          open: _composerOpen,
+          onOpen: () {
+            _wakeDock();
+            _openComposer();
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -3831,6 +3832,12 @@ class _CallScreenState extends State<CallScreen> {
         ? null
         : widget.displayName.trim().split(' ').first;
 
+    // Caméra coupée : le fond noir avec le prénom, SANS galet.
+    final hideOrb = remoteCount > 0 &&
+        (_selfMain
+            ? !(local != null && _camOn)
+            : remote == null);
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -3883,7 +3890,9 @@ class _CallScreenState extends State<CallScreen> {
                     child: VideoTrackRenderer(
                       local,
                       fit: VideoViewFit.cover,
-                      mirrorMode: VideoViewMirrorMode.mirror,
+                      mirrorMode: _camFacingBack
+                          ? VideoViewMirrorMode.off
+                          : VideoViewMirrorMode.mirror,
                     ),
                   )
                 else if (_selfMain && remoteCount > 0)
@@ -3909,10 +3918,6 @@ class _CallScreenState extends State<CallScreen> {
                   _CameraOffTile(
                     label: peerFirstName,
                     muted: _peerMicMuted(room),
-                    shift: _camOffMode
-                        ? _camOffGeo(context, MediaQuery.sizeOf(context).height)
-                            .tile
-                        : 0,
                   )
                 else
                   Container(
@@ -3951,15 +3956,29 @@ class _CallScreenState extends State<CallScreen> {
                       ],
                     ),
                   ),
-                // v4 (caméra du pair coupée) : un tap n'importe où ne fait QUE
-                // ranger / afficher la barre. Posé SOUS la vignette (qui garde
-                // son propre tap) et sous les bulles, qui ignorent le doigt.
-                if (_camOffMode)
+                // Le panneau effacé : l'écran ENTIER le rappelle. C'est ce qui
+                // permet de le laisser disparaître complètement — on n'a pas à
+                // retrouver une cible, il suffit de toucher n'importe où. Ce
+                // premier tap ne fait QUE rallumer : il n'échange pas les deux
+                // images au passage.
+                //
+                // Posé SOUS la vignette caméra : un tap sur elle (échanger les
+                // images) ou sur son bouton « retourner la caméra » doit TOUJOURS
+                // l'atteindre, rail rangé ou non. Une couche plein écran posée
+                // par-dessus l'avalait — c'était le « je tape 10 fois, ça ne
+                // retourne pas ».
+                if (_dockDimmed || _composerOpen)
                   Positioned.fill(
-                    key: const ValueKey('camoff_tap'),
+                    key: const ValueKey('dock_wake'),
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: _toggleDockCamOff,
+                      onTap: () {
+                        // Clavier levé : un tap ailleurs le referme ; sinon il
+                        // ne fait QUE rappeler le rail (il n'échange pas les
+                        // deux images au passage).
+                        if (_chatFocus.hasFocus) _chatFocus.unfocus();
+                        _wakeDock();
+                      },
                     ),
                   ),
                 // PiP: shows whichever feed is NOT the main one. Tap to
@@ -3971,28 +3990,9 @@ class _CallScreenState extends State<CallScreen> {
                   AnimatedPositioned(
                     duration: const Duration(milliseconds: 350),
                     curve: Curves.easeOutCubic,
-                    // La vignette suit le côté des messages (maquette v2) :
-                    // bulles EN HAUT → elle descend tout en bas à droite, à la
-                    // hauteur du crayon ; bulles en bas → elle reste en haut à
-                    // droite. PAS pendant l'animation du bouton Messages (elle
-                    // ne bouge que quand les messages sont vraiment en haut).
-                    // Saisie dépliée : elle remonte au-dessus du champ.
-                    top: (_topMessagesShown || (_tabHint && _turnsOpen))
-                        ? (MediaQuery.sizeOf(context).height -
-                                MediaQuery.viewPaddingOf(context).top -
-                                MediaQuery.viewPaddingOf(context).bottom -
-                                176 -
-                                (_turnsOpen
-                                    // Zone ouverte : la barre est effacée, la
-                                    // vignette se pose au ras du crayon (et suit
-                                    // le clavier).
-                                    ? (_topControls ? _kPipBottomLift : 16) +
-                                        MediaQuery.viewInsetsOf(context).bottom
-                                    // Bulles au repos en haut : la barre est là,
-                                    // la vignette se pose au-dessus d'elle.
-                                    : _kPipBottomLift))
-                            .clamp(52.0, double.infinity)
-                        : MediaQuery.paddingOf(context).top + 40,
+                    // Toujours en haut à droite : les messages sont en bas, dans
+                    // la carte, et le rail se pose juste dessous.
+                    top: MediaQuery.paddingOf(context).top + 40,
                     right: 12,
                     width: 118,
                     height: 176,
@@ -4038,7 +4038,9 @@ class _CallScreenState extends State<CallScreen> {
                               return VideoTrackRenderer(
                                 local,
                                 fit: VideoViewFit.cover,
-                                mirrorMode: VideoViewMirrorMode.mirror,
+                                mirrorMode: _camFacingBack
+                                    ? VideoViewMirrorMode.off
+                                    : VideoViewMirrorMode.mirror,
                               );
                             }
                             return _CameraOffTile(
@@ -4059,227 +4061,36 @@ class _CallScreenState extends State<CallScreen> {
                         // part qui dépassait du cadre ne recevait pas le doigt,
                         // et la cible était petite — dur à viser en appel.
                         Positioned(
-                          right: 0,
+                          left: 0,
                           bottom: 0,
                           child: _PipFlipButton(onTap: _flipCamera),
                         ),
                       ],
                     ),
                   ),
-                // v4 : les 2 dernières bulles, permanentes, et le crayon. Un
-                // tap sur les bulles ne ferme rien : il range / affiche la barre.
-                if (_camOffMode && !_messagesCut)
-                  Builder(
-                    builder: (context) {
-                      final g = _camOffGeo(
-                        context,
-                        MediaQuery.sizeOf(context).height,
-                      );
-                      // Deux bulles si les deux dernières phrases sont courtes,
-                      // sinon la dernière seule.
-                      final last = _lastTurnsToShow(_turns);
-                      // Le crayon n'est là que sans rail (barre ni réglages
-                      // dépliés) ; champ déplié, il reste.
-                      final pencilShown =
-                          (_dockDimmed && !_controlsOpen) || _composerOpen;
-                      // La démonstration de la languette (les messages montent
-                      // tout en haut puis redescendent) joue à la première
-                      // apparition des messages de CHAQUE appel — sans limite
-                      // d'appels : les messages étant permanents, c'est elle
-                      // qui annonce qu'on peut les faire monter.
-                      if (!_tabHintSeen && last.isNotEmpty) {
-                        _tabHintSeen = true;
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (!mounted) return;
-                          setState(() => _tabHint = true);
-                        });
-                      }
-                      return Stack(
-                        key: const ValueKey('camoff_layer'),
-                        fit: StackFit.expand,
-                        children: [
-                          // La vraie zone Messages : à l'ouverture elle joue
-                          // l'animation de la languette (les messages
-                          // montent tout en haut, le doigt tire la languette,
-                          // ils redescendent). Permanente : jamais atténuée.
-                          // La languette fait remonter les messages tout en
-                          // haut (et les redescend). Zone plus haute (150) que
-                          // la normale, mais texte à sa taille habituelle.
-                          if (last.isNotEmpty && !_msgTop)
-                            AnimatedPositioned(
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeOutCubic,
-                              left: 0,
-                              // Le crayon n'est là que rail rangé : sinon les
-                              // bulles prennent toute la largeur.
-                              right: (pencilShown && !_composerOpen) ? 70 : 16,
-                              bottom: g.bubbles,
-                              child: _TurnsBlock(
-                                key: const ValueKey('camoff_block'),
-                                turns: last,
-                                myName: widget.displayName,
-                                myAvatarUrl: _myAvatarUrl,
-                                peerName: _peerProfile?.displayName ?? '',
-                                peerAvatarUrl:
-                                    _peerProfile?.bestAvatarUrl ?? '',
-                                top: false,
-                                onToggleSide: () => _setMessagesSide(true),
-                                hint: _tabHint,
-                                onHintDone: _endTabHint,
-                                // Un tap ne fait que ranger / afficher la barre.
-                                onTapZone: _toggleDockCamOff,
-                                holdFade: true,
-                                onDark: true,
-                                snug: true,
-                                listMaxHeight: g.zoneMax,
-                                showEarlier: false,
-                              ),
-                            ),
-                          if (last.isNotEmpty && _msgTop)
-                            Positioned(
-                              key: const ValueKey('camoff_block_top'),
-                              top: 4,
-                              left: 0,
-                              right: 12,
-                              child: _TurnsBlock(
-                                turns: last,
-                                myName: widget.displayName,
-                                myAvatarUrl: _myAvatarUrl,
-                                peerName: _peerProfile?.displayName ?? '',
-                                peerAvatarUrl:
-                                    _peerProfile?.bestAvatarUrl ?? '',
-                                top: true,
-                                onToggleSide: () => _setMessagesSide(false),
-                                hint: _tabHint,
-                                onHintDone: _endTabHint,
-                                onTapZone: _toggleDockCamOff,
-                                holdFade: true,
-                                onDark: true,
-                                snug: true,
-                                listMaxHeight: g.zoneMax,
-                                showEarlier: false,
-                              ),
-                            ),
-                          AnimatedPositioned(
-                            duration: const Duration(milliseconds: 250),
-                            curve: Curves.easeOutCubic,
-                            left: 14,
-                            right: 14,
-                            bottom: g.field,
-                            height: 46,
-                            // Le crayon n'est présent que lorsque le rail ne
-                            // l'est pas ; champ déplié, il reste. Il garde sa
-                            // place dans l'arbre (le champ ne doit pas être
-                            // re-mappé), il s'efface seulement.
-                            child: IgnorePointer(
-                              ignoring: !pencilShown,
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 200),
-                                opacity: pencilShown ? 1 : 0,
-                                child: Align(
-                                  alignment: _msgTop
-                                      ? Alignment.centerLeft
-                                      : Alignment.centerRight,
-                                  child: _ComposerPill(
-                                    controller: _chatCtrl,
-                                    focusNode: _chatFocus,
-                                    sending: _chatSending,
-                                    onSend: _sendCaption,
-                                    open: _composerOpen,
-                                    onOpen: () {
-                                      _wakeDock();
-                                      _openComposer();
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                // Conversation dépliée : un tap n'importe où ailleurs la
-                // referme. La couche est posée par-dessus la vidéo, donc ce
-                // tap-là ne fait QUE fermer — il n'échange pas les deux
-                // images au passage.
-                // Messages en haut : un voile sombre en haut (sous les bulles) et en
-                // bas (sous la vignette, le crayon), pour que le texte blanc se
-                // lise sur n'importe quelle image.
+                // Dégradé noir au bas de l'écran : le texte de la carte se lit
+                // sur n'importe quelle image.
                 Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 260,
-                  child: IgnorePointer(
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 350),
-                      opacity: _topMessagesShown ? 1 : 0,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.black.withValues(alpha: 0.6),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
+                  key: const ValueKey('call_bottom_scrim'),
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  height: 300,
+                  height: 380,
                   child: IgnorePointer(
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 350),
-                      opacity: _topMessagesShown ? 1 : 0,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.6),
-                            ],
-                          ),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.6),
+                          ],
                         ),
                       ),
                     ),
                   ),
                 ),
-                if (_turnsOpen)
-                  Positioned.fill(
-                    key: const ValueKey('turns_dismiss'),
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      // Un seul tap ferme tout, y compris pendant la
-                      // démonstration de la languette : [_closeTurns] l'arrête
-                      // aussi. Avant, le premier tap n'arrêtait QUE la
-                      // démonstration, et il en fallait un second pour fermer
-                      // les bulles.
-                      onTap: _showTopControls,
-                    ),
-                  ),
-                // Le panneau effacé : l'écran ENTIER le rappelle. C'est ce qui
-                // permet de le laisser disparaître complètement — on n'a pas à
-                // retrouver une cible, il suffit de toucher n'importe où. Ce
-                // premier tap ne fait QUE rallumer : il n'échange pas les deux
-                // images au passage.
-                if (_dockDimmed && !_turnsOpen && !_camOffMode)
-                  Positioned.fill(
-                    key: const ValueKey('dock_wake'),
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _wakeDock,
-                    ),
-                  ),
                 if (widget.translation.translationListenable != null)
                   ListenableBuilder(
                     listenable: widget.translation.translationListenable!,
@@ -4288,563 +4099,15 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
-                // Le galet, bas dans l'écran mais pas au ras des touches : ses
-                // ondes montent jusqu'à 2,4 fois son disque, et si elles
-                // atteignaient les réglages dépliés on ne saurait plus ce qui
-                // appartient à quoi. 0,68 le pose sous le milieu en laissant
-                // cette marge.
-                //
-                // Posé au-dessus de la couche qui rallume la barre — sinon un
-                // tap dessus se contenterait de la réveiller au lieu de couper
-                // la traduction.
-                // Un panneau s'ouvre : la vidéo se floute SOUS le galet, qui
-                // reste net. Le flou appartient à l'écran et pas au panneau —
-                // posé dans le panneau, il aurait flouté le galet avec le
-                // reste, et il aurait fallu en dessiner un second par-dessus.
-                TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: 0, end: _sheetOpen ? 22 : 0),
-                  duration: const Duration(milliseconds: 280),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, blur, _) => blur < 0.4
-                      // Rien à flouter : pas de BackdropFilter du tout. À
-                      // sigma nul il coûte encore une passe de composition
-                      // pendant tout l'appel.
-                      ? const SizedBox.shrink()
-                      : Positioned.fill(
-                          child: IgnorePointer(
-                            child: BackdropFilter(
-                              filter: ui.ImageFilter.blur(
-                                sigmaX: blur,
-                                sigmaY: blur,
-                              ),
-                              child: ColoredBox(
-                                color: Colors.black
-                                    .withValues(alpha: 0.35 * blur / 22),
-                              ),
-                            ),
-                          ),
-                        ),
+                // Le rail (4 boutons + raccrocher) et la carte de messages.
+                // Clés stables : un voisin inséré / retiré ne doit jamais
+                // re-mapper le champ de saisie (b2f3293).
+                _buildCallRail(context),
+                _buildCallCard(
+                  context,
+                  peerFirstName: peerFirstName ?? '',
+                  hideOrb: hideOrb,
                 ),
-                // Le galet REMONTE au-dessus du panneau et rétrécit, il ne
-                // disparaît pas pour être remplacé ailleurs. Un seul objet,
-                // un seul jeu de tickers, et le trajet se voit.
-                LayoutBuilder(
-                  builder: (context, box) {
-                    // La conversation est un bloc au ras du bas dont on connaît
-                    // la hauteur ; le galet se pose JUSTE au-dessus. Calculé
-                    // plutôt que réglé à la main : le clavier fait monter la
-                    // zone, et une valeur fixe le laisserait dessous.
-                    // Le galet descend : son TEXTE se pose juste au-dessus de la fin
-                    // des messages, pas à une hauteur fixe qui laissait un grand
-                    // vide quand il n'y a que deux petites bulles. Calculé depuis
-                    // ce qui occupe réellement le bas de l'écran : le rembourrage,
-                    // le clavier, la barre et les réglages quand ils sont rappelés
-                    // (le panneau se pose au-dessus d'eux), la hauteur des bulles
-                    // (94 au minimum, plus la saisie dépliée), puis le galet réduit
-                    // et son texte (~60 : rayon, air, une ligne).
-                    final lift = 16 + // le rembourrage bas de la colonne
-                        MediaQuery.of(context).viewInsets.bottom +
-                        (_topControls ? 112.0 : 0.0) +
-                        (_controlsOpen ? 92.0 : 0.0) +
-                        94 + // hauteur minimale de la zone des bulles
-                        (_composerOpen ? 58.0 : 0.0) + // la saisie dépliée
-                        60; // le galet réduit et son texte
-                    final turnsY = box.maxHeight <= 0
-                        ? 0.0
-                        : (1 - 2 * lift / box.maxHeight).clamp(-0.9, 0.9);
-                    return AnimatedAlign(
-                  duration: const Duration(milliseconds: 320),
-                  curve: Curves.easeOutCubic,
-                  // Il remonte d'un cran à chaque chose qui s'ouvre, et
-                  // redescend tout en bas quand il ne reste que l'appel. Les
-                  // cas sont testés du plus haut au plus bas : un panneau
-                  // recouvre le rail, qui recouvre la conversation.
-                  // Messages rangés EN HAUT : le galet reste où il est — rien
-                  // ne vient occuper sa place en bas.
-                  alignment: _sheetOpen
-                      ? const Alignment(0, -0.52)
-                      : (_turnsOpen && !_msgTop)
-                          ? Alignment(0, turnsY.toDouble())
-                          : (!_turnsOpen || (_msgTop && _topControls))
-                              ? Alignment(0, _orbY(box.maxHeight))
-                              // Rien de déplié : ses ondes atteignent les
-                              // touches et c'est très bien, elles passent
-                              // derrière.
-                              : const Alignment(0, 0.80),
-                  child: AnimatedScale(
-                    duration: const Duration(milliseconds: 320),
-                    curve: Curves.easeOutCubic,
-                    // 56 sur 65 : la même réduction que la maquette, obtenue
-                    // par une transformation plutôt qu'en repeignant le galet
-                    // à chaque image d'une taille qui change. La conversation
-                    // le réduit pareil : sous elle il n'est plus le sujet.
-                    scale: (_sheetOpen || (_turnsOpen && !_msgTop))
-                        ? 56 / TranslationOrb.kSize
-                        : 1,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TranslationOrb(
-                          // Sous un panneau, les ondes iraient chercher l'œil
-                          // pour rien.
-                          ripples: !_sheetOpen,
-                          on: _translationEnabled,
-                          micOn: _micOn,
-                          ttsSpeaking: ttsSpeaking,
-                          voiceLevel: _voiceLevel,
-                          onTap: _toggleTranslation,
-                          onLongPress: _openCallSettingsSheet,
-                        ),
-                        // Coupée, la traduction le DIT. La pierre éteinte et
-                        // son triangle suffisent à qui connaît déjà le galet ;
-                        // pour tous les autres, un appel qui cesse de traduire
-                        // sans un mot ressemble à une panne.
-                        //
-                        // Hors du [Pressable] : ce n'est qu'une étiquette, elle
-                        // ne doit pas voler le tap destiné à reprendre.
-                        if (!_translationEnabled)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              AppStrings.t('call_translation_paused'),
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.65),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 1.4,
-                                shadows: const [
-                                  Shadow(color: Colors.black, blurRadius: 8),
-                                ],
-                              ),
-                            ),
-                          )
-                        // Les textes d'explication, SOUS le galet : « Parle
-                        // normalement », « Patiente… », « X a reçu ta
-                        // traduction », « À toi… ». Pas pendant une
-                        // conversation ouverte ni sous un panneau.
-                        else if (_trCaptions &&
-                            !_sheetOpen &&
-                            (!_turnsOpen || _msgTop))
-                          // Remonté contre le galet : sa boîte garde ~38 px de
-                          // marge sous le disque pour les ondes, le texte s'y
-                          // pose plutôt que dessous.
-                          Transform.translate(
-                            offset: const Offset(0, -30),
-                            child: TranslationStepCaption(
-                              peerName: peerFirstName ?? '',
-                              myVoice: _myVoiceLevel,
-                              myLines: widget.translation.localTranscript,
-                              // Vignette caméra en bas à droite : le texte se
-                              // resserre (2 lignes) pour ne pas la toucher.
-                              compact: _msgTop,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                    );
-                  },
-                ),
-                // Le dock : une barre de verre posée en bas, qui flotte
-                // au-dessus de la vidéo. Ce qui se déplie — conversation et
-                // réglages — pousse vers le HAUT, au-dessus d'elle ; la barre,
-                // elle, ne bouge jamais.
-                Positioned(
-                  key: const ValueKey('call_controls'),
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: SafeArea(
-                    top: false,
-                    child: Padding(
-                      // Presque rien sur les côtés. C'était 40 — la largeur de
-                      // la barre de nav de l'app — du temps où la rangée était
-                      // un panneau de verre qu'il fallait cadrer. Sans panneau,
-                      // ces 40 ne cadraient plus rien : ils empêchaient
-                      // seulement les touches d'atteindre les bords, quel que
-                      // soit le rembourrage qu'on mettait à l'intérieur.
-                      //
-                      // Le clavier pousse la colonne entière vers le haut :
-                      // c'est le seul endroit où la saisie peut monter, le
-                      // Scaffold ayant [resizeToAvoidBottomInset] à false pour
-                      // que la vidéo, elle, ne bouge pas.
-                      padding: EdgeInsets.fromLTRB(
-                        12,
-                        0,
-                        12,
-                        16 + MediaQuery.of(context).viewInsets.bottom,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // 1. La conversation. Deux états, tous deux rangés À
-                          // GAUCHE sur 82 % de la largeur — c'est une marge de
-                          // page, pas un panneau centré : le visage reste
-                          // visible à côté.
-                          //
-                          //  • AU REPOS : les derniers tours se posent
-                          //    AU-DESSUS DES TOUCHES, sans en-tête ni saisie.
-                          //    Une phrase paraît d'elle-même dès qu'elle est
-                          //    dite — c'est ce qui fait découvrir qu'il y a une
-                          //    conversation — et les touches ne bougent pas.
-                          //    Elle s'efface seule au bout de dix secondes, ou
-                          //    au premier doigt posé dessus.
-                          //  • OUVERTE par la touche Messages : elle prend
-                          //    l'écran, la barre s'efface et la saisie apparaît.
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 240),
-                            curve: Curves.easeOutCubic,
-                            alignment: Alignment.bottomLeft,
-                            // Ici ne restent que les phrases AU REPOS rangées en
-                            // bas. La zone ouverte est sa propre couche, sur
-                            // toute la largeur (la languette colle au bord) ;
-                            // et rangées en haut, les phrases vivent en haut.
-                            child: (_turnsOpen ||
-                                    _camOffMode ||
-                                    _msgTop ||
-                                    _messagesCut ||
-                                    _turns.isEmpty)
-                                ? const SizedBox(width: double.infinity)
-                                : Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: FractionallySizedBox(
-                                      widthFactor: 0.82,
-                                      // Sans ça la boîte se centre dans la
-                                      // largeur qu'on lui laisse : elle
-                                      // occuperait 82 % au MILIEU de l'écran
-                                      // au lieu de se ranger sur le bord.
-                                      alignment: Alignment.centerLeft,
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 10,
-                                        ),
-                                        child: _RestingTurns(
-                                                turns: _restTurns,
-                                                myName: widget.displayName,
-                                                myAvatarUrl: _myAvatarUrl,
-                                                peerName: _peerProfile
-                                                        ?.displayName ??
-                                                    '',
-                                                peerAvatarUrl:
-                                                    _peerProfile?.bestAvatarUrl ??
-                                                        '',
-                                                // Un tap sur la phrase ne la retire
-                                                // pas : il range / affiche la
-                                                // barre de boutons.
-                                                onTap: _toggleDockCamOff,
-                                              ),
-                                      ),
-                                    ),
-                                  ),
-                          ),
-                          // 2. Les réglages, dépliés par le chevron.
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 240),
-                            curve: Curves.easeOutCubic,
-                            alignment: Alignment.bottomCenter,
-                            child: !_controlsOpen
-                                ? const SizedBox(width: double.infinity)
-                                : Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      12,
-                                      0,
-                                      12,
-                                      10,
-                                    ),
-                                    // Étalés, pas groupés au milieu : la même
-                                    // règle que la rangée du bas, sinon les
-                                    // deux ne se répondent pas.
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceEvenly,
-                                      children: [
-                                        // La conversation descend ici et le
-                                        // haut-parleur monte dans la barre :
-                                        // on change de sortie audio en pleine
-                                        // phrase, on relit le texte plus
-                                        // posément.
-                                        _RoundCallButton(
-                                          icon: Icons.sms_rounded,
-                                          label:
-                                              AppStrings.t('messages_title'),
-                                          active: _turnsOpen,
-                                          // L'anneau cyan : c'est le bouton
-                                          // qu'on cherche en ouvrant le rail.
-                                          ring: true,
-                                          onTap: () {
-                                            _wakeDock();
-                                            if (_turnsOpen) {
-                                              // Referme comme un tap sur
-                                              // l'écran : la zone ET les
-                                              // bulles au repos, sinon la
-                                              // touche rendrait la barre en
-                                              // laissant les phrases derrière.
-                                              _closeTurns();
-                                              return;
-                                            }
-                                            setState(() {
-                                              _turnsOpen = true;
-                                              _messagesCut = false;
-                                              // La saisie apparaît DÉPLIÉE puis se
-                                              // replie d'elle-même en rond crayon
-                                              // (voir _foldComposerSoon) : on voit
-                                              // qu'elle se ferme et où la
-                                              // retrouver. La languette se
-                                              // présente à la première fois.
-                                              _composerOpen = true;
-                                              _tabHint = !_tabHintSeen;
-                                              _tabHintSeen = true;
-                                              // Le rail se replie en même
-                                              // temps : les deux se déplient
-                                              // au MÊME endroit, l'un sur
-                                              // l'autre, et la conversation a
-                                              // besoin de toute la hauteur. Le
-                                              // bouton qu'on vient de toucher
-                                              // disparaît avec — c'est
-                                              // justement ce qu'on veut, il a
-                                              // fait son office.
-                                              _controlsOpen = false;
-                                            });
-                                            _foldComposerSoon();
-                                          },
-                                        ),
-                                        // Les langues reviennent ici : la barre
-                                        // du bas porte désormais le micro et
-                                        // la caméra à leur place, et sans ce
-                                        // retour le sélecteur de langues ne
-                                        // serait plus atteignable nulle part.
-                                        _RoundCallButton(
-                                          icon: Icons.translate_rounded,
-                                          // Le drapeau de la langue qu'on
-                                          // ENTEND — celle que cette touche
-                                          // sert à changer. Repli sur la langue
-                                          // du compte tant que rien n'a été
-                                          // choisi.
-                                          flagCountry: findCallLanguageByCode(
-                                                _myOutputLang.isNotEmpty
-                                                    ? _myOutputLang
-                                                    : AppStrings
-                                                        .currentBcp47.value,
-                                              )?.countryCode ??
-                                              '',
-                                          label:
-                                              AppStrings.t('call_language'),
-                                          onTap: _openLanguagePairSheet,
-                                        ),
-                                        // Ils ouvrent un panneau, ils ne
-                                        // basculent rien : jamais d'état
-                                        // blanc, et le même verre que les
-                                        // autres.
-                                        _RoundCallButton(
-                                          icon: Icons.tune_rounded,
-                                          label: AppStrings.t('call_audio'),
-                                          onTap: _openAudioSheet,
-                                        ),
-                                        // Dev-only: capture ad footage via
-                                        // LiveKit Egress. Never shown to a
-                                        // regular user — [_isEgressAdmin]
-                                        // checks the signed-in account's
-                                        // email, and the backend checks it
-                                        // again independently.
-                                        if (_isEgressAdmin)
-                                          _RoundCallButton(
-                                            icon: Icons.fiber_manual_record,
-                                            label: _egressId == null
-                                                ? 'REC'
-                                                : 'STOP',
-                                            active: _egressId != null,
-                                            // Pas de toucher « muet » : pendant le
-                                            // démarrage, on le DIT (sinon on croit
-                                            // que rien ne s'est passé et on
-                                            // re-touche — ce qui arrêtait tout).
-                                            onTap: _egressBusy
-                                                ? () => ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Enregistrement en cours de démarrage…',
-                                                        ),
-                                                        duration: Duration(
-                                                          seconds: 2,
-                                                        ),
-                                                      ),
-                                                    )
-                                                : () {
-                                                    _armControlsIdle();
-                                                    _toggleEgress();
-                                                  },
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                          ),
-                          // 3. La barre elle-même — effacée tant que la
-                          // conversation est ouverte. Elle et la saisie se
-                          // disputent le bas de l'écran, et c'est la saisie
-                          // qu'on est venu chercher ; le tap qui referme la
-                          // ramène. La place dans la colonne est gardée (une
-                          // boîte vide) : retirer un enfant re-mappe ses
-                          // voisins, et le champ de saisie y perdrait son
-                          // focus — c'est le bug de b2f3293.
-                          if (_turnsOpen && !_topControls)
-                            const SizedBox(width: double.infinity)
-                          else
-                          // En veille, la rangée ne se contente plus de
-                          // s'effacer : elle REND SA PLACE. Elle passait à
-                          // l'opacité zéro en gardant toute sa hauteur, et les
-                          // phrases restaient suspendues au-dessus d'une bande
-                          // vide — on voyait le trou, pas la vidéo. Sa hauteur
-                          // se replie donc avec elle, sur la même durée et la
-                          // même courbe que son fondu, et les bulles
-                          // descendent d'autant.
-                          //
-                          // La cible qui la rallume ne se perd pas au passage :
-                          // c'est la couche plein écran [dock_wake] qui
-                          // l'attrape, pas la rangée elle-même.
-                          TweenAnimationBuilder<double>(
-                            tween: Tween<double>(
-                              begin: 1,
-                              end: _dockDimmed ? 0 : 1,
-                            ),
-                            duration: const Duration(milliseconds: 450),
-                            curve: Curves.easeInOut,
-                            builder: (context, f, child) => ClipRect(
-                              child: Align(
-                                alignment: Alignment.bottomCenter,
-                                heightFactor: f,
-                                child: child,
-                              ),
-                            ),
-                            child: _CallDock(
-                            camOn: _camOn,
-                            micOn: _micOn,
-                            speakerOn: _audio.speakerOn,
-                            ttsSpeaking: ttsSpeaking,
-                            voiceLevel: _voiceLevel,
-                            controlsOpen: _controlsOpen,
-                            dimmed: _dockDimmed,
-                            onWake: _wakeDock,
-                            onToggleCam: () {
-                              _wakeDock();
-                              _toggleCam();
-                            },
-                            onToggleMic: () {
-                              _wakeDock();
-                              _toggleMic();
-                            },
-                            onToggleSpeaker: () {
-                              _wakeDock();
-                              _toggleSpeaker();
-                            },
-                            onHangUp: _hangUp,
-                            onToggleControls: () {
-                              _wakeDock();
-                              setState(() {
-                                _controlsOpen = !_controlsOpen;
-                                // Les messages restent : ils sont permanents (avec
-                                // leur languette et leur crayon), la zone se pose
-                                // au-dessus des réglages dépliés. Seule la touche
-                                // Messages les coupe.
-                              });
-                              if (_controlsOpen) {
-                                _armControlsIdle();
-                              } else {
-                                _controlsIdleTimer?.cancel();
-                              }
-                            },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                // La conversation OUVERTE : sa propre couche, sur toute la
-                // largeur, au ras du bas (le clavier la soulève). Rangée en
-                // haut, il n'y reste que la saisie. Clé stable : le champ ne
-                // doit jamais être re-mappé (b2f3293).
-                if (_turnsOpen)
-                  Positioned(
-                    key: const ValueKey('turns_panel'),
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: SafeArea(
-                      top: false,
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          bottom: 16 +
-                              MediaQuery.of(context).viewInsets.bottom +
-                              // La barre est rappelée par un tap : la zone se
-                              // pose au-dessus d'elle (et au-dessus des
-                              // réglages quand ils sont dépliés). Bulles en bas
-                              // comme en haut : le crayon est toujours là.
-                              (_topControls ? 112.0 : 0.0) +
-                              (_controlsOpen ? 92.0 : 0.0),
-                        ),
-                        child: _SpokenTurnsPanel(
-                          turns: _turns,
-                          myName: widget.displayName,
-                          myAvatarUrl: _myAvatarUrl,
-                          peerName: _peerProfile?.displayName ?? '',
-                          peerAvatarUrl: _peerProfile?.bestAvatarUrl ?? '',
-                          chatController: _chatCtrl,
-                          chatFocus: _chatFocus,
-                          sending: _chatSending,
-                          onSend: _sendCaption,
-                          top: _msgTop,
-                          composerOpen: _composerOpen,
-                          onOpenComposer: _openComposer,
-                          onToggleSide: () => _setMessagesSide(!_msgTop),
-                          hint: _tabHint,
-                          onHintDone: _endTabHint,
-                          // Un tap sur les messages ne les ferme PLUS : il
-                          // rappelle la barre. Seule la touche Messages coupe.
-                          onTapZone: _showTopControls,
-                        ),
-                      ),
-                    ),
-                  ),
-                // Messages rangés EN HAUT : sous la barre d'état, à gauche de
-                // la vignette caméra (qui descend un peu pour leur laisser de
-                // l'air). Au repos comme ouverte.
-                if (_topMessagesShown && !_camOffMode)
-                  Positioned(
-                    key: const ValueKey('turns_top'),
-                    top: 4,
-                    left: 0,
-                    // Pleine largeur (moins la marge) : la vignette caméra descend
-                    // SOUS le bloc au lieu de le serrer sur sa gauche.
-                    right: 12,
-                    child: _turnsOpen
-                        ? _TurnsBlock(
-                            turns: _turns,
-                            myName: widget.displayName,
-                            myAvatarUrl: _myAvatarUrl,
-                            peerName: _peerProfile?.displayName ?? '',
-                            peerAvatarUrl: _peerProfile?.bestAvatarUrl ?? '',
-                            top: true,
-                            onToggleSide: () => _setMessagesSide(false),
-                            hint: _tabHint,
-                            onHintDone: _endTabHint,
-                            // Toucher les messages rappelle la barre de boutons ;
-                            // seule la touche Messages les coupe.
-                            onTapZone: _showTopControls,
-                          )
-                        : Padding(
-                            padding: const EdgeInsets.only(left: 28),
-                            child: _RestingTurns(
-                              turns: _restTurns,
-                              myName: widget.displayName,
-                              myAvatarUrl: _myAvatarUrl,
-                              peerName: _peerProfile?.displayName ?? '',
-                              peerAvatarUrl: _peerProfile?.bestAvatarUrl ?? '',
-                              onTap: _toggleDockCamOff,
-                            ),
-                          ),
-                  ),
                 // Brand watermark — top-centre, always on top of whatever
                 // call layout is showing (full-screen, PiP, split…).
                 Align(
@@ -4856,9 +4119,7 @@ class _CallScreenState extends State<CallScreen> {
                       // s'efface pendant qu'ils sont là, et revient ensuite.
                       child: AnimatedOpacity(
                         duration: const Duration(milliseconds: 250),
-                        // Aussi pendant l'animation de la zone Messages qui
-                        // monte en haut puis redescend.
-                        opacity: (_topMessagesShown || _tabHint) ? 0.0 : 0.7,
+                        opacity: 0.7,
                         child: SwaycoWordmark(
                           fontSize: 29,
                           letterSpacing: 0.5,
@@ -4888,300 +4149,179 @@ class _CallScreenState extends State<CallScreen> {
 
 }
 
-/// Une phrase est « courte » jusqu'à ce nombre de caractères : elle tient sur
-/// une ligne de bulle.
-const int _kShortTurnChars = 40;
-
-/// Ce qu'on affiche des messages permanents : les DEUX dernières phrases quand
-/// elles sont toutes deux courtes, sinon la dernière seule — une phrase longue
-/// (message audio) prend la place pour elle.
-List<_SpokenTurn> _lastTurnsToShow(List<_SpokenTurn> turns) {
-  if (turns.length >= 2) {
-    final a = turns[turns.length - 2];
-    final b = turns[turns.length - 1];
-    if (a.text.trim().length <= _kShortTurnChars &&
-        b.text.trim().length <= _kShortTurnChars) {
-      return turns.sublist(turns.length - 2);
-    }
-  }
-  return turns.isEmpty ? turns : turns.sublist(turns.length - 1);
-}
-
-/// Un tour de parole : ce qu'une des deux personnes vient de dire, déjà dans
-/// la langue de CE device (ma phrase telle que je l'ai dite ; celle du pair
-/// telle qu'elle m'arrive traduite).
-class _SpokenTurn {
-  _SpokenTurn({required this.mine, required this.text, this.delivered = true});
-  final bool mine;
-  final String text;
-
-  /// Mine only: heard, but the peer never got it. Drawn dimmed.
-  final bool delivered;
-}
-
-/// La dernière phrase, AU REPOS : posée au-dessus des touches (ou en haut), sans
-/// rien effacer. Elle est PERMANENTE : aucun délai, et un tap dessus ne la retire
-/// pas (il range / affiche la barre de boutons).
-///
-/// PAS de saisie ici : au repos c'est une notification, pas une conversation.
-/// Écrire est un geste qu'on choisit : il appartient au panneau qu'on ouvre.
-class _RestingTurns extends StatelessWidget {
-  const _RestingTurns({
-    required this.turns,
+/// Une touche ronde du rail : 48, icône pleine de 24. Repos : blanc 10 %,
+/// bordure blanche 26 %, icône blanche. Actif : blanc plein, icône noire. PAS de
+/// flou, PAS de verre.
+class _RailButton extends StatelessWidget {
+  const _RailButton({
+    required this.label,
+    required this.icon,
     required this.onTap,
-    required this.myName,
-    required this.myAvatarUrl,
-    required this.peerName,
-    required this.peerAvatarUrl,
+    this.active = false,
+    this.fill,
   });
 
-  final List<_SpokenTurn> turns;
+  final String label;
+  final IconData icon;
   final VoidCallback onTap;
-  final String myName;
-  final String myAvatarUrl;
-  final String peerName;
-  final String peerAvatarUrl;
+  final bool active;
 
-  /// Une seule bulle à la fois, mais qui peut être longue (message audio) : on
-  /// la laisse aller jusqu'à six lignes avant de la couper.
-  static const int _kRestLines = 6;
+  /// Une couleur de fond propre (raccrocher), icône blanche.
+  final Color? fill;
+
+  static const double size = 48;
 
   @override
   Widget build(BuildContext context) {
-    final shown = turns;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final turn in shown)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _TurnBubble(
-                turn: turn,
-                name: turn.mine ? myName : peerName,
-                avatarUrl: turn.mine ? myAvatarUrl : peerAvatarUrl,
-                maxLines: _kRestLines,
-              ),
+    final Color bg = fill ??
+        (active ? Colors.white : Colors.white.withValues(alpha: 0.10));
+    return Semantics(
+      label: label,
+      button: true,
+      toggled: active,
+      child: Pressable(
+        bounce: true,
+        onTap: onTap,
+        child: AnimatedContainer(
+          // Court exprès : c'est un interrupteur, pas une transition.
+          duration: const Duration(milliseconds: 90),
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: bg,
+            border: Border.all(
+              color: Colors.white
+                  .withValues(alpha: (fill != null || active) ? 0 : 0.26),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-/// La conversation de l'appel, OUVERTE par la touche Messages, rangée EN BAS :
-/// le bloc de bulles (avec sa languette et sa pastille « N plus tôt ») et la
-/// saisie repliée en rond crayon. Posée sur toute la largeur de l'écran : la
-/// languette colle au bord gauche.
-///
-/// Rangée EN HAUT ([top]), le bloc est dessiné ailleurs (sous la barre d'état,
-/// à gauche de la vignette caméra) et il ne reste ici que la saisie.
-class _SpokenTurnsPanel extends StatelessWidget {
-  const _SpokenTurnsPanel({
-    required this.turns,
-    required this.myName,
-    required this.myAvatarUrl,
-    required this.peerName,
-    required this.peerAvatarUrl,
-    required this.chatController,
-    required this.chatFocus,
-    required this.sending,
-    required this.onSend,
-    required this.top,
-    required this.composerOpen,
-    required this.onOpenComposer,
-    required this.onToggleSide,
-    required this.hint,
-    required this.onHintDone,
-    required this.onTapZone,
-  });
-
-  /// Un tap sur les bulles : ferme la zone (en un seul tap).
-  final VoidCallback onTapZone;
-
-  final List<_SpokenTurn> turns;
-  final String myName;
-  final String myAvatarUrl;
-  final String peerName;
-  final String peerAvatarUrl;
-
-  /// La saisie. Elle appartient à l'écran d'appel et pas au panneau : le
-  /// panneau se démonte à chaque fermeture, ce qui perdrait le texte en cours.
-  final TextEditingController chatController;
-  final FocusNode chatFocus;
-  final bool sending;
-  final Future<void> Function() onSend;
-
-  final bool top;
-  final bool composerOpen;
-  final VoidCallback onOpenComposer;
-  final VoidCallback onToggleSide;
-  final bool hint;
-  final VoidCallback onHintDone;
-
-  /// Deux bulles d'une ligne (~38 chacune) et l'air entre elles. Au-delà on
-  /// remonte le fil en faisant défiler ; aucune troisième bulle estompée.
-  static const double maxHeight = 84;
-
-  /// La saisie dépliée fait remonter les bulles d'autant.
-  static const double _composerLift = 58;
-
-  @override
-  Widget build(BuildContext context) {
-    final composer = Positioned(
-      // Bulles en haut : le crayon est en bas à GAUCHE (la vignette caméra est
-      // en bas à droite). Bulles en bas : comme avant, à droite.
-      left: top ? 14 : 28,
-      right: 14,
-      bottom: 0,
-      height: 46,
-      child: Align(
-        alignment: top ? Alignment.centerLeft : Alignment.centerRight,
-        child: _ComposerPill(
-          controller: chatController,
-          focusNode: chatFocus,
-          sending: sending,
-          onSend: onSend,
-          open: composerOpen,
-          onOpen: onOpenComposer,
+          ),
+          child: Icon(
+            icon,
+            size: 24,
+            color: (fill != null || !active) ? Colors.white : Colors.black,
+          ),
         ),
       ),
     );
-    // Messages rangés EN HAUT : les bulles sont en haut, mais le crayon reste
-    // en bas à gauche — permanent, comme la languette. L'écran d'appel remonte
-    // toute la zone au-dessus de la barre quand elle est rappelée (voir le
-    // remplissage du panneau), donc il ne tombe plus sur les boutons.
-    if (top) {
-      return SizedBox(
-        height: 46,
-        child: Stack(clipBehavior: Clip.none, children: [composer]),
-      );
-    }
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 84 + 10),
+  }
+}
+
+/// La carte de l'appel : coins 28, bordure blanche 26 %, fond blanc 8 %. PAS de
+/// BackdropFilter (un flou refait à chaque image vidéo chauffait le GPU).
+///
+/// Ancrée en bas : elle grandit vers le haut quand la saisie se déroule. Le
+/// champ de saisie (ou son crayon) est posé dans un [Stack] à une place FIXE de
+/// l'arbre — jamais re-mappé, sinon le clavier y perdrait le focus.
+class _CallCard extends StatelessWidget {
+  const _CallCard({
+    required this.header,
+    required this.showHeader,
+    required this.messages,
+    required this.composer,
+    required this.composerOpen,
+  });
+
+  final Widget header;
+  final bool showHeader;
+  final Widget messages;
+  final Widget composer;
+  final bool composerOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.26)),
+      ),
       child: Stack(
-        clipBehavior: Clip.none,
         children: [
-          // Crayon fermé : les bulles à la hauteur du rond, à sa gauche.
-          // Saisie ouverte : elles remontent au-dessus du champ.
-          AnimatedPadding(
+          AnimatedSize(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
-            padding: EdgeInsets.only(
-              right: composerOpen ? 14 : 70,
-              bottom: composerOpen ? _composerLift : 0,
-            ),
-            child: _TurnsBlock(
-              turns: turns,
-              myName: myName,
-              myAvatarUrl: myAvatarUrl,
-              peerName: peerName,
-              peerAvatarUrl: peerAvatarUrl,
-              top: false,
-              onToggleSide: onToggleSide,
-              hint: hint,
-              onHintDone: onHintDone,
-              onTapZone: onTapZone,
-              holdFade: composerOpen,
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              // La saisie déroulée prend 46 + 12 sous les messages.
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                18,
+                18 + (composerOpen ? 58.0 : 0.0),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (showHeader) ...[
+                    KeyedSubtree(
+                      key: const ValueKey('card_header'),
+                      child: header,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  messages,
+                ],
+              ),
             ),
           ),
-          composer,
+          Positioned(
+            left: 16,
+            right: composerOpen ? 16 : 12,
+            bottom: composerOpen ? 16 : 12,
+            height: 46,
+            child: Align(alignment: Alignment.centerRight, child: composer),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Le bloc de bulles de la conversation ouverte : la pastille « N plus tôt »,
-/// les deux dernières bulles (on remonte le fil en faisant défiler), et la
-/// languette collée au bord gauche qui le fait passer du bas au haut de
-/// l'écran — en la glissant ou d'un simple tap.
+/// Les messages de la carte : DEUX au plus, jamais plus. Photo ronde de 26, texte
+/// de 16 px (graisse 600). Le plus récent en blanc plein, le précédent à ~70 %.
+/// Au-delà de deux, une pastille « N plus tôt ».
 ///
-/// Il entre en scène : les bulles montent, la languette glisse depuis le bord,
-/// la pastille apparaît. À la première ouverture, une démonstration montre que
-/// la languette se glisse.
-class _TurnsBlock extends StatefulWidget {
-  const _TurnsBlock({
+/// Atténuation (gardée de l'ancien bloc) : 5 s sans geste ni nouveau message,
+/// l'avant-dernier passe à 35 % — sauf les DEUX premiers de l'appel et pendant la
+/// saisie. Un tap sur la zone, ou un nouveau message, le réveille.
+class _CardMessages extends StatefulWidget {
+  const _CardMessages({
     super.key,
     required this.turns,
     required this.myName,
     required this.myAvatarUrl,
     required this.peerName,
     required this.peerAvatarUrl,
-    required this.top,
-    required this.onToggleSide,
-    required this.hint,
-    required this.onHintDone,
+    required this.holdFade,
+    required this.reservePencil,
     required this.onTapZone,
-    this.holdFade = false,
-    this.onDark = false,
-    this.snug = false,
-    this.listMaxHeight = _SpokenTurnsPanel.maxHeight,
-    this.showEarlier = true,
   });
-
-  /// Vrai tant que la saisie est dépliée : les bulles ne s'atténuent pas.
-  final bool holdFade;
-
-  /// Caméra du pair coupée (v4) : verre blanc sur fond noir, deux lignes au
-  /// plus par bulle. Le texte garde sa taille ; c'est la zone qui est plus haute.
-  final bool onDark;
-
-  /// Les bulles se collent au bord (bas, ou haut si [top]) de la zone au lieu
-  /// de flotter dans sa hauteur minimale de 84 px.
-  final bool snug;
-
-  /// Hauteur maximale de la liste de bulles.
-  final double listMaxHeight;
-
-  /// Faux : pas de pastille « N plus tôt » (la démonstration garde la sienne).
-  final bool showEarlier;
 
   final List<_SpokenTurn> turns;
   final String myName;
   final String myAvatarUrl;
   final String peerName;
   final String peerAvatarUrl;
-  final bool top;
-  final VoidCallback onToggleSide;
-  final bool hint;
-  final VoidCallback onHintDone;
 
-  /// Un tap sur les bulles elles-mêmes : ferme la zone d'un seul tap. La liste
-  /// (un Scrollable) absorbait ce tap sans rien en faire : il ne passait pas à
-  /// la couche qui ferme, et seul un tap HORS de la zone la refermait.
+  /// La saisie est dépliée : pas d'atténuation.
+  final bool holdFade;
+
+  /// Chaque ligne laisse 46 px à droite pour le crayon.
+  final bool reservePencil;
+
+  /// Un tap sur les messages : masque / ramène l'en-tête de la carte.
   final VoidCallback onTapZone;
 
   @override
-  State<_TurnsBlock> createState() => _TurnsBlockState();
+  State<_CardMessages> createState() => _CardMessagesState();
 }
 
-class _TurnsBlockState extends State<_TurnsBlock>
-    with TickerProviderStateMixin {
+class _CardMessagesState extends State<_CardMessages> {
   static const _yellow = Color(0xFFF4FF1F);
-
-  /// L'entrée en scène, ~1,3 s.
-  late final AnimationController _enter = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1300),
-  );
-
-  /// La démonstration de la languette, après l'entrée.
-  late final AnimationController _demo = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 3200),
-  );
-
-  /// Atténuation : 5 s sans geste ni nouveau message, l'AVANT-DERNIÈRE bulle
-  /// passe à 35 % (rien ne disparaît ; la plus récente reste à 100 %). Les DEUX
-  /// PREMIÈRES de l'appel (celles du démarrage) ne s'atténuent jamais. Un tap sur
-  /// la bulle atténuée, ou sur la languette, la réveille ; un nouveau message
-  /// aussi (il arrive à 100 %, le délai de 5 s repart).
   static const Duration _fadeAfter = Duration(seconds: 5);
   static const int _neverFade = 2;
+
   Timer? _fadeTimer;
   bool _faded = false;
   int _seenLen = 0;
@@ -5199,67 +4339,20 @@ class _TurnsBlockState extends State<_TurnsBlock>
     _armFade();
   }
 
-  /// Ce que le doigt a tiré la languette (vertical).
-  double _drag = 0;
-
-  /// Assez tiré pour changer de côté au lâcher.
-  static const double _switchAt = 70;
-
-  /// Le trajet MINIMUM montré par la démonstration (repli si on ne peut pas
-  /// mesurer l'écran).
-  static const double _demoTravel = 110;
-
-  /// Le trajet réellement montré : de la place actuelle de la zone jusqu'à
-  /// l'autre bord de l'écran. Avant, la zone ne bougeait que de 110 px : ça
-  /// ressemblait à un petit rebond, pas à « la zone monte tout en haut ».
-  double _travelPx = _demoTravel;
-
-  final GlobalKey _boxKey = GlobalKey();
-
-  void _measureTravel() {
-    try {
-      final box = _boxKey.currentContext?.findRenderObject() as RenderBox?;
-      if (box == null || !box.attached) return;
-      final mq = MediaQuery.of(context);
-      final y = box.localToGlobal(Offset.zero).dy;
-      final h = box.size.height;
-      // viewPadding, pas padding : le SafeArea de l'écran a déjà consommé
-      // padding (il vaut 0 ici), et la zone montait jusque sous la barre d'état.
-      final topLimit = mq.viewPadding.top + 4;
-      final bottomLimit = mq.size.height - (16 + mq.viewPadding.bottom) - h;
-      final d = widget.top ? bottomLimit - y : y - topLimit;
-      _travelPx = d.clamp(_demoTravel, mq.size.height).toDouble();
-    } catch (_) {
-      _travelPx = _demoTravel;
-    }
-  }
-
   @override
   void initState() {
     super.initState();
     _seenLen = widget.turns.length;
     _armFade();
-    _enter.forward();
-    _enter.addStatusListener((s) {
-      if (s == AnimationStatus.completed && widget.hint && mounted) {
-        _measureTravel();
-        _demo.forward(from: 0);
-      }
-    });
-    _demo.addStatusListener((s) {
-      if (s == AnimationStatus.completed) widget.onHintDone();
-    });
   }
 
   @override
-  void didUpdateWidget(covariant _TurnsBlock oldWidget) {
+  void didUpdateWidget(covariant _CardMessages oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Un nouveau message (le mien ou le sien) remet tout à 100 %.
     if (widget.turns.length != _seenLen) {
       _seenLen = widget.turns.length;
       _wake();
     }
-    // La saisie dépliée : pas d'atténuation ; au repli, le délai repart.
     if (widget.holdFade != oldWidget.holdFade) {
       if (widget.holdFade) {
         _fadeTimer?.cancel();
@@ -5268,308 +4361,150 @@ class _TurnsBlockState extends State<_TurnsBlock>
         _armFade();
       }
     }
-    // La démonstration est demandée alors que la zone est déjà en place (le
-    // premier message de l'appel arrive après l'entrée) : on la lance.
-    if (!oldWidget.hint &&
-        widget.hint &&
-        _enter.status == AnimationStatus.completed) {
-      _measureTravel();
-      _demo.forward(from: 0);
-    }
-    // Un tap sur l'écran a arrêté la démonstration.
-    if (oldWidget.hint && !widget.hint) {
-      _demo.stop();
-      _demo.value = 0;
-    }
   }
 
   @override
   void dispose() {
     _fadeTimer?.cancel();
-    _enter.dispose();
-    _demo.dispose();
     super.dispose();
   }
 
-  double _interval(double from, double to, Curve curve) {
-    final t = ((_enter.value - from) / (to - from)).clamp(0.0, 1.0);
-    return curve.transform(t);
-  }
-
-  /// Démonstration : deux petits sauts, puis le rond-doigt tire la languette
-  /// jusqu'à l'autre bord et la ramène.
-  ({double hop, double travel, double finger}) get _demoState {
-    final v = _demo.value;
-    if (!widget.hint || v == 0) return (hop: 0, travel: 0, finger: 0);
-    double hop = 0;
-    if (v < 0.22) hop = -7 * math.sin(math.pi * ((v / 0.11) % 1.0)).abs();
-    double travel = 0;
-    double finger = 0;
-    if (v >= 0.25 && v < 0.95) {
-      finger = 1;
-      final go = v < 0.6
-          ? Curves.easeInOut.transform((v - 0.25) / 0.35)
-          : 1 - Curves.easeInOut.transform((v - 0.6) / 0.35);
-      travel = (widget.top ? 1 : -1) * _travelPx * go;
-    }
-    return (hop: hop, travel: travel, finger: finger);
+  Widget _row(_SpokenTurn turn, int idx, bool newest) {
+    final name = turn.mine ? widget.myName : widget.peerName;
+    final avatarUrl = turn.mine ? widget.myAvatarUrl : widget.peerAvatarUrl;
+    final dim = _faded && idx == widget.turns.length - 2 && idx >= _neverFade;
+    final double alpha = newest ? 1.0 : (dim ? 0.35 : 0.7);
+    return AnimatedOpacity(
+      duration: Duration(milliseconds: _faded ? 600 : 200),
+      curve: Curves.easeOut,
+      opacity: turn.delivered ? 1 : 0.5,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Liseré blanc 50 % : la photo se détache de la vidéo derrière.
+          Container(
+            padding: const EdgeInsets.all(1.5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.5),
+            ),
+            child: ProfileAvatar(
+              displayName: name,
+              avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
+              size: 23,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Text(
+                turn.text,
+                maxLines: 5,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: alpha),
+                  fontSize: 16,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                  fontStyle:
+                      turn.delivered ? FontStyle.normal : FontStyle.italic,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      blurRadius: 8,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_enter, _demo]),
-      builder: (context, _) {
-        final demo = _demoState;
-        final shift = _drag + demo.travel;
-        final bubblesIn = _interval(0.08, 0.55, Curves.easeOutCubic);
-        final tabIn = _interval(0.23, 0.6, Curves.easeOutCubic);
-        final pillIn = _interval(0.46, 0.7, Curves.easeOut);
-
-        final earlier = widget.turns.length - 2;
-        final Widget? pill = widget.hint && _demo.value > 0
-            ? _pill(AppStrings.t('call_tab_hint'), highlighted: true)
-            : (earlier > 0 && widget.showEarlier
-                ? _pill(
-                    AppStrings.t('call_earlier', args: {'n': '$earlier'}),
-                    highlighted: false,
-                  )
-                : null);
-        final pillBox = pill == null
-            ? const SizedBox.shrink()
-            : Opacity(
-                opacity: pillIn,
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    top: widget.top ? 8 : 0,
-                    bottom: widget.top ? 0 : 8,
-                  ),
-                  child: pill,
-                ),
-              );
-
-        final list = GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          // Atténuées : le tap les réveille au lieu de fermer la zone.
-          onTap: () {
-            if (_faded) {
-              _wake();
-            } else {
-              widget.onTapZone();
-            }
-          },
-          child: Opacity(
-          opacity: bubblesIn,
-          child: Transform.translate(
-            offset: Offset(0, 70 * (1 - bubblesIn) * (widget.top ? -1 : 1)),
-            child: Transform.scale(
-              scale: 0.9 + 0.1 * bubblesIn,
-              alignment: widget.top ? Alignment.topLeft : Alignment.bottomLeft,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: widget.listMaxHeight,
-                ),
-                child: ListView.builder(
-                  // À l'envers : la plus récente en bas, et on remonte le
-                  // temps en faisant défiler.
-                  reverse: true,
-                  shrinkWrap: true,
-                  physics: const BouncingScrollPhysics(),
-                  padding: EdgeInsets.zero,
-                  itemCount: widget.turns.length,
-                  itemBuilder: (ctx, i) {
-                    final idx = widget.turns.length - 1 - i;
-                    final turn = widget.turns[idx];
-                    return Padding(
-                      padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
-                      child: AnimatedOpacity(
-                        duration: Duration(milliseconds: _faded ? 600 : 200),
-                        curve: Curves.easeOut,
-                        // Seule l'AVANT-DERNIÈRE bulle s'atténue (la plus récente
-                        // reste à 100 %), et jamais l'une des deux premières de
-                        // l'appel. Rien ne disparaît.
-                        opacity: (_faded &&
-                                idx == widget.turns.length - 2 &&
-                                idx >= _neverFade)
-                            ? 0.35
-                            : 1.0,
-                        child: _TurnBubble(
-                          turn: turn,
-                          name: turn.mine ? widget.myName : widget.peerName,
-                          avatarUrl: turn.mine
-                              ? widget.myAvatarUrl
-                              : widget.peerAvatarUrl,
-                          onDark: widget.onDark,
-                          maxLines: null,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-          ),
-        );
-
-        final column = Padding(
-          // La place de la languette, sur le bord gauche.
-          padding: const EdgeInsets.only(left: 28),
+    final turns = widget.turns;
+    final from = turns.length > 2 ? turns.length - 2 : 0;
+    final earlier = from;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      // Atténuées : le tap les réveille au lieu de masquer l'en-tête.
+      onTap: () {
+        if (_faded) {
+          _wake();
+        } else {
+          widget.onTapZone();
+        }
+      },
+      child: ConstrainedBox(
+        // Même vide, la zone garde la place du crayon.
+        constraints: const BoxConstraints(minHeight: 44),
+        child: AnimatedPadding(
+          duration: const Duration(milliseconds: 200),
+          padding: EdgeInsets.only(right: widget.reservePencil ? 46 : 0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: widget.top ? [list, pillBox] : [pillBox, list],
-          ),
-        );
-
-        final tab = Transform.translate(
-          offset: Offset(-22 * (1 - tabIn), demo.hop),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              _wake();
-              widget.onToggleSide();
-            },
-            onVerticalDragUpdate: (d) => setState(() {
-              _drag = (_drag + d.delta.dy).clamp(-160.0, 160.0);
-            }),
-            onVerticalDragEnd: (_) {
-              final go = widget.top ? _drag > _switchAt : _drag < -_switchAt;
-              setState(() => _drag = 0);
-              if (go) widget.onToggleSide();
-            },
-            onVerticalDragCancel: () => setState(() => _drag = 0),
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.center,
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topRight: Radius.circular(14),
-                    bottomRight: Radius.circular(14),
-                  ),
-                  child: _Frost(
-                    child: Container(
-                      width: 20,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        borderRadius: const BorderRadius.only(
-                          topRight: Radius.circular(14),
-                          bottomRight: Radius.circular(14),
+            children: [
+              if (earlier > 0)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Container(
+                    height: 24,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.keyboard_arrow_up_rounded,
+                          size: 16,
+                          color: _yellow,
                         ),
-                        border: Border(
-                          top: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.18),
-                          ),
-                          right: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.18),
-                          ),
-                          bottom: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.18),
+                        const SizedBox(width: 4),
+                        Text(
+                          AppStrings.t('call_earlier', args: {'n': '$earlier'}),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
                           ),
                         ),
-                      ),
-                      child: Icon(
-                        widget.top
-                            ? Icons.keyboard_double_arrow_down_rounded
-                            : Icons.keyboard_double_arrow_up_rounded,
-                        size: 18,
-                        color: _yellow,
-                      ),
+                      ],
                     ),
                   ),
                 ),
-                // Le rond-doigt de la démonstration, posé sur la languette.
-                if (demo.finger > 0)
-                  IgnorePointer(
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ),
+              for (var i = from; i < turns.length; i++) ...[
+                if (i > from) const SizedBox(height: 10),
+                _row(turns[i], i, i == turns.length - 1),
               ],
-            ),
-          ),
-        );
-
-        return Transform.translate(
-          offset: Offset(0, shift),
-          child: Stack(
-            key: _boxKey,
-            clipBehavior: Clip.none,
-            children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 64 + 20),
-                child: widget.snug
-                    ? Align(
-                        alignment: widget.top
-                            ? Alignment.topLeft
-                            : Alignment.bottomLeft,
-                        child: column,
-                      )
-                    : column,
-              ),
-              Positioned(
-                left: 0,
-                top: widget.top ? 10 : null,
-                bottom: widget.top ? null : 10,
-                child: tab,
-              ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _pill(String text, {required bool highlighted}) {
-    final content = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (!highlighted) ...[
-          const Icon(Icons.keyboard_arrow_up_rounded, size: 16, color: _yellow),
-          const SizedBox(width: 4),
-        ],
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: highlighted ? SC.onAccent : Colors.white,
-          ),
-        ),
-      ],
-    );
-    if (highlighted) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: _yellow,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: content,
-      );
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: _Frost(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-          ),
-          child: content,
         ),
       ),
     );
   }
+}
+
+/// Un tour de parole : ce qu'une des deux personnes vient de dire, déjà dans
+/// la langue de CE device (ma phrase telle que je l'ai dite ; celle du pair
+/// telle qu'elle m'arrive traduite).
+class _SpokenTurn {
+  _SpokenTurn({required this.mine, required this.text, this.delivered = true});
+  final bool mine;
+  final String text;
+
+  /// Mine only: heard, but the peer never got it. Drawn dimmed.
+  final bool delivered;
 }
 
 /// La saisie de l'appel, REPLIÉE en rond crayon : un tap la déplie en champ
@@ -5581,6 +4516,7 @@ class _TurnsBlockState extends State<_TurnsBlock>
 /// son focus — c'est le bug de b2f3293.
 class _ComposerPill extends StatefulWidget {
   const _ComposerPill({
+    super.key,
     required this.controller,
     required this.focusNode,
     required this.sending,
@@ -5641,23 +4577,23 @@ class _ComposerPillState extends State<_ComposerPill>
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOutCubic,
-              width: widget.open ? full : 46,
-              height: 46,
+              // Fermé : rond de 40 (même style que les touches du rail). Ouvert :
+              // champ de 46, bordure jaune de 1,5, fond blanc 8 %.
+              width: widget.open ? full : 40,
+              height: widget.open ? 46 : 40,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(23),
                 child: _Frost(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.58),
+                      color: Colors.white
+                          .withValues(alpha: widget.open ? 0.08 : 0.10),
                       borderRadius: BorderRadius.circular(23),
-                      // Fermé : le bouton crayon est cerclé de jaune (le même
-                      // jaune que « À toi, tu peux reparler ») pour qu'on le
-                      // repère ; ouvert, le champ garde son filet blanc discret.
                       border: Border.all(
                         color: widget.open
-                            ? Colors.white.withValues(alpha: 0.18)
-                            : const Color(0xFFF4FF1F),
-                        width: widget.open ? 1 : 1.8,
+                            ? _yellow
+                            : Colors.white.withValues(alpha: 0.26),
+                        width: widget.open ? 1.5 : 1,
                       ),
                     ),
                     child: Stack(
@@ -5711,21 +4647,20 @@ class _ComposerPillState extends State<_ComposerPill>
                                   behavior: HitTestBehavior.opaque,
                                   onTap: widget.sending ? null : widget.onSend,
                                   child: Container(
-                                    width: 32,
-                                    height: 32,
+                                    width: 36,
+                                    height: 36,
                                     decoration: BoxDecoration(
-                                      // Bleu de marque ; grisé pendant
-                                      // l'envoi — un second tap enverrait deux
-                                      // fois.
+                                      // Jaune ; grisé pendant l'envoi — un
+                                      // second tap enverrait deux fois.
                                       color: widget.sending
                                           ? Colors.white24
-                                          : const Color(0xFF1F5EFF),
+                                          : _yellow,
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(
                                       Icons.arrow_upward_rounded,
-                                      color: Colors.white,
-                                      size: 18,
+                                      color: Colors.black,
+                                      size: 20,
                                     ),
                                   ),
                                 ),
@@ -5746,13 +4681,13 @@ class _ComposerPillState extends State<_ComposerPill>
                                     const Icon(
                                       Icons.edit,
                                       color: Colors.white,
-                                      size: 22,
+                                      size: 20,
                                     ),
                                     // Un brouillon attend dans le champ.
                                     if (v.text.trim().isNotEmpty)
                                       Positioned(
-                                        top: 9,
-                                        right: 9,
+                                        top: 7,
+                                        right: 7,
                                         child: Container(
                                           width: 8,
                                           height: 8,
@@ -5776,116 +4711,6 @@ class _ComposerPillState extends State<_ComposerPill>
           ),
         );
       },
-    );
-  }
-}
-
-/// Une bulle : la PDP de qui parle, du côté de qui parle.
-///
-/// TOUTES à gauche, les miennes comme les siennes : la conversation n'occupe
-/// qu'une colonne sur le bord de l'écran, et une bulle renvoyée à droite y
-/// serait à l'étroit pour rien. C'est la PDP qui dit qui a parlé, pas le côté.
-class _TurnBubble extends StatelessWidget {
-  const _TurnBubble({
-    required this.turn,
-    required this.name,
-    required this.avatarUrl,
-    this.maxLines,
-    this.onDark = false,
-  });
-
-  final _SpokenTurn turn;
-  final String name;
-  final String avatarUrl;
-
-  /// Posée sur le fond noir de la caméra coupée (v4) : verre blanc 12 %, le noir
-  /// translucide y serait invisible. La taille du texte ne change pas.
-  final bool onDark;
-
-  /// Combien de lignes au plus, au-delà desquelles la phrase se coupe.
-  ///
-  /// Nul dans le panneau ouvert : on y est venu pour lire, rien n'y est tronqué.
-  /// Fixé au repos, où la bulle s'invite sur la vidéo sans qu'on l'ait demandé
-  /// et ne doit donc pas pouvoir prendre l'écran. Le compte de bulles y était
-  /// bien plafonné, mais pas leur HAUTEUR : deux phrases longues montaient sans
-  /// limite, et « deux au maximum » ne veut plus rien dire quand chacune fait
-  /// huit lignes.
-  final int? maxLines;
-
-  @override
-  Widget build(BuildContext context) {
-    // Liseré blanc 1,5 px à 50 % : la PDP se détache de la vidéo derrière.
-    final avatar = Container(
-      padding: const EdgeInsets.all(1.5),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: 0.5),
-      ),
-      child: ProfileAvatar(
-        displayName: name,
-        avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
-        size: 23,
-      ),
-    );
-
-    // UNE seule teinte, transparente, pour tout le monde : le verre sombre qui
-    // était déjà celui du pair. Les miennes étaient teintées d'accent, ce qui
-    // faisait deux couleurs sur une colonne qui n'en demande pas — la PDP dit
-    // déjà qui parle, et un fond coloré rend surtout la vidéo moins lisible
-    // dessous. Posées sur un visage, les bulles doivent le laisser passer :
-    // c'est tout ce qu'on leur demande.
-    //
-    // La plus récente ne se distingue pas non plus : elle passait en blanc
-    // plein, ce qui faisait changer de couleur une bulle déjà lue dès que la
-    // suivante arrivait.
-    final Color fill = onDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.6);
-    final Color ink = Colors.white.withValues(alpha: turn.mine ? 0.92 : 0.78);
-    const double radius = 18;
-
-    final bubble = Flexible(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: _Frost(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-              color: fill,
-              borderRadius: BorderRadius.circular(radius),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.14),
-              ),
-            ),
-            child: Text(
-              turn.text,
-              maxLines: maxLines,
-              // Coupée, la phrase le dit — et la suite n'est pas perdue : elle
-              // est entière dans le panneau, à un tap.
-              overflow: maxLines == null
-                  ? TextOverflow.clip
-                  : TextOverflow.ellipsis,
-              style: TextStyle(
-                // Une phrase que personne n'a reçue s'efface franchement : on
-                // doit pouvoir la relire pour la redire, mais on voit d'un
-                // coup d'œil qu'elle n'est pas partie.
-                color: turn.delivered ? ink : ink.withValues(alpha: 0.4),
-                fontSize: 15.5,
-                height: 1.3,
-                fontWeight: FontWeight.w400,
-                fontStyle:
-                    turn.delivered ? FontStyle.normal : FontStyle.italic,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [avatar, const SizedBox(width: 8), bubble],
     );
   }
 }
@@ -5933,281 +4758,6 @@ class _PipFlipButton extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// La rangée du bas : cinq touches posées À MÊME la vidéo, sans panneau
-/// derrière elles.
-///
-/// De gauche à droite — la conversation, couper la caméra, le chevron qui
-/// déplie les réglages, couper le micro, raccrocher. Le micro et la caméra sont
-/// ici et non derrière le chevron : on les coupe en pleine phrase, ça ne se
-/// déplie pas.
-class _CallDock extends StatelessWidget {
-  const _CallDock({
-    required this.camOn,
-    required this.micOn,
-    required this.speakerOn,
-    required this.ttsSpeaking,
-    required this.voiceLevel,
-    required this.controlsOpen,
-    required this.dimmed,
-    required this.onWake,
-    required this.onToggleCam,
-    required this.onToggleMic,
-    required this.onToggleSpeaker,
-    required this.onHangUp,
-    required this.onToggleControls,
-  });
-
-  /// L'état des deux bascules montées dans la rangée.
-  final bool camOn;
-  final bool micOn;
-  final bool speakerOn;
-  final ValueListenable<bool> ttsSpeaking;
-  final ValueListenable<double> voiceLevel;
-  final bool controlsOpen;
-
-  /// Silence : la rangée s'efface entièrement.
-  final bool dimmed;
-  final VoidCallback onWake;
-  final VoidCallback onToggleCam;
-  final VoidCallback onToggleMic;
-  final VoidCallback onToggleSpeaker;
-  final VoidCallback onHangUp;
-  final VoidCallback onToggleControls;
-
-  /// La veille va jusqu'à l'effacement complet. Ce qui devient invisible
-  /// devient introuvable, d'ordinaire — ici non : le galet reste posé au
-  /// milieu, et un tap N'IMPORTE OÙ sur l'écran ramène la rangée.
-  static const double _dimOpacity = 0.0;
-
-  /// Une touche de la rangée : elle s'estompe avec la veille et cesse de
-  /// répondre quand la barre est endormie — le premier tap la rallume, il ne
-  /// déclenche rien d'autre.
-  Widget _live(double live, bool asleep, Widget child) => Opacity(
-        opacity: live,
-        child: IgnorePointer(ignoring: asleep, child: child),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: dimmed ? 1 : 0),
-      // Plus long et plus mou que les mouvements de la rangée : elle s'en va,
-      // elle ne claque pas.
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeInOut,
-      builder: (context, dim, _) {
-        // 1 en pleine lumière, [_dimOpacity] en veille — jamais moins.
-        final live = 1 - (1 - _dimOpacity) * dim;
-        return GestureDetector(
-          // En veille, la rangée entière devient une seule grande cible qui la
-          // rallume : opaque, sinon le tap traverse et personne ne l'attrape.
-          behavior:
-              dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
-          onTap: dimmed ? onWake : null,
-          // Plus de barre de verre, et plus de lueur autour : les touches sont
-          // posées à même la vidéo, sans rien derrière elles.
-          child: Padding(
-              // Les touches ne touchent pas le bord de l'écran, et elles
-              // respirent entre elles : c'est le seul rôle qui restait au
-              // panneau.
-              // Presque rien sur les côtés : les deux touches extrêmes vont
-              // chercher le bord de l'écran. C'est la zone de clic qui les
-              // empêche de le toucher vraiment.
-              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.max,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // À GAUCHE : la sortie audio, puis couper la caméra.
-                  _live(
-                    live,
-                    dimmed,
-                    _DockKeyButton(
-                      icon: speakerOn
-                          ? Icons.volume_up_rounded
-                          : Icons.phone_in_talk_rounded,
-                      // Le texte dit L'ÉTAT COURANT, comme l'icône. Il disait
-                      // l'action à faire, ce qui affichait « Écouteur » au
-                      // moment précis où le haut-parleur était allumé.
-                      label: AppStrings.t(
-                        speakerOn ? 'call_speaker' : 'call_earpiece',
-                      ),
-                      // LE BLANC MARQUE CE QU'ON VEUT VOIR D'UN COUP D'ŒIL.
-                      //
-                      // Le haut-parleur s'allume quand il est ACTIF ; le micro
-                      // et la caméra quand ils sont COUPÉS. Pas de règle
-                      // unique, et c'est assumé : d'un appel on veut savoir
-                      // « le son sort du haut-parleur » d'un côté, et « on ne
-                      // me voit pas, on ne m'entend pas » de l'autre. Ce sont
-                      // les trois choses qu'on cherche du regard.
-                      //
-                      // L'ICÔNE et le TEXTE disent tous deux l'état courant :
-                      // micro barré + « Muet », micro plein + « Micro ». Les
-                      // trois signaux racontent la même chose.
-                      background: speakerOn
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.14),
-                      iconColor: speakerOn ? Colors.black : Colors.white,
-                      onTap: onToggleSpeaker,
-                    ),
-                  ),
-                  _live(
-                    live,
-                    dimmed,
-                    _DockKeyButton(
-                      icon: camOn
-                          ? Icons.videocam_rounded
-                          : Icons.videocam_off_rounded,
-                      label: AppStrings.t(
-                        camOn ? 'call_camera' : 'call_video_off',
-                      ),
-                      // Blanche quand la caméra est COUPÉE, comme le micro.
-                      background: camOn
-                          ? Colors.white.withValues(alpha: 0.14)
-                          : Colors.white,
-                      iconColor: camOn ? Colors.white : Colors.black,
-                      onTap: onToggleCam,
-                    ),
-                  ),
-                  // AU CENTRE : le chevron qui déplie le reste.
-                  _live(
-                    live,
-                    dimmed,
-                    _RailToggleButton(
-                      open: controlsOpen,
-                      onTap: onToggleControls,
-                    ),
-                  ),
-                  // À DROITE : le micro, puis raccrocher.
-                  _live(
-                    live,
-                    dimmed,
-                    _DockKeyButton(
-                      icon: micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
-                      label: AppStrings.t(micOn ? 'call_mic' : 'call_mute'),
-                      background: micOn
-                          ? Colors.white.withValues(alpha: 0.14)
-                          : Colors.white,
-                      iconColor: micOn ? Colors.white : Colors.black,
-                      onTap: onToggleMic,
-                    ),
-                  ),
-                  _live(
-                    live,
-                    dimmed,
-                    _DockKeyButton(
-                      icon: Icons.call_end_rounded,
-                      label: AppStrings.t('call_end'),
-                      background: const Color(0xFFE53935),
-                      onTap: onHangUp,
-                    ),
-                  ),
-                ],
-              ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _DockKeyButton extends StatelessWidget {
-  const _DockKeyButton({
-    required this.icon,
-    required this.label,
-    required this.background,
-    required this.onTap,
-    this.iconColor,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color background;
-
-  /// Null = la touche est là mais n'a rien à ouvrir (aucune phrase encore
-  /// dite) : elle ne réagit pas, sans changer d'aspect.
-  final VoidCallback? onTap;
-
-  /// Noir quand la touche est engagée et se remplit de blanc.
-  final Color? iconColor;
-
-  /// Le rond visible. Agrandi : à 46 il fallait viser.
-  static const double size = 56;
-
-  /// La zone qui répond au doigt, plus large que le rond. On visait un cercle
-  /// de 46 et on ratait : Apple demande 44 MINIMUM, ce qui ne laisse aucune
-  /// marge d'erreur, et un doigt ne tombe pas au pixel. Les 14 px de plus ne
-  /// se voient pas — ils se sentent.
-  static const double hitSize = 68;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: label,
-      button: true,
-      child: Pressable(
-        bounce: true,
-        onTap: onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: hitSize,
-              height: hitSize,
-              child: Center(
-                child: Container(
-                  width: size,
-                  height: size,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: background,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.22),
-                    ),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: iconColor ?? Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-            ),
-            // Le titre, comme sur les touches du rail. Il manquait ici et
-            // nulle part ailleurs : cinq ronds muets en bas d'un appel se
-            // devinent, ils ne se lisent pas.
-            //
-            // Borné à la largeur de la touche et RÉTRÉCI pour y tenir. En
-            // français « Haut-parleur » fait déjà 12 signes, en portugais
-            // « Auscultador » 11, en allemand « Nachrichten » 11 : à cinq de
-            // front, la rangée débordait dans ces langues-là. Rétréci plutôt
-            // que coupé — « Haut-parl… » est pire qu'un mot un peu plus petit.
-            SizedBox(
-              width: hitSize + 6,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.65),
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w500,
-                    height: 1.1,
-                    shadows: const [
-                      Shadow(color: Colors.black, blurRadius: 6),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -6892,248 +5442,6 @@ class _OrbPainter extends CustomPainter {
       old.showBars != showBars;
 }
 
-/// The glass chevron that unfolds the blue controls above the dock — the same
-/// pill as the one on a Discover card, a size up, and flipped: it points UP to
-/// open them (they grow upward) and DOWN to fold them away again.
-class _RailToggleButton extends StatelessWidget {
-  const _RailToggleButton({required this.open, required this.onTap});
-
-  final bool open;
-  final VoidCallback onTap;
-
-  /// Le bouton lui-même. L'anneau et son halo se peignent dans les quelques
-  /// pixels qui restent autour, d'où l'encombrement un peu plus large.
-  static const double _size = 42;
-  static const double _box = 50;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: SizedBox(
-        width: _box,
-        height: _box,
-        child: CustomPaint(
-          // L'anneau irisé est PEINT, pas posé en décoration : un dégradé ne
-          // rentre pas dans un Border, et un disque dégradé placé dessous se
-          // verrait par transparence à travers le verre du bouton. Un trait
-          // circulaire n'a pas d'intérieur, donc rien ne traverse.
-          painter: _ChevronRimPainter(visible: !open),
-          child: Center(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
-              width: _size,
-              height: _size,
-              decoration: BoxDecoration(
-                // Pas de BackdropFilter ici : le bouton est POSÉ sur le dock,
-                // qui floute déjà le fond — un second flou ne verrait que du
-                // verre et coûterait une passe de plus.
-                //
-                // Déplié = engagé, donc blanc plein comme les bascules
-                // au-dessus : les réglages sont ouverts, et ça se voit sans
-                // lire le chevron.
-                color:
-                    open ? Colors.white : Colors.white.withValues(alpha: 0.14),
-                shape: BoxShape.circle,
-              ),
-              child: AnimatedRotation(
-                turns: open ? 0.5 : 0.0,
-                duration: const Duration(milliseconds: 240),
-                curve: Curves.easeOutCubic,
-                child: Icon(
-                  Icons.keyboard_arrow_up_rounded,
-                  color: open ? Colors.black : Colors.white,
-                  size: 26,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// La lueur du chevron : un trait cyan autour du bouton, doublé du même trait
-/// flouté qui fait le halo.
-///
-/// Elle s'efface quand les réglages sont dépliés : le bouton est alors blanc
-/// plein, et deux signaux qui disent la même chose se gênent.
-class _ChevronRimPainter extends CustomPainter {
-  const _ChevronRimPainter({
-    required this.visible,
-    this.buttonSize = _RailToggleButton._size,
-  });
-
-  final bool visible;
-
-  /// Le diamètre du bouton que l'anneau doit cerner. Il ne connaissait que le
-  /// chevron ; le bouton des messages porte le même anneau et n'a pas la même
-  /// taille.
-  final double buttonSize;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (!visible) return;
-    final c = Offset(size.width / 2, size.height / 2);
-    // Le rayon du bouton, plus un cheveu : le trait court juste à l'extérieur.
-    final r = buttonSize / 2 + 1.2;
-    // La lueur d'abord : le même anneau, plus épais et flou, dessous.
-    canvas.drawCircle(
-      c,
-      r,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.5
-        ..color = SC.accent.withValues(alpha: 0.45)
-        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3.5),
-    );
-    // Puis le trait net.
-    canvas.drawCircle(
-      c,
-      r,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4
-        ..color = SC.accent.withValues(alpha: 0.85),
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ChevronRimPainter old) =>
-      old.visible != visible || old.buttonSize != buttonSize;
-}
-
-/// Un réglage d'appel, au-dessus du dock.
-///
-/// Les bascules suivent le geste natif (Téléphone / FaceTime d'iOS, WhatsApp) :
-/// verre translucide au repos, **blanc plein et icône noire dès que l'état est
-/// engagé** — muet, caméra coupée, haut-parleur. L'icône, elle, continue de
-/// montrer l'état courant (micro barré quand on est muet) : le remplissage seul
-/// est ambigu, on ne se souvient pas de la couleur "de repos" d'un bouton
-/// (Nielsen Norman, «State-Switch Controls»). Les deux ensemble se lisent sans
-/// rien avoir à retenir.
-class _RoundCallButton extends StatelessWidget {
-  const _RoundCallButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.active = false,
-    this.ring = false,
-    this.flagCountry,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  /// L'anneau cyan du chevron, autour de ce bouton-ci : il désigne celui qu'on
-  /// cherche en premier dans la rangée.
-  final bool ring;
-
-  /// Code ISO pays. Non nul, le bouton montre CE DRAPEAU au lieu de [icon] —
-  /// on reconnaît une langue à son drapeau bien plus vite qu'à un pictogramme
-  /// de traduction, qui est le même pour toutes.
-  final String? flagCountry;
-
-  /// L'état que porte ce bouton est engagé. Un bouton qui ouvre un panneau ne
-  /// l'est jamais : il garde son verre.
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    final fill =
-        active ? Colors.white : Colors.white.withValues(alpha: 0.14);
-    // Le libellé s'écrit sous le bouton. Il existait déjà — il ne servait
-    // qu'aux lecteurs d'écran — donc il n'y a rien à traduire de plus : ce sont
-    // les mêmes clés, dans les douze langues.
-    return Semantics(
-      label: label,
-      button: true,
-      toggled: active,
-      child: Pressable(
-        bounce: true,
-        onTap: onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CustomPaint(
-              // L'anneau est PEINT autour, pas posé en bordure : un dégradé ne
-              // rentre pas dans un Border, et il doit déborder du bouton.
-              painter: ring
-                  ? const _ChevronRimPainter(
-                      visible: true,
-                      buttonSize: _DockKeyButton.size,
-                    )
-                  : null,
-              child: // Stable Flutter frosted-glass circle (NOT a platform
-                  // view): the native glass flickered under the keyboard.
-                  ClipOval(
-              child: _Frost(
-                child: AnimatedContainer(
-                  // Court exprès : c'est un interrupteur, pas une transition.
-                  // Au-delà, le blanc «arrive» au lieu d'être déjà là.
-                  duration: const Duration(milliseconds: 90),
-                  curve: Curves.easeOut,
-                  width: _DockKeyButton.size,
-                  height: _DockKeyButton.size,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: fill,
-                    border: Border.all(
-                      color:
-                          Colors.white.withValues(alpha: active ? 0.0 : 0.22),
-                    ),
-                  ),
-                  child: flagCountry == null || flagCountry!.isEmpty
-                      ? Icon(
-                          icon,
-                          color: active ? Colors.black : Colors.white,
-                          size: 24,
-                        )
-                      : ClipOval(
-                          child: CountryFlag.fromCountryCode(
-                            flagCountry!,
-                            theme: const ImageTheme(
-                              width: 45,
-                              height: 45,
-                              shape: Circle(),
-                            ),
-                          ),
-                        ),
-                ),
-              ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            // Même règle qu'en bas : borné, et rétréci s'il le faut.
-            SizedBox(
-              width: 74,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-              label,
-              maxLines: 1,
-              style: TextStyle(
-                // Engagé, le libellé passe au blanc plein comme son bouton :
-                // les deux disent la même chose, ils doivent le dire ensemble.
-                color: Colors.white.withValues(alpha: active ? 1.0 : 0.6),
-                fontSize: 11,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                height: 1.1,
-              ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// Les deux langues de l'appel dans un seul panneau : « Langue que je parle »
 /// à gauche, « Langue que j'entends » à droite, séparées par la flèche à deux
 /// têtes qui dit que l'une va vers l'autre.
@@ -7147,7 +5455,14 @@ class _LanguagePairSheet extends StatelessWidget {
     required this.spokenCode,
     required this.heardCode,
     required this.onChanged,
+    required this.translationOn,
+    required this.onToggleTranslation,
   });
+
+  /// La traduction tourne ? Le galet n'est plus cliquable : couper / reprendre
+  /// la traduction se fait d'ici.
+  final bool translationOn;
+  final VoidCallback onToggleTranslation;
 
   final String spokenCode;
   final String heardCode;
@@ -7180,7 +5495,33 @@ class _LanguagePairSheet extends StatelessWidget {
               heardCode: heardCode,
               onChanged: onChanged,
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).maybePop();
+                onToggleTranslation();
+              },
+              icon: Icon(
+                translationOn
+                    ? Icons.pause_circle_outline_rounded
+                    : Icons.play_circle_outline_rounded,
+                size: 20,
+                color: Colors.white70,
+              ),
+              label: Text(
+                AppStrings.t(
+                  translationOn
+                      ? 'call_translation_cut'
+                      : 'call_translation_resume',
+                ),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
             // Le panneau s'appliquait déjà en se refermant, quel qu'ait été le
             // geste. Ce bouton ne fait donc que refermer — mais il dit qu'on a
             // fini, ce qu'un panneau qu'on fait glisser ne dit jamais vraiment.
@@ -7336,64 +5677,6 @@ class _LanguageWheelsState extends State<_LanguageWheels> {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Les deux panneaux d'un seul tenant, ouverts par un appui long sur la
-/// pastille : le son à gauche, les langues à droite.
-class _CallSettingsSheet extends StatelessWidget {
-  const _CallSettingsSheet({
-    required this.controller,
-    required this.spokenCode,
-    required this.heardCode,
-    required this.onLanguagesChanged,
-  });
-
-  final AudioController controller;
-  final String spokenCode;
-  final String heardCode;
-  final void Function(String spoken, String heard) onLanguagesChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _SheetHandle(),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _AudioControls(controller: controller)),
-                  // Le trait qui sépare les deux panneaux.
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: VerticalDivider(
-                      width: 1,
-                      thickness: 1,
-                      color: Colors.white.withValues(alpha: 0.12),
-                    ),
-                  ),
-                  Expanded(
-                    child: _LanguageWheels(
-                      spokenCode: spokenCode,
-                      heardCode: heardCode,
-                              onChanged: onLanguagesChanged,
-                      compact: true,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
