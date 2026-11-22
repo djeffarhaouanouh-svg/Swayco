@@ -82,6 +82,12 @@ abstract final class Attribution {
         }
         try {
           await sdk.start();
+          _started = true;
+          // The SDK can now accept an acknowledged event: this is the earliest
+          // safe moment to report `engaged_user` for accounts that are ALREADY
+          // eligible (no new message / friendship needed), and — since it fires
+          // on every foreground — the retry point after a failed send.
+          checkEngaged();
         } catch (e) {
           debugPrint('Attribution: start failed: $e');
         }
@@ -174,17 +180,32 @@ abstract final class Attribution {
 
   static bool _engagedInFlight = false;
 
+  /// True once `sdk.start()` has succeeded in this process.
+  static bool _started = false;
+
+  /// True once the server has the send confirmed — no more RPCs this process.
+  static bool _engagedDone = false;
+
+  /// How long to wait for AppsFlyer to acknowledge the event. A timeout does
+  /// not cancel the native request, so a late success after it can mean one
+  /// extra retry — rare, and preferable to a session stuck forever.
+  static const Duration _engagedAckTimeout = Duration(seconds: 30);
+
   /// Cheap to call from anywhere (after a message, after a friendship is
-  /// confirmed, at boot). Never throws, never blocks the caller.
+  /// confirmed, at boot). Never throws, never blocks the caller. Silently does
+  /// nothing until the SDK has started: the check is re-run the moment it does
+  /// (see the session-ready listener), so an early call is never lost.
   static void checkEngaged() {
-    if (!_initialized || !isSupported || !isSupabaseReady) return;
+    if (_engagedDone || !_started || !isSupported || !isSupabaseReady) return;
     final client = Supabase.instance.client;
     if (client.auth.currentUser == null) return;
     unawaited(
       runEngagedCheck(
-        claim: () async =>
-            (await client.rpc('claim_engaged_user')) == true,
-        send: () => logEvent('engaged_user'),
+        claim: () async => (await client.rpc('claim_engaged_user')) == true,
+        // Waits for the SDK's native acknowledgement; throws if it fails.
+        send: () => AppsFlyerSdk.instance
+            .logEvent('engaged_user', awaitResponse: true)
+            .timeout(_engagedAckTimeout),
         confirm: () async {
           await client.rpc('confirm_engaged_user_sent');
         },
@@ -195,29 +216,49 @@ abstract final class Attribution {
   /// The claim → send → confirm sequence, with its collaborators injected so it
   /// can be tested. A single in-flight run at a time absorbs bursts of triggers
   /// on this device; the server lease covers other devices.
+  ///
+  /// The server is only told "sent" AFTER [send] completes successfully. If
+  /// [send] throws, nothing is confirmed: the 10-minute lease expires and the
+  /// next trigger (any message, friendship, or app foreground) retries.
+  /// Returns true when the event was sent AND confirmed.
   @visibleForTesting
-  static Future<void> runEngagedCheck({
+  static Future<bool> runEngagedCheck({
     required Future<bool> Function() claim,
-    required void Function() send,
+    required Future<void> Function() send,
     required Future<void> Function() confirm,
   }) async {
-    if (_engagedInFlight) return;
+    if (_engagedInFlight) return false;
     _engagedInFlight = true;
     try {
-      if (!await claim()) return;
-      send();
+      if (!await claim()) return false;
+      try {
+        await send();
+      } catch (e) {
+        debugPrint('Attribution: engaged_user send failed, will retry: $e');
+        return false;
+      }
       try {
         await confirm();
+        _engagedDone = true;
+        return true;
       } catch (e) {
-        // Event is out; if the confirmation is lost the lease expires and a
-        // later launch may re-send once — AppsFlyer-side that is a rare extra
-        // count, which beats losing the conversion.
+        // Event is out but unconfirmed: the lease expires and a later trigger
+        // may re-send once — a rare extra count beats losing the conversion.
         debugPrint('Attribution: engaged confirm failed: $e');
+        return false;
       }
     } catch (e) {
       debugPrint('Attribution: engaged check failed: $e');
+      return false;
     } finally {
       _engagedInFlight = false;
     }
+  }
+
+  /// Test hook: forget the per-process "already confirmed" memory.
+  @visibleForTesting
+  static void resetEngagedForTest() {
+    _engagedInFlight = false;
+    _engagedDone = false;
   }
 }
