@@ -3524,12 +3524,6 @@ class _CallScreenState extends State<CallScreen> {
   /// la zone sûre). Plus de logo Swayco au-dessus : elle remonte.
   static const double _kPipTop = 8;
 
-  /// Le repère du rail : l'ancien haut de la vignette (sous la barre d'état +
-  /// 40), remonté de 16 px. La vignette est montée ([_kPipTop]) ; le rail, lui,
-  /// n'a gagné que ces quelques pixels.
-  double _railAnchor(BuildContext context) =>
-      MediaQuery.paddingOf(context).top + 40 - 16;
-
   /// La carte de messages, mesurée à chaque image (sa hauteur change : en-tête,
   /// messages longs, saisie). Le rail se place d'après elle.
   final GlobalKey _cardKey = GlobalKey();
@@ -3543,21 +3537,21 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// Où poser le rail pour qu'il ne touche JAMAIS la carte de messages (ni la
-  /// vignette) : 12 px d'air au-dessus de la carte, toujours.
-  ///  0. Le rail NE BOUGE PAS quand la vignette monte : il garde l'ancienne place
-  ///     de la vignette comme repère ([_railAnchor]).
-  ///  1. Sous la vignette, si les 5 touches y tiennent (48, réduites jusqu'à 34,
-  ///     espaces de 10 puis 6).
-  ///  2. Sinon (petit écran, carte haute) : à GAUCHE de la vignette, à partir
-  ///     de son haut — la colonne a alors toute la hauteur de la vignette en plus.
+  /// Où poser le rail : AU MILIEU de l'espace libre entre le bas de la vignette
+  /// et le haut de la carte (celle du galet), avec 12 px d'air de chaque côté, et
+  /// donc sans toucher ni l'une ni l'autre. La hauteur de la carte est mesurée
+  /// (elle change : en-tête, messages longs, saisie), le rail suit.
+  ///  1. Les 5 touches tiennent dans cet espace : 48 (réduites jusqu'à 34),
+  ///     espaces de 10 puis 6 ; la colonne y est centrée.
+  ///  2. Sinon (petit écran, carte haute) : à GAUCHE de la vignette, du haut de
+  ///     la vignette jusqu'à 12 px au-dessus de la carte.
   ({double top, double right, double d, double gap}) _railGeo(
     BuildContext context,
   ) {
     final mq = MediaQuery.of(context);
     final h = mq.size.height - mq.viewPadding.top - mq.viewPadding.bottom;
-    final pipTop = _railAnchor(context);
-    final limit = h - 28 - _cardH - 12; // le bas permis du rail
+    const pipBottom = _kPipTop + 176;
+    final cardTop = h - 28 - _cardH;
     const n = 5; // haut-parleur, caméra, micro, son, raccrocher
     ({double d, double gap})? fit(double space) {
       for (final g in const [10.0, 6.0]) {
@@ -3567,11 +3561,16 @@ class _CallScreenState extends State<CallScreen> {
       return null;
     }
 
-    final under = pipTop + 176 + 12;
-    final f1 = fit(limit - under);
-    if (f1 != null) return (top: under, right: 20.0, d: f1.d, gap: f1.gap);
-    final f2 = fit(limit - pipTop) ?? (d: 34.0, gap: 6.0);
-    return (top: pipTop, right: 12.0 + 118 + 12, d: f2.d, gap: f2.gap);
+    // L'espace libre entre la vignette et la carte, 12 px d'air de chaque côté.
+    final free = cardTop - pipBottom - 24;
+    final f1 = fit(free);
+    if (f1 != null) {
+      final railH = n * f1.d + (n - 1) * f1.gap;
+      final top = pipBottom + 12 + (free - railH) / 2;
+      return (top: top, right: 20.0, d: f1.d, gap: f1.gap);
+    }
+    final f2 = fit(cardTop - 12 - _kPipTop) ?? (d: 34.0, gap: 6.0);
+    return (top: _kPipTop, right: 12.0 + 118 + 12, d: f2.d, gap: f2.gap);
   }
 
   /// Le rail : haut-parleur, caméra, micro, réglage du son, puis raccrocher
