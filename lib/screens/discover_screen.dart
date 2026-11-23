@@ -15,7 +15,6 @@ import '../services/ad_service.dart';
 import '../services/analytics.dart';
 import '../services/app_boot.dart';
 import '../services/app_strings.dart';
-import '../services/activity_signal.dart';
 import '../services/swayco_sounds.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
@@ -592,10 +591,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     RevenueCat.proActive.addListener(_refreshLimit);
     _maybeShowSwipeCoach();
     NavTab.index.addListener(_maybeShowSwipeCoach);
-    // « Fait défiler des profils » : visible des autres seulement tant que
-    // l'onglet Discover est sous les yeux.
-    NavTab.index.addListener(_publishDiscoverActivity);
-    _publishDiscoverActivity();
     _pollTimer = WebPoll.every(const Duration(seconds: 12), _refreshFriendships);
     // Un nouveau match (annoncé par le shell, en temps réel) : on retire cette
     // personne du paquet tout de suite, sans sondage sur mobile.
@@ -619,9 +614,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     setState(() => _showSwipeCoach = true);
   }
 
-  void _publishDiscoverActivity() =>
-      ActivitySignal.setDiscover(NavTab.index.value == NavTab.discover);
-
   @override
   void dispose() {
     NavChrome.autoHidden.removeListener(_syncNavAway);
@@ -631,8 +623,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     MatchCelebration.matchesChanged.removeListener(_refreshFriendships);
     RevenueCat.proActive.removeListener(_refreshLimit);
     NavTab.index.removeListener(_maybeShowSwipeCoach);
-    NavTab.index.removeListener(_publishDiscoverActivity);
-    ActivitySignal.setDiscover(false);
     super.dispose();
   }
 

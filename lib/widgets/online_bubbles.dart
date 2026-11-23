@@ -586,21 +586,6 @@ class ActivityBadge extends StatelessWidget {
           ),
           child: const Center(child: _BouncingDots()),
         );
-      case PeerActivity.discover:
-        return Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: border,
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF1F5EFF), Color(0xFF18DDEA)],
-            ),
-          ),
-          child: const Center(child: _BlinkingEye()),
-        );
     }
   }
 }
@@ -708,49 +693,6 @@ class _BouncingDotsState extends State<_BouncingDots>
       ),
     );
   }
-}
-
-/// L'œil : ouvert / fermé en boucle (cycle 2,6 s), il ne se déplace pas.
-class _BlinkingEye extends StatefulWidget {
-  const _BlinkingEye();
-
-  @override
-  State<_BlinkingEye> createState() => _BlinkingEyeState();
-}
-
-class _BlinkingEyeState extends State<_BlinkingEye>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2600),
-  )..repeat();
-
-  // Ouvert 0 → 38 %, se ferme jusqu'à 50 % (scaleY 1 → 0,08), se rouvre à 62 %.
-  late final Animation<double> _scaleY = TweenSequence<double>([
-    TweenSequenceItem(tween: ConstantTween(1.0), weight: 38),
-    TweenSequenceItem(
-      tween: Tween(begin: 1.0, end: 0.08).chain(CurveTween(curve: Curves.easeInOut)),
-      weight: 12,
-    ),
-    TweenSequenceItem(
-      tween: Tween(begin: 0.08, end: 1.0).chain(CurveTween(curve: Curves.easeInOut)),
-      weight: 12,
-    ),
-    TweenSequenceItem(tween: ConstantTween(1.0), weight: 38),
-  ]).animate(_c);
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _scaleY,
-        builder: (_, child) => Transform.scale(scaleY: _scaleY.value, child: child),
-        child: const Icon(Icons.visibility_rounded, size: 14, color: Colors.white),
-      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1033,16 +975,6 @@ class _StatePill extends StatelessWidget {
           null,
           _kNavy,
         ),
-      PeerActivity.discover => (
-          AppStrings.t('activity_discover'),
-          null,
-          const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF1F5EFF), Color(0xFF18DDEA)],
-          ),
-          Colors.white,
-        ),
     };
     return Align(
       alignment: Alignment.centerLeft,
@@ -1088,7 +1020,6 @@ class ActivityBadgeMini extends StatelessWidget {
   Widget build(BuildContext context) => switch (kind) {
         PeerActivity.call => const _ShakingPhone(),
         PeerActivity.typing => const _BouncingDots(),
-        PeerActivity.discover => const _BlinkingEye(),
       };
 }
 

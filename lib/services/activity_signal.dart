@@ -8,15 +8,15 @@ import 'app_settings.dart';
 import 'supabase_service.dart';
 
 /// Ce qu'une personne en ligne est en train de faire (la bulle de la page
-/// Messages, handoff « messages_bulles »). Priorité : appel > écrit > Discover.
-enum PeerActivity { call, typing, discover }
+/// Messages, handoff « messages_bulles »). Priorité : appel > écrit.
+enum PeerActivity { call, typing }
 
 /// Le signal d'activité GLOBAL : un seul canal Realtime (`activity`), où chaque
-/// client qui fait quelque chose annonce `{user, call, discover, typingTo}` et le
+/// client qui fait quelque chose annonce `{user, call, typingTo}` et le
 /// répète toutes les [_heartbeat] tant que ça dure. Rien en base, rien de stocké.
 ///
-/// • Qui publie : l'écran d'appel ([setCall]), le champ de saisie d'un fil
-///   ([setTypingTo]) et l'onglet Discover ([setDiscover]).
+/// • Qui publie : l'écran d'appel ([setCall]) et le champ de saisie d'un fil
+///   ([setTypingTo]).
 /// • Qui écoute : la page Messages, seulement quand elle est sous les yeux
 ///   ([setWatching]).
 /// • Une annonce sans nouvelles pendant [_expiry] s'éteint toute seule.
@@ -40,7 +40,6 @@ abstract final class ActivitySignal {
 
   // Mon état.
   static bool _call = false;
-  static bool _discover = false;
   static String _typingTo = '';
 
   // L'état des autres : user → annonce.
@@ -65,12 +64,6 @@ abstract final class ActivitySignal {
     _changed();
   }
 
-  static void setDiscover(bool on) {
-    if (_discover == on) return;
-    _discover = on;
-    _changed();
-  }
-
   /// [peerId] vide = je n'écris plus.
   static void setTypingTo(String peerId) {
     if (_typingTo == peerId) return;
@@ -79,10 +72,9 @@ abstract final class ActivitySignal {
   }
 
   /// Ce que je publie vraiment : un APPEL continue même app en arrière-plan
-  /// (écran verrouillé, autre app au premier plan) ; Discover et « écrit »
-  /// seulement quand l'app est au premier plan.
-  static bool get _hasState =>
-      _call || (_foreground && (_discover || _typingTo.isNotEmpty));
+  /// (écran verrouillé, autre app au premier plan) ; « écrit » seulement quand
+  /// l'app est au premier plan.
+  static bool get _hasState => _call || (_foreground && _typingTo.isNotEmpty);
 
   static bool get _mayPublish =>
       !AppSettings.hideOnlineLocal.value && _myId.isNotEmpty;
@@ -113,7 +105,6 @@ abstract final class ActivitySignal {
           .sendBroadcastMessage(event: 'act', payload: {
             'user': _myId,
             'call': idle ? false : _call,
-            'discover': idle ? false : (_foreground && _discover),
             'typingTo': idle ? '' : (_foreground ? _typingTo : ''),
           })
           .catchError((Object e) {
@@ -154,8 +145,6 @@ abstract final class ActivitySignal {
     if (e.call) return PeerActivity.call;
     // « Écrit » se voit peu importe à qui la personne écrit.
     if (e.typingTo.isNotEmpty) return PeerActivity.typing;
-    // « Regarde Découvrir » (le badge à l'œil sur la bulle et la ligne du menu)
-    // n'est plus montré : on ne signale que l'appel et l'écriture.
     return null;
   }
 
@@ -167,19 +156,17 @@ abstract final class ActivitySignal {
     if (user.isEmpty || user == _myId) return;
     final e = _Entry(
       call: data['call'] == true,
-      discover: data['discover'] == true,
       typingTo: data['typingTo']?.toString() ?? '',
       at: DateTime.now(),
     );
     final old = _peers[user];
-    if (!e.call && !e.discover && e.typingTo.isEmpty) {
+    if (!e.call && e.typingTo.isEmpty) {
       if (_peers.remove(user) != null) revision.value++;
       return;
     }
     _peers[user] = e;
     if (old == null ||
         old.call != e.call ||
-        old.discover != e.discover ||
         old.typingTo != e.typingTo) {
       revision.value++;
     }
@@ -233,13 +220,11 @@ abstract final class ActivitySignal {
 class _Entry {
   const _Entry({
     required this.call,
-    required this.discover,
     required this.typingTo,
     required this.at,
   });
 
   final bool call;
-  final bool discover;
   final String typingTo;
   final DateTime at;
 }
