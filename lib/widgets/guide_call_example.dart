@@ -108,9 +108,12 @@ class _GuideCallExampleState extends State<GuideCallExample>
   Widget build(BuildContext context) {
     return OnVisible(
       onVisible: _start,
-      child: AspectRatio(
-        // Un peu plus haut que 4/3 : la carte du bas ne touche pas les prénoms.
-        aspectRatio: 1.2,
+      child: SizedBox(
+        // Hauteur FIXE (et non un rapport largeur/hauteur) : sur un encart étroit
+        // — le web — le rapport écrasait la scène et la carte du bas passait
+        // par-dessus les prénoms. Portraits + prénoms (≈ 130), de l'air, puis la
+        // carte (≈ 92) et ses 14 px de marge.
+        height: 256,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
           child: DecoratedBox(
@@ -390,11 +393,15 @@ class _GuideCallExampleState extends State<GuideCallExample>
 
   Widget _status(String text, double o, Color c) => Opacity(
         opacity: o,
-        child: Text(
-          text,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: c, fontSize: 14, fontWeight: FontWeight.w700),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            text,
+            maxLines: 1,
+            style:
+                TextStyle(color: c, fontSize: 14, fontWeight: FontWeight.w700),
+          ),
         ),
       );
 
