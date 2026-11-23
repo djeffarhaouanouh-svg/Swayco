@@ -90,13 +90,24 @@ footer.foot a:hover{color:#fff}
 }
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 
-.lang{display:flex;align-items:center;gap:2px;margin-right:4px}
-.lang a{height:32px;min-width:36px;padding:0 8px;border-radius:99px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.5px;color:rgba(245,247,255,.7)}
-.lang a:hover{color:#fff;background:rgba(255,255,255,.1)}
-.lang a[aria-current="true"]{color:var(--navy);background:var(--yellow)}
-@media (max-width:420px){.lang a{min-width:30px;padding:0 6px}.btn-top{padding:0 14px}}
 
 .badges{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
 .badges a{display:block;line-height:0;border-radius:10px}
 .badges img{display:block;height:56px;width:auto}
 .badges a:hover{filter:brightness(1.08)}
+
+.langmenu{position:relative;margin-right:4px}
+.langmenu summary{list-style:none;cursor:pointer;height:42px;padding:0 14px;border-radius:99px;border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.07);display:flex;align-items:center;gap:8px;color:#fff;font-weight:700;font-size:14px;user-select:none;-webkit-user-select:none}
+.langmenu summary::-webkit-details-marker{display:none}
+.langmenu summary:hover,.langmenu[open] summary{background:rgba(255,255,255,.14)}
+.langmenu summary svg{width:18px;height:18px;fill:currentColor;flex:none}
+.langmenu summary .chev{width:16px;height:16px;transition:transform .2s}
+.langmenu[open] summary .chev{transform:rotate(180deg)}
+.langmenu ul{position:absolute;right:0;top:calc(100% + 10px);min-width:190px;margin:0;padding:6px;list-style:none;background:#101830;border:1px solid rgba(255,255,255,.18);border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.55);z-index:30;animation:lm .16s ease-out}
+.langmenu li a{display:flex;align-items:center;justify-content:space-between;gap:14px;height:44px;padding:0 14px;border-radius:12px;color:#fff;font-weight:600;font-size:15px}
+.langmenu li a:hover{background:rgba(255,255,255,.09);color:#fff}
+.langmenu li a[aria-current="true"]{color:var(--yellow)}
+.langmenu li a svg{width:18px;height:18px;fill:currentColor}
+@keyframes lm{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@media (max-width:420px){header.top{gap:8px}.langmenu{margin-right:0}.langmenu summary{padding:0 10px;gap:6px}.btn-top{padding:0 14px}.brand span{font-size:18px}.brand{gap:8px}}
+@media (prefers-reduced-motion:reduce){.langmenu ul{animation:none}.langmenu summary .chev{transition:none}}
