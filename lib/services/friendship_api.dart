@@ -426,6 +426,46 @@ abstract final class FriendshipApi {
     return byId.values.toList(growable: false);
   }
 
+  /// The ids of everyone I'm matched with, or NULL when the read failed.
+  ///
+  /// This is what the match celebrations are decided from, and it must never
+  /// lie: [fetchMatches] swallows errors and hands back `[]` — or HALF the list
+  /// when only one of its two reads fails, or when a profile lookup misses —
+  /// which looks exactly like "you have fewer matches". The caller then forgets
+  /// the missing people, and at the next poll they come back as brand-new
+  /// matches: a burst of "added" animations for people you already talked to.
+  /// Here any failure (either direction, any malformed answer) is reported as
+  /// null, and no profile hydration is involved, so a non-null set is complete.
+  static Future<Set<String>?> fetchMatchIds(String meId) async {
+    if (!isSupabaseReady || meId.isEmpty) return null;
+    try {
+      final lists = await Future.wait([
+        for (final d in FriendDirection.values)
+          _c.rpc(
+            'friendship_accepted_peers',
+            params: {
+              'p_user_id': meId,
+              'p_direction':
+                  d == FriendDirection.followers ? 'followers' : 'following',
+            },
+          ),
+      ]);
+      final ids = <String>{};
+      for (final result in lists) {
+        if (result is! List) return null;
+        for (final r in result) {
+          final id =
+              Map<String, dynamic>.from(r as Map)['peer_id']?.toString() ?? '';
+          if (id.isNotEmpty && id != meId) ids.add(id);
+        }
+      }
+      return ids;
+    } catch (e) {
+      debugPrint('FriendshipApi.fetchMatchIds failed: $e');
+      return null;
+    }
+  }
+
   static Future<void> _notifyNewFollower(
     String meId,
     String peerId, {

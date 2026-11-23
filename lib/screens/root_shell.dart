@@ -280,8 +280,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (!isSupabaseReady || myId.isEmpty) return;
     _matchMyId = myId;
     MatchCelebration.pendingPeerId.addListener(_onMatchPending);
+    // The baseline is only taken from a read that SUCCEEDED (see
+    // [_refreshKnownMatches]); until then the 12 s poll below retries it.
     await _refreshKnownMatches(myId);
-    _matchWatchPrimed = true;
     _matchChannel = FriendshipApi.subscribeMine(
       userId: myId,
       onChange: () => _refreshKnownMatches(myId),
@@ -296,8 +297,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   Future<void> _refreshKnownMatches(String myId) async {
     if (!mounted || myId.isEmpty) return;
     try {
-      final peers = await FriendshipApi.fetchMatches(myId);
-      final ids = {for (final p in peers) p.id};
+      // A failed read changes NOTHING: no baseline, no "forgotten" peers, no
+      // celebrations. (It used to look like "no matches left", so everybody
+      // came back as new at the next poll.)
+      final ids = await FriendshipApi.fetchMatchIds(myId);
+      if (ids == null) return;
       if (!_matchWatchPrimed) {
         // Matches celebrated in an earlier session are remembered on disk, so
         // one made while the app was closed (an AI accepting my like) shows
@@ -311,6 +315,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
             : <String>{};
         if (!hadHistory) await MatchCelebration.seed(ids);
         _knownMatchIds = ids;
+        _matchWatchPrimed = true;
         if (unseen.isNotEmpty) MatchCelebration.matchesChanged.value++;
         for (final id in unseen) {
           MatchCelebration.offer(id);
