@@ -95,3 +95,8 @@ footer.foot a:hover{color:#fff}
 .lang a:hover{color:#fff;background:rgba(255,255,255,.1)}
 .lang a[aria-current="true"]{color:var(--navy);background:var(--yellow)}
 @media (max-width:420px){.lang a{min-width:30px;padding:0 6px}.btn-top{padding:0 14px}}
+
+.badges{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+.badges a{display:block;line-height:0;border-radius:10px}
+.badges img{display:block;height:56px;width:auto}
+.badges a:hover{filter:brightness(1.08)}
