@@ -369,15 +369,9 @@ class OfficialChatRow extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    _hm(time),
-                    style: GoogleFonts.ibmPlexMono(
-                      color: unread ? _kYellow : SC.fg.withValues(alpha: 0.5),
-                      fontSize: 11,
-                    ),
-                  ),
-                  if (unread) ...[
-                    const SizedBox(height: 6),
+                  // Pas d'heure ni de date sur la ligne de l'équipe : seule la
+                  // pastille jaune dit qu'il y a du nouveau.
+                  if (unread)
                     Container(
                       width: 10,
                       height: 10,
@@ -386,7 +380,6 @@ class OfficialChatRow extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                     ),
-                  ],
                 ],
               ),
             ],

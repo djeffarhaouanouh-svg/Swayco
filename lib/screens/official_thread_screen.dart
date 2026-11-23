@@ -364,8 +364,7 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
                           _OfficialCard(
                             title: p.title,
                             body: p.body,
-                            // Pas d'heure sous les messages de l'équipe.
-                            time: '',
+                            time: _time(p.createdAt),
                             extra: p.mediaUrl.isEmpty
                                 ? null
                                 : _PostMedia(url: p.mediaUrl),
