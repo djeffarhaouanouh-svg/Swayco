@@ -93,8 +93,6 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
       if (isPeerOnline(p)) p.id,
   };
 
-  int get _onlineCount => _shown.where(isPeerOnline).length;
-
   @override
   void didUpdateWidget(OnlineBubblesRow old) {
     super.didUpdateWidget(old);
@@ -217,31 +215,9 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
                   color: SC.fg.withValues(alpha: 0.45),
                 ),
               ),
-              if (_onlineCount > 0) const SizedBox(width: 8),
-              if (_onlineCount > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                // Même pastille que celle du titre « Messages » (même ombre).
-                decoration: BoxDecoration(
-                  color: SC.accent,
-                  borderRadius: BorderRadius.circular(999),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x73000000),
-                      blurRadius: 7,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Text(
-                  '$_onlineCount',
-                  style: GoogleFonts.ibmPlexMono(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: SC.onAccent,
-                  ),
-                ),
-              ),
+              // Plus de pastille « N » à côté du titre : on la prenait pour une
+              // notification. Le nombre d'amis en ligne est déjà dans la pastille
+              // « • N en ligne » du haut de la page.
             ],
           ),
         ),
