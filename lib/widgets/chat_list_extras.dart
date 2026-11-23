@@ -45,7 +45,7 @@ String _hm(DateTime dt) {
       '${dt.month.toString().padLeft(2, '0')}';
 }
 
-/// Le « + » jaune de l'en-tête (rond de 40 px, lueur jaune légère).
+/// Le « + » jaune de l'en-tête (rond de 40 px, lueur jaune très discrète).
 class NewGroupButton extends StatelessWidget {
   const NewGroupButton({super.key, required this.onTap});
 
@@ -67,9 +67,9 @@ class NewGroupButton extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: _kYellow.withValues(alpha: 0.35),
-                blurRadius: 14,
-                spreadRadius: -2,
+                color: _kYellow.withValues(alpha: 0.14),
+                blurRadius: 8,
+                spreadRadius: -3,
               ),
             ],
           ),
