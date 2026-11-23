@@ -210,10 +210,13 @@ class _CallScreenState extends State<CallScreen> {
   /// statut, drapeau) ; un second le ramène.
   bool _cardHeaderHidden = false;
 
-  /// On a remonté les messages (pas sur le dernier) : l'en-tête s'efface et
-  /// la fenêtre des messages s'agrandit de la place libérée. Il revient dès
-  /// qu'on est de nouveau sur le dernier message.
+  /// On a remonté les messages (pas sur le dernier) : l'en-tête s'efface. Il
+  /// revient dès qu'on est de nouveau sur le dernier message.
   bool _cardScrolledBack = false;
+
+  /// Un des deux derniers messages est long (plus d'une ligne) : l'en-tête
+  /// s'efface aussi, pour lui laisser la place.
+  bool _cardLong = false;
 
   /// L'étape du texte d'état (0 « Parle normalement », 1 « Patiente… », 2 « a
   /// reçu ta traduction », 3 « À toi »). Le galet de l'en-tête s'estompe à 1.
@@ -3517,20 +3520,46 @@ class _CallScreenState extends State<CallScreen> {
     _wakeDock();
   }
 
-  /// Place verticale que la carte peut prendre en bas (marge + en-tête + deux
-  /// messages), servant à garder le rail au-dessus d'elle.
-  static const double _kCardReserve = 28 + 190;
+  /// La carte de messages, mesurée à chaque image (sa hauteur change : en-tête,
+  /// messages longs, saisie). Le rail se place d'après elle.
+  final GlobalKey _cardKey = GlobalKey();
+  double _cardH = 190;
 
-  /// Le diamètre des touches du rail : 48, réduit (jamais sous 40) quand
-  /// l'écran est trop court pour que le rail entier tienne entre la vignette et
-  /// la carte.
-  double _railDiameter(BuildContext context) {
+  void _measureCard() {
+    final box = _cardKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    if ((box.size.height - _cardH).abs() > 0.5) {
+      setState(() => _cardH = box.size.height);
+    }
+  }
+
+  /// Où poser le rail pour qu'il ne touche JAMAIS la carte de messages (ni la
+  /// vignette) : 12 px d'air au-dessus de la carte, toujours.
+  ///  1. Sous la vignette, si les 5 touches y tiennent (48, réduites jusqu'à 34,
+  ///     espaces de 10 puis 6).
+  ///  2. Sinon (petit écran, carte haute) : à GAUCHE de la vignette, à partir
+  ///     de son haut — la colonne a alors toute la hauteur de la vignette en plus.
+  ({double top, double right, double d, double gap}) _railGeo(
+    BuildContext context,
+  ) {
     final mq = MediaQuery.of(context);
     final h = mq.size.height - mq.viewPadding.top - mq.viewPadding.bottom;
-    final top = MediaQuery.paddingOf(context).top + 40 + 176 + 12;
-    final avail = h - top - _kCardReserve;
-    const gaps = 4 * 10.0; // 5 touches, 4 espaces
-    return ((avail - gaps) / 5).clamp(40.0, 48.0).toDouble();
+    final pipTop = MediaQuery.paddingOf(context).top + 40;
+    final limit = h - 28 - _cardH - 12; // le bas permis du rail
+    const n = 5; // haut-parleur, caméra, micro, son, raccrocher
+    ({double d, double gap})? fit(double space) {
+      for (final g in const [10.0, 6.0]) {
+        final d = (space - (n - 1) * g) / n;
+        if (d >= 34) return (d: d.clamp(34.0, 48.0).toDouble(), gap: g);
+      }
+      return null;
+    }
+
+    final under = pipTop + 176 + 12;
+    final f1 = fit(limit - under);
+    if (f1 != null) return (top: under, right: 20.0, d: f1.d, gap: f1.gap);
+    final f2 = fit(limit - pipTop) ?? (d: 34.0, gap: 6.0);
+    return (top: pipTop, right: 12.0 + 118 + 12, d: f2.d, gap: f2.gap);
   }
 
   /// Le rail : haut-parleur, caméra, micro, réglage du son, puis raccrocher
@@ -3538,14 +3567,16 @@ class _CallScreenState extends State<CallScreen> {
   /// par défaut : il apparaît au tap sur l'écran et s'efface après 2 s sans
   /// geste ; rangé, il ne répond plus aux taps.
   Widget _buildCallRail(BuildContext context) {
-    final visible = !_dockDimmed && !_sheetOpen;
-    // La vignette : top = paddingTop + 40, hauteur 176 ; 12 px d'air dessous.
-    final top = MediaQuery.paddingOf(context).top + 40 + 176 + 12;
-    final d = _railDiameter(context);
-    const gap = SizedBox(height: 10);
+    // Saisie ouverte : la carte monte avec le clavier, le rail s'efface pour
+    // ne jamais la toucher.
+    final visible = !_dockDimmed && !_sheetOpen && !_composerOpen;
+    final geo = _railGeo(context);
+    final top = geo.top;
+    final d = geo.d;
+    final gap = SizedBox(height: geo.gap);
     return Positioned(
       key: const ValueKey('call_rail'),
-      right: 20,
+      right: geo.right,
       top: top,
       child: IgnorePointer(
         ignoring: !visible,
@@ -3626,13 +3657,13 @@ class _CallScreenState extends State<CallScreen> {
   /// Le bouton REC (admin seulement), posé À CÔTÉ du rail, à sa gauche, au
   /// niveau de sa première touche : il suit le rail (même fondu, même rangement).
   Widget _buildCallRec(BuildContext context) {
-    final visible = !_dockDimmed && !_sheetOpen;
-    final top = MediaQuery.paddingOf(context).top + 40 + 176 + 12;
+    final visible = !_dockDimmed && !_sheetOpen && !_composerOpen;
+    final geo = _railGeo(context);
     return Positioned(
       key: const ValueKey('call_rec'),
-      // Le rail : right 20 + 48 de large ; 12 d'air.
-      right: 20 + _railDiameter(context) + 12,
-      top: top,
+      // À gauche du rail, 12 d'air.
+      right: geo.right + geo.d + 12,
+      top: geo.top,
       child: IgnorePointer(
         ignoring: !visible,
         child: AnimatedOpacity(
@@ -3640,7 +3671,7 @@ class _CallScreenState extends State<CallScreen> {
           curve: Curves.easeInOut,
           opacity: visible ? 1 : 0,
           child: _RailButton(
-            diameter: _railDiameter(context),
+            diameter: geo.d,
             label: _egressId == null ? 'REC' : 'STOP',
             icon: Icons.fiber_manual_record,
             active: _egressId != null,
@@ -3786,14 +3817,20 @@ class _CallScreenState extends State<CallScreen> {
     final sb = mq.viewPadding.bottom;
     // 28 de marge ; clavier levé, la carte se pose juste au-dessus de lui.
     final bottom = kb > 0 ? math.max(0.0, kb - sb) + 12 : 28.0;
-    final showHeader =
-        !_composerOpen && !_cardHeaderHidden && !_cardScrolledBack;
+    final showHeader = !_composerOpen &&
+        !_cardHeaderHidden &&
+        !_cardScrolledBack &&
+        !_cardLong;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _measureCard();
+    });
     return Positioned(
       key: const ValueKey('call_card'),
       left: 14,
       right: 14,
       bottom: bottom,
       child: _CallCard(
+        key: _cardKey,
         onTapBackground: _tapBackground,
         showHeader: showHeader,
         composerOpen: _composerOpen,
@@ -3818,10 +3855,14 @@ class _CallScreenState extends State<CallScreen> {
           holdFade: _composerOpen,
           reservePencil: !_composerOpen,
           onTapZone: _toggleCardHeader,
-          roomy: _cardScrolledBack,
           onScrolledBack: (back) {
             if (mounted && back != _cardScrolledBack) {
               setState(() => _cardScrolledBack = back);
+            }
+          },
+          onLong: (long) {
+            if (mounted && long != _cardLong) {
+              setState(() => _cardLong = long);
             }
           },
         ),
@@ -4307,6 +4348,7 @@ class _RailButton extends StatelessWidget {
 /// l'arbre — jamais re-mappé, sinon le clavier y perdrait le focus.
 class _CallCard extends StatelessWidget {
   const _CallCard({
+    super.key,
     required this.header,
     required this.showHeader,
     required this.messages,
@@ -4401,14 +4443,14 @@ class _CardMessages extends StatefulWidget {
     required this.reservePencil,
     required this.onTapZone,
     required this.onScrolledBack,
-    this.roomy = false,
+    required this.onLong,
   });
+
+  /// Prévenu quand les deux derniers messages dépassent une ligne chacun.
+  final ValueChanged<bool> onLong;
 
   /// Prévenu quand on quitte / retrouve le dernier message en faisant défiler.
   final ValueChanged<bool> onScrolledBack;
-
-  /// L'en-tête est effacé : la fenêtre des messages peut être plus haute.
-  final bool roomy;
 
   final List<_SpokenTurn> turns;
   final String myName;
@@ -4442,12 +4484,38 @@ class _CardMessagesState extends State<_CardMessages> {
   final ScrollController _scroll = ScrollController();
   bool _atOldest = false;
 
-  /// Hauteur de la fenêtre des messages : deux messages courts. Au-delà on
-  /// défile, la carte, elle, ne grandit plus.
+  /// Repli tant que la hauteur des deux derniers messages n'est pas mesurée.
   static const double _kWindow = 132;
 
-  /// Fenêtre plus haute quand l'en-tête est effacé.
-  static const double _kWindowRoomy = 204;
+  /// La fenêtre au repos fait EXACTEMENT la hauteur des deux derniers messages
+  /// (mesurée) : on en voit deux, jamais plus, même quand ils sont courts. Les
+  /// plus anciens ne se découvrent qu'en faisant glisser le doigt.
+  final GlobalKey _k0 = GlobalKey();
+  final GlobalKey _k1 = GlobalKey();
+  double? _restH;
+  bool _long = false;
+
+  void _measureRest() {
+    var h = 0.0;
+    for (final k in [_k0, _k1]) {
+      final box = k.currentContext?.findRenderObject() as RenderBox?;
+      if (box != null && box.hasSize) h += box.size.height;
+    }
+    if (h > 0 && (_restH == null || (h - _restH!).abs() > 0.5)) {
+      setState(() => _restH = h);
+    }
+    // Une ligne de message ≈ 26 px (la photo) ; deux lignes + l'air ≈ 62. Au-delà
+    // de 80, l'un des deux est long : l'en-tête doit s'effacer.
+    final long = h > 80;
+    if (long != _long) {
+      _long = long;
+      widget.onLong(long);
+    }
+  }
+
+  /// Plafond : deux messages très longs ne prennent pas tout l'écran (au-delà
+  /// ils défilent dans la fenêtre).
+  static const double _kWindowMax = 204;
 
   bool _scrolledBack = false;
 
@@ -4589,6 +4657,9 @@ class _CardMessagesState extends State<_CardMessages> {
     // pas remonté jusqu'au plus ancien.
     final earlier = turns.length > 2 ? turns.length - 2 : 0;
     final showEarlier = earlier > 0 && !_atOldest;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _measureRest();
+    });
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       // Atténuées : le tap les réveille au lieu de masquer l'en-tête.
@@ -4659,8 +4730,11 @@ class _CardMessagesState extends State<_CardMessages> {
               // La fenêtre : deux messages visibles, les autres se découvrent en
               // faisant glisser le doigt vers le bas (on remonte le temps).
               ConstrainedBox(
+                // Comme l'ancienne zone : la hauteur de DEUX messages, toujours
+                // (aucune troisième visible) ; on remonte le fil en faisant
+                // défiler, la fenêtre ne grandit jamais.
                 constraints: BoxConstraints(
-                  maxHeight: widget.roomy ? _kWindowRoomy : _kWindow,
+                  maxHeight: (_restH ?? _kWindow).clamp(0.0, _kWindowMax),
                 ),
                 child: ListView.builder(
                   controller: _scroll,
@@ -4672,6 +4746,9 @@ class _CardMessagesState extends State<_CardMessages> {
                   itemBuilder: (context, i) {
                     final idx = turns.length - 1 - i;
                     return Padding(
+                      // Les deux plus récents portent une clé : leur hauteur
+                      // donne celle de la fenêtre au repos.
+                      key: i == 0 ? _k0 : (i == 1 ? _k1 : null),
                       padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
                       child: _row(turns[idx], idx, idx == turns.length - 1),
                     );
