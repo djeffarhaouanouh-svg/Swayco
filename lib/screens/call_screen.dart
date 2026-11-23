@@ -3525,9 +3525,10 @@ class _CallScreenState extends State<CallScreen> {
   static const double _kPipTop = 8;
 
   /// Le repère du rail : l'ancien haut de la vignette (sous la barre d'état +
-  /// 40). La vignette est montée ([_kPipTop]), le rail est resté où il était.
+  /// 40), remonté de 16 px. La vignette est montée ([_kPipTop]) ; le rail, lui,
+  /// n'a gagné que ces quelques pixels.
   double _railAnchor(BuildContext context) =>
-      MediaQuery.paddingOf(context).top + 40;
+      MediaQuery.paddingOf(context).top + 40 - 16;
 
   /// La carte de messages, mesurée à chaque image (sa hauteur change : en-tête,
   /// messages longs, saisie). Le rail se place d'après elle.
