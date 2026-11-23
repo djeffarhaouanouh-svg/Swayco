@@ -17,6 +17,35 @@ import '../widgets/chat_video.dart';
 import '../widgets/official_guide.dart';
 import '../widgets/popup_kit.dart';
 
+/// Le fond des conversations (le même que chat_thread_screen : SC.bg).
+Color get _kThreadBg => SC.bg;
+
+/// Opacité du fond derrière le header et la barre d'écriture — mêmes valeurs
+/// que les autres conversations (chat_thread_screen) : le header et le footer
+/// sont des calques posés SUR la liste, fondus dans le fond.
+const double _kChromeSolid = 0.92;
+const double _kChromeFade = 40;
+const double _kFooterFade = 190;
+
+LinearGradient _chromeGradient({required double solid, required bool top}) {
+  final f = solid / (solid + _kChromeFade);
+  final tail = 1 - f;
+  final c = _kThreadBg;
+  return LinearGradient(
+    begin: top ? Alignment.topCenter : Alignment.bottomCenter,
+    end: top ? Alignment.bottomCenter : Alignment.topCenter,
+    stops: [0, f, f + tail * 0.25, f + tail * 0.5, f + tail * 0.75, 1],
+    colors: [
+      c.withValues(alpha: _kChromeSolid),
+      c.withValues(alpha: _kChromeSolid),
+      c.withValues(alpha: _kChromeSolid * 0.78),
+      c.withValues(alpha: _kChromeSolid * 0.45),
+      c.withValues(alpha: _kChromeSolid * 0.15),
+      c.withValues(alpha: 0),
+    ],
+  );
+}
+
 /// La conversation du compte officiel Swayco (handoff messages_groupes_quiz,
 /// partie B, écran 1b) : le guide et les messages de l'équipe en cartes. On peut
 /// aussi écrire à l'équipe : ces messages sont enregistrés en base (table
@@ -44,6 +73,19 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
   // que quand elle arrive dessus (voir OnVisible).
   final int _revealed = officialGuide.length;
   final bool _animating = false;
+
+  /// La barre d'écriture, mesurée : la liste lui laisse sa place en bas (elle
+  /// grandit avec un texte sur plusieurs lignes).
+  final GlobalKey _composerKey = GlobalKey();
+  double _composerH = 66;
+
+  void _measureComposer() {
+    final box = _composerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    if ((box.size.height - _composerH).abs() > 0.5) {
+      setState(() => _composerH = box.size.height);
+    }
+  }
 
   @override
   void initState() {
@@ -215,188 +257,255 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
   @override
   Widget build(BuildContext context) {
     final safe = MediaQuery.paddingOf(context);
-    return Scaffold(
-      backgroundColor: SC.tabBg,
-      body: Column(
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _measureComposer();
+    });
+    // Hauteur du header : la marge haute, la rangée (48) et l'air dessous.
+    final headerH = safe.top + 8 + 48 + 10;
+    final header = Padding(
+      padding: EdgeInsets.fromLTRB(8, safe.top + 8, 16, 10),
+      child: Row(
         children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(8, safe.top + 8, 16, 10),
-            child: Row(
+          IconButton(
+            icon: Icon(Icons.arrow_back_ios_new_rounded,
+                color: SC.textPrimary, size: 20),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          // L'icône de l'app, en photo de profil (ronde, comme les autres).
+          ClipOval(
+            child: Image.asset(
+              'assets/icon-app.png',
+              width: 42,
+              height: 42,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                IconButton(
-                  icon: Icon(Icons.arrow_back_ios_new_rounded,
-                      color: SC.textPrimary, size: 20),
-                  onPressed: () => Navigator.of(context).maybePop(),
-                ),
-                // L'icône de l'app, en photo de profil (ronde, comme les autres).
-                ClipOval(
-                  child: Image.asset(
-                    'assets/icon-app.png',
-                    width: 42,
-                    height: 42,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Swayco',
-                            style: popupDisplay(
-                              fontSize: 18,
-                              color: SC.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(Icons.verified_rounded,
-                              size: 17, color: SC.accentFg),
-                        ],
+                Row(
+                  children: [
+                    Text(
+                      'Swayco',
+                      style: popupDisplay(
+                        fontSize: 18,
+                        color: SC.textPrimary,
                       ),
-                      Text(
-                        '${AppStrings.t('official_team')} · '
-                        '${AppStrings.t('official_account')}',
-                        style: TextStyle(
-                          color: SC.textMuted,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                    ],
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(Icons.verified_rounded,
+                        size: 17, color: SC.accentFg),
+                  ],
+                ),
+                Text(
+                  '${AppStrings.t('official_team')} · '
+                  '${AppStrings.t('official_account')}',
+                  style: TextStyle(
+                    color: SC.textMuted,
+                    fontSize: 12.5,
                   ),
                 ),
               ],
             ),
           ),
-          Divider(height: 1, color: SC.stroke.withValues(alpha: 0.10)),
-          Expanded(
-            // Le guide d'accueil d'abord (message, exemple, message,
-            // exemple…), puis les messages de l'équipe.
-            // Une colonne dans un défilement inversé (le bas = le plus récent) :
-            // tous les messages arrivés sont construits d'emblée, aucun n'attend
-            // qu'on défile pour apparaître.
-            child: SingleChildScrollView(
-              reverse: true,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Pendant l'arrivée du guide, seuls les messages déjà arrivés
-                  // sont là ; les annonces de l'équipe viennent après.
-                  for (var index = 0; index < _revealed; index++)
-                    _Arrival(
-                      key: ValueKey('guide-$index'),
-                      // Seul le DERNIER arrivé s'anime (fondu + montée).
-                      animate: _animating && index == _revealed - 1,
-                      child: _OfficialCard(
-                        title: officialGuide[index].titleKey == null
-                            ? ''
-                            : AppStrings.t(officialGuide[index].titleKey!),
-                        body: AppStrings.t(officialGuide[index].bodyKey),
-                        time: '',
-                        icon: officialGuide[index].icon,
-                        extra: officialGuide[index].example?.call(context),
-                      ),
-                    ),
-                  if (!_animating)
-                    for (final p in _items)
-                      if (p.mine)
-                        _MyBubble(
-                          text: p.body,
-                          mediaUrl: p.mediaUrl,
-                          time: _time(p.createdAt),
-                        )
-                      else
-                        _OfficialCard(
-                          title: p.title,
-                          body: p.body,
-                          time: _time(p.createdAt),
-                          extra: p.mediaUrl.isEmpty
-                              ? null
-                              : _PostMedia(url: p.mediaUrl),
+        ],
+      ),
+    );
+    return Scaffold(
+      backgroundColor: _kThreadBg,
+      // Comme les autres conversations : la liste occupe TOUT l'écran ; header
+      // et footer sont des calques posés dessus, fondus dans le fond. Au
+      // défilement, les messages passent dessous et s'y dissolvent.
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusScope.of(context).unfocus(),
+              // Le guide d'accueil d'abord (message, exemple, message,
+              // exemple…), puis les messages de l'équipe.
+              // Une colonne dans un défilement inversé (le bas = le plus récent) :
+              // tous les messages arrivés sont construits d'emblée, aucun n'attend
+              // qu'on défile pour apparaître.
+              child: SingleChildScrollView(
+                reverse: true,
+                padding: EdgeInsets.fromLTRB(16, headerH + 8, 16, _composerH + 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Pendant l'arrivée du guide, seuls les messages déjà arrivés
+                    // sont là ; les annonces de l'équipe viennent après.
+                    for (var index = 0; index < _revealed; index++)
+                      _Arrival(
+                        key: ValueKey('guide-$index'),
+                        // Seul le DERNIER arrivé s'anime (fondu + montée).
+                        animate: _animating && index == _revealed - 1,
+                        child: _OfficialCard(
+                          title: officialGuide[index].titleKey == null
+                              ? ''
+                              : AppStrings.t(officialGuide[index].titleKey!),
+                          body: AppStrings.t(officialGuide[index].bodyKey),
+                          time: '',
+                          icon: officialGuide[index].icon,
+                          extra: officialGuide[index].example?.call(context),
                         ),
-                ],
+                      ),
+                    if (!_animating)
+                      for (final p in _items)
+                        if (p.mine)
+                          _MyBubble(
+                            text: p.body,
+                            mediaUrl: p.mediaUrl,
+                            time: _time(p.createdAt),
+                          )
+                        else
+                          _OfficialCard(
+                            title: p.title,
+                            body: p.body,
+                            time: _time(p.createdAt),
+                            extra: p.mediaUrl.isEmpty
+                                ? null
+                                : _PostMedia(url: p.mediaUrl),
+                          ),
+                  ],
+                ),
               ),
-            ),          ),
-          // Le champ d'écriture : les gens peuvent écrire à l'équipe.
-          Container(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + safe.bottom),
-            color: SC.tabBg,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            ),
+          ),
+          // ── Header : fond constant derrière le titre, puis un fondu doux de
+          //    40 px sous lui (comme les autres conversations). ──
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Stack(
               children: [
-                // Photo ou vidéo (pas de GIF).
-                GestureDetector(
-                  onTap: _sending ? null : _attach,
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: SC.menu,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.add_rounded, color: SC.textPrimary),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: SC.fill.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(26),
-                      border: Border.all(
-                          color: SC.stroke.withValues(alpha: 0.16)),
-                    ),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 48),
-                      child: TextField(
-                        controller: _ctrl,
-                        minLines: 1,
-                        maxLines: 5,
-                        maxLength: 4000,
-                        textCapitalization: TextCapitalization.sentences,
-                        cursorColor: SC.accentFg,
-                        style: TextStyle(color: SC.textPrimary),
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          counterText: '',
-                          hintText: AppStrings.t('official_write_hint'),
-                          hintStyle: TextStyle(color: SC.fgA(0.5)),
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 12),
-                        ),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: headerH + _kChromeFade,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: _chromeGradient(solid: headerH, top: true),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _ctrl.text.trim().isEmpty || _sending ? null : _send,
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: _ctrl.text.trim().isEmpty
-                          ? SC.menu
-                          : const Color(0xFFF4FF1F),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.arrow_upward_rounded,
-                      color: _ctrl.text.trim().isEmpty
-                          ? SC.textMuted
-                          : const Color(0xFF04123A),
-                    ),
-                  ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: _kChromeFade),
+                  child: header,
                 ),
               ],
+            ),
+          ),
+          // ── Footer : fondu haut derrière la barre. Transparent en haut, fond
+          //    PLEIN à 66 % de la hauteur : les messages s'effacent avant
+          //    d'arriver au champ (comme les autres conversations). ──
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: Container(
+                height: _kFooterFade + safe.bottom * 0.4,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [_kThreadBg.withValues(alpha: 0), _kThreadBg],
+                    stops: const [0, 0.66],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Le champ d'écriture, posé SUR la conversation : les gens peuvent
+          // écrire à l'équipe.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              key: _composerKey,
+              padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + safe.bottom),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // Photo ou vidéo (pas de GIF).
+                  GestureDetector(
+                    onTap: _sending ? null : _attach,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: SC.menu,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.add_rounded, color: SC.textPrimary),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: SC.fill.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(
+                            color: SC.stroke.withValues(alpha: 0.16)),
+                      ),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 48),
+                        child: TextField(
+                          controller: _ctrl,
+                          minLines: 1,
+                          maxLines: 5,
+                          maxLength: 4000,
+                          textCapitalization: TextCapitalization.sentences,
+                          cursorColor: SC.accentFg,
+                          style: TextStyle(color: SC.textPrimary),
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            counterText: '',
+                            hintText: AppStrings.t('official_write_hint'),
+                            hintStyle: TextStyle(color: SC.fgA(0.5)),
+                            filled: false,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding:
+                                const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _ctrl.text.trim().isEmpty || _sending ? null : _send,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: _ctrl.text.trim().isEmpty
+                            ? SC.menu
+                            : const Color(0xFFF4FF1F),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.arrow_upward_rounded,
+                        color: _ctrl.text.trim().isEmpty
+                            ? SC.textMuted
+                            : const Color(0xFF04123A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
