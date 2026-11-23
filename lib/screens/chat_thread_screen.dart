@@ -2033,7 +2033,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         text: AppStrings.t('quiz_nobody'),
       );
     }
-    return null;
+    // L'autre a répondu, pas moi : c'est à moi (il voit « En attente de … »).
+    return QuizWaitingPill(
+      key: ValueKey('quiz-turn-${q.index}'),
+      text: AppStrings.t('quiz_your_turn'),
+    );
   }
 
   @override
