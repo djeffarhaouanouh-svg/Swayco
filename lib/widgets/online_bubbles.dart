@@ -384,14 +384,17 @@ class _LocalClockState extends State<_LocalClock> {
     final show = seen != null &&
         !isPeerOnline(p) &&
         DateTime.now().difference(seen) < const Duration(hours: 24);
-    // « vu 14 min » / « vu 3 h » : on comprend tout de suite que c'est la
+    // « maintenant » / « vu 14 min » / « vu 3 h » : on comprend tout de suite que c'est la
     // dernière connexion.
     String label = '';
     if (show) {
       final mins = DateTime.now().difference(seen).inMinutes;
-      label = mins < 60
-          ? AppStrings.t('friends_seen_min', args: {'n': '${mins < 1 ? 1 : mins}'})
-          : AppStrings.t('friends_seen_h', args: {'n': '${mins ~/ 60}'});
+      // Moins de 3 min : « maintenant » (il vient juste de partir).
+      label = mins < 3
+          ? AppStrings.t('friends_seen_now')
+          : mins < 60
+              ? AppStrings.t('friends_seen_min', args: {'n': '$mins'})
+              : AppStrings.t('friends_seen_h', args: {'n': '${mins ~/ 60}'});
     }
     return FittedBox(
       fit: BoxFit.scaleDown,

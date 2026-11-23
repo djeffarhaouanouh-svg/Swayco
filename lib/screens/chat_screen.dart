@@ -1088,7 +1088,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   /// Amis joignables tout de suite — le compteur de la pastille verte.
-  int get _onlineFriends => _friends.where(isPeerOnline).length;
 
   /// The band pinned at the top of the page — the swaycø wordmark on the left,
   /// and on the right the count of friends who are online right now. Le seul
@@ -1183,43 +1182,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 style: SCText.h1,
               ),
             ),
-            // Personne en ligne = pas de pastille : un « 0 en ligne » est une
-            // mauvaise nouvelle affichée en permanence.
-            if (_onlineFriends > 0)
-              Container(
-                height: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: SC.menu,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                        color: SC.online,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      AppStrings.t(
-                        'online_count',
-                        args: {'n': '$_onlineFriends'},
-                      ),
-                      style: TextStyle(
-                        fontFamily: _kMono,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: SC.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            // Plus de pastille « N en ligne » ici : les amis en ligne se voient à
+            // leur bulle (anneau jaune, en tête de la rangée).
             const SizedBox(width: 6),
             // Le « + » jaune : nouveau groupe (à droite de la loupe).
             // La loupe — venue de Découvrir. Elle s'étire en champ au tap.
