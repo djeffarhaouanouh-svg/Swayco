@@ -4757,7 +4757,10 @@ class _CardMessagesState extends State<_CardMessages> {
                       // Les deux plus récents portent une clé : leur hauteur
                       // donne celle de la fenêtre au repos.
                       key: i == 0 ? _k0 : (i == 1 ? _k1 : null),
-                      padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
+                      // L'air est SOUS le message le plus ancien, c'est-à-dire
+                      // ENTRE lui et le plus récent (la liste est à l'envers : il
+                      // était au-dessus de l'ancien, et les deux se touchaient).
+                      padding: EdgeInsets.only(bottom: i == 0 ? 0 : 10),
                       child: _row(turns[idx], idx, idx == turns.length - 1),
                     );
                   },
