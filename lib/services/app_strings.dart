@@ -1010,7 +1010,7 @@ abstract final class AppStrings {
     'official_guide_t6': 'Explore le monde avec le globe',
     'official_guide_b6': 'Sur Découvrir, touche la bulle « Filtrer » sur la photo : un globe 3D s\'ouvre. Choisis un ou plusieurs pays et ne vois que les profils de ces langues.',
     'official_guide_t7': 'Invite tes amis',
-    'official_guide_b7': 'Swayco, c\'est mieux à plusieurs : touche « Inviter » (ci-dessous, ou en bas de ta liste de messages) pour envoyer le lien à tes amis, où qu\'ils soient.',
+    'official_guide_b7': 'Plus on est de monde, plus on s\'amuse. Touche « Inviter » et envoie le lien à tes amis, où qu\'ils soient.',
     'quiz_pick_title': 'Choisis un thème',
     'quiz_pick_word': 'thème',
     'quiz_pick_sub': '{name} reçoit une question de ce thème dans le chat.',
