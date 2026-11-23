@@ -840,7 +840,7 @@ abstract final class AppStrings {
     'friends_seen_min': 'vu {n} min',
     'friends_seen_h': 'vu {n} h',
     'friends_none_online': 'Personne en ligne pour l\'instant',
-    'friends_section': 'Friends',
+    'friends_section': 'Amis',
     'activity_call': 'Discute avec quelqu\'un',
     'activity_typing': 'Écrit un message',
     'activity_discover': 'Fait défiler des profils sur Discover',

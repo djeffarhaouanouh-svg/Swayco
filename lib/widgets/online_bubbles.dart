@@ -221,9 +221,17 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
               if (_onlineCount > 0)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                // Même pastille que celle du titre « Messages » (même ombre).
                 decoration: BoxDecoration(
                   color: SC.accent,
                   borderRadius: BorderRadius.circular(999),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x73000000),
+                      blurRadius: 7,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
                 child: Text(
                   '$_onlineCount',
