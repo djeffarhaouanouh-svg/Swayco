@@ -386,20 +386,37 @@ class _LocalClockState extends State<_LocalClock> {
     // L'heure de SA DERNIÈRE CONNEXION (à mon heure), pour ceux vus dans les 24
     // dernières heures. Rien pour ceux qui sont en ligne : ils sont là.
     final online = isPeerOnline(p);
-    final show = online ||
-        (seen != null &&
-            DateTime.now().difference(seen) < const Duration(hours: 24));
-    // « maintenant » / « vu 14 min » / « vu 3 h » : on comprend tout de suite que c'est la
+    // Plus de limite de 24 h : « hier », puis les jours, les semaines… Rien
+    // seulement quand on ne sait pas quand la personne est venue.
+    final show = online || seen != null;
+    // « maintenant » / « vu 14 min » / « vu 3 h » / « hier » / « vu 3 j » : on comprend tout de suite que c'est la
     // dernière connexion.
     String label = '';
     if (show) {
       // En ligne, ou parti depuis moins de 3 min : « maintenant ».
-      final mins = online ? 0 : DateTime.now().difference(seen!).inMinutes;
-      label = mins < 3
-          ? AppStrings.t('friends_seen_now')
-          : mins < 60
-              ? AppStrings.t('friends_seen_min', args: {'n': '$mins'})
-              : AppStrings.t('friends_seen_h', args: {'n': '${mins ~/ 60}'});
+      final diff = online ? Duration.zero : DateTime.now().difference(seen!);
+      final mins = diff.inMinutes;
+      final days = diff.inDays;
+      String n(int v) => '$v';
+      if (mins < 3) {
+        label = AppStrings.t('friends_seen_now');
+      } else if (mins < 60) {
+        label = AppStrings.t('friends_seen_min', args: {'n': n(mins)});
+      } else if (diff.inHours < 24) {
+        label = AppStrings.t('friends_seen_h', args: {'n': n(mins ~/ 60)});
+      } else if (diff.inHours < 48) {
+        // Plus de 24 h : « hier ».
+        label = AppStrings.t('friends_seen_yesterday');
+      } else if (days < 7) {
+        label = AppStrings.t('friends_seen_d', args: {'n': n(days)});
+      } else if (days < 28) {
+        label = AppStrings.t('friends_seen_w', args: {'n': n(days ~/ 7)});
+      } else if (days < 365) {
+        label =
+            AppStrings.t('friends_seen_mo', args: {'n': n(days ~/ 30 < 1 ? 1 : days ~/ 30)});
+      } else {
+        label = AppStrings.t('friends_seen_y', args: {'n': n(days ~/ 365)});
+      }
     }
     return FittedBox(
       fit: BoxFit.scaleDown,
