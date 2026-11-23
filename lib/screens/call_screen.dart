@@ -200,7 +200,20 @@ class _CallScreenState extends State<CallScreen> {
 
   // ── La carte de messages (permanente, en bas) ───────────────────────────
   /// La saisie est dépliée (sinon : un rond crayon).
-  bool _composerOpen = false;
+  bool _composerOpenValue = false;
+
+  bool get _composerOpen => _composerOpenValue;
+
+  /// Ouvrir OU fermer la saisie remet l'en-tête de la carte à zéro : un tap dans
+  /// la zone des messages pendant la saisie (ou un défilement) l'avait masqué, et
+  /// il restait caché après la fermeture — le galet ne revenait jamais.
+  set _composerOpen(bool open) {
+    if (open != _composerOpenValue) {
+      _cardHeaderHidden = false;
+      _cardScrolledBack = false;
+    }
+    _composerOpenValue = open;
+  }
   Timer? _composerIdle;
 
   /// Combien la saisie dépliée reste ouverte sans focus ni geste.
@@ -3572,7 +3585,11 @@ class _CallScreenState extends State<CallScreen> {
     final f1 = fit(free);
     if (f1 != null) {
       final railH = n * f1.d + (n - 1) * f1.gap;
-      final top = pipBottom + 12 + (free - railH) / 2;
+      // Centré, puis remonté d'un peu (sans passer sous 12 px de la vignette).
+      final top = math.max(
+        pipBottom + 12,
+        pipBottom + 12 + (free - railH) / 2 - 14,
+      );
       return (top: top, right: 20.0, d: f1.d, gap: f1.gap);
     }
     final f2 = fit(cardTop - 12 - _kPipTop) ?? (d: 34.0, gap: 6.0);
