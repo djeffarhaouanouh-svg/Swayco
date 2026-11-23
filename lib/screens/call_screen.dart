@@ -3520,6 +3520,15 @@ class _CallScreenState extends State<CallScreen> {
     _wakeDock();
   }
 
+  /// Où se pose la vignette caméra : sous la barre d'état (la pile est déjà dans
+  /// la zone sûre). Plus de logo Swayco au-dessus : elle remonte.
+  static const double _kPipTop = 8;
+
+  /// Le repère du rail : l'ancien haut de la vignette (sous la barre d'état +
+  /// 40). La vignette est montée ([_kPipTop]), le rail est resté où il était.
+  double _railAnchor(BuildContext context) =>
+      MediaQuery.paddingOf(context).top + 40;
+
   /// La carte de messages, mesurée à chaque image (sa hauteur change : en-tête,
   /// messages longs, saisie). Le rail se place d'après elle.
   final GlobalKey _cardKey = GlobalKey();
@@ -3535,6 +3544,8 @@ class _CallScreenState extends State<CallScreen> {
 
   /// Où poser le rail pour qu'il ne touche JAMAIS la carte de messages (ni la
   /// vignette) : 12 px d'air au-dessus de la carte, toujours.
+  ///  0. Le rail NE BOUGE PAS quand la vignette monte : il garde l'ancienne place
+  ///     de la vignette comme repère ([_railAnchor]).
   ///  1. Sous la vignette, si les 5 touches y tiennent (48, réduites jusqu'à 34,
   ///     espaces de 10 puis 6).
   ///  2. Sinon (petit écran, carte haute) : à GAUCHE de la vignette, à partir
@@ -3544,7 +3555,7 @@ class _CallScreenState extends State<CallScreen> {
   ) {
     final mq = MediaQuery.of(context);
     final h = mq.size.height - mq.viewPadding.top - mq.viewPadding.bottom;
-    final pipTop = MediaQuery.paddingOf(context).top + 40;
+    final pipTop = _railAnchor(context);
     final limit = h - 28 - _cardH - 12; // le bas permis du rail
     const n = 5; // haut-parleur, caméra, micro, son, raccrocher
     ({double d, double gap})? fit(double space) {
@@ -4110,7 +4121,7 @@ class _CallScreenState extends State<CallScreen> {
                     curve: Curves.easeOutCubic,
                     // Toujours en haut à droite : les messages sont en bas, dans
                     // la carte, et le rail se pose juste dessous.
-                    top: MediaQuery.paddingOf(context).top + 40,
+                    top: _kPipTop,
                     right: 12,
                     width: 118,
                     height: 176,
@@ -4229,32 +4240,6 @@ class _CallScreenState extends State<CallScreen> {
                 // gagner le tap, jamais le fond de la carte.
                 _buildCallRail(context),
                 if (_isEgressAdmin) _buildCallRec(context),
-                // Brand watermark — top-centre, always on top of whatever
-                // call layout is showing (full-screen, PiP, split…).
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: IgnorePointer(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      // Les messages rangés en haut prennent sa place : le logo
-                      // s'efface pendant qu'ils sont là, et revient ensuite.
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 250),
-                        opacity: 0.7,
-                        child: SwaycoWordmark(
-                          fontSize: 29,
-                          letterSpacing: 0.5,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              blurRadius: 8,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
                   ),
