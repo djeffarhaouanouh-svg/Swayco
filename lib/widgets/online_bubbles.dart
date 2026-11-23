@@ -400,7 +400,7 @@ class _LocalClockState extends State<_LocalClock> {
     final show = seen != null &&
         !isPeerOnline(p) &&
         DateTime.now().difference(seen) < const Duration(hours: 24);
-    // « il y a 14 min » / « il y a 3 h » : on comprend tout de suite que c'est la
+    // « vu 14 min » / « vu 3 h » : on comprend tout de suite que c'est la
     // dernière connexion.
     String label = '';
     if (show) {
@@ -414,9 +414,12 @@ class _LocalClockState extends State<_LocalClock> {
       child: Text(
         label,
         maxLines: 1,
-        style: GoogleFonts.ibmPlexMono(
-          fontSize: 9.5,
-          color: SC.fg.withValues(alpha: 0.65),
+        // Police pleine de l'app (pas la mono fine, qui se lisait comme de
+        // l'italique à cette taille).
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w600,
+          color: SC.fg.withValues(alpha: 0.7),
         ),
       ),
     );

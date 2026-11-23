@@ -365,22 +365,25 @@ class OfficialChatRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Pas d'heure ni de date sur la ligne de l'équipe : seule la
-                  // pastille jaune dit qu'il y a du nouveau.
-                  if (unread)
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        color: _kYellow,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                ],
+              // Colonne de droite à largeur FIXE (comme les autres lignes, qui y
+              // mettent l'heure) : sans elle le texte du message courait jusqu'au
+              // bord. Pas d'heure ni de date ici : seule la pastille jaune dit
+              // qu'il y a du nouveau.
+              SizedBox(
+                width: 36,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: unread
+                      ? Container(
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                            color: _kYellow,
+                            shape: BoxShape.circle,
+                          ),
+                        )
+                      : null,
+                ),
               ),
             ],
           ),
