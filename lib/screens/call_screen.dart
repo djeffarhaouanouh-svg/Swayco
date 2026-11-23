@@ -1771,6 +1771,7 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void initState() {
     super.initState();
+    _callSignal = true;
     ActivitySignal.setCall(true);
     widget.translation.localTranscript?.addListener(_onMyTranscript);
     Analytics.track('screen_view', props: {'screen': 'live'});
@@ -2908,6 +2909,7 @@ class _CallScreenState extends State<CallScreen> {
     final startedAt = _connectedAt;
     if (_hadRemote && startedAt != null && mounted) {
       _finalDuration = DateTime.now().difference(startedAt);
+      _releaseCallSignal();
       setState(() => _ended = true);
       unawaited(_prepareEndedCard());
       return;
@@ -3405,9 +3407,23 @@ class _CallScreenState extends State<CallScreen> {
     if (leave == true && mounted) await _hangUp();
   }
 
+  /// Cet écran a annoncé « en appel » à mes amis (la bulle jaune de la page
+  /// Messages). À couper dès que l'appel est FINI, pas seulement à la fermeture
+  /// de l'écran : la carte de fin d'appel reste affichée tant qu'on ne la ferme
+  /// pas, et le téléphone continuait d'annoncer « en appel » pendant ce temps.
+  /// Idempotent : le compteur de [ActivitySignal.setCall] ne doit baisser qu'une
+  /// fois par écran.
+  bool _callSignal = false;
+
+  void _releaseCallSignal() {
+    if (!_callSignal) return;
+    _callSignal = false;
+    ActivitySignal.setCall(false);
+  }
+
   @override
   void dispose() {
-    ActivitySignal.setCall(false);
+    _releaseCallSignal();
     SwaycoSounds.callActive = false;
     widget.translation.localTranscript?.removeListener(_onMyTranscript);
     AsrService.osRefusedKey.removeListener(_onSttRefused);
@@ -4402,6 +4418,21 @@ class _CardMessagesState extends State<_CardMessages> {
   bool _faded = false;
   int _seenLen = 0;
 
+  /// La liste se fait défiler au doigt (reverse : 0 = le plus récent, en bas).
+  final ScrollController _scroll = ScrollController();
+  bool _atOldest = false;
+
+  /// Hauteur de la fenêtre des messages : deux messages courts. Au-delà on
+  /// défile, la carte, elle, ne grandit plus.
+  static const double _kWindow = 132;
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final p = _scroll.position;
+    final atOldest = p.pixels >= p.maxScrollExtent - 4;
+    if (atOldest != _atOldest) setState(() => _atOldest = atOldest);
+  }
+
   void _armFade() {
     _fadeTimer?.cancel();
     if (widget.holdFade) return;
@@ -4419,6 +4450,7 @@ class _CardMessagesState extends State<_CardMessages> {
   void initState() {
     super.initState();
     _seenLen = widget.turns.length;
+    _scroll.addListener(_onScroll);
     _armFade();
   }
 
@@ -4428,6 +4460,16 @@ class _CardMessagesState extends State<_CardMessages> {
     if (widget.turns.length != _seenLen) {
       _seenLen = widget.turns.length;
       _wake();
+      // Un nouveau message : on revient au plus récent.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _scroll.hasClients) {
+          _scroll.animateTo(
+            0,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+          );
+        }
+      });
     }
     if (widget.holdFade != oldWidget.holdFade) {
       if (widget.holdFade) {
@@ -4442,6 +4484,7 @@ class _CardMessagesState extends State<_CardMessages> {
   @override
   void dispose() {
     _fadeTimer?.cancel();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -4510,8 +4553,10 @@ class _CardMessagesState extends State<_CardMessages> {
   @override
   Widget build(BuildContext context) {
     final turns = widget.turns;
-    final from = turns.length > 2 ? turns.length - 2 : 0;
-    final earlier = from;
+    // « N plus tôt » : ce qu'il reste au-dessus des deux derniers, tant qu'on n'est
+    // pas remonté jusqu'au plus ancien.
+    final earlier = turns.length > 2 ? turns.length - 2 : 0;
+    final showEarlier = earlier > 0 && !_atOldest;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       // Atténuées : le tap les réveille au lieu de masquer l'en-tête.
@@ -4532,43 +4577,73 @@ class _CardMessagesState extends State<_CardMessages> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (earlier > 0)
+              if (showEarlier)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Container(
-                    height: 24,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.3),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    // Toucher la pastille remonte aussi aux plus anciens.
+                    onTap: () {
+                      _wake();
+                      if (_scroll.hasClients) {
+                        _scroll.animateTo(
+                          _scroll.position.maxScrollExtent,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut,
+                        );
+                      }
+                    },
+                    child: Container(
+                      height: 24,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.3),
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.keyboard_arrow_up_rounded,
-                          size: 16,
-                          color: _yellow,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          AppStrings.t('call_earlier', args: {'n': '$earlier'}),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.keyboard_arrow_up_rounded,
+                            size: 16,
+                            color: _yellow,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Text(
+                            AppStrings.t('call_earlier', args: {'n': '$earlier'}),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              for (var i = from; i < turns.length; i++) ...[
-                if (i > from) const SizedBox(height: 10),
-                _row(turns[i], i, i == turns.length - 1),
-              ],
+              // La fenêtre : deux messages visibles, les autres se découvrent en
+              // faisant glisser le doigt vers le bas (on remonte le temps).
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: _kWindow),
+                child: ListView.builder(
+                  controller: _scroll,
+                  reverse: true,
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: turns.length,
+                  itemBuilder: (context, i) {
+                    final idx = turns.length - 1 - i;
+                    return Padding(
+                      padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
+                      child: _row(turns[idx], idx, idx == turns.length - 1),
+                    );
+                  },
+                ),
+              ),
             ],
           ),
         ),
