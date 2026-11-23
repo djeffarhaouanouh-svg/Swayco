@@ -2650,6 +2650,10 @@ app.post('/api/notify-online-broadcast', async (req, res) => {
   }
 });
 
+// NOTE (Railway): this service only redeploys when a WATCHED path changes, and a
+// commit that touches only landing/ is skipped ("No deployment needed"). Add
+// landing/** to the service's Watch Paths, or touch this file, to ship a
+// landing-only change.
 // Landing page: /bienvenue (index.html + its assets). express.static adds the
 // trailing slash itself (/bienvenue -> /bienvenue/), which the page's relative
 // asset URLs need. Registered BEFORE the Flutter SPA fallback, like the legal
