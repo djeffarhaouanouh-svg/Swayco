@@ -96,6 +96,7 @@ footer.foot a:hover{color:#fff}
 .badges img{display:block;height:56px;width:auto}
 .badges a:hover{filter:brightness(1.08)}
 
+
 .langmenu{position:relative;margin-right:4px}
 .langmenu summary{list-style:none;cursor:pointer;height:42px;padding:0 14px;border-radius:99px;border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.07);display:flex;align-items:center;gap:8px;color:#fff;font-weight:700;font-size:14px;user-select:none;-webkit-user-select:none}
 .langmenu summary::-webkit-details-marker{display:none}
@@ -108,6 +109,8 @@ footer.foot a:hover{color:#fff}
 .langmenu li a:hover{background:rgba(255,255,255,.09);color:#fff}
 .langmenu li a[aria-current="true"]{color:var(--yellow)}
 .langmenu li a svg{width:18px;height:18px;fill:currentColor}
+.flag{width:22px;height:22px;border-radius:50%;object-fit:cover;display:block;flex:none;box-shadow:0 0 0 1px rgba(255,255,255,.25)}
+.langmenu li .nm{display:flex;align-items:center;gap:12px}
 @keyframes lm{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 @media (max-width:420px){header.top{gap:8px}.langmenu{margin-right:0}.langmenu summary{padding:0 10px;gap:6px}.btn-top{padding:0 14px}.brand span{font-size:18px}.brand{gap:8px}}
 @media (prefers-reduced-motion:reduce){.langmenu ul{animation:none}.langmenu summary .chev{transition:none}}
