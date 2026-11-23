@@ -3228,6 +3228,11 @@ class _CallScreenState extends State<CallScreen> {
                                     fallbackUrl: profile?.fallbackPhotoUrl,
                                     size: 140,
                                     popular: (profile?.isPro ?? false) || (profile?.isPlus ?? false),
+                                    // Le liseré entre l'anneau jaune et la photo est
+                                    // TRANSPARENT : par défaut il prend le fond sombre de
+                                    // l'app (presque noir) et dessinait un contour noir
+                                    // sur cette carte bleue.
+                                    gapColor: Colors.transparent,
                                   ),
                                 ),
                               ),
