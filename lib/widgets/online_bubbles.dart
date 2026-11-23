@@ -208,7 +208,11 @@ class _OnlineBubblesRowState extends State<OnlineBubblesRow> {
             children: [
               Text(
                 AppStrings.t('friends_section').toUpperCase(),
-                style: GoogleFonts.ibmPlexMono(
+                // La MÊME police que le titre « Messages » (chat_screen : la
+                // monospace du système) : IBM Plex Mono n'a ni la même taille ni
+                // les mêmes lettres, les deux titres ne se répondaient pas.
+                style: TextStyle(
+                  fontFamily: 'monospace',
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 1.1,
@@ -381,15 +385,16 @@ class _LocalClockState extends State<_LocalClock> {
     final seen = p.lastSeen?.toLocal();
     // L'heure de SA DERNIÈRE CONNEXION (à mon heure), pour ceux vus dans les 24
     // dernières heures. Rien pour ceux qui sont en ligne : ils sont là.
-    final show = seen != null &&
-        !isPeerOnline(p) &&
-        DateTime.now().difference(seen) < const Duration(hours: 24);
+    final online = isPeerOnline(p);
+    final show = online ||
+        (seen != null &&
+            DateTime.now().difference(seen) < const Duration(hours: 24));
     // « maintenant » / « vu 14 min » / « vu 3 h » : on comprend tout de suite que c'est la
     // dernière connexion.
     String label = '';
     if (show) {
-      final mins = DateTime.now().difference(seen).inMinutes;
-      // Moins de 3 min : « maintenant » (il vient juste de partir).
+      // En ligne, ou parti depuis moins de 3 min : « maintenant ».
+      final mins = online ? 0 : DateTime.now().difference(seen!).inMinutes;
       label = mins < 3
           ? AppStrings.t('friends_seen_now')
           : mins < 60
