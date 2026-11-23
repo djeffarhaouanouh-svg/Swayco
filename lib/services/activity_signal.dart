@@ -154,7 +154,8 @@ abstract final class ActivitySignal {
     if (e.call) return PeerActivity.call;
     // « Écrit » se voit peu importe à qui la personne écrit.
     if (e.typingTo.isNotEmpty) return PeerActivity.typing;
-    if (e.discover) return PeerActivity.discover;
+    // « Regarde Découvrir » (le badge à l'œil sur la bulle et la ligne du menu)
+    // n'est plus montré : on ne signale que l'appel et l'écriture.
     return null;
   }
 
