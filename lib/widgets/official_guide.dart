@@ -397,41 +397,61 @@ class _ExampleTranslationState extends State<_ExampleTranslation> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 350),
-                child: Text(
-                  translated ? result : original,
-                  key: ValueKey(translated),
-                  style: TextStyle(color: _ink, fontSize: 14),
-                ),
+              // Le texte principal : l'original d'abord, puis la traduction.
+              // Les DEUX textes, invisibles, sont posés dans la pile pour qu'elle
+              // ait la hauteur du plus long : la bulle ne change jamais de taille
+              // (la hauteur de la scène n'est plus fixée à la main : elle
+              // débordait dès qu'un texte passait à la ligne).
+              Stack(
+                children: [
+                  Opacity(
+                    opacity: 0,
+                    child: Text(result, style: TextStyle(color: _ink, fontSize: 14)),
+                  ),
+                  Opacity(
+                    opacity: 0,
+                    child: Text(original, style: TextStyle(color: _ink, fontSize: 14)),
+                  ),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 350),
+                    layoutBuilder: (current, previous) => Stack(
+                      alignment: Alignment.topLeft,
+                      children: [...previous, ?current],
+                    ),
+                    child: Text(
+                      translated ? result : original,
+                      key: ValueKey(translated),
+                      style: TextStyle(color: _ink, fontSize: 14),
+                    ),
+                  ),
+                ],
               ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutCubic,
-                alignment: Alignment.topLeft,
-                child: translated
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.translate_rounded,
-                                size: 11, color: _ink.withValues(alpha: 0.5)),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                original,
-                                style: TextStyle(
-                                  color: _ink.withValues(alpha: 0.5),
-                                  fontSize: 11.5,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                            ),
-                          ],
+              // L'original, en petit dessous : sa place est réservée d'emblée,
+              // il apparaît en fondu.
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: AnimatedOpacity(
+                  opacity: translated ? 1 : 0,
+                  duration: const Duration(milliseconds: 300),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.translate_rounded,
+                          size: 11, color: _ink.withValues(alpha: 0.5)),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          original,
+                          style: TextStyle(
+                            color: _ink.withValues(alpha: 0.5),
+                            fontSize: 11.5,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
-                      )
-                    : const SizedBox(width: 0, height: 0),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -443,48 +463,47 @@ class _ExampleTranslationState extends State<_ExampleTranslation> {
   @override
   Widget build(BuildContext context) {
     // La scène parle la langue de l'INTERFACE : le gras est la traduction dans
-    // cette langue, le petit gris l'original dans la langue de l'AUTRE (japonais,
-    // espagnol). Si l'interface est justement le japonais ou l'espagnol, l'autre
-    // parle coréen / portugais pour que la traduction serve à quelque chose.
+    // cette langue, le petit gris l'original dans la langue de l'AUTRE (japonais
+    // pour les deux messages ; coréen si l'interface est justement le japonais).
     final ui = AppStrings.currentBcp47.value.trim().toLowerCase().split(RegExp(r'[-_]')).first;
     final first = ui == 'ja'
         ? '안녕하세요! 잘 지내요? 🇰🇷'
         : 'こんにちは！元気？ 🇯🇵';
-    final second = ui == 'es'
-        ? 'Vamos conversar por vídeo? 🇧🇷'
-        : '¿Hablamos por vídeo? 🇪🇸';
+    // Le MÊME interlocuteur écrit les deux messages : la même langue (c'était
+    // du japonais puis de l'espagnol, comme deux personnes différentes).
+    final second = ui == 'ja'
+        ? '영상으로 이야기할까요? 🇰🇷'
+        : 'ビデオで話しませんか？ 🇯🇵';
     return OnVisible(
       onVisible: _start,
       child: _ExampleFrame(
-        child: SizedBox(
-          height: 238,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _incoming(
-                shown: _r1,
-                translated: _t1,
-                original: first,
-                result: AppStrings.t('guide_scene_m1'),
-              ),
-              const SizedBox(height: 8),
-              _appear(_a1, _bubble(AppStrings.t('guide_scene_r1'), mine: true)),
-              const SizedBox(height: 14),
-              _incoming(
-                shown: _r2,
-                translated: _t2,
-                original: second,
-                result: AppStrings.t('guide_scene_m2'),
-              ),
-              const SizedBox(height: 8),
-              _appear(_a2, _bubble(AppStrings.t('guide_scene_r2'), mine: true)),
-            ],
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _incoming(
+              shown: _r1,
+              translated: _t1,
+              original: first,
+              result: AppStrings.t('guide_scene_m1'),
+            ),
+            const SizedBox(height: 8),
+            _appear(_a1, _bubble(AppStrings.t('guide_scene_r1'), mine: true)),
+            const SizedBox(height: 14),
+            _incoming(
+              shown: _r2,
+              translated: _t2,
+              original: second,
+              result: AppStrings.t('guide_scene_m2'),
+            ),
+            const SizedBox(height: 8),
+            _appear(_a2, _bubble(AppStrings.t('guide_scene_r2'), mine: true)),
+          ],
         ),
       ),
     );
   }
 }
+
 /// Étape 2 — un mini écran d'appel : visage, sous-titre d'origine et traduction.
 class _ExampleCall extends StatelessWidget {
   const _ExampleCall();
