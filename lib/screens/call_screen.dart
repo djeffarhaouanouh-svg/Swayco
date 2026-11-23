@@ -5003,26 +5003,31 @@ class _PipFlipButton extends StatelessWidget {
       child: Pressable(
         bounce: true,
         onTap: onTap,
-        // La cible déborde du rond visible, comme partout ailleurs : dans un
-        // coin de vignette, un doigt tombe rarement au centre.
+        // Le rond est collé DANS l'angle bas-gauche de la vignette (6 px de
+        // marge : il suit le coin arrondi sans en sortir). La zone de toucher
+        // (48) reste elle aussi entièrement dans la vignette.
         child: SizedBox(
-          width: 60,
-          height: 60,
-          child: Center(
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.black.withValues(alpha: 0.55),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.35),
+          width: 48,
+          height: 48,
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 6, bottom: 6),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.black.withValues(alpha: 0.55),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.35),
+                  ),
                 ),
-              ),
-              child: const Icon(
-                Icons.autorenew_rounded,
-                color: Colors.white,
-                size: 21,
+                child: const Icon(
+                  Icons.autorenew_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
           ),
