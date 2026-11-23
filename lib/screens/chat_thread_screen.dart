@@ -354,6 +354,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     if (ids == null || ids.isEmpty) return;
     try {
       await GroupApi.addMembers(g.id, ids);
+      unawaited(GroupApi.notifyAdded(
+        groupId: g.id,
+        groupName: g.name,
+        addedIds: ids,
+      ));
       await _refreshGroup();
     } catch (e) {
       if (mounted) {

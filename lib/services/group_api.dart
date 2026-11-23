@@ -262,6 +262,50 @@ abstract final class GroupApi {
     }
   }
 
+  /// Prévient chaque personne AJOUTÉE à un groupe (à sa création ou plus tard) :
+  /// « Lely t'a ajouté au groupe », dans SA langue, avec le nom du groupe en
+  /// titre. Un tap ouvre la conversation du groupe. Au mieux : un échec
+  /// n'annule jamais l'ajout.
+  static Future<void> notifyAdded({
+    required String groupId,
+    required String groupName,
+    required List<String> addedIds,
+  }) async {
+    try {
+      final meId = _client.auth.currentUser?.id ?? '';
+      final targets = [
+        for (final id in addedIds)
+          if (id.isNotEmpty && id != meId) id,
+      ];
+      if (targets.isEmpty || groupId.isEmpty) return;
+      final me = meId.isEmpty ? null : await ProfileApi.fetchById(meId);
+      final first =
+          (me?.displayName ?? '').trim().split(RegExp(r'\s+')).first;
+      final profiles = await ProfileApi.fetchByIds(targets);
+      final langOf = {for (final p in profiles) p.id: p.language};
+      for (final uid in targets) {
+        unawaited(PushDispatcher.notify(
+          recipientUid: uid,
+          title: groupName.trim().isEmpty ? 'Swayco' : groupName.trim(),
+          body: AppStrings.tIn(
+            langOf[uid] ?? '',
+            'push_group_added',
+            args: {'name': first.isEmpty ? 'Swayco' : first},
+          ),
+          type: 'message',
+          data: {
+            'conversationId': 'grp-$groupId',
+            'groupId': groupId,
+            'groupName': groupName,
+            'senderId': meId,
+          },
+        ));
+      }
+    } catch (e) {
+      debugPrint('GroupApi.notifyAdded failed: $e');
+    }
+  }
+
   /// Notifie les autres membres (sauf ceux qui ont mis le groupe en silence),
   /// chacun dans SA langue. Au mieux : un échec n'arrête jamais l'envoi.
   static Future<void> notifyMembers({

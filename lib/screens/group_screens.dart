@@ -173,6 +173,12 @@ class _PickMembersSheetState extends State<_PickMembersSheet> {
         memberIds: _picked.toList(),
       );
       Analytics.track('group_created', props: {'members': _picked.length + 1});
+      // Chaque personne ajoutée est prévenue (« X t'a ajouté au groupe »).
+      unawaited(GroupApi.notifyAdded(
+        groupId: id,
+        groupName: _name.text.trim(),
+        addedIds: _picked.toList(),
+      ));
       // La photo choisie : au mieux, un échec n'annule pas le groupe.
       if (_photo != null && id.isNotEmpty) {
         try {
@@ -559,6 +565,11 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     if (ids == null || ids.isEmpty) return;
     try {
       await GroupApi.addMembers(_group.id, ids);
+      unawaited(GroupApi.notifyAdded(
+        groupId: _group.id,
+        groupName: _group.name,
+        addedIds: ids,
+      ));
       await _reload();
     } catch (e) {
       if (mounted) {
