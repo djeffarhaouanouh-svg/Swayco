@@ -3312,7 +3312,8 @@ class _CallScreenState extends State<CallScreen> {
                 children: [
                   Positioned(
                     top: 4,
-                    left: 4,
+                    // 16 du bord (c'était 4 : la croix collait au bord de l'écran).
+                    left: 16,
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => Navigator.of(context).pop(),
