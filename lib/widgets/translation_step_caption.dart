@@ -28,7 +28,17 @@ class TranslationStepCaption extends StatefulWidget {
     required this.myVoice,
     required this.myLines,
     this.compact = false,
+    this.bare = false,
+    this.onStep,
   });
+
+  /// Habillage de la carte de l'appel : le texte seul, aligné à gauche, 14 px
+  /// gras, sans pastille noire derrière. La logique des étapes est inchangée.
+  final bool bare;
+
+  /// Prévenu à chaque changement d'étape (0..3) : la carte s'en sert pour
+  /// estomper son galet pendant « Patiente… ».
+  final ValueChanged<int>? onStep;
 
   /// Version étroite (≈112 px, 2 lignes) : quand la vignette caméra est en bas
   /// à droite, le texte ne doit pas la toucher.
@@ -162,6 +172,7 @@ class _TranslationStepCaptionState extends State<TranslationStepCaption> {
           });
         }
     }
+    widget.onStep?.call(_step);
     if (mounted) setState(() {});
   }
 
@@ -190,6 +201,28 @@ class _TranslationStepCaptionState extends State<TranslationStepCaption> {
         default:
           text = AppStrings.t('tuto_tr_l1');
       }
+    }
+    if (widget.bare) {
+      return AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        layoutBuilder: (current, previous) => Stack(
+          alignment: Alignment.centerLeft,
+          children: [...previous, if (current != null) current],
+        ),
+        child: Text(
+          text,
+          key: ValueKey('$_step-$_failed-bare'),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.start,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: color,
+            shadows: const [Shadow(color: Colors.black54, blurRadius: 8)],
+          ),
+        ),
+      );
     }
     // Sur un fond sombre arrondi : le texte blanc reste lisible quelle que
     // soit la vidéo derrière.
