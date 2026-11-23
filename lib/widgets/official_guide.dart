@@ -3,10 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/app_strings.dart';
+import '../services/auth_service.dart';
+import '../services/profile_api.dart';
 import '../theme/swayco_theme.dart';
 import 'chat_list_extras.dart';
 import 'chat_quiz.dart';
 import 'chat_video.dart';
+import 'guide_call_example.dart';
+import 'profile_avatar.dart' show profileFlagIso;
 import 'viewport_trigger.dart';
 import '../services/voice_heard.dart';
 import 'voice_note_player.dart';
@@ -504,133 +508,73 @@ class _ExampleTranslationState extends State<_ExampleTranslation> {
   }
 }
 
-/// Étape 2 — un mini écran d'appel : visage, sous-titre d'origine et traduction.
-class _ExampleCall extends StatelessWidget {
+/// Étape 2 — la miniature ANIMÉE de l'écran d'appel (voir [GuideCallExample]) :
+/// qui parle, et les 4 étapes de la traduction. Les deux personnes sont accordées
+/// à leur photo et à leur drapeau : TOI (ta vraie photo, le drapeau de ton pays)
+/// et l'autre — Aiko 🇯🇵, ou Minji 🇰🇷 si tu es toi-même japonais. Toucher
+/// l'exemple ouvre toujours la vraie vidéo de démonstration.
+class _ExampleCall extends StatefulWidget {
   const _ExampleCall();
 
   @override
+  State<_ExampleCall> createState() => _ExampleCallState();
+}
+
+class _ExampleCallState extends State<_ExampleCall> {
+  String _name = '';
+  String _avatar = '';
+  String _iso = '';
+  bool _japanese = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Avant l'arrivée du profil : la langue de l'interface.
+    final ui = AppStrings.currentBcp47.value;
+    _iso = profileFlagIso(country: '', language: ui);
+    _japanese = ui.trim().toLowerCase().startsWith('ja');
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    try {
+      final uid = AuthService.currentUserId;
+      if (uid.isEmpty) return;
+      final me = await ProfileApi.fetchById(uid);
+      if (me == null || !mounted) return;
+      final ui = AppStrings.currentBcp47.value;
+      final lang = me.language.trim().isNotEmpty ? me.language : ui;
+      final iso = profileFlagIso(country: me.country, language: lang);
+      setState(() {
+        _name = me.displayName;
+        _avatar = me.bestAvatarUrl;
+        if (iso.isNotEmpty) _iso = iso;
+        // Japonais lui-même (pays ou langue) : l'autre parle coréen.
+        _japanese = _iso.toLowerCase() == 'jp' ||
+            lang.trim().toLowerCase().startsWith('ja');
+      });
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final peerName = _japanese ? 'Minji' : 'Aiko';
     return GestureDetector(
       onTap: () => showChatVideo(context, kGuideCallDemoUrl),
       child: _ExampleFrame(
-      child: AspectRatio(
-        aspectRatio: 16 / 10,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF1B2250), Color(0xFF0B0E22)],
-              ),
-            ),
-            child: Stack(
-              children: [
-                Align(
-                  alignment: const Alignment(0, -0.35),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 58,
-                        height: 58,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.14),
-                          border: Border.all(color: Colors.white38, width: 1.5),
-                        ),
-                        child: const Text('🇯🇵', style: TextStyle(fontSize: 28)),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Aiko',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Positioned(
-                  left: 12,
-                  right: 12,
-                  bottom: 10,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _caption('こんにちは！元気？', Colors.white.withValues(alpha: 0.18),
-                          Colors.white70, 12),
-                      const SizedBox(height: 5),
-                      _caption('Hello! How are you?', _kYellow, _kNavy, 13.5),
-                    ],
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.translate_rounded,
-                            size: 11, color: Colors.white70),
-                        SizedBox(width: 4),
-                        Text('LIVE',
-                            style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.8)),
-                      ],
-                    ),
-                  ),
-                ),
-                // Le bouton lecture : toucher l'exemple ouvre la VRAIE vidéo de
-                // démonstration de l'appel traduit.
-                Positioned.fill(
-                  child: Center(
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.black.withValues(alpha: 0.45),
-                        border: Border.all(color: Colors.white70, width: 1.5),
-                      ),
-                      child: const Icon(Icons.play_arrow_rounded,
-                          color: Colors.white, size: 36),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        child: GuideCallExample(
+          myName: _name,
+          myAvatarUrl: _avatar,
+          myIso: _iso,
+          peerName: peerName,
+          peerIso: _japanese ? 'kr' : 'jp',
+          youSays: AppStrings.t('guide_call_you_says', args: {'name': peerName}),
+          // Le japonais déjà utilisé par l'exemple de traduction du chat.
+          peerSays: _japanese ? '안녕하세요! 잘 지내요?' : 'こんにちは！元気？',
         ),
-      ),
       ),
     );
   }
-
-  Widget _caption(String text, Color bg, Color fg, double size) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(99),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(color: fg, fontSize: size, fontWeight: FontWeight.w700),
-        ),
-      );
 }
 
 /// Étape 5 — le « + » jaune et une ligne de groupe.
