@@ -210,6 +210,11 @@ class _CallScreenState extends State<CallScreen> {
   /// statut, drapeau) ; un second le ramène.
   bool _cardHeaderHidden = false;
 
+  /// On a remonté les messages (pas sur le dernier) : l'en-tête s'efface et
+  /// la fenêtre des messages s'agrandit de la place libérée. Il revient dès
+  /// qu'on est de nouveau sur le dernier message.
+  bool _cardScrolledBack = false;
+
   /// L'étape du texte d'état (0 « Parle normalement », 1 « Patiente… », 2 « a
   /// reçu ta traduction », 3 « À toi »). Le galet de l'en-tête s'estompe à 1.
   final ValueNotifier<int> _trStep = ValueNotifier<int>(0);
@@ -3781,7 +3786,8 @@ class _CallScreenState extends State<CallScreen> {
     final sb = mq.viewPadding.bottom;
     // 28 de marge ; clavier levé, la carte se pose juste au-dessus de lui.
     final bottom = kb > 0 ? math.max(0.0, kb - sb) + 12 : 28.0;
-    final showHeader = !_composerOpen && !_cardHeaderHidden;
+    final showHeader =
+        !_composerOpen && !_cardHeaderHidden && !_cardScrolledBack;
     return Positioned(
       key: const ValueKey('call_card'),
       left: 14,
@@ -3812,6 +3818,12 @@ class _CallScreenState extends State<CallScreen> {
           holdFade: _composerOpen,
           reservePencil: !_composerOpen,
           onTapZone: _toggleCardHeader,
+          roomy: _cardScrolledBack,
+          onScrolledBack: (back) {
+            if (mounted && back != _cardScrolledBack) {
+              setState(() => _cardScrolledBack = back);
+            }
+          },
         ),
         // Clé stable, position stable : ne JAMAIS re-mapper le champ de
         // saisie, le clavier y perdrait le focus (b2f3293).
@@ -4388,7 +4400,15 @@ class _CardMessages extends StatefulWidget {
     required this.holdFade,
     required this.reservePencil,
     required this.onTapZone,
+    required this.onScrolledBack,
+    this.roomy = false,
   });
+
+  /// Prévenu quand on quitte / retrouve le dernier message en faisant défiler.
+  final ValueChanged<bool> onScrolledBack;
+
+  /// L'en-tête est effacé : la fenêtre des messages peut être plus haute.
+  final bool roomy;
 
   final List<_SpokenTurn> turns;
   final String myName;
@@ -4426,11 +4446,23 @@ class _CardMessagesState extends State<_CardMessages> {
   /// défile, la carte, elle, ne grandit plus.
   static const double _kWindow = 132;
 
+  /// Fenêtre plus haute quand l'en-tête est effacé.
+  static const double _kWindowRoomy = 204;
+
+  bool _scrolledBack = false;
+
   void _onScroll() {
     if (!_scroll.hasClients) return;
     final p = _scroll.position;
     final atOldest = p.pixels >= p.maxScrollExtent - 4;
     if (atOldest != _atOldest) setState(() => _atOldest = atOldest);
+    // Remonté (pas sur le dernier message) : l'en-tête s'efface. Deux seuils
+    // (24 / 6 px) pour qu'il ne clignote pas autour de la limite.
+    final back = _scrolledBack ? p.pixels > 6 : p.pixels > 24;
+    if (back != _scrolledBack) {
+      _scrolledBack = back;
+      widget.onScrolledBack(back);
+    }
   }
 
   void _armFade() {
@@ -4627,7 +4659,9 @@ class _CardMessagesState extends State<_CardMessages> {
               // La fenêtre : deux messages visibles, les autres se découvrent en
               // faisant glisser le doigt vers le bas (on remonte le temps).
               ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: _kWindow),
+                constraints: BoxConstraints(
+                  maxHeight: widget.roomy ? _kWindowRoomy : _kWindow,
+                ),
                 child: ListView.builder(
                   controller: _scroll,
                   reverse: true,
