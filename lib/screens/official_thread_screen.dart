@@ -12,10 +12,12 @@ import '../services/chat_api.dart' show ChatApi, isVideoUrl;
 import '../services/device_id.dart';
 import '../services/friendly_error.dart';
 import '../services/official_api.dart';
+import '../services/profile_api.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/chat_video.dart';
 import '../widgets/official_guide.dart';
 import '../widgets/popup_kit.dart';
+import '../widgets/profile_avatar.dart' show profileFlagIso;
 
 /// Le fond des conversations (le même que chat_thread_screen : SC.bg).
 Color get _kThreadBg => SC.bg;
@@ -68,6 +70,20 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
   String _myName = '';
   bool _sending = false;
 
+  /// Le drapeau (emoji) du pays de la personne : « Représente ton pays 🇫🇷 »,
+  /// 🇧🇷 pour un Brésilien… Calculé d'après son profil, jamais écrit en dur.
+  String _myFlag = '';
+
+  /// 🇫🇷 depuis « FR » : deux lettres, chacune décalée vers les indicateurs
+  /// régionaux Unicode. Rien si le code n'est pas sur deux lettres.
+  static String _flagEmoji(String iso) {
+    final c = iso.trim().toUpperCase();
+    if (c.length != 2) return '';
+    final a = c.codeUnitAt(0), b = c.codeUnitAt(1);
+    if (a < 65 || a > 90 || b < 65 || b > 90) return '';
+    return String.fromCharCodes([0x1F1E6 + a - 65, 0x1F1E6 + b - 65]);
+  }
+
   // Le guide d'accueil est affiché EN ENTIER dès l'ouverture : la personne
   // défile à son rythme, et chaque exemple animé (traduction, vidéo) ne se joue
   // que quand elle arrive dessus (voir OnVisible).
@@ -115,6 +131,15 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
       OfficialApi.fetch(),
       OfficialApi.fetchMine(_myId),
     ]);
+    // Le drapeau du pays de la personne (au mieux : sans profil, pas de drapeau).
+    try {
+      final me = await ProfileApi.fetchById(_myId);
+      if (me != null) {
+        _myFlag = _flagEmoji(
+          profileFlagIso(country: me.country, language: me.language),
+        );
+      }
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _posts = results[0];
@@ -345,7 +370,14 @@ class _OfficialThreadScreenState extends State<OfficialThreadScreen> {
                         child: _OfficialCard(
                           title: officialGuide[index].titleKey == null
                               ? ''
-                              : AppStrings.t(officialGuide[index].titleKey!),
+                              : AppStrings.t(officialGuide[index].titleKey!) +
+                                  // « Représente ton pays » porte le drapeau de
+                                  // SON pays.
+                                  (officialGuide[index].titleKey ==
+                                              'official_guide_t7' &&
+                                          _myFlag.isNotEmpty
+                                      ? ' $_myFlag'
+                                      : ''),
                           body: AppStrings.t(officialGuide[index].bodyKey),
                           time: '',
                           icon: officialGuide[index].icon,
