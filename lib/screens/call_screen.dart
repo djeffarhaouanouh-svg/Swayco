@@ -692,6 +692,10 @@ class _CallScreenState extends State<CallScreen> {
   /// aucun texte). À [_kLangCheckThreshold] d'affilée : la pop-up « langue
   /// d'écoute », une seule fois par appel.
   void _bumpFailureStreak() {
+    // Pas sur le WEB : la reconnaissance y passe par le cloud et reconnaît la
+    // langue toute seule (« ton micro écoute en français » y serait faux), et la
+    // mesure du micro y donne de fausses alertes sans qu'on parle.
+    if (kIsWeb) return;
     if (++_undeliveredStreak < _kLangCheckThreshold ||
         _langCheckShown ||
         _sheetOpen ||
