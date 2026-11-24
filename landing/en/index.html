@@ -31,7 +31,6 @@
 
 <header class="top">
   <a class="brand" href="#" aria-label="Swayco"><img src="../assets/img/logo.png" alt="" width="42" height="42"><span>swayco</span></a>
-  <details class="langmenu"><summary aria-label="Language"><img class="flag" src="../assets/img/flags/en.svg" alt="" width="22" height="22"><span>EN</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></summary><ul><li><a href="../" hreflang="fr" lang="fr" onclick="try{localStorage.setItem('swayco_lang','fr')}catch(e){}"><span class="nm"><img class="flag" src="../assets/img/flags/fr.svg" alt="" width="22" height="22">Français</span></a></li><li><a href="./" hreflang="en" lang="en" aria-current="true" onclick="try{localStorage.setItem('swayco_lang','en')}catch(e){}"><span class="nm"><img class="flag" src="../assets/img/flags/en.svg" alt="" width="22" height="22">English</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></a></li><li><a href="../pt-br/" hreflang="pt-BR" lang="pt-BR" onclick="try{localStorage.setItem('swayco_lang','pt')}catch(e){}"><span class="nm"><img class="flag" src="../assets/img/flags/pt.svg" alt="" width="22" height="22">Português (BR)</span></a></li></ul></details>
   <a class="btn-top" href="#download">Download</a>
 </header>
 
@@ -85,12 +84,13 @@
   <a href="mailto:support@swayco.fr">Contact</a>
 </footer>
 </div>
+<details class="langmenu"><summary aria-label="Language"><img class="flag" src="../assets/img/flags/en.svg" alt="" width="28" height="28"><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></summary><ul><li><a href="../" hreflang="fr" lang="fr" onclick="try{localStorage.setItem('swayco_lang','fr')}catch(e){}"><span class="nm"><img class="flag" src="../assets/img/flags/fr.svg" alt="" width="22" height="22">Français</span></a></li><li><a href="./" hreflang="en" lang="en" aria-current="true" onclick="try{localStorage.setItem('swayco_lang','en')}catch(e){}"><span class="nm"><img class="flag" src="../assets/img/flags/en.svg" alt="" width="22" height="22">English</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></a></li><li><a href="../pt-br/" hreflang="pt-BR" lang="pt-BR" onclick="try{localStorage.setItem('swayco_lang','pt')}catch(e){}"><span class="nm"><img class="flag" src="../assets/img/flags/pt.svg" alt="" width="22" height="22">Português (BR)</span></a></li></ul></details>
 <script>
 (function(){var m=document.querySelector('.langmenu');if(!m)return;
 function close(){m.removeAttribute('open')}
 document.addEventListener('click',function(e){if(!m.contains(e.target))close()});
 document.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
-window.addEventListener('scroll',close,{passive:true});})();
+})();
 </script>
 </body>
 </html>
