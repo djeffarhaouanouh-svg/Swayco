@@ -2661,6 +2661,7 @@ app.post('/api/notify-online-broadcast', async (req, res) => {
 // (And for the /bienvenue/get/ download page.)
 // (And when /bienvenue/ became the single download page.)
 // (And for the help line of the download page.)
+// (And for the lead sentence of the download page.)
 // Landing page: /bienvenue (index.html + its assets). express.static adds the
 // trailing slash itself (/bienvenue -> /bienvenue/), which the page's relative
 // asset URLs need. Registered BEFORE the Flutter SPA fallback, like the legal
