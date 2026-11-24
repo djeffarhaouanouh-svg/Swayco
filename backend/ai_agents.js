@@ -1409,6 +1409,98 @@ async function tableAvailable(sb) {
   return !error;
 }
 
+/**
+ * Rattrapage ponctuel : UN message par PERSONNE (jamais un par IA) pour ceux dont
+ * la derniere conversation avec une IA attend une reponse (round 1), puis, plus
+ * tard, UNE seconde IA (differente) pour ceux qui n'ont toujours pas repondu
+ * (round 2, >= 20 h apres le round 1). Idempotent : ref unique `catchup:<id>` /
+ * `catchup2:<id>`. Declenche a la main (POST /internal/ai-catchup).
+ */
+async function catchUp(ctx, { dryRun = true, round = 1 } = {}) {
+  const { sb } = ctx;
+  const now = Date.now();
+  const { data: recent } = await sb.from('messages')
+    .select('id, conversation_id, sender, recipient, created_at')
+    .gte('created_at', new Date(now - NUDGE_MAX_AGE_MS).toISOString())
+    .not('recipient', 'is', null)
+    .order('created_at', { ascending: false }).limit(5000);
+  if (!recent || !recent.length) return { people: 0, plan: [] };
+  const aiSet = await aiIdsAmong(sb, recent.flatMap((m) => [m.sender, m.recipient]));
+  const prot = await protectedIds(sb);
+
+  const byConv = new Map();
+  for (const m of recent) {
+    const aiSide = aiSet.has(m.sender) ? m.sender : aiSet.has(m.recipient) ? m.recipient : null;
+    const human = aiSide === m.sender ? m.recipient : m.sender;
+    if (!aiSide || aiSet.has(human)) continue;
+    let c = byConv.get(m.conversation_id);
+    if (!c) { c = { conversation: m.conversation_id, aiId: aiSide, humanId: human, latest: m, humanMsgs: 0 }; byConv.set(m.conversation_id, c); }
+    if (m.sender === human) c.humanMsgs++;
+  }
+  const byHuman = new Map();
+  for (const c of byConv.values()) {
+    if (c.humanMsgs < 1 || !UUID.test(String(c.humanId)) || prot.has(c.humanId)) continue;
+    const age = now - Date.parse(c.latest.created_at);
+    c.unanswered = c.latest.sender === c.humanId;
+    c.age = age;
+    if (c.unanswered ? age < 30 * 60 * 1000 : age < NUDGE_MIN_GAP_MS) continue;
+    (byHuman.get(c.humanId) || byHuman.set(c.humanId, []).get(c.humanId)).push(c);
+  }
+
+  const plan = [];
+  for (const [humanId, convs] of byHuman) {
+    convs.sort((a, b) => (b.unanswered - a.unanswered) || (a.age - b.age));
+    const ref = round === 2 ? `catchup2:${humanId}` : `catchup:${humanId}`;
+    const { data: seen } = await sb.from('ai_actions').select('id').eq('ref', ref).limit(1);
+    if (seen && seen.length) continue;
+    let pick = convs[0];
+    if (round === 2) {
+      const { data: first } = await sb.from('ai_actions').select('ai_id, created_at, status')
+        .eq('ref', `catchup:${humanId}`).eq('status', 'done').limit(1);
+      if (!first || !first.length) continue;
+      const sentAt = Date.parse(first[0].created_at);
+      if (now - sentAt < 20 * HOUR) continue;
+      // a repondu depuis ? alors plus d'attente.
+      const { data: reply } = await sb.from('messages').select('id').eq('sender', humanId)
+        .gte('created_at', new Date(sentAt).toISOString()).limit(1);
+      if (reply && reply.length) continue;
+      pick = convs.find((c) => c.aiId !== first[0].ai_id);
+      if (!pick) continue;
+    }
+    const { data: snub } = await sb.from('ai_actions').select('id').eq('ref', `snub:${pick.conversation}`).limit(1);
+    if (snub && snub.length) continue;
+    plan.push({ humanId, aiId: pick.aiId, conversation: pick.conversation, mode: pick.unanswered ? 'reply' : 'nudge', ref });
+  }
+  if (dryRun) return { people: plan.length, plan: plan.map((p) => ({ human: p.humanId, ai: p.aiId, mode: p.mode })) };
+
+  let sent = 0, failed = 0;
+  for (const p of plan) {
+    try {
+      const ai = await getProfile(sb, p.aiId);
+      const target = await getProfile(sb, p.humanId);
+      if (!ai || ai.is_ai !== true || !target || target.is_ai) continue;
+      if (await isBlocked(sb, ai.id, target.id)) continue;
+      const claim = await sb.from('ai_actions').insert({
+        ai_id: ai.id, target_id: target.id, kind: 'message', source: 'auto', ref: p.ref, status: 'running',
+      }).select('id').single();
+      if (claim.error) continue;
+      try {
+        const { data: hist } = await sb.from('messages').select('sender, body, created_at')
+          .eq('conversation_id', p.conversation).order('created_at', { ascending: false }).limit(HISTORY_MESSAGES);
+        const text = await generate(ctx, ai, target, (hist || []).reverse(), p.mode, `${p.ref}`);
+        if (!text) { await finish(sb, claim.data.id, 'failed', 'empty_generation'); failed++; continue; }
+        await sendMessage(ctx, ai, target, text);
+        await finish(sb, claim.data.id, 'done', `catchup_${p.mode}`);
+        sent++;
+      } catch (e) {
+        await finish(sb, claim.data.id, 'failed', e?.message || String(e));
+        failed++;
+      }
+    } catch (e) { failed++; }
+  }
+  return { people: plan.length, sent, failed };
+}
+
 function start({ supabase, notifyUser }) {
   if (process.env.AI_AGENTS_ENABLED !== '1') {
     console.log('[ai] desactive (AI_AGENTS_ENABLED != 1)');
@@ -1461,6 +1553,7 @@ function start({ supabase, notifyUser }) {
 
 module.exports = {
   start,
+  catchUp,
   _test: {
     hash, replyDelayMs, utcDayStart, containsCliche, systemPrompt, convIdFor, aiLabel,
     levelFor, levelWithHysteresis, nextLevel, replyDelayForLevel, REPLIES_BY_LEVEL,

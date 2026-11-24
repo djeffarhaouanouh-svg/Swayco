@@ -36,7 +36,6 @@ import '../services/profile_api.dart';
 import '../services/presence_service.dart';
 import '../services/supabase_service.dart';
 import '../services/token_api.dart';
-import '../services/user_prefs.dart';
 import '../services/voice_wave.dart';
 import '../services/wave_api.dart';
 import '../services/web_poll.dart';
@@ -49,7 +48,6 @@ import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/spoken_language_gate.dart';
 import '../widgets/swayco_dialog.dart';
-import '../widgets/swayco_wave_promo.dart';
 import 'call_screen.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
@@ -157,25 +155,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Envoi en cours — le bouton de CETTE ligne tourne au lieu de réagir deux
   /// fois à un doigt nerveux.
   final Set<String> _waving = <String>{};
-
-  /// One-shot "faire signe" coach, montré une seule fois au-dessus de la nav,
-  /// dès qu'il y a au moins une conversation à prévisualiser.
-  bool _showWavePromo = false;
-
-  Future<void> _maybeShowWavePromo() async {
-    // Sur le WEB, pas de coach « Faire signe » : il s'animait à l'arrivée sur
-    // la page Messages (et gênait la liste).
-    if (kIsWeb) return;
-    // Seulement quand l'onglet Messages est SOUS LES YEUX : cette page est
-    // construite au lancement, et le coach, pos? en arri?re-plan puis marqu?
-    // ? vu ?, ne se montrait jamais. Il revient ? l'arriv?e sur l'onglet
-    // (_onNavTabChanged recharge la liste, qui le redemande).
-    if (NavTab.index.value != NavTab.chat) return;
-    if (await UserPrefs.isWavePromoSeen()) return;
-    await UserPrefs.markWavePromoSeen();
-    if (!mounted) return;
-    setState(() => _showWavePromo = true);
-  }
 
   Future<void> _checkNotifStatus() async {
     final blocked = (await NotificationClient.notifStatus()) != 'enabled';
@@ -588,7 +567,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // de plus, et une liste qui attend après elles s'afficherait plus tard
       // pour tout le monde, y compris ceux à qui personne n'a fait signe.
       unawaited(_reloadWaves());
-      if (friends.isNotEmpty) unawaited(_maybeShowWavePromo());
     } catch (e) {
       if (!mounted || seq != _reloadSeq) return;
       setState(() {
@@ -1035,8 +1013,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       NavAutoHide(tab: NavTab.chat, child: _buildScaffold(context));
 
   Widget _buildScaffold(BuildContext context) {
-    final navBody =
-        GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     return Scaffold(
       // Classic flat black, matching the conversation thread — no blue mesh.
       backgroundColor: SC.tabBg,
@@ -1065,23 +1041,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ],
             ),
           ),
-          if (_showWavePromo)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: navBody,
-              child: SwaycoWavePromo(
-                peers: [
-                  for (final p in _friends.take(4))
-                    WavePromoPeer(
-                      avatarUrl: p.avatarUrl,
-                      displayName: p.displayName,
-                    ),
-                ],
-                onCta: () => setState(() => _showWavePromo = false),
-                onDismiss: () => setState(() => _showWavePromo = false),
-              ),
-            ),
         ],
       ),
     );

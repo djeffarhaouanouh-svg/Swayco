@@ -42,9 +42,6 @@ abstract final class UserPrefs {
   // One-shot "glisse pour choisir" coach overlay: shown the very first time
   // the user lands on Discover, right after onboarding.
   static const String keySwipeCoachSeen = 'swipe_coach_seen';
-  // One-shot "faire signe" coach overlay: shown the very first time the
-  // Messages list has at least one conversation to preview.
-  static const String keyWavePromoSeen = 'wave_promo_seen';
 
 
   /// Discover feed cursor: the profile id of the card the user was last
@@ -271,7 +268,6 @@ abstract final class UserPrefs {
     await p.remove(keyOnboardingTipsSeen);
     await p.remove(keyProfileTipSeen);
     await p.remove(keySwipeCoachSeen);
-    await p.remove(keyWavePromoSeen);
   }
 
   /// Whether the "glisse pour choisir" Discover coach has already played.
@@ -283,17 +279,6 @@ abstract final class UserPrefs {
   static Future<void> markSwipeCoachSeen() async {
     final p = await SharedPreferences.getInstance();
     await p.setBool(keySwipeCoachSeen, true);
-  }
-
-  /// Whether the "faire signe" Messages coach has already played.
-  static Future<bool> isWavePromoSeen() async {
-    final p = await SharedPreferences.getInstance();
-    return p.getBool(keyWavePromoSeen) ?? false;
-  }
-
-  static Future<void> markWavePromoSeen() async {
-    final p = await SharedPreferences.getInstance();
-    await p.setBool(keyWavePromoSeen, true);
   }
 
   /// Whether the two post-onboarding "add a Discover photo" popups have

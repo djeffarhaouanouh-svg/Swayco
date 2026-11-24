@@ -3230,6 +3230,23 @@ require('./hostess').start({ supabase });
 // migration 0068). Inerte tant que AI_AGENTS_ENABLED n'est pas « 1 ».
 require('./ai_agents').start({ supabase, notifyUser });
 
+// Rattrapage ponctuel des IA (1 message par personne). Protege par la cle
+// service-role en Bearer ; dryRun par defaut.
+app.post('/internal/ai-catchup', async (req, res) => {
+  try {
+    const m = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || '').trim());
+    if (!SUPABASE_SERVICE_ROLE_KEY || !m || m[1] !== SUPABASE_SERVICE_ROLE_KEY) return res.status(401).json({ error: 'unauthorized' });
+    const sb = supabase();
+    if (!sb) return res.status(503).json({ error: 'no_db' });
+    const out = await require('./ai_agents').catchUp(
+      { sb, notifyUser },
+      { dryRun: req.body?.dryRun !== false, round: req.body?.round === 2 ? 2 : 1 });
+    res.json(out);
+  } catch (e) {
+    res.status(500).json({ error: e?.message || String(e) });
+  }
+});
+
 // Pro dont l'echeance est depassee (webhook perdu, achat test) : retour a free.
 revenueCat.startExpirySweep(supabase);
 
