@@ -3240,7 +3240,7 @@ app.post('/internal/ai-catchup', async (req, res) => {
     if (!sb) return res.status(503).json({ error: 'no_db' });
     const out = await require('./ai_agents').catchUp(
       { sb, notifyUser },
-      { dryRun: req.body?.dryRun !== false, round: req.body?.round === 2 ? 2 : 1 });
+      { dryRun: req.body?.dryRun !== false, round: req.body?.round === 2 ? 2 : 1, immediate: req.body?.immediate === true });
     res.json(out);
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });

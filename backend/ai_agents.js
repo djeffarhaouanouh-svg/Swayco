@@ -1416,7 +1416,7 @@ async function tableAvailable(sb) {
  * (round 2, >= 20 h apres le round 1). Idempotent : ref unique `catchup:<id>` /
  * `catchup2:<id>`. Declenche a la main (POST /internal/ai-catchup).
  */
-async function catchUp(ctx, { dryRun = true, round = 1 } = {}) {
+async function catchUp(ctx, { dryRun = true, round = 1, immediate = false } = {}) {
   const { sb } = ctx;
   const now = Date.now();
   const { data: recent } = await sb.from('messages')
@@ -1459,7 +1459,7 @@ async function catchUp(ctx, { dryRun = true, round = 1 } = {}) {
         .eq('ref', `catchup:${humanId}`).eq('status', 'done').limit(1);
       if (!first || !first.length) continue;
       const sentAt = Date.parse(first[0].created_at);
-      if (now - sentAt < 20 * HOUR) continue;
+      if (!immediate && now - sentAt < 20 * HOUR) continue;
       // a repondu depuis ? alors plus d'attente.
       const { data: reply } = await sb.from('messages').select('id').eq('sender', humanId)
         .gte('created_at', new Date(sentAt).toISOString()).limit(1);
