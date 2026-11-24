@@ -70,6 +70,14 @@ abstract final class SC {
   static const brandBlueDeep = Color(0xFF1F5EFF);
   static const brandBlue     = Color(0xFF2B7FFF);
   static const brandCyan     = Color(0xFF18DDEA);
+  /// Le fond des surfaces de l'appel (pop-up « langue d'écoute », panneaux Son et
+  /// Langues) : un seul dégradé, pour qu'elles ne divergent plus.
+  static const callSurface = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFF1A2040), Color(0xFF16161E)],
+  );
+
   static const brandGradient = LinearGradient(
     begin: Alignment(-0.6, -1),
     end: Alignment(0.6, 1),

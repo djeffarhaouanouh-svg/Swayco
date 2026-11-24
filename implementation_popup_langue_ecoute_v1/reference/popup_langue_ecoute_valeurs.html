@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><title>Pop-up langue d'écoute — valeurs</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@800&family=Plus+Jakarta+Sans:wght@500;800&family=IBM+Plex+Mono:wght@500&family=Noto+Kufi+Arabic:wght@800&family=Noto+Sans+Arabic:wght@500;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&display=block" rel="stylesheet">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#E4E2DD;font-family:'Plus Jakarta Sans',sans-serif;color:#04123A;padding:40px;display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start}
+.bg{position:relative;width:370px;height:560px;border-radius:24px;overflow:hidden;background:#222 url(video.jpg) 50% 25%/cover}
+.veil{position:absolute;inset:0}.card{position:absolute;left:28px;right:28px;top:90px;border-radius:30px;border:1px solid;padding:24px 20px 20px;display:flex;flex-direction:column;align-items:center;text-align:center}
+.ic{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid}
+.ms{font-family:'Material Symbols Rounded';line-height:1}
+h2{margin:16px 0 0;font-family:'Unbounded';font-weight:800;font-size:20px;letter-spacing:-.03em;line-height:1.22}
+p{margin:10px 0 0;font-weight:500;font-size:14px;line-height:1.6}
+.pill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px;border-radius:99px;border:1px solid;font-weight:800;font-size:13px;vertical-align:middle;white-space:nowrap}
+.fl{width:18px;height:18px;border-radius:50%;background:#888 50% 50%/cover}
+.btns{align-self:stretch;display:flex;flex-direction:column;gap:10px;margin-top:20px}
+.b{height:48px;border-radius:99px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+.dark .veil{background:rgba(4,10,30,.7)}.dark .card{background:linear-gradient(180deg,#1A2040,#16161E);border-color:rgba(255,255,255,.14);box-shadow:0 24px 60px rgba(0,0,0,.5);color:#fff}
+.dark .ic{background:linear-gradient(135deg,#1F5EFF,#18DDEA);border-color:transparent;color:#fff}.dark p{color:rgba(245,247,255,.8)}
+.dark .pill{background:rgba(24,221,234,.14);border-color:rgba(24,221,234,.45);color:#fff}.dark .pill .ms{color:#18DDEA}
+.dark .sec{border:1.5px solid rgba(255,255,255,.28);color:#fff}
+.light .veil{background:rgba(4,18,58,.5)}.light .card{background:#fff;border-color:rgba(4,18,58,.12);box-shadow:0 24px 60px rgba(4,18,58,.35);color:#04123A}
+.light .ic{background:linear-gradient(135deg,#1F5EFF,#18DDEA);border-color:transparent;color:#fff}.light p{color:rgba(4,18,58,.78)}
+.light .pill{background:rgba(31,94,255,.08);border-color:rgba(31,94,255,.35);color:#04123A}.light .pill .ms{color:#1F5EFF}
+.light .sec{border:1.5px solid rgba(4,18,58,.22);color:#04123A}
+.pri{background:#F4FF1F;color:#04123A}
+.spec{width:420px;font-size:13.5px;line-height:1.6}.spec code{font-family:'IBM Plex Mono',monospace;font-size:12px;background:#fff;padding:1px 5px;border-radius:5px}
+</style></head><body>
+<div class="bg dark"><div class="veil"></div><div class="card"><span class="ic"><span class="ms" style="font-size:28px;font-variation-settings:'FILL' 1">mic</span></span><h2>On ne te comprend pas</h2><p>Ton micro écoute en <span class="pill"><span class="fl"></span>Français<span class="ms" style="font-size:18px">unfold_more</span></span>. Si tu parles une autre langue, change-la : ce n'est pas une panne, juste un réglage.</p><div class="btns"><span class="b pri">Changer la langue</span><span class="b sec">C'est la bonne</span></div></div></div>
+<div class="bg light"><div class="veil"></div><div class="card"><span class="ic"><span class="ms" style="font-size:28px;font-variation-settings:'FILL' 1">mic</span></span><h2>On ne te comprend pas</h2><p>Ton micro écoute en <span class="pill"><span class="fl"></span>Français<span class="ms" style="font-size:18px">unfold_more</span></span>. Si tu parles une autre langue, change-la : ce n'est pas une panne, juste un réglage.</p><div class="btns"><span class="b pri">Changer la langue</span><span class="b sec">C'est la bonne</span></div></div></div>
+<div class="spec"><strong>Valeurs</strong><br>Marges 28 · rayon 30 · bordure 1 px · fond dégradé <code>#1A2040</code> → <code>#16161E</code> · padding 24/20/20<br>Icône : rond <code>56</code> dégradé bleu→cyan, micro blanc <code>28</code><br>Titre : Unbounded 800 <code>20</code>, interligne <code>1.22</code>, 2 lignes max<br>Texte : Jakarta 500 <code>14</code>, interligne <code>1.6</code>, 4 lignes max<br>Boutons : hauteur <code>48</code>, écart <code>10</code>, texte <code>15/800</code><br>Pastille : hauteur <code>28</code>, drapeau <code>18</code>, chevron <code>18</code><br>Jaune <code>#F4FF1F</code> · cyan <code>#18DDEA</code> · bleu <code>#1F5EFF</code> · bleu nuit <code>#04123A</code><br>Appuyé : échelle <code>.97</code>, jaune <code>#D7E218</code><br>Entrée : fondu + 8 px, <code>180 ms</code> easeOut<br><br>Fond vidéo : remplacer <code>video.jpg</code> par une image d'appel. Le drapeau est vide ici : mettre l'image du drapeau.</div>
+</body></html>

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Swayco — Pop-up « On ne te comprend pas »</title>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&amp;family=Plus+Jakarta+Sans:wght@500;700;800&amp;family=IBM+Plex+Mono:wght@500&amp;family=Noto+Kufi+Arabic:wght@800&amp;family=Noto+Sans+Arabic:wght@500;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&amp;display=block" rel="stylesheet">
+<style>html,body{margin:0;background:#E4E2DD}*{box-sizing:border-box}a{color:#04123A}a:hover{color:#1F5EFF}</style>
+</helmet>
+<section data-screen-label="Langue d'écoute" style="display:flex;flex-direction:column;gap:30px;padding:64px;width:1860px;font-family:'Plus Jakarta Sans',sans-serif;color:#04123A">
+<div style="display:flex;flex-direction:column;gap:8px;max-width:1100px"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:1px;color:#555">APPEL TRADUIT · POP-UP « TA LANGUE D'ÉCOUTE N'EST PAS LA BONNE »</span><span style="font-family:'Unbounded',sans-serif;font-weight:800;font-size:28px;letter-spacing:-.03em;line-height:1.12">Un réglage à vérifier, un tap et c'est réglé.</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:44px 40px;align-items:flex-start">
+<sc-for list="{{ screens }}" as="s" hint-placeholder-count="5">
+<div style="display:flex;flex-direction:column;gap:12px;width:390px"><span style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:12px;background:#F4FF1F;color:#04123A;padding:5px 11px;border-radius:99px">{{ s.tag }}</span>
+<div data-screen-label="{{ s.tag }}" style="position:relative;width:390px;height:780px;border-radius:52px;border:10px solid #000;overflow:hidden;background:#0A0F1C;color:#fff">
+<div style="position:absolute;inset:0;background:#222 url(uploads/0005_japanese.jpg) 50% 25%/cover"></div>
+<div style="position:absolute;left:0;right:0;top:0;height:200px;background:linear-gradient(rgba(0,0,0,.5),transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:260px;background:linear-gradient(transparent,rgba(0,0,0,.55))"></div>
+<div style="position:absolute;top:56px;left:18px;display:flex;flex-direction:column;gap:6px"><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Unbounded';font-weight:800;font-size:21px;letter-spacing:-.03em">Aiko</span><span style="width:20px;height:20px;border-radius:99px;background:url(https://flagcdn.com/w80/jp.png) 50% 50%/cover;border:1.5px solid rgba(255,255,255,.6)"></span></div><span style="align-self:flex-start;display:flex;align-items:center;gap:7px;height:26px;padding:0 11px;border-radius:99px;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.14);font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px"><span style="width:7px;height:7px;border-radius:99px;background:#F4FF1F"></span>04:12</span></div>
+<div style="position:absolute;top:52px;right:12px;width:96px;height:140px;border-radius:14px;border:1.5px solid rgba(255,255,255,.3);background:#000 url(uploads/13.jpg) 50% 22%/cover"></div>
+<div style="position:absolute;inset:0;background:{{ s.overlay }}"></div>
+<div style="position:absolute;left:0;right:0;bottom:26px;display:flex;justify-content:center;gap:16px">
+<sc-for list="{{ keys }}" as="k" hint-placeholder-count="5"><span style="width:54px;height:54px;border-radius:99px;display:flex;align-items:center;justify-content:center;background:{{ k.bg }}"><span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:26px;line-height:1;color:#fff">{{ k.i }}</span></span></sc-for></div>
+<div dir="{{ s.dir }}" style="position:absolute;left:28px;right:28px;top:{{ s.top }}px;border-radius:30px;border:1px solid {{ s.cardBorder }};background:{{ s.cardBg }};box-shadow:0 24px 60px {{ s.shadow }};padding:24px 20px 20px;display:flex;flex-direction:column;align-items:center;text-align:center">
+<span style="width:56px;height:56px;border-radius:99px;background:{{ s.iconBg }};border:1px solid {{ s.iconBorder }};display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:28px;line-height:1;color:{{ s.iconColor }}">mic</span></span>
+<span style="font-family:{{ s.titleFont }};font-weight:800;font-size:{{ s.titleSize }}px;letter-spacing:-.03em;line-height:1.22;color:{{ s.titleColor }};margin-top:16px;text-wrap:balance">{{ s.title }}</span>
+<span style="font-family:{{ s.textFont }};font-weight:500;font-size:14px;line-height:1.6;color:{{ s.textColor }};margin-top:10px;text-wrap:pretty">{{ s.t1 }} <span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px;border-radius:99px;background:{{ s.pillBg }};border:1px solid {{ s.pillBorder }};color:{{ s.pillColor }};font-weight:800;font-size:13px;vertical-align:middle;white-space:nowrap"><span style="width:18px;height:18px;border-radius:99px;background:url(https://flagcdn.com/w80/{{ s.flag }}.png) 50% 50%/cover"></span>{{ s.lang }}<span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:{{ s.chev }}">unfold_more</span></span>{{ s.t2 }}</span>
+<div style="align-self:stretch;display:flex;flex-direction:column;gap:10px;margin-top:20px">
+<span style="height:48px;border-radius:99px;background:#F4FF1F;color:#04123A;font-family:{{ s.btnFont }};font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center">{{ s.primary }}</span>
+<span style="height:48px;border-radius:99px;border:1.5px solid {{ s.secBorder }};color:{{ s.secColor }};font-family:{{ s.btnFont }};font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center">{{ s.secondary }}</span></div>
+</div></div>
+<span style="font-size:12.5px;line-height:1.5;color:#555;max-width:370px">{{ s.note }}</span></div>
+</sc-for>
+
+<div style="width:700px;display:flex;flex-direction:column;gap:12px"><span style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:12px;background:#F4FF1F;color:#04123A;padding:5px 11px;border-radius:99px">États et pastille</span>
+<div style="border-radius:30px;background:linear-gradient(180deg,#1A2040,#16161E);border:1px solid rgba(255,255,255,.14);padding:28px;color:#fff;display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;gap:24px"><div style="flex:1;display:flex;flex-direction:column;gap:10px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1px;color:rgba(245,247,255,.65)">NORMAL</span>
+<span style="height:48px;border-radius:99px;background:#F4FF1F;color:#04123A;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center">Changer la langue</span>
+<span style="height:48px;border-radius:99px;border:1.5px solid rgba(255,255,255,.28);font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center">C'est la bonne</span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:10px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1px;color:rgba(245,247,255,.65)">APPUYÉ</span>
+<span style="height:48px;border-radius:99px;background:#D7E218;color:#04123A;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;transform:scale(.97)">Changer la langue</span>
+<span style="height:48px;border-radius:99px;border:1.5px solid rgba(255,255,255,.5);background:rgba(255,255,255,.1);font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;transform:scale(.97)">C'est la bonne</span></div></div>
+<div style="display:flex;gap:24px;align-items:center"><div style="flex:1;display:flex;flex-direction:column;gap:10px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1px;color:rgba(245,247,255,.65)">PASTILLE NORMALE / APPUYÉE</span>
+<div style="display:flex;gap:14px"><span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px;border-radius:99px;background:rgba(24,221,234,.14);border:1px solid rgba(24,221,234,.45);font-weight:800;font-size:13px"><span style="width:18px;height:18px;border-radius:99px;background:url(https://flagcdn.com/w80/fr.png) 50% 50%/cover"></span>Français<span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#18DDEA">unfold_more</span></span>
+<span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px;border-radius:99px;background:rgba(24,221,234,.3);border:1px solid #18DDEA;font-weight:800;font-size:13px;transform:scale(.97)"><span style="width:18px;height:18px;border-radius:99px;background:url(https://flagcdn.com/w80/fr.png) 50% 50%/cover"></span>Français<span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#18DDEA">unfold_more</span></span></div></div></div>
+<div style="height:1px;background:rgba(255,255,255,.12)"></div>
+<div style="display:flex;gap:22px;align-items:center"><div style="flex:1;display:flex;flex-direction:column;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1px;color:rgba(245,247,255,.65)">POURQUOI CE CHEVRON</span><span style="font-size:13.5px;line-height:1.55;color:rgba(245,247,255,.85)">L'icône « unfold_more » (deux chevrons) annonce une roue qui se déroule. Au tap, le sélecteur s'ouvre avec la roue « langue que je parle » entourée de jaune. Schéma de principe, pas ton sélecteur réel.</span></div>
+<div style="flex:none;display:flex;gap:10px"><div style="width:96px;height:112px;border-radius:18px;border:2px solid #F4FF1F;background:rgba(244,255,31,.08);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px"><span style="font-size:10px;font-weight:800;color:#F4FF1F">Je parle</span><span style="font-size:11px;color:rgba(255,255,255,.4)">Español</span><span style="font-size:13px;font-weight:800">Français</span><span style="font-size:11px;color:rgba(255,255,255,.4)">Deutsch</span></div>
+<div style="width:96px;height:112px;border-radius:18px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px"><span style="font-size:10px;font-weight:800;color:rgba(255,255,255,.6)">J'entends</span><span style="font-size:11px;color:rgba(255,255,255,.4)">English</span><span style="font-size:13px;font-weight:800">日本語</span><span style="font-size:11px;color:rgba(255,255,255,.4)">Italiano</span></div></div></div>
+</div></div>
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = { overlay: 'rgba(4,10,30,.7)', cardBg: 'linear-gradient(180deg,#1A2040,#16161E)', cardBorder: 'rgba(255,255,255,.14)', shadow: 'rgba(0,0,0,.5)', iconBg: 'linear-gradient(135deg,#1F5EFF,#18DDEA)', iconBorder: 'transparent', iconColor: '#FFFFFF', titleColor: '#FFFFFF', textColor: 'rgba(245,247,255,.8)', pillBg: 'rgba(24,221,234,.14)', pillBorder: 'rgba(24,221,234,.45)', pillColor: '#FFFFFF', chev: '#18DDEA', secBorder: 'rgba(255,255,255,.28)', secColor: '#FFFFFF' };
+    const light = { overlay: 'rgba(4,18,58,.5)', cardBg: '#FFFFFF', cardBorder: 'rgba(4,18,58,.12)', shadow: 'rgba(4,18,58,.35)', iconBg: 'linear-gradient(135deg,#1F5EFF,#18DDEA)', iconBorder: 'transparent', iconColor: '#FFFFFF', titleColor: '#04123A', textColor: 'rgba(4,18,58,.78)', pillBg: 'rgba(31,94,255,.08)', pillBorder: 'rgba(31,94,255,.35)', pillColor: '#04123A', chev: '#1F5EFF', secBorder: 'rgba(4,18,58,.22)', secColor: '#04123A' };
+    const U = "'Unbounded',sans-serif", J = "'Plus Jakarta Sans',sans-serif", K = "'Noto Kufi Arabic',sans-serif", A = "'Noto Sans Arabic',sans-serif";
+    const base = { dir: 'ltr', top: 190, titleFont: U, titleSize: 20, textFont: J, btnFont: J };
+    return {
+      keys: [{ i: 'mic', bg: 'rgba(255,255,255,.14)' }, { i: 'videocam', bg: 'rgba(255,255,255,.14)' }, { i: 'chat_bubble', bg: 'rgba(255,255,255,.14)' }, { i: 'volume_up', bg: 'rgba(255,255,255,.14)' }, { i: 'call_end', bg: '#E5484D' }],
+      screens: [
+        { ...base, ...dark, tag: '1 · Français, sombre', note: 'Version de référence. La barre d\'appel reste au-dessus du voile : on peut toujours raccrocher.', title: 'On ne te comprend pas', t1: 'Ton micro écoute en', flag: 'fr', lang: 'Français', t2: '. Si tu parles une autre langue, change-la : ce n\'est pas une panne, juste un réglage.', primary: 'Changer la langue', secondary: 'C\'est la bonne' },
+        { ...base, ...light, tag: '2 · Français, clair', note: 'Fond blanc, texte bleu nuit. Le bouton principal reste jaune #F4FF1F avec texte bleu nuit.', title: 'On ne te comprend pas', t1: 'Ton micro écoute en', flag: 'fr', lang: 'Français', t2: '. Si tu parles une autre langue, change-la : ce n\'est pas une panne, juste un réglage.', primary: 'Changer la langue', secondary: 'C\'est la bonne' },
+        { ...base, ...dark, tag: '3 · Allemand, mots longs', note: 'Contrôle des mots longs : titre sur 2 lignes, texte sur 4 lignes maximum.', title: 'Wir verstehen dich nicht', t1: 'Dein Mikrofon hört auf', flag: 'fr', lang: 'Französisch', t2: '. Sprichst du anders, ändere sie: keine Störung, nur eine Einstellung.', primary: 'Sprache ändern', secondary: 'Passt so' },
+        { ...base, ...dark, tag: '4 · Russe', note: 'Contrôle du cyrillique : Unbounded 800 le gère, la pastille garde sa hauteur.', title: 'Мы тебя не понимаем', titleSize: 18, t1: 'Микрофон слушает на', flag: 'ru', lang: 'Русский', t2: '. Говоришь на другом языке? Поменяй: это не поломка, а настройка.', primary: 'Сменить язык', secondary: 'Всё верно' },
+        { ...base, ...dark, tag: '5 · Arabe, droite à gauche', dir: 'rtl', titleFont: K, titleSize: 22, textFont: A, btnFont: A, note: 'Carte en lecture droite à gauche : le drapeau passe à droite de la pastille, le chevron à gauche. Les icônes et la barre d\'appel ne bougent pas.', title: 'لا نفهمك', t1: 'ميكروفونك يستمع بـ', flag: 'sa', lang: 'العربية', t2: '. إذا كنت تتحدث لغة أخرى، غيّرها: هذا ليس عطلًا، مجرد إعداد.', primary: 'تغيير اللغة', secondary: 'هذه هي اللغة الصحيحة' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

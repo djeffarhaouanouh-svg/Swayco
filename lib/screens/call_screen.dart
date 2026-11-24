@@ -50,6 +50,7 @@ import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../swayco/translation_route.dart';
 import '../widgets/call_loader.dart';
+import '../widgets/language_check_dialog.dart';
 import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
@@ -298,15 +299,25 @@ class _CallScreenState extends State<CallScreen> {
     });
     return showModalBottomSheet<void>(
       context: context,
-      // L'appel reste sombre en toute apparence : surface figée.
-      backgroundColor: const Color(0xFF16161B),
+      // L'appel reste sombre en toute apparence : surface figée (le fond est le
+      // dégradé commun SC.callSurface, le même que la pop-up « langue d'écoute »).
+      backgroundColor: Colors.transparent,
       // Pas de voile : rien ne doit flouter ni assombrir l'écran d'appel.
       barrierColor: Colors.transparent,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: body,
+      builder: (ctx) => DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: SC.callSurface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border(
+            top: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
+          ),
+        ),
+        child: body(ctx),
+      ),
     ).whenComplete(() {
       if (!mounted) return;
       setState(() {
@@ -490,6 +501,7 @@ class _CallScreenState extends State<CallScreen> {
         _probeFresh = false;
       }
       _hotTicks = hot ? _hotTicks + 1 : 0;
+      _trackVoiceRun(hot);
       // La pastille ne bat que sur de la vraie parole : lui donner le bruit de
       // fond la ferait trembler tout l'appel.
       _localVoice = hot ? lvl : 0.0;
@@ -627,6 +639,7 @@ class _CallScreenState extends State<CallScreen> {
   void _onMyTranscript() {
     final line = widget.translation.localTranscript?.value;
     if (line == null) return;
+    if (line.text.trim().isNotEmpty) _lastTranscriptAt = DateTime.now();
     _trackPhraseLevel(line);
     _addTurn(_SpokenTurn(
       mine: true,
@@ -672,6 +685,13 @@ class _CallScreenState extends State<CallScreen> {
     }
     // Un segment vide n'est pas un échec de traduction, juste du silence capté.
     if (line.text.trim().isEmpty) return;
+    _bumpFailureStreak();
+  }
+
+  /// Une phrase de plus qui n'est pas passée (non livrée, ou voix captée sans
+  /// aucun texte). À [_kLangCheckThreshold] d'affilée : la pop-up « langue
+  /// d'écoute », une seule fois par appel.
+  void _bumpFailureStreak() {
     if (++_undeliveredStreak < _kLangCheckThreshold ||
         _langCheckShown ||
         _sheetOpen ||
@@ -681,6 +701,42 @@ class _CallScreenState extends State<CallScreen> {
     _langCheckShown = true;
     _undeliveredStreak = 0;
     _promptSpokenLanguageCheck();
+  }
+
+  // ── Voix captée mais aucun texte ─────────────────────────────────────────
+  // Quand le micro écoute dans une langue et qu'on en parle une autre, rien ne
+  // sort : pas de phrase « refusée », juste du silence côté traduction. On compte
+  // alors une phrase non reconnue si ma voix a tenu au moins [_kVoiceRunTicks]
+  // relevés (~1,5 s) sans qu'aucun texte n'arrive dans les [_kNoTextWindow].
+  int _voiceRunTicks = 0;
+  DateTime? _voiceRunStart;
+  DateTime _lastTranscriptAt = DateTime.fromMillisecondsSinceEpoch(0);
+  static const int _kVoiceRunTicks = 2;
+  static const Duration _kNoTextWindow = Duration(seconds: 4);
+
+  void _trackVoiceRun(bool hot) {
+    if (hot && _remoteVoice < 0.02) {
+      _voiceRunStart ??= DateTime.now();
+      _voiceRunTicks++;
+      return;
+    }
+    final start = _voiceRunStart;
+    final ticks = _voiceRunTicks;
+    _voiceRunStart = null;
+    _voiceRunTicks = 0;
+    if (start == null || ticks < _kVoiceRunTicks) return;
+    Timer(_kNoTextWindow, () {
+      if (!mounted) return;
+      // Un texte est arrivé depuis le début de la voix : elle a été comprise.
+      if (_lastTranscriptAt.isAfter(start)) return;
+      // Seulement s'il y a vraiment quelque chose à traduire.
+      if (!_translationEnabled || !_micOn || _langCheckShown) return;
+      if (_peerListenLang.isEmpty ||
+          _baseLang(_peerListenLang) == _baseLang(_mySourceLang)) {
+        return;
+      }
+      _bumpFailureStreak();
+    });
   }
 
   bool _micOn = true;
@@ -1736,7 +1792,7 @@ class _CallScreenState extends State<CallScreen> {
   int _undeliveredStreak = 0;
 
   /// Combien d'échecs consécutifs avant de demander si la langue est la bonne.
-  static const int _kLangCheckThreshold = 3;
+  static const int _kLangCheckThreshold = 2;
 
   /// Déjà proposé pendant cet appel : on ne redemande pas à chaque phrase.
   bool _langCheckShown = false;
@@ -1777,14 +1833,17 @@ class _CallScreenState extends State<CallScreen> {
   void _promptSpokenLanguageCheck() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      showSwaycoNotice(
+      Analytics.track('lang_check_shown');
+      showSwaycoLanguageCheck(
         context: context,
-        icon: Icons.translate_rounded,
-        message: AppStrings.t('call_lang_check_q'),
-        buttonLabel: AppStrings.t('call_lang_check_change'),
-        secondaryLabel: AppStrings.t('call_lang_check_keep'),
+        languageCode: _mySourceLang,
       ).then((change) {
-        if (change == true && mounted) _openLanguagePairSheet();
+        if (change == true && mounted) {
+          Analytics.track('lang_check_change');
+          // La roue « je parle » est entourée de jaune : c'est elle qu'il faut
+          // corriger.
+          _openLanguagePairSheet(highlightSpoken: true);
+        }
       });
     });
   }
@@ -2735,7 +2794,7 @@ class _CallScreenState extends State<CallScreen> {
   /// Les deux langues de l'appel, dans un seul panneau : à gauche celle que je
   /// parle, à droite celle que j'entends. Une roue par question, un drapeau à
   /// la fois — rien à lire, on fait défiler jusqu'au bon.
-  void _openLanguagePairSheet() {
+  void _openLanguagePairSheet({bool highlightSpoken = false}) {
     // Le panneau n'a pas de bouton de validation : on note ce que les roues
     // désignent, et on applique quand il se referme — peu importe comment il a
     // été refermé. Appliquer à chaque cran relancerait le recogniser, ou
@@ -2745,6 +2804,7 @@ class _CallScreenState extends State<CallScreen> {
     var heard = _myOutputLang;
     unawaited(_showCallSheet(
       (ctx) => _LanguagePairSheet(
+        highlightSpoken: highlightSpoken,
         spokenCode: _mySourceLang,
         heardCode: _myOutputLang,
         onChanged: (s, h) {
@@ -5736,11 +5796,15 @@ class _OrbPainter extends CustomPainter {
 /// annoncerait une langue au pair, pour rien.
 class _LanguagePairSheet extends StatelessWidget {
   const _LanguagePairSheet({
+    this.highlightSpoken = false,
     required this.spokenCode,
     required this.heardCode,
     required this.onChanged,
   });
 
+  /// La roue « je parle » est entourée de jaune (ouverte depuis la pop-up
+  /// « langue d'écoute »).
+  final bool highlightSpoken;
   final String spokenCode;
   final String heardCode;
 
@@ -5768,6 +5832,7 @@ class _LanguagePairSheet extends StatelessWidget {
           children: [
             const _SheetHandle(),
             _LanguageWheels(
+              highlightSpoken: highlightSpoken,
               spokenCode: spokenCode,
               heardCode: heardCode,
               onChanged: onChanged,
@@ -5832,12 +5897,14 @@ class _SheetHandle extends StatelessWidget {
 /// Les deux roues listent LES TROIS langues de l'app, toujours les mêmes.
 class _LanguageWheels extends StatefulWidget {
   const _LanguageWheels({
+    this.highlightSpoken = false,
     required this.spokenCode,
     required this.heardCode,
     required this.onChanged,
     this.compact = false,
   });
 
+  final bool highlightSpoken;
   final String spokenCode;
   final String heardCode;
   final void Function(String spoken, String heard) onChanged;
@@ -5897,6 +5964,7 @@ class _LanguageWheelsState extends State<_LanguageWheels> {
             icon: Icons.mic_rounded,
             languages: _langs,
             index: _spoken,
+            highlight: widget.highlightSpoken,
             compact: widget.compact,
             onChanged: (i) {
               setState(() => _spoken = i);
@@ -5942,9 +6010,12 @@ class _FlagWheel extends StatefulWidget {
     required this.languages,
     required this.index,
     required this.onChanged,
+    this.highlight = false,
     this.compact = false,
   });
 
+  /// Bordure jaune autour de la roue (la roue à corriger).
+  final bool highlight;
   final String title;
 
   /// Ce que fait cette colonne : ma voix qui entre, la traduction qui sort.
@@ -6004,7 +6075,9 @@ class _FlagWheelState extends State<_FlagWheel> {
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            border: widget.highlight
+                ? Border.all(color: const Color(0xFFF4FF1F), width: 2)
+                : Border.all(color: Colors.white.withValues(alpha: 0.12)),
           ),
           child: ListWheelScrollView.useDelegate(
             controller: _ctrl,
