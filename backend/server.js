@@ -2655,6 +2655,7 @@ app.post('/api/notify-online-broadcast', async (req, res) => {
 // landing/** to the service's Watch Paths, or touch this file, to ship a
 // landing-only change.
 // (Touched again for the language-menu + flags release.)
+// (And again for the App Store link.)
 // Landing page: /bienvenue (index.html + its assets). express.static adds the
 // trailing slash itself (/bienvenue -> /bienvenue/), which the page's relative
 // asset URLs need. Registered BEFORE the Flutter SPA fallback, like the legal
