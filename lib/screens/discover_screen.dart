@@ -3411,25 +3411,39 @@ class _TinderCardState extends State<_TinderCard> {
           // ── Photo dots — petits, centrés en haut ────────────────────────
           if (photos.length > 1)
             Positioned(
-              // Descendues : collées au bord elles se perdaient dans l'encoche.
-              top: 20,
+              // À la hauteur du bouton d'annulation et des pastilles du haut.
+              top: 31,
               left: 0,
               right: 0,
               child: LayoutBuilder(
                 builder: (context, box) {
                   final dots =
                       _PhotoDots(count: photos.length, active: _photoIndex);
-                  // Largeur naturelle : 24 px par point + 4 px d'écart. Centrée
-                  // en haut, elle ne doit toucher ni le badge (POPULAIRE /
-                  // Vérifié, ~125 px à gauche) ni le bouton d'annulation (~70 px
-                  // à droite).
+                  // Les points sont TOUJOURS centrés sur la carte : la même
+                  // réserve à gauche et à droite.
+                  // À droite le bouton d'annulation (~70 px) ; à gauche
+                  // « POPULAIRE » / « En ligne » quand ils sont là (~120 px).
+                  final popular = p.isPro || p.isPlus;
+                  final online = !widget.preview && isPeerOnline(p);
+                  final side = (popular || online) ? 120.0 : 70.0;
+                  // Largeur naturelle : 24 px par point + 4 px d'écart.
                   final natural = photos.length * 24 + (photos.length - 1) * 4;
-                  if (natural <= box.maxWidth - 250) return Center(child: dots);
-                  // Trop de photos : la rangée passe SOUS le badge, rétrécie
-                  // pour tenir entre le bord gauche et le bouton d'annulation.
+                  if (natural <= box.maxWidth - 2 * side) {
+                    return Center(child: dots);
+                  }
+                  // Trop de photos pour tenir : la rangée rétrécit. Avec un
+                  // badge à gauche, elle passe dessous (et sous « En ligne »
+                  // quand les deux sont empilés).
+                  final below = popular && online ? 56.0 : 24.0;
                   return Padding(
-                    padding: const EdgeInsets.only(top: 32, left: 14, right: 70),
-                    child: FittedBox(fit: BoxFit.scaleDown, child: dots),
+                    padding: EdgeInsets.only(
+                      top: (popular || online) ? below : 0,
+                      left: 70,
+                      right: 70,
+                    ),
+                    child: Center(
+                      child: FittedBox(fit: BoxFit.scaleDown, child: dots),
+                    ),
                   );
                 },
               ),
