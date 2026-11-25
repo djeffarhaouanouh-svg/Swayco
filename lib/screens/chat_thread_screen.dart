@@ -1479,7 +1479,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _reactionSub?.cancel();
     _peerReadSub?.cancel();
     _typing?.dispose();
-    if (!_isGroup) ActivitySignal.setTypingTo('');
+    if (!_isGroup) ActivitySignal.setTyping(false);
     WidgetsBinding.instance.removeObserver(this);
     _catchUpTimer?.cancel();
     _nativePollTimer?.cancel();
@@ -2287,8 +2287,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             onTypingChanged: (t) {
                               _typing?.setTyping(t);
                               if (!_isGroup) {
-                                ActivitySignal.setTypingTo(
-                                    t ? widget.peerDeviceId : '');
+                                ActivitySignal.setTyping(t);
                               }
                             },
                             myLang: _myLang,

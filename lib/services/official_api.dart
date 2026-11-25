@@ -125,6 +125,21 @@ abstract final class OfficialApi {
     required String contentType,
     String caption = '',
   }) async {
+    // La limite de 3 par jour AVANT d'envoyer le fichier : refusé après coup, il
+    // restait stocké pour rien. (La base reste juge : déclencheur 0095.)
+    final since = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(hours: 24))
+        .toIso8601String();
+    final recent = await _client
+        .from('official_messages')
+        .select('id')
+        .eq('user_id', meId)
+        .gt('created_at', since)
+        .limit(3);
+    if ((recent as List).length >= 3) {
+      throw Exception('official_rate_limited');
+    }
     final stamp = DateTime.now().millisecondsSinceEpoch;
     final path = 'team/$meId/$stamp.$extension';
     await _client.storage.from('avatars').uploadBinary(
@@ -137,12 +152,22 @@ abstract final class OfficialApi {
           ),
         );
     final url = _client.storage.from('avatars').getPublicUrl(path);
-    await _client.from('official_messages').insert({
-      'user_id': meId,
-      'user_name': name,
-      'body': caption,
-      'media_url': url,
-    });
+    try {
+      await _client.from('official_messages').insert({
+        'user_id': meId,
+        'user_name': name,
+        'body': caption,
+        'media_url': url,
+      });
+    } catch (_) {
+      // Message refusé : on retire le fichier qu'on vient d'envoyer.
+      try {
+        await _client.storage.from('avatars').remove([path]);
+      } catch (e) {
+        debugPrint('OfficialApi: orphan media not removed: $e');
+      }
+      rethrow;
+    }
     return url;
   }
 

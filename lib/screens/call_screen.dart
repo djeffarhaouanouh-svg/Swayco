@@ -716,7 +716,9 @@ class _CallScreenState extends State<CallScreen> {
   DateTime? _voiceRunStart;
   DateTime _lastTranscriptAt = DateTime.fromMillisecondsSinceEpoch(0);
   static const int _kVoiceRunTicks = 2;
-  static const Duration _kNoTextWindow = Duration(seconds: 4);
+  // Large : le texte n'arrive ici qu'APRÈS la traduction, qui peut traîner sur
+  // un réseau lent. Trop court, une phrase bien comprise passait pour ratée.
+  static const Duration _kNoTextWindow = Duration(seconds: 8);
 
   void _trackVoiceRun(bool hot) {
     if (hot && _remoteVoice < 0.02) {

@@ -12,11 +12,11 @@ import 'supabase_service.dart';
 enum PeerActivity { call, typing }
 
 /// Le signal d'activité GLOBAL : un seul canal Realtime (`activity`), où chaque
-/// client qui fait quelque chose annonce `{user, call, typingTo}` et le
+/// client qui fait quelque chose annonce `{user, call, typing}` et le
 /// répète toutes les [_heartbeat] tant que ça dure. Rien en base, rien de stocké.
 ///
 /// • Qui publie : l'écran d'appel ([setCall]) et le champ de saisie d'un fil
-///   ([setTypingTo]).
+///   ([setTyping]).
 /// • Qui écoute : la page Messages, seulement quand elle est sous les yeux
 ///   ([setWatching]).
 /// • Une annonce sans nouvelles pendant [_expiry] s'éteint toute seule.
@@ -40,7 +40,7 @@ abstract final class ActivitySignal {
 
   // Mon état.
   static bool _call = false;
-  static String _typingTo = '';
+  static bool _typing = false;
 
   // L'état des autres : user → annonce.
   static final Map<String, _Entry> _peers = {};
@@ -64,17 +64,18 @@ abstract final class ActivitySignal {
     _changed();
   }
 
-  /// [peerId] vide = je n'écris plus.
-  static void setTypingTo(String peerId) {
-    if (_typingTo == peerId) return;
-    _typingTo = peerId;
+  /// Seulement « j'écris » (oui / non) : À QUI l'on écrit ne quitte jamais le
+  /// téléphone — le canal est commun à tous les utilisateurs.
+  static void setTyping(bool on) {
+    if (_typing == on) return;
+    _typing = on;
     _changed();
   }
 
   /// Ce que je publie vraiment : un APPEL continue même app en arrière-plan
   /// (écran verrouillé, autre app au premier plan) ; « écrit » seulement quand
   /// l'app est au premier plan.
-  static bool get _hasState => _call || (_foreground && _typingTo.isNotEmpty);
+  static bool get _hasState => _call || (_foreground && _typing);
 
   static bool get _mayPublish =>
       !AppSettings.hideOnlineLocal.value && _myId.isNotEmpty;
@@ -105,7 +106,7 @@ abstract final class ActivitySignal {
           .sendBroadcastMessage(event: 'act', payload: {
             'user': _myId,
             'call': idle ? false : _call,
-            'typingTo': idle ? '' : (_foreground ? _typingTo : ''),
+            'typing': !idle && _foreground && _typing,
           })
           .catchError((Object e) {
             debugPrint('ActivitySignal send failed: $e');
@@ -144,7 +145,7 @@ abstract final class ActivitySignal {
     if (DateTime.now().difference(e.at) > _expiry) return null;
     if (e.call) return PeerActivity.call;
     // « Écrit » se voit peu importe à qui la personne écrit.
-    if (e.typingTo.isNotEmpty) return PeerActivity.typing;
+    if (e.typing) return PeerActivity.typing;
     return null;
   }
 
@@ -156,18 +157,21 @@ abstract final class ActivitySignal {
     if (user.isEmpty || user == _myId) return;
     final e = _Entry(
       call: data['call'] == true,
-      typingTo: data['typingTo']?.toString() ?? '',
+      // (`typingTo` : les versions d'avant, qui envoyaient encore le
+      // destinataire ; on n'en retient que « écrit ».)
+      typing: data['typing'] == true ||
+          (data['typingTo']?.toString() ?? '').isNotEmpty,
       at: DateTime.now(),
     );
     final old = _peers[user];
-    if (!e.call && e.typingTo.isEmpty) {
+    if (!e.call && !e.typing) {
       if (_peers.remove(user) != null) revision.value++;
       return;
     }
     _peers[user] = e;
     if (old == null ||
         old.call != e.call ||
-        old.typingTo != e.typingTo) {
+        old.typing != e.typing) {
       revision.value++;
     }
   }
@@ -220,12 +224,12 @@ abstract final class ActivitySignal {
 class _Entry {
   const _Entry({
     required this.call,
-    required this.typingTo,
+    required this.typing,
     required this.at,
   });
 
   final bool call;
-  final String typingTo;
+  final bool typing;
   final DateTime at;
 }
 

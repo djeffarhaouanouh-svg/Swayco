@@ -300,7 +300,7 @@ class _GrowWidth extends StatelessWidget {
 }
 
 /// Une bulle : photo ronde, drapeau, badge d'activité, heure locale dessous.
-class _Bubble extends StatelessWidget {
+class _Bubble extends StatefulWidget {
   const _Bubble({
     super.key,
     required this.profile,
@@ -315,16 +315,27 @@ class _Bubble extends StatelessWidget {
   final void Function(Rect globalRect) onLongPress;
 
   @override
+  State<_Bubble> createState() => _BubbleState();
+}
+
+class _BubbleState extends State<_Bubble> {
+  /// UNE clé pour toute la vie de la bulle. Recréée à chaque rafraîchissement,
+  /// elle reconstruisait la photo et relançait les animations (le téléphone
+  /// retremblait sans cesse).
+  final GlobalKey _photoKey = GlobalKey();
+
+  @override
   Widget build(BuildContext context) {
-    final photoKey = GlobalKey();
+    final profile = widget.profile;
+    final myId = widget.myId;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      onTap: widget.onTap,
       onLongPress: () {
-        final box = photoKey.currentContext?.findRenderObject() as RenderBox?;
+        final box = _photoKey.currentContext?.findRenderObject() as RenderBox?;
         if (box == null || !box.attached) return;
         final topLeft = box.localToGlobal(Offset.zero);
-        onLongPress(topLeft & box.size);
+        widget.onLongPress(topLeft & box.size);
       },
       child: SizedBox(
         width: _kBubble + 22,
@@ -336,7 +347,7 @@ class _Bubble extends StatelessWidget {
             ValueListenableBuilder<int>(
               valueListenable: ActivitySignal.revision,
               builder: (_, _, _) => BubbleFace(
-                key: photoKey,
+                key: _photoKey,
                 profile: profile,
                 activity: ActivitySignal.of(profile.id, myId),
               ),
