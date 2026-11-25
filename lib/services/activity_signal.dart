@@ -11,7 +11,7 @@ import 'supabase_service.dart';
 /// Messages, handoff « messages_bulles »). Priorité : appel > écrit.
 enum PeerActivity { call, typing }
 
-/// Le signal d'activité GLOBAL : un seul canal Realtime (`activity`), où chaque
+/// Le signal d'activité GLOBAL : un seul canal Realtime (`activity-v2`), où chaque
 /// client qui fait quelque chose annonce `{user, call, typing}` et le
 /// répète toutes les [_heartbeat] tant que ça dure. Rien en base, rien de stocké.
 ///
@@ -31,7 +31,6 @@ abstract final class ActivitySignal {
   static final ValueNotifier<int> revision = ValueNotifier<int>(0);
 
   static RealtimeChannel? _channel;
-  static bool _subscribed = false;
   static bool _watching = false;
   static bool _foreground = true;
   static _Lifecycle? _lifecycle;
@@ -80,39 +79,44 @@ abstract final class ActivitySignal {
   static bool get _mayPublish =>
       !AppSettings.hideOnlineLocal.value && _myId.isNotEmpty;
 
+  /// Ai-je annoncé « je fais quelque chose » sans l'avoir encore éteint ?
+  static bool _announced = false;
+
   static void _changed() {
     _lifecycle ??= _Lifecycle()..attach();
-    _ensureChannel();
     _beat?.cancel();
     _beat = null;
     if (_hasState && _mayPublish) {
       _send();
       _beat = Timer.periodic(_heartbeat, (_) => _send());
-    } else {
+    } else if (_announced) {
       // Dernier mot : « je ne fais plus rien », pour que la bulle s'éteigne tout
       // de suite chez les autres.
       _send(force: true);
     }
-    _releaseIfIdle();
   }
 
+  /// L'annonce passe par le SERVEUR (`publish_activity`, migration 0097) : c'est
+  /// lui qui y met mon identifiant, d'après ma session. Personne ne peut donc
+  /// annoncer à la place d'un autre (les clients n'ont pas le droit d'écrire sur
+  /// le canal, seulement de l'écouter).
   static void _send({bool force = false}) {
-    final ch = _channel;
-    if (ch == null || !_subscribed) return;
-    if (!force && !(_hasState && _mayPublish)) return;
+    if (_myId.isEmpty) return;
     final idle = !(_hasState && _mayPublish);
-    unawaited(
-      ch
-          .sendBroadcastMessage(event: 'act', payload: {
-            'user': _myId,
-            'call': idle ? false : _call,
-            'typing': !idle && _foreground && _typing,
-          })
-          .catchError((Object e) {
-            debugPrint('ActivitySignal send failed: $e');
-            return ChannelResponse.error;
-          }),
-    );
+    if (idle && !force) return;
+    _announced = !idle;
+    unawaited(_publish(idle));
+  }
+
+  static Future<void> _publish(bool idle) async {
+    try {
+      await Supabase.instance.client.rpc('publish_activity', params: {
+        'p_call': !idle && _call,
+        'p_typing': !idle && _foreground && _typing,
+      });
+    } catch (e) {
+      debugPrint('ActivitySignal publish failed: $e');
+    }
   }
 
   // ── Écouter ────────────────────────────────────────────────────────────────
@@ -132,7 +136,7 @@ abstract final class ActivitySignal {
         _peers.clear();
         revision.value++;
       }
-      _releaseIfIdle();
+      _releaseChannel();
     }
   }
 
@@ -157,10 +161,7 @@ abstract final class ActivitySignal {
     if (user.isEmpty || user == _myId) return;
     final e = _Entry(
       call: data['call'] == true,
-      // (`typingTo` : les versions d'avant, qui envoyaient encore le
-      // destinataire ; on n'en retient que « écrit ».)
-      typing: data['typing'] == true ||
-          (data['typingTo']?.toString() ?? '').isNotEmpty,
+      typing: data['typing'] == true,
       at: DateTime.now(),
     );
     final old = _peers[user];
@@ -185,33 +186,26 @@ abstract final class ActivitySignal {
 
   // ── Canal ──────────────────────────────────────────────────────────────────
 
+  /// Le canal PRIVÉ d'écoute : seuls les comptes connectés le reçoivent, et seul
+  /// le serveur y écrit.
   static void _ensureChannel() {
     if (_channel != null || !isSupabaseReady) return;
     _channel = Supabase.instance.client
-        .channel('activity')
+        .channel(
+          'activity-v2',
+          opts: const RealtimeChannelConfig(private: true),
+        )
         .onBroadcast(event: 'act', callback: _onBroadcast);
     _channel!.subscribe((status, error) {
-      _subscribed = status == RealtimeSubscribeStatus.subscribed;
-      if (_subscribed && _hasState && _mayPublish) _send();
+      if (error != null) debugPrint('ActivitySignal channel: $status $error');
     });
   }
 
-  static void _releaseIfIdle() {
-    if (_watching || _hasState) return;
-    final ch = _channel;
-    if (ch == null) return;
-    // Laisse partir le « je ne fais plus rien » avant de quitter le canal.
-    Timer(const Duration(milliseconds: 600), () {
-      if (_watching || _hasState) return;
-      final c = _channel;
-      _channel = null;
-      _subscribed = false;
-      if (c != null) {
-        unawaited(Supabase.instance.client.removeChannel(c));
-      }
-    });
+  static void _releaseChannel() {
+    final c = _channel;
+    _channel = null;
+    if (c != null) unawaited(Supabase.instance.client.removeChannel(c));
   }
-
   static void _onLifecycle(AppLifecycleState s) {
     final fg = s == AppLifecycleState.resumed;
     if (fg == _foreground) return;
