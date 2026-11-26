@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
@@ -318,8 +319,12 @@ class _GlassNavBarState extends State<GlassNavBar>
     // pill instead of over-rounding into a blob at the new proportions.
     const radius = BorderRadius.all(Radius.circular(GlassNavBar.height / 2));
 
-    // Shader Liquid Glass path (iOS native).
-    if (useShaderGlass) {
+    // Shader Liquid Glass path (natif). Sauf Android en CLAIR : le verre à shader
+    // s'y confondait avec le fond blanc, il prend la barre pleine ci-dessous.
+    final lightAndroid = SC.light &&
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android;
+    if (useShaderGlass && !lightAndroid) {
       return lg.GlassContainer(
         useOwnLayer: true,
         clipBehavior: Clip.antiAlias,
