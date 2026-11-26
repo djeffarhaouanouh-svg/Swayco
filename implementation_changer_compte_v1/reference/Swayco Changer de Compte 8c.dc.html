@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Swayco — Changer de compte (Réglages)</title>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&amp;family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&amp;display=block" rel="stylesheet">
+<style>html,body{margin:0;background:#E4E2DD}*{box-sizing:border-box}a{color:#04123A}a:hover{color:#1F5EFF}</style>
+</helmet>
+<section data-screen-label="Changer de compte" style="display:flex;flex-direction:column;gap:30px;padding:64px;width:1440px;font-family:'Plus Jakarta Sans',sans-serif;color:#04123A">
+<div style="display:flex;flex-direction:column;gap:8px;max-width:1000px"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:1px;color:#555">RÉGLAGES · CHANGER DE COMPTE · D'APRÈS settings_screen.dart</span><span style="font-family:'Unbounded',sans-serif;font-weight:800;font-size:28px;letter-spacing:-.03em;line-height:1.12">Une ligne dans « Compte », un panneau avec la liste des comptes.</span></div>
+<div style="display:flex;gap:44px;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:12px;width:390px"><span style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:12px;background:#F4FF1F;color:#04123A;padding:5px 11px;border-radius:99px">1 · La ligne dans Réglages</span>
+<div data-screen-label="1 Réglages" style="position:relative;width:390px;height:780px;border-radius:52px;border:10px solid #000;overflow:hidden;background:radial-gradient(90% 40% at 50% 0%,rgba(43,127,255,.22),rgba(10,15,28,0) 70%),#0A0F1C;color:#F5F7FF">
+<div style="height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 26px;font-size:14px;font-weight:700"><span>9:41</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px">●●● ▮</span></div>
+<div style="height:56px;display:flex;align-items:center;gap:14px;padding:0 14px"><span style="width:44px;height:44px;border-radius:99px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#fff">arrow_back</span></span><span style="font-family:'Unbounded';font-weight:800;font-size:18px;letter-spacing:-.02em">Réglages</span></div>
+<div style="padding:0 16px">
+<div style="padding:16px 8px 8px;font-size:11px;font-weight:700;letter-spacing:.8px;color:rgba(245,247,255,.6)">LANGUE DE L'APPEL</div>
+<div style="border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);overflow:hidden"><div style="display:flex;align-items:center;gap:14px;padding:14px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#fff">call</span><span style="flex:1;font-size:14px;font-weight:500">Langue de l'appel</span><span style="font-size:13px;color:rgba(245,247,255,.6)">Français</span><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:rgba(245,247,255,.6)">chevron_right</span></div></div>
+<div style="padding:20px 8px 8px;font-size:11px;font-weight:700;letter-spacing:.8px;color:rgba(245,247,255,.6)">COMPTE</div>
+<div style="border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);overflow:hidden">
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+<div style="display:flex;align-items:center;gap:14px;padding:14px;border-top:{{ r.bt }};background:{{ r.bg }}"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#fff">{{ r.i }}</span><span style="flex:1;font-size:14px;font-weight:500;white-space:nowrap">{{ r.l }}</span><span style="font-size:13px;color:rgba(245,247,255,.6);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.v }}</span><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:rgba(245,247,255,.6);display:{{ r.chev }}">chevron_right</span></div>
+</sc-for></div>
+<div style="padding:20px 8px 8px;font-size:11px;font-weight:700;letter-spacing:.8px;color:rgba(245,247,255,.6)">ABONNEMENT</div>
+<div style="border-radius:18px 18px 0 0;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-bottom:0;overflow:hidden"><div style="display:flex;align-items:center;gap:14px;padding:14px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#fff">workspace_premium</span><span style="flex:1;font-size:14px;font-weight:500">Mon abonnement</span><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:rgba(245,247,255,.6)">chevron_right</span></div></div>
+</div></div></div>
+
+<sc-for list="{{ panels }}" as="p" hint-placeholder-count="2">
+<div style="display:flex;flex-direction:column;gap:12px;width:390px"><span style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:12px;background:#F4FF1F;color:#04123A;padding:5px 11px;border-radius:99px">{{ p.tag }}</span>
+<div data-screen-label="{{ p.tag }}" style="position:relative;width:390px;height:780px;border-radius:52px;border:10px solid #000;overflow:hidden;background:radial-gradient(90% 40% at 50% 0%,rgba(43,127,255,.22),rgba(10,15,28,0) 70%),#0A0F1C;color:#F5F7FF">
+<div style="height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 26px;font-size:14px;font-weight:700"><span>9:41</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px">●●● ▮</span></div>
+<div style="height:56px;display:flex;align-items:center;gap:14px;padding:0 14px"><span style="width:44px;height:44px;border-radius:99px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#fff">arrow_back</span></span><span style="font-family:'Unbounded';font-weight:800;font-size:18px;letter-spacing:-.02em">Réglages</span></div>
+<div style="padding:0 16px"><div style="padding:16px 8px 8px;font-size:11px;font-weight:700;letter-spacing:.8px;color:rgba(245,247,255,.6)">COMPTE</div><div style="border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);height:260px"></div></div>
+<div style="position:absolute;inset:0;background:rgba(0,0,0,.54)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;border-radius:28px 28px 0 0;background:linear-gradient(180deg,#1A2040,#16161E);border-top:1px solid rgba(255,255,255,.14);padding:12px 18px 30px">
+<div style="width:36px;height:4px;border-radius:99px;background:rgba(255,255,255,.24);margin:0 auto 18px"></div>
+<div style="display:flex;align-items:baseline;gap:10px;padding:0 4px"><span style="flex:1;font-family:'Unbounded';font-weight:800;font-size:19px;letter-spacing:-.03em">Changer de compte</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ p.countColor }}">{{ p.count }}</span></div>
+<div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">
+<sc-for list="{{ p.accounts }}" as="a" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:14px;padding:10px 12px;border-radius:18px;background:{{ a.bg }};border:1px solid {{ a.bd }}"><span style="flex:none;width:48px;height:48px;border-radius:99px;background:#3A3A40 url({{ a.img }}) 50% 22%/cover"></span><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:700">{{ a.name }}</span><span style="font-size:12.5px;color:rgba(245,247,255,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.mail }}</span></div><span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' {{ a.fill }};font-size:26px;line-height:1;color:{{ a.ic }}">{{ a.icon }}</span></div>
+</sc-for></div>
+<div style="height:50px;margin-top:14px;border-radius:99px;border:1.5px solid {{ p.addBorder }};display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px;font-weight:800;color:{{ p.addColor }}"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1">{{ p.addIcon }}</span>{{ p.addLabel }}</div>
+<div style="margin-top:14px;font-size:12.5px;line-height:1.5;text-align:center;color:rgba(245,247,255,.6);text-wrap:balance">Les notifications et les appels arrivent sur le compte actif.</div>
+</div></div>
+<span style="font-size:12.5px;line-height:1.5;color:#555;max-width:370px">{{ p.note }}</span></div>
+</sc-for>
+
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const act = { bg: 'rgba(244,255,31,.07)', bd: 'rgba(244,255,31,.5)', icon: 'check_circle', fill: 1, ic: '#F4FF1F' };
+    const off = { bg: 'transparent', bd: 'rgba(255,255,255,.1)', icon: 'radio_button_unchecked', fill: 0, ic: 'rgba(245,247,255,.4)' };
+    const A = (name, mail, img, st) => ({ name, mail, img, ...st });
+    const three = [
+      A('Claire', 'claire.d@mail.com', 'assets/face_claire.png', act),
+      A('Max', 'max.swayco@mail.com', 'assets/face_homme2.png', off),
+      A('Alice', 'alice.test@mail.com', 'assets/face_alice.png', off)
+    ];
+    const five = three.concat([
+      A('Lenny', 'lenny@mail.com', 'assets/face_lenny.png', off),
+      A('Tom', 'tom.pro@mail.com', 'assets/face_man1.png', off)
+    ]);
+    const row = (i, l, v, bg, chev, bt) => ({ i, l, v, bg: bg || 'transparent', chev: chev || 'block', bt: bt || '1px solid rgba(255,255,255,.12)' });
+    return {
+      rows: [
+        row('swap_horiz', 'Changer de compte', 'Claire', 'transparent', 'block', '0'),
+        row('alternate_email', 'E-mail', 'claire.d@mail.com', 'transparent', 'none'),
+        row('badge', 'Prénom', 'Claire'),
+        row('location_on', 'Localisation', 'Lyon, France'),
+        row('lock_reset', 'Changer le mot de passe', '')
+      ],
+      panels: [
+        { tag: '2 · Le panneau', count: '3 sur 5', countColor: 'rgba(245,247,255,.6)', accounts: three, addIcon: 'add', addLabel: 'Ajouter un compte', addBorder: 'rgba(255,255,255,.28)', addColor: '#FFFFFF', note: 'Un tap sur un compte bascule dessus, sans retaper le mot de passe. Le compte actif est coché et entouré de jaune.' },
+        { tag: '3 · Cinq comptes', count: '5 sur 5', countColor: '#F4FF1F', accounts: five, addIcon: 'block', addLabel: '5 comptes maximum', addBorder: 'rgba(255,255,255,.12)', addColor: 'rgba(245,247,255,.4)', note: 'Quand la limite est atteinte, « Ajouter un compte » est grisé. Pour en ajouter un, il faut d\'abord en retirer un (appui long sur la ligne).' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

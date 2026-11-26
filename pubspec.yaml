@@ -96,6 +96,8 @@ dependencies:
   # using the Stripe checkout via StripeApi; RevenueCat's native SDK has no
   # web support).
   purchases_flutter: ^10.2.2
+  # Connexions gardées pour « Changer de compte » (Keychain / Keystore).
+  flutter_secure_storage: ^9.2.4
   # AppsFlyer — install attribution (which campaign / ad brought the user)
   # on iOS / Android. No web support; lib/services/attribution.dart no-ops
   # there. Pinned exactly: AppsFlyer ships release candidates as

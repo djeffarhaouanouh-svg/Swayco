@@ -8,7 +8,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/analytics.dart';
 import '../services/app_theme.dart';
 import '../services/app_settings.dart';
+import '../services/account_switcher.dart';
 import '../services/app_strings.dart';
+import '../widgets/account_switcher_sheet.dart';
 import 'forgot_password_screen.dart';
 import '../services/ui_variant.dart';
 import '../services/presence_service.dart';
@@ -54,6 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const _kHideFromCountry = AppSettings.kHideFromCountry;
 
   bool _busy = false;
+  bool _canSwitchAccount = false;
   bool _push = true;
   bool _emailNotifs = true;
   bool _hideOnline = false;
@@ -82,6 +85,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _loadPrefs();
     _loadVersion();
+    AccountSwitcher.available().then((ok) {
+      if (mounted && ok) setState(() => _canSwitchAccount = true);
+    });
     UserPrefs.loadCallSpokenLang().then((saved) {
       if (mounted) setState(() => _callLang = saved.lang);
     });
@@ -374,6 +380,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await IosCallKit.unregisterToken(uid);
       HapticFeedback.mediumImpact();
       SwaycoSounds.play(SwSound.signOut);
+      // D'autres comptes gardés sur ce téléphone : on passe au suivant au
+      // lieu d'afficher l'écran de connexion.
+      if (await AccountSwitcher.leaveCurrentForAnother()) return;
       await AuthService.signOut();
       // AuthService.signOut() flips the ROOT widget's _authed flag, which
       // makes it build the login screen — but that only changes what the
@@ -453,6 +462,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       //    bottom route shows, it doesn't pop this pushed one).
       HapticFeedback.mediumImpact();
       SwaycoSounds.play(SwSound.signOut);
+      if (await AccountSwitcher.leaveCurrentForAnother()) return;
       await AuthService.signOut();
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -656,6 +666,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SectionHeader(label: AppStrings.t('settings_section_account')),
                 _SettingsCard(
                   children: [
+                    // « Changer de compte » : seulement là où la fonction est
+                    // débloquée (le téléphone d'Iasmim).
+                    if (_canSwitchAccount)
+                      _SettingsRow(
+                        icon: Icons.swap_horiz_rounded,
+                        label: AppStrings.t('switch_account'),
+                        trailing: _SubtleText(
+                          _profile?.displayName.trim().isNotEmpty ?? false
+                              ? _profile!.displayName.trim()
+                              : '—',
+                        ),
+                        onTap: () => showAccountSwitcher(context),
+                      ),
                     _SettingsRow(
                       icon: Icons.alternate_email,
                       label: AppStrings.t('settings_email'),

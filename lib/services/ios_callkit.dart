@@ -93,6 +93,9 @@ abstract final class IosCallKit {
     }
   }
 
+  /// Rattache les appels de ce téléphone à [userId] (changement de compte annulé).
+  static Future<void> registerToken(String userId) => _registerToken(userId);
+
   static Future<void> _registerToken(String userId, {int attempts = 8}) async {
     if (!_isIos || userId.isEmpty) return;
     // The VoIP token may not be ready the instant we start — PushKit delivers

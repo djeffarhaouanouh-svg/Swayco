@@ -55,6 +55,9 @@ abstract final class ActivitySignal {
   /// la durée de l'appel.
   static int _callScreens = 0;
 
+  /// Suis-je dans un appel ? (pas de changement de compte pendant un appel).
+  static bool get inCall => _call;
+
   static void setCall(bool on) {
     _callScreens = on ? _callScreens + 1 : (_callScreens > 0 ? _callScreens - 1 : 0);
     final now = _callScreens > 0;

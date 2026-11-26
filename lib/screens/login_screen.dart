@@ -27,7 +27,11 @@ const double _kPhotoSharpUntil = 0.78;
 /// sign-in the parent (`main.dart`) reacts to the auth state change and routes
 /// to onboarding / home.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.initialEmail = ''});
+
+  /// E-mail prérempli (reconnexion d'un compte dont la session a expiré) : le
+  /// formulaire s'ouvre alors sur la CONNEXION.
+  final String initialEmail;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -41,6 +45,15 @@ class _LoginScreenState extends State<LoginScreen> {
   // A visitor with no session opens on account creation; someone who already
   // has an account switches with the link under the form.
   _Mode _mode = _Mode.signUp;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialEmail.isNotEmpty) {
+      _emailCtrl.text = widget.initialEmail;
+      _mode = _Mode.signIn;
+    }
+  }
   bool _busy = false;
   bool _showPassword = false;
   String? _error;

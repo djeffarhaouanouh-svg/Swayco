@@ -39,6 +39,9 @@ import 'services/local_notifications.dart';
 import 'services/notif_enable_flow.dart';
 import 'services/notification_client.dart';
 import 'services/open_thread.dart';
+import 'services/account_switcher.dart';
+import 'services/friend_request_unread.dart';
+import 'services/nav_tab.dart';
 import 'services/presence_service.dart';
 import 'services/profile_api.dart';
 import 'swayco/asr/asr_service.dart';
@@ -352,6 +355,9 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   }
   StreamSubscription<AuthState>? _authSub;
 
+  /// Le compte dont l'app affiche les données.
+  String _activeUid = '';
+
   @override
   void initState() {
     super.initState();
@@ -361,7 +367,16 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     _bootstrap();
     // React to sign-in / sign-out events anywhere in the app.
     if (isSupabaseReady) {
+      AccountSwitcher.changed.addListener(_onAccountChanged);
       _authSub = AuthService.onAuthStateChange.listen((state) {
+        // Une bascule de compte est en cours : ses étapes intermédiaires ne
+        // nous regardent pas, [_onAccountChanged] suivra.
+        if (AccountSwitcher.busy) return;
+        // Garde le jeton le plus récent (seulement là où la fonction est
+        // débloquée).
+        unawaited(AccountSwitcher.rememberCurrent(
+          fetchProfile: state.event != AuthChangeEvent.tokenRefreshed,
+        ));
         // A recovery link (PKCE `?code=` flow, where the launch URL carries
         // no `type=recovery` marker for the check in main()) surfaces only
         // as this event. Show the set-a-new-password screen and ignore the
@@ -379,6 +394,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           } else {
             _onSignedOut();
           }
+        } else if (nowAuthed &&
+            _activeUid.isNotEmpty &&
+            AuthService.currentUserId != _activeUid) {
+          unawaited(_onAccountChanged());
         }
       });
     }
@@ -387,6 +406,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   @override
   void dispose() {
     _authSub?.cancel();
+    AccountSwitcher.changed.removeListener(_onAccountChanged);
     // Only dispose if we actually constructed it — accessing the field
     // via the lazy getter here would force a useless construction. The port
     // is an interface; both concrete impls are ChangeNotifiers.
@@ -489,6 +509,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       if (mounted) {
         setState(() {
           _authed = authed;
+          _activeUid = authed ? AuthService.currentUserId : '';
           _needsOnboarding = needsOnboarding;
           _loading = false;
         });
@@ -538,13 +559,46 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     if (!mounted) return;
     setState(() {
       _authed = true;
+      _activeUid = AuthService.currentUserId;
       _needsOnboarding = needsOnboarding;
       _loading = false;
     });
   }
 
+  /// « Changer de compte » : le compte connecté n'est plus celui affiché. On
+  /// referme tout, on coupe ce qui écoutait pour l'ancien compte, puis on
+  /// recharge comme après une connexion.
+  Future<void> _onAccountChanged() async {
+    if (!mounted) return;
+    final uid = AuthService.currentUserId;
+    if (uid == _activeUid) return;
+    rootNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+    if (uid.isEmpty) {
+      _onSignedOut();
+      return;
+    }
+    _activeUid = uid;
+    // L'écran d'attente : l'ancien écran principal est détruit avec ses
+    // listes et ses abonnements.
+    setState(() => _loading = true);
+    try {
+      PresenceService.stop();
+      await ChatUnread.stop();
+      await FriendRequestUnread.stop();
+      await RevenueCat.logOut();
+      await UserPrefs.clearAccountIdentity();
+    } catch (e) {
+      debugPrint('account change cleanup failed: $e');
+    }
+    if (!mounted) return;
+    NavTab.select(NavTab.discover);
+    await _onSignedIn();
+  }
+
   void _onSignedOut() {
+    _activeUid = '';
     setState(() {
+      _loading = false;
       _authed = false;
       _needsOnboarding = false;
     });
@@ -893,6 +947,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         },
       );
     }
-    return RootShell(translation: _getTranslation());
+    // Une clé par compte : rien de l'écran d'un compte ne passe à un autre.
+    return RootShell(
+      key: ValueKey('shell-$_activeUid'),
+      translation: _getTranslation(),
+    );
   }
 }
