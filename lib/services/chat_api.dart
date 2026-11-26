@@ -19,10 +19,8 @@ const String kGifLabel = '🎞️ GIF';
 
 /// Un GIF : hébergé chez Giphy, ou un fichier .gif.
 bool isGifUrl(String url) {
-  if (url.isEmpty) return false;
-  final u = Uri.tryParse(url);
-  return (u?.host.toLowerCase().contains('giphy.com') ?? false) ||
-      (u?.path ?? url).toLowerCase().endsWith('.gif');
+  final l = url.toLowerCase();
+  return l.contains('giphy.') || l.split('?').first.endsWith('.gif');
 }
 
 bool isVideoUrl(String url) {

@@ -11,18 +11,15 @@ import '../services/chat_api.dart';
 import '../theme/swayco_theme.dart';
 import 'glass_panel.dart';
 
+/// `isGifUrl` vit avec les messages ; on le laisse accessible d'ici.
+export '../services/chat_api.dart' show isGifUrl;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Répondre à un message (chat) : bandeau au-dessus du champ, citation dans la
 // bulle, glissement vers la droite, menu de l'appui long.
 // Les widgets ne connaissent que des données déjà résolues (nom, texte) : la
 // logique (qui est cité, où est l'original) reste dans chat_thread_screen.dart.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/// Le message cité est un GIF (Giphy) plutôt qu'une photo : l'étiquette change.
-bool isGifUrl(String url) {
-  final l = url.toLowerCase();
-  return l.contains('giphy.') || l.split('?').first.endsWith('.gif');
-}
 
 /// `m:ss` ; `0:00` quand la durée est inconnue.
 String voiceDuration(int ms) {
