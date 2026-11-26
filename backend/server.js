@@ -3223,7 +3223,7 @@ require('./engagement').start({ supabase, notifyUser });
 
 // L'hôtesse d'accueil : une minute après l'inscription, chaque nouvel utilisateur
 // devient ami avec Iasmim (backend/hostess.js ; HOSTESS_ENABLED=0 pour couper).
-require('./hostess').start({ supabase });
+require('./hostess').start({ supabase, notifyUser });
 
 // Comptes IA (profiles.is_ai) : file d'actions, repondeur (2 reponses/jour par
 // conversation) et mode autonome (backend/ai_agents.js ; table ai_actions,
