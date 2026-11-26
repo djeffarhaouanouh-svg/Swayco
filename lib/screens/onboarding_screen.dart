@@ -718,6 +718,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       pageCount: _pageCount,
       controller: _pageController,
       onPageChanged: (i) {
+        // Après le prénom, plus aucune saisie : le clavier se range (il restait
+        // ouvert et cachait les choix et les boutons).
+        if (i > 0) FocusManager.instance.primaryFocus?.unfocus();
         setState(() => _page = i);
         if (i >= 0 && i < stepNames.length) _trackStep(stepNames[i]);
       },
@@ -810,6 +813,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   /// Advance one page with the shared transition.
   void _next() {
+    // Le clavier du prénom se ferme dès qu'on avance.
+    FocusManager.instance.primaryFocus?.unfocus();
     HapticFeedback.selectionClick();
     SwaycoSounds.play(SwSound.stepNext);
     _pageController.nextPage(

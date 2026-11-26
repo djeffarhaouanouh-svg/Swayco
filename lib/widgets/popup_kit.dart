@@ -305,6 +305,10 @@ class PopupButton extends StatelessWidget {
           disabledBackgroundColor:
               (danger ? PopupTokens.danger : SC.accent).withValues(alpha: 0.6),
           shape: const StadiumBorder(),
+          // La hauteur est fixée par le SizedBox : les 14 px verticaux du thème
+          // ne laissaient plus la place au texte (bas des lettres rogné).
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          minimumSize: Size(0, height),
         ),
         child: busy
             ? SizedBox(
