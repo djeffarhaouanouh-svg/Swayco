@@ -315,6 +315,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
     final f = res.friendship;
     if (!mounted || f == null) return;
+    if (!res.matched) unawaited(NotifEnableFlow.askAfterFirstLike(context));
     setState(() => _myFriendships = [..._myFriendships, f]);
     if (res.matched) unawaited(_reload());
   }

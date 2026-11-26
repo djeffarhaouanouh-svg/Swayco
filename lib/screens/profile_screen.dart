@@ -14,6 +14,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/analytics.dart';
 
 import '../services/app_strings.dart';
+import '../services/notif_enable_flow.dart';
 import '../services/swayco_sounds.dart';
 import '../services/block_api.dart';
 import '../services/chat_unread.dart';
@@ -331,6 +332,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         props: {'source': 'profile', 'kind': res.matched ? 'match' : 'like'},
       );
       if (!mounted) return;
+      if (!res.matched) unawaited(NotifEnableFlow.askAfterFirstLike(context));
       if (res.matched) {
         setState(() {
           _matched = true;

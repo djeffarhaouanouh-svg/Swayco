@@ -15,6 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
+import '../services/notif_enable_flow.dart';
 import '../services/activity_signal.dart';
 import '../services/swayco_sounds.dart';
 import '../services/block_api.dart';
@@ -1605,6 +1606,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       // Mon message doit apparaître tout de suite, même si le canal temps réel
       // est mort : on relit le fil au lieu d'attendre que le flux le renvoie.
       unawaited(_syncMessages());
+      // Premier message envoyé : « on te prévient quand on te répond ? ».
+      if (!_isGroup && mounted) {
+        unawaited(NotifEnableFlow.askAfterFirstMessage(context));
+      }
     } catch (e) {
       HapticFeedback.vibrate();
       SwaycoSounds.play(SwSound.error);
