@@ -13,6 +13,18 @@ import 'review_prompt.dart';
 
 /// Vrai si [url] pointe un fichier VIDÉO (extension `.mp4`, `.mov`, `.m4v`,
 /// `.webm`, `.3gp`), requête et ancre ignorées.
+/// Ce qu'on écrit à la place d'un GIF (aperçus, bannières, notifications) : le
+/// même mot dans toutes les langues.
+const String kGifLabel = '🎞️ GIF';
+
+/// Un GIF : hébergé chez Giphy, ou un fichier .gif.
+bool isGifUrl(String url) {
+  if (url.isEmpty) return false;
+  final u = Uri.tryParse(url);
+  return (u?.host.toLowerCase().contains('giphy.com') ?? false) ||
+      (u?.path ?? url).toLowerCase().endsWith('.gif');
+}
+
 bool isVideoUrl(String url) {
   if (url.isEmpty) return false;
   final path = Uri.tryParse(url)?.path ?? url;
@@ -484,6 +496,7 @@ abstract final class ChatApi {
     bool imageBody = false,
     bool voiceBody = false,
     bool videoBody = false,
+    bool gifBody = false,
     bool special = false,
   }) async {
     // Message de groupe : pas de destinataire unique, le groupe envoie ses
@@ -503,7 +516,11 @@ abstract final class ChatApi {
               ? AppStrings.tIn(lang, 'voice_message')
               : (videoBody
                   ? AppStrings.tIn(lang, 'push_video')
-                  : (imageBody ? AppStrings.tIn(lang, 'push_photo') : body))),
+                  : (gifBody
+                      ? kGifLabel
+                      : (imageBody
+                          ? AppStrings.tIn(lang, 'push_photo')
+                          : body)))),
       type: 'message',
       data: {
         'conversationId': conversationId,
@@ -764,7 +781,7 @@ abstract final class ChatApi {
       senderName: senderName,
       conversationId: conversationId,
       senderId: senderId,
-      imageBody: true,
+      gifBody: true,
     ));
   }
 

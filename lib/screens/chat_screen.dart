@@ -2024,6 +2024,8 @@ class _FriendChatRow extends StatelessWidget {
               ? AppStrings.t('quiz_preview')
               : lastMessage!.isVideo
               ? AppStrings.t('push_video')
+              : isGifUrl(lastMessage!.imageUrl)
+              ? kGifLabel
               : lastMessage!.isImage
                   ? AppStrings.t('push_photo')
                   : lastMessage!.body,

@@ -122,6 +122,8 @@ class GroupChatRow extends StatelessWidget {
       preview = AppStrings.t('chat_preview_deleted_peer');
     } else if (m.isVideo) {
       preview = AppStrings.t('push_video');
+    } else if (isGifUrl(m.imageUrl)) {
+      preview = kGifLabel;
     } else if (m.isImage) {
       preview = AppStrings.t('push_photo');
     } else if (m.isVoice) {

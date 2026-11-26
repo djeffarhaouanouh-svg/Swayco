@@ -1797,7 +1797,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         'message_sent',
         props: {'source': 'chat', 'type': 'video'},
       );
-      if (_isGroup) _notifyGroup('');
+      if (_isGroup) _notifyGroup(AppStrings.t('push_video'));
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.msgSent);
       if (mounted) setState(() => _replyTo = null);
@@ -1854,7 +1854,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         'message_sent',
         props: {'source': 'chat', 'type': 'gif'},
       );
-      if (_isGroup) _notifyGroup('');
+      if (_isGroup) _notifyGroup(kGifLabel);
       HapticFeedback.lightImpact();
       SwaycoSounds.play(SwSound.msgSent);
       if (mounted) setState(() => _replyTo = null);

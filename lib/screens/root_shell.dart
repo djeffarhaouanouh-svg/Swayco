@@ -212,10 +212,27 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (intent == null || !mounted) return;
     switch (intent.type) {
       case 'match':
-        // Both sides get the celebration: the peer who accepted sees it on
-        // the spot, this one when the "c'est un match" push lands.
+        // Toucher « c'est un match » ouvre la DISCUSSION (avant, on restait
+        // sur Discover). L'animation est alors notée comme vue.
         final peerId = intent.data['peerId']?.toString() ?? '';
-        if (peerId.isNotEmpty) MatchCelebration.offer(peerId);
+        if (peerId.isNotEmpty) {
+          MatchCelebration.markShown(peerId);
+          NavTab.select(NavTab.chat);
+          unawaited(_openThreadFromPush({'senderId': peerId}));
+        }
+      case 'wave':
+      case 'call_reminder':
+        // Un signe 👋 ou un rappel d'appel : la conversation avec la personne.
+        final from = (intent.data['senderId'] ?? intent.data['peerId'])
+                ?.toString() ??
+            '';
+        NavTab.select(NavTab.chat);
+        if (from.isNotEmpty) {
+          unawaited(_openThreadFromPush({'senderId': from}));
+        }
+      case 'friend_request':
+        // Une demande reçue : la page des demandes (pas encore de discussion).
+        _selectTab(NavTab.demandes);
       case 'message':
       case 'reaction':
         // L'onglet Messages ET le fil concerné : on a touché la notification

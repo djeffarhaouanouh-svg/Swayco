@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_strings.dart';
-import 'chat_api.dart' show isVideoUrl;
+import 'chat_api.dart' show isGifUrl, isVideoUrl, kGifLabel;
 import 'chat_reads.dart';
 import 'message_banner.dart';
 import 'message_reactions.dart';
@@ -177,7 +177,9 @@ abstract final class ChatUnread {
           : audioUrl.isNotEmpty
           ? AppStrings.t('push_voice')
           : imageUrl.isNotEmpty
-              ? AppStrings.t(isVideoUrl(imageUrl) ? 'push_video' : 'push_photo')
+              ? isGifUrl(imageUrl)
+              ? kGifLabel
+              : AppStrings.t(isVideoUrl(imageUrl) ? 'push_video' : 'push_photo')
               : body,
     ));
   }
@@ -312,7 +314,9 @@ abstract final class ChatUnread {
       final text = (r['audio_url']?.toString() ?? '').isNotEmpty
           ? AppStrings.t('push_voice')
           : imageUrl.isNotEmpty
-              ? AppStrings.t(isVideoUrl(imageUrl) ? 'push_video' : 'push_photo')
+              ? isGifUrl(imageUrl)
+              ? kGifLabel
+              : AppStrings.t(isVideoUrl(imageUrl) ? 'push_video' : 'push_photo')
               : body;
       MessageBanner.offer(MessageBannerIntent(
         conversationId: convId,
