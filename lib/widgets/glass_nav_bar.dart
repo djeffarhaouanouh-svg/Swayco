@@ -337,36 +337,45 @@ class _GlassNavBarState extends State<GlassNavBar>
     }
 
     // BackdropFilter glass path (Android / web).
-    return ClipRRect(
+    final glass = ClipRRect(
       borderRadius: radius,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
         child: Container(
           decoration: BoxDecoration(
+            // En clair, un blanc presque plein et un bord net : sur un fond
+            // blanc, le verre translucide ne se voyait pas du tout.
             color: SC.light
-                ? SwaycoPalette.light.navGlass
+                ? const Color(0xF2FFFFFF)
                 : Colors.white.withValues(alpha: 0.13),
             borderRadius: radius,
             border: Border.all(
               color: SC.light
-                  ? SwaycoPalette.light.navBorder
+                  ? const Color(0x2604123A)
                   : Colors.white.withValues(alpha: 0.22),
               width: 1.2,
             ),
-            boxShadow: SC.light
-                ? const [
-                    BoxShadow(
-                      color: Color(0x3304123A),
-                      blurRadius: 30,
-                      spreadRadius: -10,
-                      offset: Offset(0, 10),
-                    ),
-                  ]
-                : null,
           ),
           child: inner,
         ),
       ),
+    );
+    if (!SC.light) return glass;
+    // L'ombre est AUTOUR de la découpe : posée à l'intérieur, elle était rognée
+    // et la barre n'avait plus aucun relief.
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        borderRadius: radius,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x3304123A),
+            blurRadius: 24,
+            spreadRadius: -4,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: glass,
     );
   }
 }

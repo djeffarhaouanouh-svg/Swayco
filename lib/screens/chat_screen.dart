@@ -85,6 +85,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Set<String> _matchedIds = const {};
   Map<String, ChatMessage> _latestByConv = const {};
 
+  /// La dernière activité avec chaque ami (message, appel ou match) : classe les
+  /// lignes, mêlées aux groupes et à Swayco.
+  Map<String, DateTime> _activityById = const {};
+
   /// Demandes de message special deja traitees (acceptees ou refusees).
   Set<String> _specialHandled = const {};
   // Raw inbound messages (not yet known-seen at _reload() time) — the read
@@ -375,6 +379,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         setState(() {
           _myId = id;
           _friends = const [];
+          _activityById = const {};
           _matchedIds = const {};
           _loading = false;
         });
@@ -472,12 +477,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // La date qui classe une ligne : le dernier message, ou le dernier appel
       // si celui-ci est plus récent. Appeler quelqu'un le fait donc remonter en
       // tête, comme lui écrire.
+      // La date du MATCH compte aussi : un nouvel ami apparaît en haut, même
+      // sans message, puis descend naturellement si personne n'écrit.
       DateTime? lastTouch(String peerId) {
-        final msg = latest[convIdFor(peerId)]?.createdAt;
-        final call = touched[peerId];
-        if (msg == null) return call;
-        if (call == null) return msg;
-        return call.isAfter(msg) ? call : msg;
+        DateTime? best;
+        for (final t in [
+          latest[convIdFor(peerId)]?.createdAt,
+          touched[peerId],
+          matchedAtById[peerId],
+        ]) {
+          if (t != null && (best == null || t.isAfter(best))) best = t;
+        }
+        return best;
       }
 
       final friends = visible.toList()
@@ -559,6 +570,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _specialHandled = specialHandled;
         _myId = id;
         _friends = friends;
+        _activityById = {
+          for (final p in friends)
+            if (lastTouch(p.id) != null) p.id: lastTouch(p.id)!,
+        };
         _matchedIds = {for (final p in matches) p.id};
         _latestByConv = latest;
         _inbound = inbound;
@@ -814,7 +829,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   /// Les rangées de conversations : amis, groupes et la ligne « Swayco » mêlés,
-  /// du plus récent au plus ancien. Les amis sans message restent en bas.
+  /// du plus récent au plus ancien. Un ami sans aucune date reste en bas.
   List<({RemoteProfile? peer, ChatGroup? group, bool official})> _listEntries() {
     final dms = _friends.where((p) => !_isSpecialPending(p)).toList();
     // Groupes et Swayco : classés par leur date, comme les conversations.
@@ -825,7 +840,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final out = <({RemoteProfile? peer, ChatGroup? group, bool official})>[];
     var gi = 0;
     for (final p in dms) {
-      final t = _latestByConv[_conversationIdFor(p.id)]?.createdAt;
+      final t = _activityById[p.id];
       while (gi < extras.length && (t == null || extras[gi].t.isAfter(t))) {
         out.add((peer: null, group: extras[gi].group, official: extras[gi].official));
         gi++;
