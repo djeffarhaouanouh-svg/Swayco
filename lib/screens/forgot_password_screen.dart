@@ -144,123 +144,69 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: SwayOnb.screenBg,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: const BackButton(color: Colors.white),
-      ),
-      body: SwayHalo(
-        preset: SwayHaloPreset.login,
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Center(
-                      child: SwayTitle(
-                        AppStrings.t('forgot_pw_title'),
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      AppStrings.t('forgot_pw_subtitle'),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: SC.textMuted,
-                        fontSize: 14,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 26),
-                    SwayInput(
-                      controller: _emailCtrl,
-                      hint: AppStrings.t('login_email_hint'),
-                      keyboardType: TextInputType.emailAddress,
-                      textCapitalization: TextCapitalization.none,
-                      enabled: !_busy && !_sent,
-                    ),
-                    if (_sent) ...[
-                      const SizedBox(height: 14),
-                      SwayInput(
-                        controller: _codeCtrl,
-                        hint: AppStrings.t('forgot_pw_code_hint'),
-                        keyboardType: TextInputType.number,
-                        textCapitalization: TextCapitalization.none,
-                        enabled: !_busy,
-                      ),
-                    ],
-                    if (_error != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _error!,
-                        style: const TextStyle(
-                          color: Color(0xFFFFAB91),
-                          fontSize: 13,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                    if (_info != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _info!,
-                        style: const TextStyle(
-                          color: SC.accent,
-                          fontSize: 13,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SwayCta(
-                          label: AppStrings.t(
-                            _sent ? 'forgot_pw_code_cta' : 'forgot_pw_cta',
-                          ),
-                          onPressed: _busy
-                              ? null
-                              : _sent
-                                  ? _verifyCode
-                                  : _submit,
-                        ),
-                        if (_busy)
-                          const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: SwayOnb.onAccent,
-                            ),
-                          ),
-                      ],
-                    ),                    if (_sent) ...[
-                      const SizedBox(height: 6),
-                      Center(
-                        child: TextButton(
-                          onPressed: _busy ? null : _resend,
-                          child: Text(AppStrings.t('forgot_pw_resend')),
-                        ),
-                      ),
-                    ],
-
-                  ],
+    return SwayAuthPage(
+      title: AppStrings.t('forgot_pw_title'),
+      subtitle: AppStrings.t('forgot_pw_subtitle'),
+      onBack: () => Navigator.of(context).maybePop(),
+      children: [
+        SwayInput(
+          controller: _emailCtrl,
+          hint: AppStrings.t('login_email_hint'),
+          keyboardType: TextInputType.emailAddress,
+          textCapitalization: TextCapitalization.none,
+          enabled: !_busy && !_sent,
+        ),
+        if (_sent) ...[
+          const SizedBox(height: 10),
+          SwayInput(
+            controller: _codeCtrl,
+            hint: AppStrings.t('forgot_pw_code_hint'),
+            keyboardType: TextInputType.number,
+            textCapitalization: TextCapitalization.none,
+            enabled: !_busy,
+          ),
+        ],
+        if (_error != null) SwayAuthMessage(_error!, error: true),
+        if (_info != null) SwayAuthMessage(_info!),
+        const SizedBox(height: 18),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            SwayCta(
+              label: AppStrings.t(
+                _sent ? 'forgot_pw_code_cta' : 'forgot_pw_cta',
+              ),
+              onPressed: _busy
+                  ? null
+                  : _sent
+                      ? _verifyCode
+                      : _submit,
+            ),
+            if (_busy)
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: SwayOnb.onAccent,
                 ),
+              ),
+          ],
+        ),
+        if (_sent) ...[
+          const SizedBox(height: 10),
+          Center(
+            child: TextButton(
+              onPressed: _busy ? null : _resend,
+              style: TextButton.styleFrom(foregroundColor: SC.accent),
+              child: Text(
+                AppStrings.t('forgot_pw_resend'),
+                style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
           ),
-        ),
-      ),
+        ],
+      ],
     );
   }
 }

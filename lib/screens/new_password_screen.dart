@@ -97,114 +97,68 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: SwayOnb.screenBg,
-      body: SwayHalo(
-        preset: SwayHaloPreset.login,
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Center(
-                      child: SwayTitle(
-                        AppStrings.t('reset_pw_title'),
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      AppStrings.t('reset_pw_subtitle'),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: SC.textMuted,
-                        fontSize: 14,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 26),
-                    SwayInput(
-                      controller: _pwCtrl,
-                      hint: AppStrings.t('reset_pw_new_hint'),
-                      obscure: !_show,
-                      enabled: !_busy,
-                      textCapitalization: TextCapitalization.none,
-                      trailing: IconButton(
-                        onPressed: () => setState(() => _show = !_show),
-                        icon: Icon(
-                          _show
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                          color: SwayOnb.dim,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    SwayInput(
-                      controller: _confirmCtrl,
-                      hint: AppStrings.t('reset_pw_confirm_hint'),
-                      obscure: !_show,
-                      enabled: !_busy,
-                      textCapitalization: TextCapitalization.none,
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _error!,
-                        style: const TextStyle(
-                          color: Color(0xFFFFAB91),
-                          fontSize: 13,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                    if (_info != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _info!,
-                        style: const TextStyle(
-                          color: SC.accent,
-                          fontSize: 13,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SwayCta(
-                          label: AppStrings.t('reset_pw_cta'),
-                          onPressed: _busy ? null : _submit,
-                        ),
-                        if (_busy)
-                          const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: SwayOnb.onAccent,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    TextButton(
-                      onPressed: _busy ? null : widget.onDone,
-                      child: Text(AppStrings.t('login_btn_signin')),
-                    ),
-                  ],
-                ),
-              ),
+    return SwayAuthPage(
+      title: AppStrings.t('reset_pw_title'),
+      subtitle: AppStrings.t('reset_pw_subtitle'),
+      children: [
+        SwayInput(
+          controller: _pwCtrl,
+          hint: AppStrings.t('reset_pw_new_hint'),
+          obscure: !_show,
+          enabled: !_busy,
+          textCapitalization: TextCapitalization.none,
+          trailing: IconButton(
+            onPressed: () => setState(() => _show = !_show),
+            icon: Icon(
+              _show
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: SwayOnb.hintOnWhite,
+              size: 20,
             ),
           ),
         ),
-      ),
+        const SizedBox(height: 10),
+        SwayInput(
+          controller: _confirmCtrl,
+          hint: AppStrings.t('reset_pw_confirm_hint'),
+          obscure: !_show,
+          enabled: !_busy,
+          textCapitalization: TextCapitalization.none,
+        ),
+        if (_error != null) SwayAuthMessage(_error!, error: true),
+        if (_info != null) SwayAuthMessage(_info!),
+        const SizedBox(height: 18),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            SwayCta(
+              label: AppStrings.t('reset_pw_cta'),
+              onPressed: _busy ? null : _submit,
+            ),
+            if (_busy)
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: SwayOnb.onAccent,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Center(
+          child: TextButton(
+            onPressed: _busy ? null : widget.onDone,
+            style: TextButton.styleFrom(foregroundColor: SC.accent),
+            child: Text(
+              AppStrings.t('login_btn_signin'),
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

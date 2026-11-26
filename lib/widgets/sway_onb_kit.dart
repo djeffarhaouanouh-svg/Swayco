@@ -76,9 +76,11 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/app_strings.dart';
+import 'swayco_wordmark.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/persona_categories.dart';
@@ -269,6 +271,124 @@ class SwayTitle extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Le cadre des écrans « mot de passe » : le même habillage que la connexion
+/// (dégradé bleu, logo en haut, titre à gauche avec son dernier mot en pastille
+/// jaune, texte blanc), et un retour en rond de verre quand [onBack] est donné.
+class SwayAuthPage extends StatelessWidget {
+  const SwayAuthPage({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.children,
+    this.onBack,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(gradient: SwayOnb.stepGradient),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                  child: SizedBox(
+                    height: 44,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        const SwaycoWordmark(fontSize: 26, oColor: SC.accent),
+                        if (onBack != null)
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: IconButton(
+                              onPressed: onBack,
+                              tooltip: MaterialLocalizations.of(context)
+                                  .backButtonTooltip,
+                              style: IconButton.styleFrom(
+                                backgroundColor:
+                                    Colors.white.withValues(alpha: 0.18),
+                                fixedSize: const Size(44, 44),
+                              ),
+                              icon: const Icon(
+                                Icons.arrow_back_rounded,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(22, 48, 22, 24),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SwayTitle(title, size: 36),
+                            const SizedBox(height: 12),
+                            Text(
+                              subtitle,
+                              style: SwayOnb.body.copyWith(
+                                fontSize: 14,
+                                color: Colors.white.withValues(alpha: 0.9),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            ...children,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Le message d'erreur / d'information sous les champs de ces écrans.
+class SwayAuthMessage extends StatelessWidget {
+  const SwayAuthMessage(this.text, {super.key, this.error = false});
+
+  final String text;
+  final bool error;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: error ? const Color(0xFFFFE0D6) : SC.accent,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            height: 1.35,
+          ),
+        ),
+      );
 }
 
 /// Barre carrousel : segments pleine largeur, l'actif en jaune.
