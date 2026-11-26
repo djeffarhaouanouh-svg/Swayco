@@ -302,12 +302,18 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       // came back as new at the next poll.)
       final ids = await FriendshipApi.fetchMatchIds(myId);
       if (ids == null) return;
+      // Une lecture qui revient après la déconnexion (ou sous un autre compte)
+      // ne dit rien de MES matchs : elle ne doit rien faire oublier.
+      if (!mounted ||
+          (Supabase.instance.client.auth.currentUser?.id ?? '') != myId) {
+        return;
+      }
       if (!_matchWatchPrimed) {
         // Matches celebrated in an earlier session are remembered on disk, so
         // one made while the app was closed (an AI accepting my like) shows
         // its celebration now. With nothing stored yet (first launch), the
         // matches found are the baseline — don't replay every past match.
-        final hadHistory = await MatchCelebration.restore();
+        final hadHistory = await MatchCelebration.restore(myId);
         // Un match terminé puis refait doit se fêter de nouveau.
         if (hadHistory) MatchCelebration.forgetEnded(ids);
         final unseen = hadHistory

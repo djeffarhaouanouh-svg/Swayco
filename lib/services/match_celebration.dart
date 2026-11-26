@@ -8,6 +8,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 abstract final class MatchCelebration {
   static const String _kShownKey = 'match_celebrated_ids';
 
+  /// Le compte dont la mémoire est chargée. La mémoire est PAR COMPTE : avec une
+  /// seule liste pour tout le téléphone, se connecter à un autre compte faisait
+  /// « oublier » les matchs du premier ([forgetEnded]), qui étaient alors refêtés
+  /// au retour.
+  static String _account = '';
+
+  static String get _key => '${_kShownKey}_$_account';
+
   /// Signal : une célébration attend (l'id du dernier match offert), ou null une
   /// fois la file vidée. Les célébrations elles-mêmes sont dans [_queue] : avec
   /// une seule place, un 2e match arrivé pendant l'animation du 1er l'écrasait
@@ -32,10 +40,19 @@ abstract final class MatchCelebration {
   /// then treats the matches it finds as the baseline instead of replaying them.
   /// Without this, a match made while the app was CLOSED (an AI accepting
   /// your like, say) was swallowed as "already there" at the next launch.
-  static Future<bool> restore() async {
+  static Future<bool> restore(String accountId) async {
+    if (_account != accountId) {
+      // Changement de compte : on repart de SA mémoire, sans celle du précédent.
+      if (_account.isNotEmpty) {
+        _alreadyShown.clear();
+        _queue.clear();
+        pendingPeerId.value = null;
+      }
+      _account = accountId;
+    }
     try {
       final p = await SharedPreferences.getInstance();
-      final saved = p.getStringList(_kShownKey);
+      final saved = p.getStringList(_key);
       if (saved == null) return false;
       _alreadyShown.addAll(saved);
       return true;
@@ -46,9 +63,11 @@ abstract final class MatchCelebration {
   }
 
   static Future<void> _persist() async {
+    // Aucun compte chargé : gardé en mémoire, écrit au prochain passage.
+    if (_account.isEmpty) return;
     try {
       final p = await SharedPreferences.getInstance();
-      await p.setStringList(_kShownKey, _alreadyShown.toList());
+      await p.setStringList(_key, _alreadyShown.toList());
     } catch (e) {
       debugPrint('match: persist failed: $e');
     }
