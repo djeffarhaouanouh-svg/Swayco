@@ -223,6 +223,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final isSignUp = _mode == _Mode.signUp;
     final size = MediaQuery.sizeOf(context);
+    // Lu AU-DESSUS du Scaffold (qui l'efface pour son contenu).
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       // The gradient sits BEHIND the transparent Scaffold, so any strip the
@@ -279,37 +281,64 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
+                // L'écran est FIXE : tel qu'il est dessiné, sans défilement. Sur
+                // un téléphone trop court, l'ensemble rétrécit juste ce qu'il
+                // faut pour tenir. Il ne défile que clavier ouvert. (L'arbre ne
+                // change pas à l'ouverture du clavier : sinon le champ perdrait
+                // le focus.)
                 SafeArea(
                   bottom: false,
-                  child: SingleChildScrollView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 18),
-                        const SwaycoWordmark(
-                          fontSize: 26,
-                          oColor: SC.accent,
-                          shadows: [
-                            Shadow(color: Color(0x40000000), blurRadius: 8),
-                          ],
+                  child: LayoutBuilder(
+                    builder: (context, box) => SingleChildScrollView(
+                      physics: const ClampingScrollPhysics(),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight:
+                              keyboardOpen ? double.infinity : box.maxHeight,
                         ),
-                        SizedBox(height: size.height * 0.30),
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            22,
-                            0,
-                            22,
-                            MediaQuery.paddingOf(context).bottom + 24,
-                          ),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 420),
-                              child: _form(isSignUp),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.topCenter,
+                          child: SizedBox(
+                            width: box.maxWidth,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const SizedBox(height: 18),
+                                const SwaycoWordmark(
+                                  fontSize: 26,
+                                  oColor: SC.accent,
+                                  shadows: [
+                                    Shadow(
+                                      color: Color(0x40000000),
+                                      blurRadius: 8,
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: size.height * 0.30),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    22,
+                                    0,
+                                    22,
+                                    8,
+                                  ),
+                                  child: Center(
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 420,
+                                      ),
+                                      child: _form(isSignUp),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
