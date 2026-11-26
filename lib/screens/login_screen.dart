@@ -223,6 +223,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final isSignUp = _mode == _Mode.signUp;
     final size = MediaQuery.sizeOf(context);
+    // Petit écran : espacements resserrés et photo moins haute, pour que tout
+    // tienne sans défiler.
+    final compact = size.height < 760;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       // The gradient sits BEHIND the transparent Scaffold, so any strip the
@@ -242,7 +245,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   top: _kPhotoTop,
                   left: 0,
                   right: 0,
-                  height: size.height * 0.58,
+                  height: size.height * (compact ? 0.48 : 0.58),
                   child: ShaderMask(
                     blendMode: BlendMode.dstIn,
                     shaderCallback: (rect) => const LinearGradient(
@@ -279,38 +282,60 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
+                // Logo FIXE en haut ; dessous, le formulaire collé en bas. Sur
+                // un petit écran il remonte (jusqu'au logo) ; il ne défile que
+                // s'il ne rentre vraiment pas (clavier ouvert, très petit
+                // téléphone).
                 SafeArea(
                   bottom: false,
-                  child: SingleChildScrollView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 18),
-                        const SwaycoWordmark(
-                          fontSize: 26,
-                          oColor: SC.accent,
-                          shadows: [
-                            Shadow(color: Color(0x40000000), blurRadius: 8),
-                          ],
-                        ),
-                        SizedBox(height: size.height * 0.30),
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            22,
-                            0,
-                            22,
-                            MediaQuery.paddingOf(context).bottom + 24,
-                          ),
-                          child: Center(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 18),
+                      const SwaycoWordmark(
+                        fontSize: 26,
+                        oColor: SC.accent,
+                        shadows: [
+                          Shadow(color: Color(0x40000000), blurRadius: 8),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, box) => SingleChildScrollView(
+                            physics: const ClampingScrollPhysics(),
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
                             child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 420),
-                              child: _form(isSignUp),
+                              constraints: BoxConstraints(
+                                minHeight: box.maxHeight,
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Padding(
+                                    padding: EdgeInsets.fromLTRB(
+                                      22,
+                                      0,
+                                      22,
+                                      MediaQuery.paddingOf(context).bottom +
+                                          (compact ? 10 : 24),
+                                    ),
+                                    child: Center(
+                                      child: ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 420,
+                                        ),
+                                        child: _form(isSignUp, compact),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -321,7 +346,9 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _form(bool isSignUp) {
+  Widget _form(bool isSignUp, bool compact) {
+    // Les grands espaces du formulaire, réduits sur un petit écran.
+    final gap = compact ? 9.0 : 14.0;
     final soft = Colors.white.withValues(alpha: 0.9);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -331,16 +358,16 @@ class _LoginScreenState extends State<LoginScreen> {
           isSignUp
               ? AppStrings.t('login_title_signup')
               : AppStrings.t('login_title_signin'),
-          size: 30,
+          size: compact ? 25 : 30,
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: compact ? 6 : 10),
         Text(
           isSignUp
               ? AppStrings.t('login_subtitle_signup')
               : AppStrings.t('login_subtitle_signin'),
           style: SwayOnb.body.copyWith(fontSize: 14, color: soft),
         ),
-        const SizedBox(height: 18),
+        SizedBox(height: compact ? 11 : 18),
         SwayInput(
           controller: _emailCtrl,
           hint: AppStrings.t('login_email_hint'),
@@ -418,7 +445,7 @@ class _LoginScreenState extends State<LoginScreen> {
               label: Text(AppStrings.t('login_resend_confirm')),
             ),
           ),
-        const SizedBox(height: 14),
+        SizedBox(height: gap),
         Stack(
           alignment: Alignment.center,
           children: [
@@ -439,7 +466,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
           ],
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: gap),
         Row(
           children: [
             Expanded(
@@ -461,7 +488,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: gap),
         _SocialButton(
           leading: SvgPicture.asset(
             'assets/google-logo-search-new-svgrepo-com.svg',
