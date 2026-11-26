@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../theme/swayco_theme.dart';
-import '../widgets/glass_panel.dart';
 import 'app_navigator.dart';
 import 'app_strings.dart';
 import 'notification_router.dart';
@@ -138,11 +136,18 @@ class _MessageBannerViewState extends State<_MessageBannerView>
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
           child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, -1.2),
-              end: Offset.zero,
-            ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic)),
+            position:
+                Tween<Offset>(
+                  begin: const Offset(0, -1.2),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic),
+                ),
             child: GestureDetector(
+              // La bannière passe DEVANT tout (sur un chat, par-dessus la photo
+              // du pair) et prend le tap sur toute sa surface : sinon il
+              // traversait ses zones vides et ouvrait le profil dessous.
+              behavior: HitTestBehavior.opaque,
               onTap: widget.onTap,
               onVerticalDragEnd: (d) {
                 if ((d.primaryVelocity ?? 0) < -200) widget.onDismiss();
@@ -153,49 +158,65 @@ class _MessageBannerViewState extends State<_MessageBannerView>
               // underline), which is exactly what showed up here.
               child: Material(
                 type: MaterialType.transparency,
-                child: GlassPanel(
-                  borderRadius: 18,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                // Blanche en clair comme en sombre (handoff notif_message_blanc).
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0x1A04123A)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x4704123A),
+                        blurRadius: 30,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
                   child: Row(
-                  children: [
-                    const Text('💬', style: TextStyle(fontSize: 20)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            intent.senderName.isEmpty
-                                ? AppStrings.t('push_new_message')
-                                : intent.senderName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: SC.textPrimary,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                          if (intent.preview.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                intent.preview,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: SC.textSecondary,
-                                  fontSize: 13,
-                                ),
+                    children: [
+                      const Text('💬', style: TextStyle(fontSize: 20)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              intent.senderName.isEmpty
+                                  ? AppStrings.t('push_new_message')
+                                  : intent.senderName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF04123A),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
                               ),
                             ),
-                        ],
+                            if (intent.preview.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  intent.preview,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  // Bleu nuit à 70 %.
+                                  style: const TextStyle(
+                                    color: Color(0xB304123A),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
               ),
             ),
           ),

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Swayco — Bannière de message dans l'app</title>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&amp;family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#E4E2DD}*{box-sizing:border-box}a{color:#04123A}a:hover{color:#1F5EFF}</style>
+</helmet>
+<section data-screen-label="Notif message" style="display:flex;flex-direction:column;gap:30px;padding:64px;width:1840px;font-family:'Plus Jakarta Sans',sans-serif;color:#04123A">
+<div style="display:flex;flex-direction:column;gap:8px;max-width:1000px"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:1px;color:#555">BANNIÈRE DE MESSAGE DANS L'APP · D'APRÈS message_banner.dart</span><span style="font-family:'Unbounded',sans-serif;font-weight:800;font-size:28px;letter-spacing:-.03em;line-height:1.12">Quatre couleurs, sur une photo Discover et sur une page claire.</span><span style="font-size:15px;line-height:1.5;color:#444;max-width:820px">Aujourd'hui, la bannière est un panneau de verre (GlassPanel, rayon 18) avec l'emoji 💬, le prénom et l'aperçu du message. Seule la couleur change ici : forme, taille, texte et animation restent ceux du code.</span></div>
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="2">
+<div style="display:flex;flex-direction:column;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:1px;color:#555">{{ r.title }}</span>
+<div style="display:flex;gap:28px">
+<sc-for list="{{ r.items }}" as="v" hint-placeholder-count="4">
+<div style="display:flex;flex-direction:column;gap:10px;width:390px"><span style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:12px;background:#F4FF1F;color:#04123A;padding:5px 11px;border-radius:99px">{{ v.tag }}</span>
+<div data-screen-label="{{ v.tag }}" style="position:relative;width:390px;height:190px;border-radius:28px;overflow:hidden;background:{{ v.bg }}">
+<div style="position:absolute;left:0;right:0;top:0;height:{{ v.photoH }}px;background:#222 url(uploads/0005_japanese.jpg) 50% 30%/cover"></div>
+<div style="position:absolute;left:0;right:0;top:0;height:{{ v.photoH }}px;background:{{ v.shade }}"></div>
+<div style="position:absolute;top:50px;left:12px;right:12px;display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:18px;background:{{ v.card }};border:1px solid {{ v.border }};box-shadow:{{ v.shadow }}"><span style="font-size:20px;line-height:1">💬</span><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:600;color:{{ v.title }};white-space:nowrap">Aiko</span><span style="font-size:13px;color:{{ v.text }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Salut ! Tu parles français ?</span></div></div>
+</div></div>
+</sc-for></div></div>
+</sc-for>
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const variants = [
+      { n: 'A · Bleu Swayco', card: 'linear-gradient(135deg,#1F5EFF,#2B7FFF 55%,#18DDEA)', border: 'transparent', title: '#FFFFFF', text: 'rgba(255,255,255,.92)', sd: '0 10px 30px rgba(31,94,255,.45)' },
+      { n: 'B · Gris des pop-ups', card: 'linear-gradient(180deg,#1A2040,#16161E)', border: 'rgba(255,255,255,.14)', title: '#FFFFFF', text: 'rgba(245,247,255,.8)', sd: '0 10px 30px rgba(0,0,0,.5)' },
+      { n: 'C · Jaune', card: '#F4FF1F', border: 'transparent', title: '#04123A', text: 'rgba(4,18,58,.78)', sd: '0 10px 30px rgba(0,0,0,.35)' },
+      { n: 'D · Blanc', card: '#FFFFFF', border: 'rgba(4,18,58,.1)', title: '#04123A', text: 'rgba(4,18,58,.7)', sd: '0 10px 30px rgba(4,18,58,.28)' }
+    ];
+    const mk = (bg, photoH, shade) => variants.map(v => ({ tag: v.n, bg, photoH, shade, card: v.card, border: v.border, title: v.title, text: v.text, shadow: v.sd }));
+    return {
+      rows: [
+        { title: 'SUR LA PHOTO DE DISCOVER', items: mk('#0A0F1C', 190, 'linear-gradient(rgba(0,0,0,.45),rgba(0,0,0,.05) 70%)') },
+        { title: 'SUR UNE PAGE CLAIRE', items: mk('#F6F8FE', 0, 'transparent') }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
