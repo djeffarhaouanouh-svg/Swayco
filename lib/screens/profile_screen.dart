@@ -2108,6 +2108,7 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                   },
                   bottomPadding: 28,
                   alwaysScrollable: false,
+                  fillFreeSpace: false,
                   // La place du ✕ du visionneur, à droite du bandeau.
                   bandInsetRight: 58,
                   onClose: () => Navigator.of(context).pop(),

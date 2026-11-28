@@ -12,10 +12,7 @@ class VoiceIntroTranslation extends StatelessWidget {
     super.key,
     required this.profile,
     this.divider = false,
-    this.maxLines,
   });
-
-  final int? maxLines;
 
   final RemoteProfile profile;
 
@@ -50,9 +47,7 @@ class VoiceIntroTranslation extends StatelessWidget {
             fromLang: profile.voiceIntroLang.isNotEmpty
                 ? profile.voiceIntroLang
                 : profile.language,
-            showNote: maxLines == null,
-            maxLines: maxLines,
-            overflow: maxLines == null ? null : TextOverflow.ellipsis,
+            showNote: true,
             textAlign: TextAlign.start,
             style: TextStyle(
               color: ink.withValues(alpha: 0.85),

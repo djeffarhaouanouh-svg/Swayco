@@ -1282,7 +1282,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': 'Toutes les visites de ton profil seront effacées.',
     'profile_views_off': 'Historique des vues désactivé',
     'profile_views_chat': 'Envoyer un message',
-    'voice_intro_none': 'Pas encore de message vocal',
     'login_err_generic': 'Une erreur est survenue. Réessaie dans un instant.',
     'friend_limit_week': 'Tu as atteint ta limite de nouvelles personnes pour cette semaine. Passe à Pro pour en ajouter sans limite.',
     'login_check_inbox':
@@ -2608,7 +2607,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': 'All visits to your profile will be erased.',
     'profile_views_off': 'View history is off',
     'profile_views_chat': 'Send a message',
-    'voice_intro_none': 'No voice message yet',
     'login_err_generic': 'Something went wrong. Please try again in a moment.',
     'friend_limit_week': 'You\'ve reached this week\'s limit for new connections. Go Pro to add more without limits.',
     'login_check_inbox': 'Check your inbox — we sent you a confirmation link.',
@@ -3986,7 +3984,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': 'Se borrarán todas las visitas a tu perfil.',
     'profile_views_off': 'Historial de visitas desactivado',
     'profile_views_chat': 'Enviar un mensaje',
-    'voice_intro_none': 'Aún no hay mensaje de voz',
     'login_err_generic': 'Algo salió mal. Inténtalo de nuevo en un momento.',
     'friend_limit_week': 'Has alcanzado el límite de nuevas conexiones de esta semana. Pásate a Pro para añadir más sin límite.',
     'login_check_inbox':
@@ -5304,7 +5301,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': 'Alle Aufrufe deines Profils werden gelöscht.',
     'profile_views_off': 'Aufrufverlauf ist aus',
     'profile_views_chat': 'Nachricht senden',
-    'voice_intro_none': 'Noch keine Sprachnachricht',
     'login_err_generic': 'Etwas ist schiefgelaufen. Versuche es gleich noch einmal.',
     'friend_limit_week': 'Du hast das Limit für neue Kontakte in dieser Woche erreicht. Mit Pro kannst du unbegrenzt weitere hinzufügen.',
     'login_check_inbox':
@@ -6627,7 +6623,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': 'Tutte le visite al tuo profilo verranno cancellate.',
     'profile_views_off': 'Cronologia visite disattivata',
     'profile_views_chat': 'Invia un messaggio',
-    'voice_intro_none': 'Ancora nessun messaggio vocale',
     'login_err_generic': 'Qualcosa è andato storto. Riprova tra un attimo.',
     'friend_limit_week': 'Hai raggiunto il limite di nuove connessioni di questa settimana. Passa a Pro per aggiungerne senza limiti.',
     'login_check_inbox':
@@ -7950,7 +7945,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': 'Todas as visitas ao teu perfil serão apagadas.',
     'profile_views_off': 'Histórico de visitas desativado',
     'profile_views_chat': 'Enviar mensagem',
-    'voice_intro_none': 'Ainda sem mensagem de voz',
     'login_err_generic': 'Ocorreu um erro. Tenta de novo daqui a pouco.',
     'friend_limit_week': 'Atingiste o limite de novas ligações desta semana. Passa ao Pro para adicionar sem limites.',
     'login_check_inbox':
@@ -9231,7 +9225,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': 'Todas as visitas ao seu perfil serão apagadas.',
     'profile_views_off': 'Histórico de visitas desativado',
     'profile_views_chat': 'Enviar mensagem',
-    'voice_intro_none': 'Ainda sem mensagem de voz',
     'login_err_generic': 'Algo deu errado. Tente de novo em instantes.',
     'friend_limit_week': 'Você atingiu o limite de novas conexões desta semana. Assine o Pro para adicionar sem limites.',
     'login_check_inbox': 'Verifique sua caixa de entrada — enviamos um link de confirmação para você.',
@@ -10548,7 +10541,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': 'Alle bezoeken aan je profiel worden gewist.',
     'profile_views_off': 'Weergavegeschiedenis staat uit',
     'profile_views_chat': 'Bericht sturen',
-    'voice_intro_none': 'Nog geen spraakbericht',
     'login_err_generic': 'Er ging iets mis. Probeer het zo meteen opnieuw.',
     'friend_limit_week': 'Je hebt de limiet voor nieuwe contacten van deze week bereikt. Ga naar Pro om onbeperkt toe te voegen.',
     'login_check_inbox':
@@ -11856,7 +11848,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': 'سيتم مسح كل الزيارات إلى ملفك.',
     'profile_views_off': 'سجل المشاهدات متوقف',
     'profile_views_chat': 'إرسال رسالة',
-    'voice_intro_none': 'لا توجد رسالة صوتية بعد',
     'login_err_generic': 'حدث خطأ ما. حاول مجددًا بعد قليل.',
     'friend_limit_week': 'وصلت إلى حد الأصدقاء الجدد لهذا الأسبوع. اشترك في Pro للإضافة دون حدود.',
     'login_check_inbox': 'تحقق من صندوق الوارد — أرسلنا لك رابط تأكيد.',
@@ -13176,7 +13167,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': 'Все визиты в твой профиль будут удалены.',
     'profile_views_off': 'История просмотров выключена',
     'profile_views_chat': 'Написать',
-    'voice_intro_none': 'Пока нет голосового сообщения',
     'login_err_generic': 'Что-то пошло не так. Попробуй ещё раз чуть позже.',
     'friend_limit_week': 'Ты достиг недельного лимита новых знакомств. Оформи Pro, чтобы добавлять без ограничений.',
     'login_check_inbox':
@@ -14446,7 +14436,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': '你资料的所有访问记录都将被清除。',
     'profile_views_off': '访问记录已关闭',
     'profile_views_chat': '发消息',
-    'voice_intro_none': '还没有语音消息',
     'login_err_generic': '出了点问题，请稍后再试。',
     'friend_limit_week': '你已达到本周新增好友的上限。升级 Pro 即可不限数量添加。',
     'login_check_inbox': '请查收邮箱 — 我们已向你发送了一个确认链接。',
@@ -15720,7 +15709,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': 'プロフィールの訪問履歴がすべて消去されます。',
     'profile_views_off': '閲覧履歴はオフです',
     'profile_views_chat': 'メッセージを送る',
-    'voice_intro_none': 'ボイスメッセージはまだありません',
     'login_err_generic': '問題が発生しました。しばらくしてからもう一度お試しください。',
     'friend_limit_week': '今週の新しいつながりの上限に達しました。Proにすると無制限に追加できます。',
     'login_check_inbox': '受信トレイを確認してください — 確認リンクを送信しました。',
@@ -16989,7 +16977,6 @@ abstract final class AppStrings {
     'profile_views_clear_confirm': '내 프로필의 모든 방문 기록이 지워져요.',
     'profile_views_off': '조회 기록이 꺼져 있어요',
     'profile_views_chat': '메시지 보내기',
-    'voice_intro_none': '아직 음성 메시지가 없어요',
     'login_err_generic': '문제가 생겼어요. 잠시 후 다시 시도해 주세요.',
     'friend_limit_week': '이번 주 새 인연 추가 한도에 도달했어요. Pro로 업그레이드하면 제한 없이 추가할 수 있어요.',
     'login_check_inbox': '받은편지함을 확인하세요 — 확인 링크를 보내드렸어요.',

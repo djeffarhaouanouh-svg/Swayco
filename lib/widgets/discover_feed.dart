@@ -22,10 +22,6 @@ import 'round_flag.dart';
 /// Une carte du fil : la personne et ses photos (au moins une).
 typedef FeedEntry = ({RemoteProfile profile, List<String> photos});
 
-/// La page passeport d'une carte ; [open] devient vrai quand elle est à l'écran.
-typedef PassportBuilder = Widget Function(
-    BuildContext context, RemoteProfile profile, bool open);
-
 const Color _kInk = Color(0xFF04123A);
 const Color _kYellow = Color(0xFFF4FF1F);
 const Color _kHeart = Color(0xFFFF5C8A);
@@ -59,12 +55,7 @@ class DiscoverFeed extends StatefulWidget {
     required this.footer,
     required this.bottomSpace,
     required this.maxCardHeight,
-    this.passportBuilder,
   });
-
-  /// Le passeport d'une personne, glissé dans le carrousel de sa carte, après
-  /// la première photo.
-  final PassportBuilder? passportBuilder;
 
   final ScrollController controller;
   final List<FeedEntry> entries;
@@ -294,7 +285,6 @@ class _DiscoverFeedState extends State<DiscoverFeed> {
                                       onOpenProfile: () =>
                                           widget.onOpenProfile(p),
                                       onLike: () => widget.onToggleLike(p),
-                                      passportBuilder: widget.passportBuilder,
                                     ),
                                   ),
                                 ),
@@ -405,14 +395,12 @@ class _FeedCard extends StatelessWidget {
     required this.liked,
     required this.onOpenProfile,
     required this.onLike,
-    this.passportBuilder,
   });
 
   final FeedEntry entry;
   final bool liked;
   final VoidCallback onOpenProfile;
   final VoidCallback onLike;
-  final PassportBuilder? passportBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -431,16 +419,15 @@ class _FeedCard extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(_kPhotoRadius),
-          child: _CardPhotos(
-            entry: entry,
-            passportBuilder: passportBuilder,
-            overlay: [
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _CardPhotos(entry: entry),
               Positioned(
                 left: 16,
                 right: 84, // la place du cœur
                 bottom: 14,
-                // On peut faire défiler les photos en partant du texte.
-                child: IgnorePointer(child: _CardInfo(profile: entry.profile)),
+                child: _CardInfo(profile: entry.profile),
               ),
               Positioned(
                 right: 12,
@@ -456,19 +443,10 @@ class _FeedCard extends StatelessWidget {
 }
 
 /// Le carrousel : on fait défiler les photos de gauche à droite dans la carte.
-/// La deuxième page est le passeport de la personne.
 class _CardPhotos extends StatefulWidget {
-  const _CardPhotos({
-    required this.entry,
-    required this.overlay,
-    this.passportBuilder,
-  });
+  const _CardPhotos({required this.entry});
 
   final FeedEntry entry;
-
-  /// Le nom, les puces et le cœur : sur les photos, pas sur le passeport.
-  final List<Widget> overlay;
-  final PassportBuilder? passportBuilder;
 
   @override
   State<_CardPhotos> createState() => _CardPhotosState();
@@ -488,18 +466,12 @@ class _CardPhotosState extends State<_CardPhotos> {
   Widget build(BuildContext context) {
     final p = widget.entry.profile;
     final photos = widget.entry.photos;
-    final passport = widget.passportBuilder;
-    // La place du passeport dans le carrousel (-1 : aucun).
-    final passportAt = passport == null ? -1 : math.min(1, photos.length);
-    final pages = photos.length + (passport == null ? 0 : 1);
-    final dots = pages > 6 ? 6 : pages;
-    final index = pages == 0 ? 0 : _index.clamp(0, pages - 1);
-    // Au-delà de 6 pages, le point avance en proportion.
-    final active =
-        pages <= 6 ? index : (index * 5 / (pages - 1)).round();
-    final onPassport = index == passportAt;
-    // Sur le passeport clair, des points blancs ne se verraient pas.
-    final dotColor = onPassport && SC.light ? _kInk : Colors.white;
+    final dots = photos.length > 5 ? 5 : photos.length;
+    final index = photos.isEmpty ? 0 : _index.clamp(0, photos.length - 1);
+    // Au-delà de 5 photos, le point avance en proportion.
+    final active = photos.length <= 5
+        ? index
+        : (index * 4 / (photos.length - 1)).round();
     final popular = p.isPro || p.isPlus;
     return Stack(
       fit: StackFit.expand,
@@ -515,52 +487,32 @@ class _CardPhotosState extends State<_CardPhotos> {
           child: PageView.builder(
             controller: _pages,
             physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
-            itemCount: pages,
+            itemCount: photos.length,
             onPageChanged: (i) => setState(() => _index = i),
-            itemBuilder: (context, i) {
-              if (i == passportAt) {
-                return passport!(context, p, index == passportAt);
-              }
-              final photo = passportAt >= 0 && i > passportAt ? i - 1 : i;
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    photos[photo],
-                    fit: BoxFit.cover,
-                    // Cadrée sur le visage.
-                    alignment: const Alignment(0, -0.55),
-                    gaplessPlayback: true,
-                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                  ),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0x4D000000),
-                          Color(0x00000000),
-                          Color(0x00000000),
-                          Color(0xB8000000),
-                        ],
-                        stops: [0, 0.22, 0.52, 1],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
+            itemBuilder: (context, i) => Image.network(
+              photos[i],
+              fit: BoxFit.cover,
+              // Cadrée sur le visage.
+              alignment: const Alignment(0, -0.55),
+              gaplessPlayback: true,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
           ),
         ),
-        // Le nom et le cœur s'effacent devant le passeport.
-        Positioned.fill(
-          child: IgnorePointer(
-            ignoring: onPassport,
-            child: AnimatedOpacity(
-              opacity: onPassport ? 0 : 1,
-              duration: const Duration(milliseconds: 180),
-              child: Stack(children: widget.overlay),
+        const IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0x4D000000),
+                  Color(0x00000000),
+                  Color(0x00000000),
+                  Color(0xB8000000),
+                ],
+                stops: [0, 0.22, 0.52, 1],
+              ),
             ),
           ),
         ),
@@ -580,22 +532,19 @@ class _CardPhotosState extends State<_CardPhotos> {
                       height: 5,
                       margin: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(
-                        color: dotColor
-                            .withValues(alpha: i == active ? 1 : 0.4),
+                        color: Colors.white
+                            .withValues(alpha: i == active ? 1 : 0.55),
                         borderRadius: BorderRadius.circular(99),
-                        boxShadow: dotColor == Colors.white
-                            ? const [
-                                BoxShadow(
-                                    color: Color(0x59000000), blurRadius: 4),
-                              ]
-                            : null,
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x59000000), blurRadius: 4),
+                        ],
                       ),
                     ),
                 ],
               ),
             ),
           ),
-        if (!onPassport && (popular || p.isNewcomer))
+        if (popular || p.isNewcomer)
           Positioned(
             top: 12,
             left: 12,
