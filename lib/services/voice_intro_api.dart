@@ -11,9 +11,9 @@ import 'push_dispatcher.dart';
 import 'supabase_service.dart';
 import 'voice_recorder.dart';
 
-/// Durée maximale d'une présentation vocale. Mesurée sur des phrases types : une
-/// présentation complète de trois phrases (~180 caractères) dure environ 17 s à
-/// voix posée.
+/// Durée maximale d'une présentation vocale. Mesurée sur des phrases types (voix
+/// de synthèse) : trois phrases (~180 caractères) durent 13 à 16 s, quatre
+/// (~250 caractères) 18 à 22 s.
 const int kVoiceIntroMaxMs = 20000;
 
 /// La présentation vocale du profil (migration 0098) : le fichier vit dans le
