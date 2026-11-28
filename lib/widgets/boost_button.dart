@@ -123,7 +123,8 @@ class BoostButton extends StatelessWidget {
           active,
           26,
           Container(
-            height: 52,
+            width: double.infinity,
+            height: 54,
             padding: const EdgeInsets.fromLTRB(18, 0, 24, 0),
             decoration: BoxDecoration(
               gradient: active ? null : SC.brandGradient,
@@ -140,25 +141,30 @@ class BoostButton extends StatelessWidget {
                       ),
                     ],
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.rocket_launch_rounded,
-                  size: 22,
-                  color: active ? SC.brandCyan : SC.accent,
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.rocket_launch_rounded,
+                      size: 24,
+                      color: active ? SC.brandCyan : Colors.white,
+                    ),
+                    const SizedBox(width: 9),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: popupDisplay(
+                        fontSize: 15,
+                        color: active ? SC.brandCyan : Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  maxLines: 1,
-                  softWrap: false,
-                  style: popupDisplay(
-                    fontSize: 14,
-                    color: active ? SC.brandCyan : Colors.white,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),

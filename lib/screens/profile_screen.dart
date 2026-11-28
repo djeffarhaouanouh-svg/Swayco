@@ -14,6 +14,9 @@ import 'package:image_picker/image_picker.dart';
 import '../services/analytics.dart';
 
 import '../services/app_strings.dart';
+import '../services/profile_views_api.dart';
+import '../widgets/profile_views_card.dart';
+import 'profile_views_screen.dart';
 import '../widgets/my_bio_card.dart';
 import '../widgets/voice_intro_player.dart';
 import '../services/saved_profiles_api.dart';
@@ -57,7 +60,6 @@ import '../widgets/swayco_animations.dart';
 import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_popups_extra.dart';
 import '../widgets/wheel_picker_sheet.dart';
-import '../widgets/boost_button.dart';
 import '../widgets/pro_banner.dart';
 import 'chat_thread_screen.dart';
 import 'photo_crop_screen.dart';
@@ -190,6 +192,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     final viewer = _isViewingOther;
     final canQuery = isSupabaseReady && deviceId.isNotEmpty;
     unawaited(_loadSaved());
+    // Une vue de profil (une fois à l'ouverture ; pas mon aperçu).
+    final seenPeer = widget.userId;
+    if (!silent && !widget.preview && seenPeer != null) {
+      unawaited(ProfileViewsApi.record(seenPeer));
+    }
     final results = await Future.wait<Object?>([
       // Cache local (mon profil seulement) : instantanÃ©, mais il attendait
       // quand mÃªme son tour derriÃ¨re le rÃ©seau.
@@ -235,21 +242,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       _peerLikedMe = rel?.peerLikedMe ?? false;
       _loading = false;
     });
-  }
-
-  /// The backend credits a Boost from the RevenueCat webhook, a few seconds
-  /// after the store sheet closes: poll my row until boosted_until shows up.
-  Future<void> _awaitBoostCredit() async {
-    for (var i = 0; i < 10; i++) {
-      await Future<void>.delayed(const Duration(seconds: 2));
-      if (!mounted) return;
-      final me = await ProfileApi.fetchById(_deviceId);
-      if (!mounted) return;
-      if (me != null && me.isBoosted) {
-        setState(() => _remote = me);
-        return;
-      }
-    }
   }
 
   Future<void> _unmatchPeer() async {
@@ -1282,19 +1274,15 @@ class _ProfileScreenState extends State<ProfileScreen>
           ],
         ),
         children: [
-          ValueListenableBuilder<bool>(
-            valueListenable: RevenueCat.proActive,
-            builder: (_, pro, _) => pro
-                ? const SizedBox.shrink()
-                : section(const ProBanner(), top: 0),
-          ),
           section(
-            BoostButton(
-              boostedUntil: remote?.boostedUntil,
-              onPurchased: _awaitBoostCredit,
-              hero: true,
+            ProfileViewsCard(
+              onOpen: () => Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => const ProfileViewsScreen(),
+                ),
+              ),
             ),
-            top: 14,
+            top: 0,
           ),
           section(
             _ProfileSectionHeader(
@@ -1352,6 +1340,12 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             ),
             top: 12,
+          ),
+          ValueListenableBuilder<bool>(
+            valueListenable: RevenueCat.proActive,
+            builder: (_, pro, _) => pro
+                ? const SizedBox.shrink()
+                : section(const ProBanner()),
           ),
           section(_ProfileSectionHeader(AppStrings.t('contact_title'))),
           section(const _ContactCard(), top: 12),
