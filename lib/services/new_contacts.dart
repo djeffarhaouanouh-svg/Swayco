@@ -8,7 +8,7 @@ import 'revenue_cat.dart';
 /// (date locale), le Pro est illimité. Local à l'appareil, comme les profils du
 /// jour. Répondre, ou continuer une conversation, ne compte jamais.
 abstract final class NewContacts {
-  static const int freeLimit = 5;
+  static const int freeLimit = 7;
 
   static String _key(String meId) => 'new_contacts_$meId';
 
