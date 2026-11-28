@@ -51,6 +51,7 @@ import '../widgets/sparkles.dart';
 import '../widgets/swayco_wordmark.dart';
 import '../widgets/translated_profile_text.dart';
 import '../widgets/voice_intro_player.dart';
+import '../widgets/voice_intro_translation.dart';
 import 'paywall_screen.dart';
 import '../services/daily_swipes.dart';
 import '../widgets/daily_limit_view.dart';
@@ -783,6 +784,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         onToggleLike: _toggleLike,
         onOpenProfile: _openProfile,
         onSeen: _onSeen,
+        passportBuilder: (_, p, open) => ProfileInfoPanel(
+          profile: p,
+          // La couverture s'ouvre quand le glissement l'amène à l'écran.
+          open: open,
+          embedded: true,
+          onClose: () {},
+        ),
         onScrollMoved: _onScrollMoved,
         nextAdGap: _nextAdGap,
         footer: Padding(
@@ -1444,13 +1452,14 @@ class ProfileInfoPanel extends StatefulWidget {
     this.bottomPadding = 96,
     this.alwaysScrollable = true,
     this.onContentHeight,
-    this.fillFreeSpace = true,
+    this.embedded = false,
   });
 
-  /// Sans bio, la carte d'infos s'étire pour remplir la place libre du panneau.
-  /// Faux dans la visionneuse du profil d'un pair : étirer ne sert à rien chez
-  /// quelqu'un qui n'a presque rien.
-  final bool fillFreeSpace;
+  /// Page du carrousel d'une carte Discover : pas de poignée ni de geste
+  /// vertical (le glisser vertical fait défiler le fil), rien ne défile — un
+  /// contenu trop haut est réduit pour tenir — et une bande en haut est laissée
+  /// aux points du carrousel.
+  final bool embedded;
 
   /// Hauteur dont le panneau a besoin pour montrer tout son contenu sans
   /// défiler (chrome compris). La visionneuse s'en sert pour n'agrandir le
@@ -1600,6 +1609,63 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
     return false;
   }
 
+  /// La page dessinée pour la taille d'une carte : le nom sur une ligne, la
+  /// bio et sa place pour l'audio en vraie taille, puis les cases du passeport
+  /// dans la hauteur qui reste (réduites seulement si elle ne suffit pas).
+  Widget _embeddedBody(RemoteProfile p) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _reveal(550, _PanelHeader(profile: p, compact: true)),
+          const SizedBox(height: 8),
+          _reveal(650, _PanelBio(profile: p, compact: true)),
+          const SizedBox(height: 10),
+          Expanded(
+            child: _reveal(
+              800,
+              LayoutBuilder(
+                builder: (context, box) => FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    width: box.maxWidth,
+                    child: ProfileInfoCard(
+                      profile: p,
+                      showHeader: false,
+                      framed: false,
+                      signReveal: _at(1000, 700),
+                      fillHeight: box.maxHeight,
+                      // Une ligne de puces : celles qui ne tiennent pas en
+                      // entier passent à la ligne, hors de vue.
+                      interestsBody: p.interests.isEmpty
+                          ? null
+                          : SizedBox(
+                              height: 36,
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 14,
+                                clipBehavior: Clip.hardEdge,
+                                children: [
+                                  for (final tag in p.interests)
+                                    InterestPill(
+                                      label: interestPillText(tag),
+                                    ),
+                                ],
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Animation d'un bloc : opacité 0→1 et translation 10→0 sur 450 ms, à partir
   /// de [startMs].
   Animation<double> _at(int startMs, [int durMs = 450]) => _ctl.drive(
@@ -1643,47 +1709,17 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
 
     // Les blocs, dans l'ordre d'apparition (550 / 650 / 700 / 800 / … ms).
     var step = 0;
+    final embedded = widget.embedded;
+    // La carte arrondit déjà les coins.
+    final radius = embedded ? BorderRadius.zero : _kPassportRadius;
     const starts = [550, 650, 700, 800, 900, 1000, 1100, 1200];
     int next() => starts[math.min(step++, starts.length - 1)];
 
     final content = <Widget>[
       _reveal(next(), _PanelHeader(profile: p, hideFlag: widget.hideFlag)),
       const SizedBox(height: 14),
-      if (p.bio.trim().isNotEmpty) ...[
-        _reveal(
-          next(),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                AppStrings.t('profile_bio_section').toUpperCase(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: bentoLabelStyle(),
-              ),
-              const SizedBox(height: 6),
-              TranslatedProfileText(
-                text: p.bio.trim(),
-                profileId: p.id,
-                field: 'bio',
-                fromLang: p.language,
-                showNote: true,
-                style: TextStyle(
-                  color: SC.light
-                      ? const Color(0xB804123A)
-                      : const Color(0xCCFFFFFF),
-                  fontSize: 13,
-                  height: 1.45,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-      ] else
-        // Le rang du bio est consomme meme sans bio : les delais restent ceux
-        // de la maquette.
-        const SizedBox.shrink(),
+      _reveal(next(), _PanelBio(profile: p)),
+      const SizedBox(height: 14),
       _reveal(
         next(),
         ProfileInfoCard(
@@ -1691,11 +1727,6 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
           showHeader: false,
           framed: false,
           signReveal: _at(1000, 700),
-          // Sans bio, la carte prend la place libre : poignée, bandeau, marges
-          // et en-tête (~226) retirés de la hauteur du panneau.
-          fillHeight: widget.fillFreeSpace && p.bio.trim().isEmpty
-              ? math.max(0.0, panelHeight - 226)
-              : null,
           interestsBody: p.interests.isEmpty
               ? null
               : Column(
@@ -1728,11 +1759,16 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
       behavior: HitTestBehavior.opaque,
       // Un glissement vers le bas suffit à le rabattre — pas de bouton. Un
       // coup sec OU 56 px parcourus : les deux ferment.
-      onVerticalDragStart: (_) => _dragDy = 0,
-      onVerticalDragUpdate: (d) => _dragDy += d.delta.dy,
-      onVerticalDragEnd: (d) {
-        if ((d.primaryVelocity ?? 0) > 120 || _dragDy > 56) widget.onClose();
-      },
+      onVerticalDragStart: embedded ? null : (_) => _dragDy = 0,
+      onVerticalDragUpdate:
+          embedded ? null : (d) => _dragDy += d.delta.dy,
+      onVerticalDragEnd: embedded
+          ? null
+          : (d) {
+              if ((d.primaryVelocity ?? 0) > 120 || _dragDy > 56) {
+                widget.onClose();
+              }
+            },
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -1741,7 +1777,7 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
             child: Container(
               decoration: BoxDecoration(
                 color: SC.light ? Colors.white : const Color(0xFF161B2E),
-                borderRadius: _kPassportRadius,
+                borderRadius: radius,
                 border: Border(
                   top: BorderSide(
                     color: accent.withValues(alpha: 0.6),
@@ -1750,7 +1786,7 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
                 ),
               ),
               child: ClipRRect(
-                borderRadius: _kPassportRadius,
+                borderRadius: radius,
                 child: Stack(
                   children: [
                     // Halo de la couleur du persona, DANS le cadre : transparent en
@@ -1779,7 +1815,11 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // La poignée : elle dit "tire-moi vers le bas".
+                        // La poignée : elle dit "tire-moi vers le bas". Dans
+                        // la carte, la bande des points du carrousel.
+                        if (embedded)
+                          const SizedBox(height: 22)
+                        else
                         Padding(
                           padding: const EdgeInsets.only(top: 10, bottom: 8),
                           child: Center(
@@ -1830,7 +1870,9 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
                           // fermeture : tiré vers le bas alors qu'on est déjà en
                           // haut de la liste, le geste n'est plus du défilement,
                           // c'est un « referme-moi » (70 px de débord suffisent).
-                          child: NotificationListener<ScrollNotification>(
+                          child: embedded
+                              ? _embeddedBody(p)
+                              : NotificationListener<ScrollNotification>(
                             onNotification: _onPanelScroll,
                             child: SingleChildScrollView(
                               physics: BouncingScrollPhysics(
@@ -1893,7 +1935,9 @@ class _ProfileInfoPanelState extends State<ProfileInfoPanel>
                         // Carte de Découvrir : 100 (boutons flottants). Dans la
                         // visionneuse (marge basse réduite) : le texte se pose
                         // au bas du cadre, et la pastille évite le ✕.
-                        bottomInset: widget.bottomPadding + 4,
+                        bottomInset:
+                            embedded ? 24 : widget.bottomPadding + 4,
+                        radius: radius,
                         rightInset: widget.bandInsetRight,
                       ),
                     ),
@@ -1917,7 +1961,10 @@ class _PassportCover extends StatelessWidget {
     required this.sub,
     this.bottomInset = 100,
     this.rightInset = 0,
+    this.radius = _kPassportRadius,
   });
+
+  final BorderRadius radius;
 
   /// Distance du bloc de texte au bas du cadre : 100 sur la carte (au-dessus des
   /// boutons ✕ / ❤ flottants), beaucoup moins dans la visionneuse qui n'en a pas.
@@ -1939,7 +1986,7 @@ class _PassportCover extends StatelessWidget {
     final w = box.maxWidth.isFinite ? box.maxWidth : 360.0;
     final mark = w * 1.1;
     return ClipRRect(
-      borderRadius: _kPassportRadius,
+      borderRadius: radius,
       child: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -2026,13 +2073,105 @@ class _PassportCover extends StatelessWidget {
   }
 }
 
+/// La bio du passeport : le texte, et la place de l'audio — le lecteur quand
+/// la personne s'est présentée à voix haute, un emplacement vide sinon.
+class _PanelBio extends StatelessWidget {
+  const _PanelBio({required this.profile, this.compact = false});
+
+  final RemoteProfile profile;
+
+  /// Dans une carte : sans titre, deux lignes au plus, petit lecteur.
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = profile;
+    final bio = p.bio.trim();
+    final ink = SC.light ? const Color(0xFF04123A) : Colors.white;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!compact)
+          Text(
+            AppStrings.t('profile_bio_section').toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: bentoLabelStyle(),
+          ),
+        if (bio.isNotEmpty) ...[
+          if (!compact) const SizedBox(height: 6),
+          TranslatedProfileText(
+            text: bio,
+            profileId: p.id,
+            field: 'bio',
+            fromLang: p.language,
+            showNote: !compact,
+            maxLines: compact ? 2 : null,
+            overflow: compact ? TextOverflow.ellipsis : null,
+            style: TextStyle(
+              color: ink.withValues(alpha: SC.light ? 0.72 : 0.8),
+              fontSize: 13,
+              height: 1.45,
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        if (p.hasVoiceIntro) ...[
+          VoiceIntroPlayer(
+            url: p.voiceIntroUrl,
+            durationMs: p.voiceIntroDurationMs,
+            compact: compact,
+          ),
+          if (p.voiceIntroTranscript.trim().isNotEmpty)
+            VoiceIntroTranslation(profile: p, maxLines: compact ? 2 : null),
+        ] else
+          Container(
+            height: compact ? 38 : 44,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: ink.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(color: ink.withValues(alpha: 0.14)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.mic_off_rounded,
+                    size: 18, color: ink.withValues(alpha: 0.45)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    AppStrings.t('voice_intro_none'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: ink.withValues(alpha: 0.5),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 /// La première ligne de la page : prénom (Unbounded 800 19) + drapeau en image
 /// ronde, puis « Pays - Ville » dessous.
 class _PanelHeader extends StatelessWidget {
-  const _PanelHeader({required this.profile, this.hideFlag = false});
+  const _PanelHeader({
+    required this.profile,
+    this.hideFlag = false,
+    this.compact = false,
+  });
 
   final RemoteProfile profile;
   final bool hideFlag;
+
+  /// Dans une carte : prénom, drapeau et lieu sur la même ligne.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -2050,6 +2189,11 @@ class _PanelHeader extends StatelessWidget {
       if (country.isNotEmpty) country,
       if (city.isNotEmpty) city,
     ].join(' - ');
+    final placeStyle = TextStyle(
+      color: SC.light ? const Color(0xB304123A) : const Color(0xBFFFFFFF),
+      fontSize: compact ? 12 : 13,
+      fontWeight: FontWeight.w600,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2061,7 +2205,7 @@ class _PanelHeader extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: popupDisplay(
-                  fontSize: 19,
+                  fontSize: compact ? 17 : 19,
                   letterSpacing: -0.76,
                   color: SC.light ? const Color(0xFF04123A) : Colors.white,
                 ),
@@ -2087,21 +2231,26 @@ class _PanelHeader extends StatelessWidget {
                       style: const TextStyle(fontSize: 13, height: 1),
                     ),
             ],
+            if (compact && placeText.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  placeText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: placeStyle,
+                ),
+              ),
+            ],
           ],
         ),
-        if (placeText.isNotEmpty) ...[
+        if (!compact && placeText.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(
             placeText,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: SC.light
-                  ? const Color(0xB304123A)
-                  : const Color(0xBFFFFFFF),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
+            style: placeStyle,
           ),
         ],
       ],
