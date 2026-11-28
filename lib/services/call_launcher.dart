@@ -11,12 +11,12 @@ import 'call_audio.dart';
 import 'app_strings.dart';
 import 'device_id.dart';
 import 'last_interaction.dart';
-import 'friendship_api.dart';
+import 'chat_api.dart';
 import 'incoming_call_api.dart';
 import 'profile_api.dart';
 import 'supabase_service.dart';
 import 'token_api.dart';
-import 'user_prefs.dart';
+import 'user_prefs.dart';
 import 'friendly_error.dart';
 
 /// Single entry point that any screen can call to dial a friend. Wraps the
@@ -107,17 +107,21 @@ abstract final class CallLauncher {
       // de la liste Messages, même si aucun message n'est échangé.
       unawaited(LastInteraction.touch(peerDeviceId));
 
-      // Sécurité : on n'appelle QUE ses matchs. Tant que les deux ne se sont
-      // pas likés (arête 'accepted', peu importe qui a liké en premier), pas
-      // d'appel possible — ni depuis un profil, ni depuis une conversation.
-      final rel = await FriendshipApi.matchStateWith(
-        meId: myId,
-        peerId: peerDeviceId,
+      // Sécurité : on n'appelle que quelqu'un qui m'a déjà écrit au moins une
+      // fois — ni depuis un profil, ni depuis une conversation, tant qu'il n'a
+      // pas répondu.
+      final ids = [myId, peerDeviceId]..sort();
+      final replied = await ChatApi.hasMessage(
+        'dm-${ids[0]}-${ids[1]}',
+        from: peerDeviceId,
       );
-      if (!rel.matched) {
+      if (replied != true) {
         if (!context.mounted) return false;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppStrings.t('call_needs_match'))),
+          SnackBar(
+            content: Text(AppStrings.t(
+                replied == null ? 'login_err_network' : 'call_needs_reply')),
+          ),
         );
         return false;
       }

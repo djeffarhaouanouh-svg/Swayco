@@ -6,6 +6,7 @@ import 'dart:math' show Random;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import '../widgets/tap_pad.dart';
 import '../widgets/load_failed_view.dart';
 import 'package:flutter/services.dart';
@@ -40,27 +41,21 @@ import '../theme/swayco_theme.dart';
 import '../widgets/ad_info_sheet.dart';
 import '../widgets/boost_button.dart';
 import '../widgets/country_silhouette.dart';
-import '../widgets/discover_ad_card.dart';
+import '../widgets/discover_feed.dart';
+import '../widgets/new_contact_gate.dart';
 import '../widgets/discover_globe.dart';
 import '../services/fact_emojis.dart';
 import '../widgets/info_bento.dart' show bentoLabelStyle;
 import '../widgets/profile_info_card.dart';
-import '../widgets/swayco_action_buttons.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/liquid_glass_button.dart';
 import '../widgets/lottie_icon_transition.dart';
-import '../widgets/match_overlay.dart';
 import '../widgets/popup_kit.dart' show popupDisplay;
 import '../widgets/sent_confirmation.dart';
 import '../widgets/sparkles.dart';
-import '../services/special_message_quota.dart';
-import '../widgets/special_message_pro_sheet.dart';
-import '../widgets/swayco_direct_message_sheet.dart';
 import '../widgets/swayco_wordmark.dart';
-import '../widgets/swipe_coach_overlay.dart';
 import '../widgets/translated_profile_text.dart';
-import 'chat_thread_screen.dart';
 import 'paywall_screen.dart';
 import '../services/daily_swipes.dart';
 import '../widgets/daily_limit_view.dart';
@@ -83,7 +78,8 @@ const double _kBoostGap = 28.0;
 /// and nav). Lets the photo cropper frame exactly what the card will show.
 double discoverCardAspect(BuildContext context) {
   final mq = MediaQuery.of(context);
-  final top = mq.padding.top + _DiscoverHeader.height + _CountryRow.height;
+  // 74 : la hauteur qu'avait la rangée de pays sous la carte à glisser.
+  final top = mq.padding.top + _DiscoverHeader.height + 74;
   final bottom = GlassNavBar.totalReservedHeight +
       mq.padding.bottom +
       _kActionPadV +
@@ -99,12 +95,6 @@ double discoverCardAspect(BuildContext context) {
 const double _kCardRadius = 32.0;
 /// Diamètre des boutons ✕ / message / ❤.
 const double _kActionSize = 58.0;
-// Diameter of the ✕ / ❤ buttons.
-const double _kFxSize = 58.0;
-
-/// Le bouton message du milieu, toujours plus petit que ✕ / ❤ (il ne doit
-/// pas les écraser), mais pas trop discret non plus.
-const double _kMessageSize = 47.0;
 
 /// Respiration au-dessus et au-dessous de la rangée ✕ / message / ❤.
 const double _kActionPadV = 16.0;
@@ -116,7 +106,7 @@ const Duration _kLikePushDelay = Duration(minutes: 3);
 /// Surfaces pleines du handoff : bulles pays, bouton message.
 Color get _kSurface =>
     SC.light
-        ? const Color(0xFFF2F6FF)
+        ? const Color(0xFFF8F9FC)
         : (SC.classic ? const Color(0xFF1A1A1D) : const Color(0xFF161D30));
 const Color _kSurfaceBorder = Color(0xFF2A2A2E);
 
@@ -139,6 +129,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   bool _loadFailed = false;
   final List<({RemoteProfile profile, List<String> photos})> _cards = [];
 
+  final _scroll = ScrollController();
+
   void _retryLoad() {
     setState(() {
       _loadFailed = false;
@@ -151,39 +143,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
-  /// People I'm already matched with: they never belong in the deck, whether
-  /// it came from the live feed, today's cached deck, or was loaded before the
-  /// match happened.
-  Set<String> get _matchedPeerIds => {
+  /// Mes amis : ils n'ont plus à être découverts, au chargement du fil.
+  Set<String> get _friendIds => {
         for (final f in _myFriendships)
           if (f.status == 'accepted' && f.peerOf(_myId).isNotEmpty)
             f.peerOf(_myId),
       };
 
-  /// A match landed while this deck was on screen (an AI accepting my like,
-  /// say): take that person out of the stack, keeping the current card in
-  /// place.
-  void _dropMatchedCards() {
-    final matched = _matchedPeerIds;
-    if (matched.isEmpty ||
-        !_cards.any((c) => matched.contains(c.profile.id))) {
-      return;
-    }
-    var idx = _currentIndex;
-    for (var i = _cards.length - 1; i >= 0; i--) {
-      if (!matched.contains(_cards[i].profile.id)) continue;
-      _cards.removeAt(i);
-      if (i < idx) idx--;
-    }
-    _currentIndex = idx.clamp(0, _cards.length);
-    if (_currentIndex >= _cards.length) _deckDone = _cards.isNotEmpty;
-  }
-
   void _rebuildCards() {
     _cards.clear();
-    final matched = _matchedPeerIds;
+    final friends = _friendIds;
     for (final p in _profiles) {
-      if (matched.contains(p.id)) continue;
+      if (friends.contains(p.id)) continue;
       // Le genre ne filtre que le deck des pays choisis ; sans pays, tout le
       // monde (un choix mémorisé ne doit pas rester appliqué en silence).
       if (_filtered && _gender == GenderFilter.homme && p.gender != 'm') continue;
@@ -202,7 +173,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   /// Reload today's cached deck by profile id (bypasses the live feed filter
-  /// so "Recommencer" still works after everyone was liked / matched).
+  /// so "Recommencer" still works after everyone was liked).
   Future<bool> _hydrateCachedDeck() async {
     final ids = await UserPrefs.loadDiscoverDeckToday();
     if (ids.isEmpty || !isSupabaseReady) return false;
@@ -227,57 +198,47 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
-  /// Replay today's deck from the first card — no network required.
-  void _restartDeck() {
-    if (_cards.isEmpty) return;
-    setState(() {
-      _deckDone = false;
-      _currentIndex = 0;
-      _infoOpen = false;
-    });
-    NavChrome.show();
-    if (!_filtered) {
-      UserPrefs.clearDiscoverDone();
-      UserPrefs.saveDiscoverCursor(_cards.first.profile.id);
-    }
-    _precacheAround(0);
-  }
-
-  int _currentIndex = 0;
-  /// True once every card has been swiped today — show the end-of-deck screen
-  /// instead of looping back to the first profile.
-  bool _deckDone = false;
-
-  /// Compte gratuit : les 100 profils du jour sont passés -> écran de fin.
+  /// Compte gratuit : les profils du jour sont vus -> écran de fin.
   bool _limitReached = false;
   final List<SeenProfile> _recentSeen = [];
+
+  /// Les personnes vues depuis le dernier chargement du fil.
+  final Set<String> _seenHere = {};
 
   Future<void> _refreshLimit() async {
     final reached = await DailySwipes.reached();
     if (mounted && reached != _limitReached) {
       setState(() => _limitReached = reached);
+      if (reached) NavChrome.show();
     }
   }
 
-  final _stackKey = GlobalKey<_TinderCardStackState>();
   List<Friendship> _myFriendships = const [];
 
-  /// What "retour" may take back: the pending like the last swipe on a person
-  /// wrote.
+  /// Les likes que le cœur vient de changer, avant que la base ait répondu.
+  final Map<String, bool> _likeOverride = {};
+
+  /// Retirer un like, même touché avant que son envoi soit terminé.
   late final LikeUndo _likeUndo = LikeUndo(
     (id) => FriendshipApi.retractLike(meId: _myId, friendshipId: id),
   );
 
-  bool get _hasActiveCard =>
-      !_feedLoading && _cards.isNotEmpty && !_deckDone;
+  Set<String> get _likedIds {
+    final liked = <String>{
+      for (final f in _myFriendships)
+        if (f.status == 'accepted')
+          f.peerOf(_myId)
+        else if (f.requester == _myId)
+          f.addressee,
+    };
+    for (final e in _likeOverride.entries) {
+      e.value ? liked.add(e.key) : liked.remove(e.key);
+    }
+    return liked;
+  }
 
   Timer? _pollTimer;
   String _myId = '';
-
-  /// The card's info panel: pulled up from the photo, folded back down by a
-  /// drag or a tap on the scrim. While it's open the nav bar slides away and
-  /// the ✕ / ♥ float on top of the card.
-  bool _infoOpen = false;
 
   /// Countries picked on the globe filter bar (world-atlas keys, e.g.
   /// {'France', 'Germany'}), empty for the unfiltered deck. When non-empty the
@@ -323,8 +284,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       barrierColor: Colors.transparent,
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (_, _, _) => DiscoverGlobeSheet(
-        // Aucun pays pr?s?lectionn? : le filtre en cours ne se coche pas ? la
-        // r?ouverture, on choisit ? nouveau.
+        // Aucun pays présélectionné : le filtre en cours ne se coche pas à la
+        // réouverture, on choisit à nouveau.
         initial: const {},
         initialGender: _gender,
       ),
@@ -425,33 +386,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _maybeHideFilterTransition();
   }
 
-  /// The gold button: write to the card's person without matching first.
-  /// Premium only — everyone else gets the paywall.
-  Future<void> _directMessage() async {
-    if (!_hasActiveCard) return;
-    final peer = _cards[_currentIndex].profile;
-    if (!RevenueCat.proActive.value) {
-      // D'abord la feuille qui montre ce que donne un message special, puis le
-      // paywall seulement si on veut Pro.
-      Analytics.track(
-        'special_message_pitch_open',
-        props: {'source': 'discover_direct_message'},
+  // ── Écrire depuis une carte ───────────────────────────────────────────────
+
+  Future<bool> _canWrite(RemoteProfile peer) => allowNewContact(
+        context,
+        meId: _myId,
+        peerId: peer.id,
+        source: 'discover_feed',
       );
-      final goPro = await showSpecialMessageProSheet(context, peer: peer);
-      if (!mounted || goPro != true) return;
-      Analytics.track('paywall_open', props: {'source': 'discover_direct_message'});
-      await showPaywallSheet(context, source: 'discover_direct_message');
-      if (!mounted || !RevenueCat.proActive.value) return;
-    }
-    final left = await SpecialMessageQuota.remaining(_myId);
-    if (!mounted) return;
-    final body = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => SwaycoDirectMessageSheet(remaining: left, peer: peer),
-    );
-    if (body == null || body.trim().isEmpty || !mounted) return;
+
+  Future<bool> _sendFromCard(RemoteProfile peer, String body) async {
     try {
       final mine = await ProfileApi.fetchById(_myId);
       final ids = [_myId, peer.id]..sort();
@@ -462,43 +406,226 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             ? mine!.displayName.trim()
             : 'Moi',
         recipientId: peer.id,
-        body: body.trim(),
+        body: body,
         language: (mine?.language.trim().isNotEmpty ?? false)
             ? mine!.language.trim()
             : AppStrings.currentBcp47.value,
         recipientLang: peer.language,
-        special: true,
       );
-      await SpecialMessageQuota.consume(_myId);
-      // Il n'en reste qu'un : un rappel dans quelques heures, pour bien le choisir.
-      if (await SpecialMessageQuota.remaining(_myId) == 1) {
-        unawaited(LocalNotifications.scheduleSpecialLeftReminder(
-          title: AppStrings.t('special_left_title'),
-          body: AppStrings.t('special_left_body'),
-        ));
-      }
       Analytics.track('message_sent',
-          props: {'source': 'discover_direct', 'type': 'text'});
-      if (!mounted) return;
+          props: {'source': 'discover_feed', 'type': 'text'});
+      SwaycoSounds.play(SwSound.msgSent);
+      if (!mounted) return true;
       showSentConfirmation(context, AppStrings.t('dm_sent'));
+      return true;
     } catch (e) {
-      debugPrint('discover: direct message failed: $e');
+      debugPrint('discover: message from card failed: $e');
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+      return false;
+    }
+  }
+
+  // ── Le cœur ───────────────────────────────────────────────────────────────
+
+  void _toggleLike(RemoteProfile peer) {
+    // Déjà amis : le cœur reste plein.
+    if (_friendIds.contains(peer.id)) return;
+    if (_likedIds.contains(peer.id)) {
+      HapticFeedback.lightImpact();
+      SwaycoSounds.play(SwSound.undo);
+      setState(() => _likeOverride[peer.id] = false);
+      unawaited(_unlike(peer.id));
+    } else {
+      HapticFeedback.mediumImpact();
+      SwaycoSounds.play(SwSound.like);
+      setState(() => _likeOverride[peer.id] = true);
+      unawaited(_likePeer(peer));
+    }
+  }
+
+  Future<void> _likePeer(RemoteProfile peer) async {
+    final slot = _likeUndo.begin(peer.id);
+    try {
+      await _likeUndo.turn(peer.id);
+      final res = await FriendshipApi.like(
+        meId: _myId,
+        peerId: peer.id,
+        notifyDelay: _kLikePushDelay,
+      );
+      slot.complete(res.created && !res.matched ? res.friendship?.id : null);
+      Analytics.track(
+        'friend_request_sent',
+        props: {'source': 'discover', 'kind': res.matched ? 'match' : 'like'},
+      );
+      // Les deux se sont likés : amis, sans écran de célébration ici.
+      if (res.matched) MatchCelebration.markShown(peer.id);
       if (!mounted) return;
+      // Premier like : « On te prévient dès qu'elle ou il te répond » (une fois).
+      if (!res.matched && res.friendship != null) {
+        unawaited(NotifEnableFlow.askAfterFirstLike(context));
+      }
+      await _refreshFriendships();
+    } catch (e) {
+      if (!slot.isCompleted) slot.complete(null);
+      debugPrint('discover: like failed: $e');
+      if (!mounted) return;
+      setState(() => _likeOverride.remove(peer.id));
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(friendlyError(e))));
     }
   }
 
-  /// Reloads the Discover deck, optionally filtered by peer [countries].
+  Future<void> _unlike(String peerId) async {
+    try {
+      var withdrawn = await _likeUndo.undo(peerId);
+      if (withdrawn == null) {
+        // Un like d'avant : sa ligne est déjà connue.
+        for (final f in _myFriendships) {
+          if (f.requester == _myId &&
+              f.addressee == peerId &&
+              f.status == 'pending') {
+            if (await FriendshipApi.retractLike(
+                meId: _myId, friendshipId: f.id)) {
+              withdrawn = f.id;
+            }
+          }
+        }
+      }
+      if (!mounted) return;
+      await _refreshFriendships();
+    } catch (e) {
+      debugPrint('discover: unlike failed: $e');
+    }
+  }
+
+  // ── Fil ───────────────────────────────────────────────────────────────────
+
+  /// Pendant qu'on descend, les pays se rangent et le filtre monte sur la ligne
+  /// du logo.
+  bool _collapsed = false;
+  bool _composing = false;
+
+  void _setCollapsed(bool value) {
+    if (value == _collapsed) return;
+    void apply() {
+      if (mounted && value != _collapsed) setState(() => _collapsed = value);
+    }
+
+    // Une correction de défilement peut arriver en pleine mise en page.
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => apply());
+    } else {
+      apply();
+    }
+  }
+
+  void _onScrollMoved(ScrollMetrics m, double delta) {
+    if (_composing || NavTab.index.value != NavTab.discover) return;
+    final y = m.pixels;
+    // Le rebond du bas n'est pas un mouvement de la personne.
+    if (y <= m.maxScrollExtent) {
+      if (y > 40 && delta > 2 && m.maxScrollExtent > 200) {
+        _setCollapsed(true);
+        NavChrome.hideAuto();
+      } else if (y < 20 || delta < -8) {
+        _setCollapsed(false);
+        NavChrome.show();
+      }
+    }
+    // La barre du bas revient 1,9 s après le dernier mouvement.
+    NavChrome.showAfter(const Duration(milliseconds: 1900));
+  }
+
+  void _onComposing(bool open) {
+    setState(() {
+      _composing = open;
+      if (open) _collapsed = true;
+      if (!open && _scroll.hasClients && _scroll.offset < 20) {
+        _collapsed = false;
+      }
+    });
+    open ? NavChrome.hide() : NavChrome.show();
+  }
+
+  void _onNavTab() {
+    if (NavTab.index.value != NavTab.discover) NavChrome.show();
+  }
+
+  void _onSeen(RemoteProfile p) {
+    if (!_seenHere.add(p.id)) return;
+    _recentSeen.insert(0, (
+      photoUrl: p.discoverPhotoUrl.isNotEmpty
+          ? p.discoverPhotoUrl
+          : (p.photos.isNotEmpty ? p.photos.first : null),
+      country: p.country,
+    ));
+    if (_recentSeen.length > 3) _recentSeen.removeLast();
+    unawaited(DailySwipes.markSeen(p.id).then((_) => _refreshLimit()));
+    if (!_filtered &&
+        _cards.isNotEmpty &&
+        _cards.every((c) => _seenHere.contains(c.profile.id))) {
+      UserPrefs.markDiscoverDoneToday();
+      unawaited(_scheduleSwipesBack());
+    }
+  }
+
+  /// Quota gratuit épuisé : une notification quand les profils reviennent
+  /// (demain 9 h, heure locale). Le Pro n'a pas de limite, donc pas de rappel.
+  Future<void> _scheduleSwipesBack() async {
+    try {
+      final me = await ProfileApi.fetchById(_myId);
+      if (me != null && (me.isPro || me.isPlus)) return;
+      final now = DateTime.now();
+      final next = DateTime(now.year, now.month, now.day + 1, 9);
+      await LocalNotifications.scheduleSwipesBackReminder(
+        title: AppStrings.t('swipes_back_title'),
+        body: AppStrings.t('swipes_back_body'),
+        after: next.difference(now),
+      );
+    } catch (_) {
+      // Un rappel de confort.
+    }
+  }
+
+  // Une carte publicitaire toutes les 2 à 6 cartes (retiré au sort après
+  // chacune, pour que le rythme ne se devine pas). Pro : deux fois plus espacée.
+  static final Random _adRng = Random();
+  static int _nextAdGap() =>
+      (_adRng.nextInt(5) + 2) * (RevenueCat.proActive.value ? 2 : 1);
+
+  Future<void> _openProfile(RemoteProfile p) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: p.id)),
+    );
+    if (!mounted) return;
+    if (!_composing) NavChrome.show();
+    _likeOverride.remove(p.id);
+    await _refreshFriendships();
+  }
+
+  void _openPhotos(({RemoteProfile profile, List<String> photos}) card) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    showPhotoViewer(
+      context,
+      photos: card.photos,
+      index: 0,
+      viewerMode: true,
+      footerProfile: card.profile,
+    );
+  }
+
+  /// Reloads the Discover feed, optionally filtered by peer [countries].
   Future<void> _loadFeed({required List<String>? countries}) async {
     if (_myId.isEmpty || !isSupabaseReady) return;
     setState(() {
       _feedLoading = true;
-      _currentIndex = 0;
-      _deckDone = false;
-      _infoOpen = false;
-      _showAdCard = false;
-      _swipesSinceAd = 0;
+      _collapsed = false;
+      _composing = false;
+      _seenHere.clear();
     });
     NavChrome.show();
     try {
@@ -514,7 +641,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         _loadFailed = _cards.isEmpty && ProfileApi.lastDiscoverFeedFailed;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_deckDone) _precacheAround(0);
+        if (mounted) _precacheFirst();
       });
     } catch (e) {
       debugPrint('discover: _loadFeed(countries=$countries) failed: $e');
@@ -527,54 +654,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
-  void _openInfo() {
-    if (_infoOpen || !_hasActiveCard) return;
-    setState(() => _infoOpen = true);
-    NavChrome.hide();
-  }
-
-  void _closeInfo() {
-    if (!_infoOpen) return;
-    setState(() => _infoOpen = false);
-    NavChrome.show();
-  }
-
-  // "Glisse pour choisir" one-shot coach — the very first time this screen
-  // is reached (right after onboarding). Starts closed: it only opens once
-  // the flag lookup confirms it has never played.
-  bool _showSwipeCoach = false;
-
-  // Sponsored card: after a random 2-6 swipes (redrawn after each ad, so the
-  // rhythm isn't predictable), an ad card takes the slot of the next profile
-  // until the user taps "Continuer". Not part of [_cards], so the deck, its
-  // saved cursor and the swipe counters are untouched.
-  static final Random _adRng = Random();
-  // Pro : « moins de pub », une carte pub deux fois plus espacee.
-  static int _nextAdGap() =>
-      (_adRng.nextInt(5) + 2) * (RevenueCat.proActive.value ? 2 : 1);
-  int _swipesSinceAd = 0;
-  int _adAfter = _nextAdGap();
-  bool _showAdCard = false;
-
-  /// La barre du bas est rangée par le glisser d'une carte (pas par le panneau
-  /// d'infos) : la carte et ✕ ✉ ❤ descendent dans sa place, au-dessus de la
-  /// poignée.
-  bool _navAway = false;
-  final ValueNotifier<int> _popSide = ValueNotifier<int>(0);
-
-  void _syncNavAway() {
-    final v = NavChrome.autoHidden.value;
-    if (mounted && v != _navAway) setState(() => _navAway = v);
-  }
-
-  void _onCardDragEngaged() => NavChrome.hideAuto();
-  void _onCardDragReleased() =>
-      NavChrome.showAfter(const Duration(milliseconds: 1900));
-
   @override
   void initState() {
     super.initState();
-    NavChrome.autoHidden.addListener(_syncNavAway);
     Analytics.track('screen_view', props: {'screen': 'discover'});
     // Le genre choisi la derniere fois : applique au deck des qu'il est lu.
     UserPrefs.loadDiscoverGender().then((v) {
@@ -589,11 +671,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     unawaited(_refreshLimit());
     // Devenir Pro (depuis le paywall) rouvre Discover sans recharger l'app.
     RevenueCat.proActive.addListener(_refreshLimit);
-    _maybeShowSwipeCoach();
-    NavTab.index.addListener(_maybeShowSwipeCoach);
+    NavTab.index.addListener(_onNavTab);
     _pollTimer = WebPoll.every(const Duration(seconds: 12), _refreshFriendships);
-    // Un nouveau match (annoncé par le shell, en temps réel) : on retire cette
-    // personne du paquet tout de suite, sans sondage sur mobile.
     MatchCelebration.matchesChanged.addListener(_refreshFriendships);
     // Warm up the "Discover" interstitial (shown when a country bubble is
     // switched on) and the rewarded video (Likes unlock) in the background.
@@ -602,27 +681,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     unawaited(RewardedVideo.preload());
   }
 
-  Future<void> _maybeShowSwipeCoach() async {
-    // Seulement quand Discover est SOUS LES YEUX : un lancement par une
-    // notification (ou tout autre onglet d'abord) le posait en arri?re-plan
-    // et le marquait ? vu ? sans que personne ne le voie. Il revient ?
-    // l'arriv?e sur l'onglet (?couteur ci-dessous).
-    if (NavTab.index.value != NavTab.discover) return;
-    if (await UserPrefs.isSwipeCoachSeen()) return;
-    await UserPrefs.markSwipeCoachSeen();
-    if (!mounted) return;
-    setState(() => _showSwipeCoach = true);
-  }
-
   @override
   void dispose() {
-    NavChrome.autoHidden.removeListener(_syncNavAway);
-    _popSide.dispose();
     NavChrome.show();
     _pollTimer?.cancel();
     MatchCelebration.matchesChanged.removeListener(_refreshFriendships);
     RevenueCat.proActive.removeListener(_refreshLimit);
-    NavTab.index.removeListener(_maybeShowSwipeCoach);
+    NavTab.index.removeListener(_onNavTab);
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -633,7 +699,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       if (!mounted) return;
       setState(() {
         _myFriendships = mine;
-        _dropMatchedCards();
+        // La base dit désormais ce que le cœur avait annoncé.
+        final stored = {
+          for (final f in mine)
+            if (f.status == 'accepted')
+              f.peerOf(_myId)
+            else if (f.requester == _myId)
+              f.addressee,
+        };
+        _likeOverride.removeWhere((id, liked) => stored.contains(id) == liked);
       });
     } catch (_) {}
   }
@@ -651,16 +725,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       final results = await Future.wait(<Future<Object>>[
         FriendshipApi.fetchMine(id),
         ProfileApi.fetchDiscoverFeed(myId: id),
-        UserPrefs.loadDiscoverCursor(),
         UserPrefs.loadDiscoverDoneToday(),
       ]).timeout(const Duration(seconds: 8));
       if (!mounted) return;
       final friendships = results[0] as List<Friendship>;
-      var feed = results[1] as List<RemoteProfile>;
-      final cursor = results[2] as String;
-      final doneToday = results[3] as bool;
+      final feed = results[1] as List<RemoteProfile>;
+      final doneToday = results[2] as bool;
 
-      // Nouveau paquet du jour : le rappel « tes swipes sont de retour » a fait son travail.
+      // Nouveau paquet du jour : le rappel de retour a fait son travail.
       if (!doneToday) unawaited(LocalNotifications.cancelSwipesBackReminder());
       setState(() {
         _myFriendships = friendships;
@@ -669,7 +741,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       });
 
       // Live feed empty (everyone already liked) but we still have today's
-      // deck cached → restore it so Restart / end-of-day can replay.
+      // deck cached → restore it.
       if (_cards.isEmpty) {
         final ok = await _hydrateCachedDeck();
         debugPrint('discover: feed empty, cache hydrate=$ok');
@@ -677,37 +749,20 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
       if (!mounted) return;
       setState(() {
-        if (_cards.isNotEmpty) {
-          if (doneToday) {
-            _deckDone = true;
-            _currentIndex = _cards.length;
-          } else if (cursor.isNotEmpty) {
-            final idx = _cards.indexWhere((c) => c.profile.id == cursor);
-            if (idx >= 0) _currentIndex = idx;
-          }
-        }
         _feedLoading = false;
         _loadFailed = _cards.isEmpty && ProfileApi.lastDiscoverFeedFailed;
       });
-      debugPrint(
-        'discover: feed=${feed.length} cards=${_cards.length} '
-        'done=$_deckDone idx=$_currentIndex',
-      );
+      debugPrint('discover: feed=${feed.length} cards=${_cards.length}');
       AppBoot.markHomeReady();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_deckDone) _precacheAround(_currentIndex);
+        if (mounted) _precacheFirst();
       });
     } catch (e) {
       debugPrint('discover: bootstrap failed: $e');
       // Last resort: show today's cached deck if the network timed out.
-      final ok = await _hydrateCachedDeck();
+      await _hydrateCachedDeck();
       if (mounted) {
         setState(() {
-          if (ok && _cards.isNotEmpty) {
-            // Keep them on the end screen only if they already finished today.
-            // loadDiscoverDoneToday is async — best-effort false here; Restart works either way.
-            _currentIndex = 0;
-          }
           _feedLoading = false;
           _loadFailed = _cards.isEmpty;
         });
@@ -716,457 +771,257 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
-  void _precacheAround(int index) {
-    if (!mounted || _cards.isEmpty || _deckDone) return;
-    final n = _cards.length;
-    final seen = <String>{};
-    for (var off = 0; off <= 5; off++) {
-      final i = index + off;
-      if (i < 0 || i >= n) continue;
-      for (final url in _cards[i].photos) {
-        if (url.isNotEmpty && seen.add(url)) {
-          precacheImage(NetworkImage(url), context).ignore();
-        }
-      }
-    }
-  }
-
-  /// Called on a like (swipe right or the heart button). If the peer had
-  /// already liked me the likes meet and it's a match right away —
-  /// celebrate it over the card stack.
-  Future<void> _likePeer(RemoteProfile peer) async {
-    final slot = _likeUndo.begin(peer.id);
-    try {
-      await _likeUndo.turn(peer.id);
-      final res = await FriendshipApi.like(
-        meId: _myId,
-        peerId: peer.id,
-        notifyDelay: _kLikePushDelay,
-      );
-      // Only a pending row this swipe wrote can be taken back: an older like
-      // stays, and a match is never undone by "retour".
-      slot.complete(res.created && !res.matched ? res.friendship?.id : null);
-      Analytics.track(
-        'friend_request_sent',
-        props: {'source': 'discover', 'kind': res.matched ? 'match' : 'like'},
-      );
-      if (!mounted) return;
-      final f = res.friendship;
-      if (f != null) {
-        setState(() => _myFriendships = [..._myFriendships, f]);
-      }
-      // Premier like : « On te prévient dès qu'elle ou il te répond » (une fois).
-      if (!res.matched && f != null) {
-        unawaited(NotifEnableFlow.askAfterFirstLike(context));
-      }
-      if (res.matched) {
-        // Back on a match already celebrated (undo, then like again): no replay.
-        if (!MatchCelebration.shown.contains(peer.id)) {
-          await _celebrateMatch(peer);
-        }
-        // The matched card leaves the deck, so "retour" lands on the one before.
-        if (mounted) setState(_dropMatchedCards);
-      }
-    } catch (_) {
-      if (!slot.isCompleted) slot.complete(null);
-      rethrow;
-    }
-  }
-
-  /// "Retour" on a card I had liked: the like is withdrawn with it, server side
-  /// too. Runs behind the UI (the card is already back), best effort.
-  void _withdrawLike(String peerId) {
-    unawaited(
-      _likeUndo.undo(peerId).then((withdrawn) {
-        if (withdrawn == null || !mounted) return;
-        setState(() {
-          _myFriendships = [
-            for (final f in _myFriendships)
-              if (f.id != withdrawn) f,
-          ];
-        });
-      }),
-    );
-  }
-
-  /// "It's a match!" over the Discover stack. "Dis bonjour" opens the DM.
-  Future<void> _celebrateMatch(RemoteProfile peer) async {
-    MatchCelebration.markShown(peer.id);
-    final me = isSupabaseReady ? await ProfileApi.fetchById(_myId) : null;
+  void _precacheFirst() {
     if (!mounted) return;
-    final meProfile = me ??
-        RemoteProfile(
-          id: _myId,
-          handle: '',
-          displayName: '',
-          language: AppStrings.currentBcp47.value,
-          avatarColor: '',
-          avatarUrl: '',
-        );
-    final peerName = peer.displayName.trim().isEmpty
-        ? AppStrings.t('profile_anonymous')
-        : peer.displayName;
-    await showMatchOverlay(
-      context,
-      me: meProfile,
-      peer: peer,
-      onSayHi: () {
-        final ids = [_myId, peer.id]..sort();
-        Navigator.of(context).push<void>(
-          chatThreadRoute(
-            builder: (_) => ChatThreadScreen(
-              conversationId: 'dm-${ids[0]}-${ids[1]}',
-              title: peerName,
-              peerDeviceId: peer.id,
-            ),
-          ),
-        );
-      },
+    for (final c in _cards.take(6)) {
+      precacheImage(NetworkImage(c.photos.first), context).ignore();
+    }
+  }
+
+  /// Bas du fil : remonter en haut.
+  void _backToTop() {
+    if (!_scroll.hasClients) return;
+    _scroll.animateTo(
+      0,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOutCubic,
     );
+    _setCollapsed(false);
   }
 
-  void _onCardSwiped(bool isRight, RemoteProfile profile) {
-    _closeInfo();
-    // Une fois la carte sortie (doigt ou bouton) : le bouton du côté fait son pop.
-    _popSide.value = isRight ? 1 : -1;
-    Future.delayed(const Duration(milliseconds: 260), () {
-      if (mounted) _popSide.value = 0;
-    });
-    // Standard Tinder convention: dragging/flying RIGHT is the like, LEFT
-    // the refuse.
-    if (isRight) {
-      HapticFeedback.mediumImpact();
-      SwaycoSounds.play(SwSound.like);
-      _likePeer(profile);
-    } else {
-      HapticFeedback.lightImpact();
-      SwaycoSounds.play(SwSound.pass);
-      // A pass is the last word on this person: a "retour" onto it has no
-      // like left to take back.
-      _likeUndo.forget(profile.id);
-    }
-    // Un profil de plus passé aujourd'hui (gratuit : 100 par jour).
-    _recentSeen.insert(0, (
-      photoUrl: profile.discoverPhotoUrl.isNotEmpty
-          ? profile.discoverPhotoUrl
-          : (profile.photos.isNotEmpty ? profile.photos.first : null),
-      country: profile.country,
-    ));
-    if (_recentSeen.length > 3) _recentSeen.removeLast();
-    unawaited(DailySwipes.increment().then((_) => _refreshLimit()));
-    if (!mounted || _cards.isEmpty) return;
-    final next = _currentIndex + 1;
-    if (next >= _cards.length) {
-      setState(() {
-        _currentIndex = _cards.length;
-        _deckDone = true;
-      });
-      if (!_filtered) {
-        UserPrefs.markDiscoverDoneToday();
-        UserPrefs.saveDiscoverCursor('');
-        unawaited(_scheduleSwipesBack());
-      }
-      return;
-    }
-    setState(() {
-      _currentIndex = next;
-      _deckDone = false;
-      if (!_filtered) {
-        UserPrefs.saveDiscoverCursor(_cards[_currentIndex].profile.id);
-      }
-      _precacheAround(_currentIndex);
-      _swipesSinceAd++;
-      if (_swipesSinceAd >= _adAfter && AdService.cardAdsEnabled) {
-        _swipesSinceAd = 0;
-        _adAfter = _nextAdGap();
-        _showAdCard = true;
-      }
-    });
-  }
-
-  /// Quota gratuit épuisé : une notification quand les swipes reviennent (demain
-  /// 9 h, heure locale). Le Pro n'a pas de limite, donc pas de rappel.
-  Future<void> _scheduleSwipesBack() async {
-    try {
-      final me = await ProfileApi.fetchById(_myId);
-      if (me != null && (me.isPro || me.isPlus)) return;
-      final now = DateTime.now();
-      final next = DateTime(now.year, now.month, now.day + 1, 9);
-      await LocalNotifications.scheduleSwipesBackReminder(
-        title: AppStrings.t('swipes_back_title'),
-        body: AppStrings.t('swipes_back_body'),
-        after: next.difference(now),
-      );
-    } catch (_) {
-      // Un rappel de confort.
-    }
-  }
-
-  void _onActionUndo() {
-    if (_cards.isEmpty) return;
-    if (_deckDone) {
-      _restartDeck();
-      return;
-    }
-    if (_currentIndex <= 0) return;
-    HapticFeedback.lightImpact();
-    SwaycoSounds.play(SwSound.undo);
-    setState(() {
-      _currentIndex -= 1;
-      UserPrefs.saveDiscoverCursor(_cards[_currentIndex].profile.id);
-      _precacheAround(_currentIndex);
-    });
-    // Back on a card I had just liked: the like goes with it.
-    _withdrawLike(_cards[_currentIndex].profile.id);
-  }
-
-  void _onSwipeLeft() => _stackKey.currentState?.triggerSwipe(false);
-  void _onSwipeRight() => _stackKey.currentState?.triggerSwipe(true);
-
-  /// Empty-state / end-of-deck Restart.
-  /// Prefer replaying the cards we already have (or today's cache). A live
-  /// refetch alone often returns [] once everyone is liked — that's why the
-  /// button looked broken.
+  /// Empty-state Restart. A live refetch alone often returns [] once everyone
+  /// is liked, hence the cached deck as a fallback.
   Future<void> _reset() async {
-    if (_cards.isNotEmpty) {
-      _restartDeck();
-      return;
-    }
     if (_myId.isEmpty) return;
-    setState(() {
-      _feedLoading = true;
-      _currentIndex = 0;
-      _deckDone = false;
-    });
     await UserPrefs.clearDiscoverDone();
-    await UserPrefs.saveDiscoverCursor('');
-    try {
-      final feed = await ProfileApi.fetchDiscoverFeed(myId: _myId);
-      if (!mounted) return;
-      setState(() {
-        _profiles = feed;
-        _rebuildCards();
-      });
-      if (_cards.isEmpty) {
-        final ok = await _hydrateCachedDeck();
-        debugPrint('discover: reset feed=${feed.length} cache=$ok');
-      }
-      if (!mounted) return;
-      setState(() {
-        _currentIndex = 0;
-        _deckDone = false;
-        _feedLoading = false;
-        _loadFailed = _cards.isEmpty && ProfileApi.lastDiscoverFeedFailed;
-      });
-      if (_cards.isNotEmpty) {
-        UserPrefs.saveDiscoverCursor(_cards.first.profile.id);
-        _precacheAround(0);
-      }
-    } catch (e) {
-      debugPrint('discover: reset failed: $e');
-      final ok = await _hydrateCachedDeck();
-      if (!mounted) return;
-      setState(() {
-        _currentIndex = 0;
-        _deckDone = false;
-        _feedLoading = false;
-        _loadFailed = _cards.isEmpty;
-      });
-      if (ok && _cards.isNotEmpty) {
-        UserPrefs.saveDiscoverCursor(_cards.first.profile.id);
-      }
-    }
+    await _loadFeed(countries: null);
+    if (mounted && _cards.isEmpty) await _hydrateCachedDeck();
   }
 
   @override
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    // Handoff 3c, de haut en bas : logo · rangée de pays · carte · ✕ ✉ ❤ ·
-    // nav. La rangée d'actions se pose sur la nav avec sa propre respiration
-    // (16 dessus, 16 dessous) — plus de bande blanche.
-    final btnBottomShown =
-        GlassNavBar.totalReservedHeight + safeBottom + _kActionPadV;
-    // Barre rangée : les boutons descendent dans sa place, au-dessus de la
-    // poignée.
-    final btnBottomAway =
-        math.max(safeBottom + _kActionPadV, NavChrome.handleZone + 4);
-    final btnBottom = _navAway ? btnBottomAway : btnBottomShown;
-    final cardBottom = btnBottom + _kActionSize + _kActionPadV;
-    // La carte et les boutons suivent la barre un peu plus lentement que le
-    // panneau d'infos. « Réduire les animations » : instantané.
-    final moveDuration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : Duration(milliseconds: _infoOpen ? 260 : 420);
-    final headerBottom = safeTop + _DiscoverHeader.height + _CountryRow.height;
+    final collapsed = _collapsed;
+    final rowTop = safeTop + _DiscoverHeader.height;
+    final listTop = collapsed ? safeTop + 47 : rowTop + _CountryRow.height;
+    final filterSize = collapsed ? 40.0 : 60.0;
+    final bottomSpace = math.max(
+      130.0,
+      GlassNavBar.totalReservedHeight + safeBottom + 24,
+    );
+    final still = MediaQuery.disableAnimationsOf(context);
+    final move = still ? Duration.zero : const Duration(milliseconds: 400);
+    const curve = Cubic(0.3, 0.8, 0.3, 1);
 
-    // Panneau ouvert : la carte prend toute la hauteur — elle monte par-dessus
-    // le logo et les pays, et descend dans l'espace libéré par la nav. Le
-    // panneau y gagne assez de place pour tout montrer sans défiler.
-    final openCardBottom = safeBottom + 12;
-    final currentCardBottom = _infoOpen ? openCardBottom : cardBottom;
-    final currentCardTop = _infoOpen ? safeTop + 4 : headerBottom;
+    final Widget body;
+    if (_feedLoading) {
+      body = Center(
+        child: CircularProgressIndicator(color: SC.fg, strokeWidth: 2),
+      );
+    } else if (_limitReached) {
+      body = Padding(
+        padding: EdgeInsets.fromLTRB(14, 0, 14, bottomSpace - 24),
+        child: DailyLimitView(
+          seen: _recentSeen.isNotEmpty
+              ? List.of(_recentSeen)
+              : [
+                  for (final c in _cards.take(3))
+                    (
+                      photoUrl: c.photos.isNotEmpty ? c.photos.first : null,
+                      country: c.profile.country,
+                    ),
+                ],
+          onReset: () => setState(() => _limitReached = false),
+        ),
+      );
+    } else if (_loadFailed && _cards.isEmpty) {
+      body = LoadFailedView(onRetry: _retryLoad);
+    } else if (_cards.isEmpty) {
+      body = _Empty(
+        onReset: _filtered ? _clearCountryFilter : _reset,
+        onChooseCountries: _openGlobe,
+        body: _filtered ? AppStrings.t('globe_filter_empty') : null,
+      );
+    } else {
+      body = DiscoverFeed(
+        controller: _scroll,
+        entries: _cards,
+        likedIds: _likedIds,
+        onToggleLike: _toggleLike,
+        onOpenProfile: _openProfile,
+        onOpenPhotos: _openPhotos,
+        canWrite: _canWrite,
+        onSend: _sendFromCard,
+        onSeen: _onSeen,
+        onScrollMoved: _onScrollMoved,
+        onComposing: _onComposing,
+        nextAdGap: _nextAdGap,
+        footer: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          child: _DiscoverDone(onRestart: _backToTop),
+        ),
+        bottomSpace: bottomSpace,
+      );
+    }
 
     return Scaffold(
       backgroundColor: SC.tabBg,
       extendBody: true,
-      body: Stack(
-        children: [
-          // ── Logo + rangée de pays. AVANT la carte dans la pile : panneau
-          //    ouvert, la carte monte et les recouvre. ──────────────────────
-          Positioned(
-            top: safeTop,
-            left: 0,
-            right: 0,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const _DiscoverHeader(),
-                _CountryRow(
-                  selected: _countryKeys,
-                  onFilter: _openGlobe,
-                  onCountry: _toggleCountry,
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          color: SC.classic ? SC.bg : null,
+          gradient: SC.classic
+              ? null
+              : LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: SC.light
+                      ? const [
+                          Color(0xFFCFE0FF),
+                          Color(0xFFE4EDFF),
+                          Color(0xFFF3F4F8),
+                        ]
+                      : const [
+                          Color(0xFF12306B),
+                          Color(0xFF0A1633),
+                          Color(0xFF070D1F),
+                        ],
+                  stops: const [0, 0.2, 0.45],
                 ),
-              ],
-            ),
-          ),
-
-          // ── Card ─────────────────────────────────────────────────────────
-          AnimatedPositioned(
-            duration: moveDuration,
-            curve: Curves.easeOutCubic,
-            top: currentCardTop,
-            left: _kCardInset,
-            right: _kCardInset,
-            bottom: currentCardBottom,
-            child: _feedLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                      color: SC.fg,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : _limitReached
-                    ? DailyLimitView(
-                        seen: _recentSeen.isNotEmpty
-                            ? List.of(_recentSeen)
-                            : [
-                                for (final c in _cards.take(3))
-                                  (
-                                    photoUrl: c.photos.isNotEmpty
-                                        ? c.photos.first
-                                        : null,
-                                    country: c.profile.country,
-                                  ),
-                              ],
-                        onReset: () => setState(() => _limitReached = false),
-                      )
-                : _loadFailed && _cards.isEmpty
-                    ? LoadFailedView(onRetry: _retryLoad)
-                : _cards.isEmpty
-                    ? _Empty(
-                        onReset: _filtered ? _clearCountryFilter : _reset,
-                        onChooseCountries: _openGlobe,
-                        body: _filtered
-                            ? AppStrings.t('globe_filter_empty')
-                            : null,
-                      )
-                    : _deckDone
-                        ? _DiscoverDone(onRestart: _restartDeck)
-                        : _TinderCardStack(
-                            key: _stackKey,
-                            cards: _cards,
-                            currentIndex: _currentIndex,
-                            onSwiped: _onCardSwiped,
-                            onPullUp: _openInfo,
-                            infoOpen: _infoOpen,
-                            onCloseInfo: _closeInfo,
-                            onDragEngaged: _onCardDragEngaged,
-                            onDragReleased: _onCardDragReleased,
-                            // Le retour vit DANS la carte : il glisse avec
-                            // elle au swipe. Retiré pendant la transition
-                            // "Go" et le panneau infos.
-                            topRightBadge:
-                                (!_infoOpen && !_showFilterTransition)
-                                    ? _CardUndoButton(onTap: _onActionUndo)
-                                    : null,
-                          ),
-          ),
-
-          // ── Carte publicitaire : prend la place de la prochaine carte, même
-          //    gabarit, jusqu'à « Continuer » (ou dès que la pub échoue). ─────
-          if (_showAdCard && !_infoOpen && !_feedLoading && !_deckDone)
+        ),
+        child: Stack(
+          children: [
+            // ── Logo + Pro ────────────────────────────────────────────────
             Positioned(
-              top: currentCardTop,
-              left: _kCardInset,
-              right: _kCardInset,
-              bottom: currentCardBottom,
-              child: DiscoverAdCard(
-                onDone: () {
-                  if (mounted) setState(() => _showAdCard = false);
-                },
+              top: safeTop,
+              left: 0,
+              right: 0,
+              child: const _DiscoverHeader(),
+            ),
+
+            // ── Le fil (ou l'écran d'attente / de fin) ────────────────────
+            AnimatedPositioned(
+              duration: move,
+              curve: curve,
+              top: listTop,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: body,
+            ),
+
+            // ── Les pays ──────────────────────────────────────────────────
+            AnimatedPositioned(
+              duration: move,
+              curve: curve,
+              top: collapsed ? rowTop - 24 : rowTop,
+              left: 0,
+              right: 0,
+              height: _CountryRow.height,
+              child: IgnorePointer(
+                ignoring: collapsed,
+                child: AnimatedOpacity(
+                  opacity: collapsed ? 0 : 1,
+                  duration:
+                      still ? Duration.zero : const Duration(milliseconds: 300),
+                  child: _CountryRow(
+                    selected: _countryKeys,
+                    onCountry: _toggleCountry,
+                  ),
+                ),
               ),
             ),
 
-          // ── Transition "Go" du filtre globe — icône Ring+Arrow (SANS
-          //    wordmark, contrairement au splash de boot) + un "Chargement"
-          //    séparé, plus haut et plus grand que le wordmark du boot (celui-là
-          //    est du texte de statut à lire, pas une signature discrète en
-          //    bas d'écran). ──────────────────────────────────────────────
-          if (_showFilterTransition)
-            Positioned.fill(
-              child: Stack(
-                children: [
-                  LottieIconTransition(
-                    key: ValueKey(_transitionRun),
-                    asset: 'assets/discover_filter_transition.json',
-                    onComplete: () {
-                      _transitionAnimDone = true;
-                      _maybeHideFilterTransition();
-                    },
-                  ),
-                  Align(
-                    alignment: const Alignment(0, 0.6),
-                    child: Text(
-                      AppStrings.t('profile_loading'),
-                      style: TextStyle(
-                        color: SC.fg,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
+            // ── Le filtre (le globe) ──────────────────────────────────────
+            AnimatedPositioned(
+              duration: move,
+              curve: curve,
+              top: collapsed ? safeTop - 3 : rowTop + 6,
+              left: collapsed ? 14 : 16,
+              width: filterSize,
+              height: filterSize,
+              child: _FilterButton(collapsed: collapsed, onTap: _openGlobe),
+            ),
+
+            // ── Transition "Go" du filtre globe — icône Ring+Arrow (SANS
+            //    wordmark, contrairement au splash de boot) + un "Chargement"
+            //    séparé. ───────────────────────────────────────────────────
+            if (_showFilterTransition)
+              Positioned.fill(
+                child: Stack(
+                  children: [
+                    LottieIconTransition(
+                      key: ValueKey(_transitionRun),
+                      asset: 'assets/discover_filter_transition.json',
+                      onComplete: () {
+                        _transitionAnimDone = true;
+                        _maybeHideFilterTransition();
+                      },
+                    ),
+                    Align(
+                      alignment: const Alignment(0, 0.6),
+                      child: Text(
+                        AppStrings.t('profile_loading'),
+                        style: TextStyle(
+                          color: SC.fg,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Le bouton « filtre » : 60 px à gauche des pays, 40 px sur la ligne du logo
+/// quand le fil est descendu. Il ouvre le globe.
+class _FilterButton extends StatelessWidget {
+  const _FilterButton({required this.collapsed, required this.onTap});
+
+  final bool collapsed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final light = SC.light;
+    return Semantics(
+      button: true,
+      label: AppStrings.t('globe_filter_cta'),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: light ? const Color(0xFFF8F9FC) : const Color(0xFF0D1A3A),
+            border: Border.all(color: const Color(0xFF2B8CFF), width: 2),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x592B7FFF),
+                blurRadius: 12,
+                spreadRadius: -4,
+                offset: Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Center(
+            child: AnimatedSize(
+              duration: const Duration(milliseconds: 400),
+              child: Icon(
+                Icons.tune_rounded,
+                size: collapsed ? 22 : 30,
+                color: light ? const Color(0xFF04123A) : Colors.white,
               ),
             ),
-
-          // ── ✕ · message direct · ❤ — sous la carte au repos, flottant
-          //    PAR-DESSUS elle (sur le panneau) dès qu'il est déplié. ─────────
-          AnimatedPositioned(
-            duration: moveDuration,
-            curve: Curves.easeOutCubic,
-            left: 0,
-            right: 0,
-            // Panneau ouvert : les boutons remontent DANS la carte, 16 au-dessus
-            // de son bord bas (la liste du panneau garde 96 de marge dessous).
-            bottom: _infoOpen ? openCardBottom + 16 : btnBottom,
-            height: _kActionSize,
-            child: _hasActiveCard && !_showFilterTransition && !_showAdCard
-                ? _SwipeActionBar(
-                    onNope: _onSwipeLeft,
-                    onLike: _onSwipeRight,
-                    onMessage: _directMessage,
-                    popSide: _popSide,
-                  )
-                : const SizedBox.shrink(),
           ),
-
-          // ── Coach "glisse pour choisir" — une seule fois, à l'arrivée ────
-          if (_showSwipeCoach)
-            SwipeCoachOverlay(
-              onDismiss: () => setState(() => _showSwipeCoach = false),
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -1634,7 +1489,7 @@ class _DiscoverHeader extends StatelessWidget {
 // Rangée de pays — « Filtrer » (le globe) + tous les pays du globe, en filtres
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// La rangée : « Filtrer » fixe à gauche, puis TOUS les pays du globe
+/// La rangée, à droite du bouton filtre : TOUS les pays du globe
 /// ([kGlobeCountries]) dans une bande qui défile. Chaque bulle est un filtre
 /// qu'on allume / éteint ; plusieurs peuvent l'être à la fois.
 ///
@@ -1642,24 +1497,21 @@ class _DiscoverHeader extends StatelessWidget {
 /// tout de suite ce qu'on vient d'allumer), puis les autres dans l'ordre du
 /// globe. La bande revient au début à chaque changement.
 /// Diamètre des bulles de la rangée (sans libellé dessous : plus grandes).
-const double _kBubble = 50.0;
+const double _kBubble = 60.0;
 
 class _CountryRow extends StatefulWidget {
   const _CountryRow({
     required this.selected,
-    required this.onFilter,
     required this.onCountry,
   });
 
   /// Pays sélectionnés, dans l'ordre où ils l'ont été (Set à insertion
   /// ordonnée : le dernier ajouté est le dernier de l'itération).
   final Set<String> selected;
-  final VoidCallback onFilter;
   final ValueChanged<String> onCountry;
 
-  /// 8 dessus (le retrait des bulles) + bulle + la même respiration avant la
-  /// carte qu'entre la carte et ✕ ✉ ❤ ([_kActionPadV], 16). Suit _kBubble.
-  static const double height = 8 + _kBubble + _kActionPadV;
+  /// 6 dessus (le retrait des bulles) + bulle + 14 pour le compteur dessous.
+  static const double height = 6 + _kBubble + 14;
 
   @override
   State<_CountryRow> createState() => _CountryRowState();
@@ -1702,10 +1554,6 @@ class _CountryRowState extends State<_CountryRow> {
       setState(() => _peek = null);
     }
   }
-
-  int get _total => [
-        for (final k in kGlobeCountries.keys) _countOf(k),
-      ].fold(0, (a, b) => a + b);
 
   String _format(int n) => formatCount(
         n,
@@ -1774,77 +1622,13 @@ class _CountryRowState extends State<_CountryRow> {
     final keys = _orderedKeys;
     return SizedBox(
       height: _CountryRow.height,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            // 15 + 2 (et non 20 + 12) : les cases font 62 de large au lieu de
-            // 52, les bulles restent exactement où elles étaient.
-            padding: const EdgeInsets.fromLTRB(15, 6, 2, 0),
-            child: _RowItem(
-              label: _total > 0
-                  ? '${AppStrings.t('globe_filter_cta')}, ${_countLabel(_total)}'
-                  : AppStrings.t('globe_filter_cta'),
-              onTap: widget.onFilter,
-              // Pas de verre dans la rangée : la bulle « Filtrer » est
-              // pleine, comme les bulles pays.
-              // Anneau de 1,5 px au dégradé de marque (le fond du rond extérieur
-              // vu à travers le padding) ; les bulles pays, elles, ont un fin
-              // liseré de verre.
-              // passthrough : la bulle garde exactement les contraintes d'avant ;
-              // la puce du total déborde en haut à droite du rond.
-              bubble: Stack(
-                fit: StackFit.passthrough,
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: _kBubble,
-                    height: _kBubble,
-                    padding: const EdgeInsets.all(1.5),
-                    decoration: const BoxDecoration(
-                      gradient: SC.brandGradient,
-                      shape: BoxShape.circle,
-                    ),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: _kSurface,
-                        shape: BoxShape.circle,
-                      ),
-                      // La Terre qu'avait l'onglet Discover de la barre.
-                      child: Icon(
-                        Icons.public,
-                        color: SC.fg,
-                        size: 26,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: -7,
-                    right: -2,
-                    height: 18,
-                    child: IgnorePointer(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 150),
-                        child: _total > 0
-                            ? _TotalChip(
-                                key: const ValueKey('total'),
-                                text: _format(_total),
-                              )
-                            : const SizedBox.shrink(key: ValueKey('none')),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            child: ListView.separated(
+      child: ListView.separated(
               controller: _scroll,
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(0, 6, 20, 0),
+              // La place du bouton filtre, posé par-dessus à gauche.
+              padding: const EdgeInsets.fromLTRB(88, 6, 20, 0),
               itemCount: keys.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 6),
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
               itemBuilder: (_, i) {
                 final key = keys[i];
                 final code = kGlobeCountries[key]!.code;
@@ -1858,7 +1642,11 @@ class _CountryRowState extends State<_CountryRow> {
                     height: _kBubble,
                     padding: EdgeInsets.all(on ? 2 : 1),
                     decoration: BoxDecoration(
-                      color: on ? null : SC.glassBorderStrong,
+                      color: on
+                          ? null
+                          : (SC.light
+                              ? const Color(0x2404123A)
+                              : SC.glassBorderStrong),
                       gradient: on ? SC.brandGradient : null,
                       shape: BoxShape.circle,
                     ),
@@ -1874,7 +1662,7 @@ class _CountryRowState extends State<_CountryRow> {
                       child: CountrySilhouette(
                         geoName: key,
                         iso2: code,
-                        size: 39,
+                        size: 44,
                       ),
                     ),
                   );
@@ -1974,9 +1762,6 @@ class _CountryRowState extends State<_CountryRow> {
                 );
               },
             ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -2027,36 +1812,6 @@ class _CountCapsule extends StatelessWidget {
   }
 }
 
-/// Le total des profils, en puce jaune sur la bulle du globe.
-class _TotalChip extends StatelessWidget {
-  const _TotalChip({super.key, required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 18,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: SC.accent,
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Text(
-        text,
-        maxLines: 1,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          height: 1,
-          color: SC.onAccent,
-        ),
-      ),
-    );
-  }
-}
-
 class _RowItem extends StatelessWidget {
   const _RowItem({
     super.key,
@@ -2099,221 +1854,6 @@ class _RowItem extends StatelessWidget {
         onPointerUp: (_) => peek(false),
         onPointerCancel: (_) => peek(false),
         child: item,
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Tinder card stack (3 layered cards)
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _TinderCardStack extends StatefulWidget {
-  const _TinderCardStack({
-    super.key,
-    required this.cards,
-    required this.currentIndex,
-    required this.onSwiped,
-    required this.onPullUp,
-    required this.infoOpen,
-    required this.onCloseInfo,
-    this.topRightBadge,
-    this.onDragEngaged,
-    this.onDragReleased,
-  });
-
-  /// Transmis à la carte du dessus : la main glisse / lâche la carte.
-  final VoidCallback? onDragEngaged;
-  final VoidCallback? onDragReleased;
-
-  final List<({RemoteProfile profile, List<String> photos})> cards;
-  final int currentIndex;
-  final void Function(bool isRight, RemoteProfile profile) onSwiped;
-
-  /// Dragging the photo upward asks for the info panel.
-  final VoidCallback onPullUp;
-
-  /// True while that panel is up — it covers the bottom half of the card.
-  final bool infoOpen;
-  final VoidCallback onCloseInfo;
-
-  /// Chip pinned to the top card's corner (it rides the swipe transform).
-  final Widget? topRightBadge;
-
-  @override
-  State<_TinderCardStack> createState() => _TinderCardStackState();
-}
-
-class _TinderCardStackState extends State<_TinderCardStack> {
-  GlobalKey<_DraggableCardState> _topKey = GlobalKey<_DraggableCardState>();
-  final _progress = ValueNotifier<double>(0.0);
-
-  /// Ce qu'on a déjà demandé au réseau — inutile de redemander à chaque
-  /// reconstruction, le cache d'images de Flutter garde la suite.
-  final Set<String> _warmed = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _warmNext();
-  }
-
-  @override
-  void didUpdateWidget(_TinderCardStack old) {
-    super.didUpdateWidget(old);
-    if (old.currentIndex != widget.currentIndex) {
-      _topKey = GlobalKey<_DraggableCardState>();
-      _progress.value = 0.0;
-      _warmNext();
-    }
-  }
-
-  /// Télécharge À L'AVANCE la photo des deux cartes suivantes.
-  ///
-  /// Une carte ne demandait son image qu'au moment de s'afficher : on balayait,
-  /// et on regardait un rectangle vide pendant que le réseau répondait. Ici la
-  /// photo d'après est déjà dans le cache quand la carte arrive — le balayage
-  /// ne montre plus d'attente. Deux cartes d'avance suffisent : au-delà on
-  /// télécharge des visages que la personne ne verra peut-être jamais.
-  void _warmNext() {
-    final n = widget.cards.length;
-    if (n == 0) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      for (var step = 1; step <= 2; step++) {
-        final i = widget.currentIndex + step;
-        if (i >= n) break;
-        final card = widget.cards[i];
-        final url = card.photos.isEmpty ? '' : card.photos.first;
-        if (url.isEmpty || !_warmed.add(url)) continue;
-        precacheImage(NetworkImage(url), context).catchError((_) {
-          // Une photo qui ne se charge pas ici se rechargera (ou échouera)
-          // à l'affichage, où l'erreur est déjà gérée.
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _progress.dispose();
-    super.dispose();
-  }
-
-  void triggerSwipe(bool isRight) => _topKey.currentState?.programmaticSwipe(isRight);
-
-  @override
-  Widget build(BuildContext context) {
-    final n = widget.cards.length;
-    if (n == 0) return const SizedBox.shrink();
-    final i = widget.currentIndex.clamp(0, n - 1);
-    final hasMid = i + 1 < n;
-    final hasBack = i + 2 < n;
-
-    // Les deux cartes fantômes (handoff 3c : +4° / −3°) dépassent du cadre de
-    // la carte — elles vivent donc HORS du clip. Tout le reste (la carte, la
-    // suivante, le panneau caché sous le bord) reste rogné au rectangle.
-    // Une fantôme par carte restante, jamais plus de deux : la pile ne ment
-    // pas sur ce qu'il reste à voir. Rangées pendant que le panneau est ouvert.
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        if (hasBack && !widget.infoOpen)
-          const _GhostCard(angleDeg: -3),
-        if (hasMid && !widget.infoOpen)
-          const _GhostCard(angleDeg: 4),
-        Positioned.fill(child: ClipRect(child: _buildStack(i, hasMid))),
-      ],
-    );
-  }
-
-  Widget _buildStack(int i, bool hasMid) {
-    return LayoutBuilder(
-      builder: (context, c) {
-        // Le panneau prend les trois quarts de la carte : assez pour poser la
-        // bio, les faits et les intérêts d'un coup. La bande de photo qui
-        // reste au-dessus sert de poignée pour le rabattre.
-        final panelH = c.maxHeight * 0.88;
-        return Stack(
-        children: [
-          // Carte suivante — pleine taille dessous, elle grandit à mesure
-          // que celle du dessus s'en va.
-          if (hasMid)
-            ValueListenableBuilder<double>(
-              valueListenable: _progress,
-              builder: (_, p, child) => _StackCard(
-                key: ValueKey('mid_${i + 1}'),
-                scale: 0.96 + 0.04 * p.clamp(0.0, 1.0),
-                translateY: 0,
-                child: _buildCard(widget.cards[i + 1]),
-              ),
-            ),
-          // Top card (interactive)
-          KeyedSubtree(
-            key: ValueKey('top_$i'),
-            child: _DraggableCard(
-              key: _topKey,
-              onSwiped: (right) => widget.onSwiped(right, widget.cards[i].profile),
-              onProgress: (p) => _progress.value = p,
-              // Pulling the photo up is what opens the panel — no chevron.
-              onPullUp: widget.onPullUp,
-              locked: widget.infoOpen,
-              topRightBadge: widget.topRightBadge,
-              onDragEngaged: widget.onDragEngaged,
-              onDragReleased: widget.onDragReleased,
-              child: _buildCard(widget.cards[i]),
-            ),
-          ),
-          // Au-dessus du panneau : la bande de photo qui reste sert à
-          // REFERMER. Un tap y rabat le panneau — c'est le geste que tout le
-          // monde tente en premier — et un glissement vers le bas aussi. Le
-          // carrousel de photos y perd ses taps gauche/droite tant que le
-          // panneau est ouvert : sortir d'abord, feuilleter ensuite.
-          if (widget.infoOpen)
-            Positioned(
-              left: 0,
-              right: 0,
-              top: 0,
-              bottom: panelH,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: widget.onCloseInfo,
-                onVerticalDragEnd: (d) {
-                  if ((d.primaryVelocity ?? 0) > 0) widget.onCloseInfo();
-                },
-              ),
-            ),
-          // The panel itself — slides up from the bottom edge of the card.
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 280),
-            curve: Curves.easeOutCubic,
-            left: 0,
-            right: 0,
-            height: panelH,
-            bottom: widget.infoOpen ? 0 : -panelH,
-            child: ProfileInfoPanel(
-              profile: widget.cards[i].profile,
-              open: widget.infoOpen,
-              onClose: widget.onCloseInfo,
-            ),
-          ),
-        ],
-      );
-      },
-    );
-  }
-
-  Widget _buildCard(({RemoteProfile profile, List<String> photos}) card) {
-    // Carte photo arrondie (32) qui flotte sur le fond noir — plus de liseré
-    // drapeau : le drapeau est à côté du prénom, en image.
-    return SizedBox.expand(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(_kCardRadius),
-        child: _TinderCard(
-          key: ValueKey(card.profile.id),
-          profile: card.profile,
-          photos: card.photos,
-        ),
       ),
     );
   }
@@ -3038,247 +2578,9 @@ class _PanelHeader extends StatelessWidget {
   }
 }
 
-class _StackCard extends StatelessWidget {
-  const _StackCard({
-    super.key,
-    required this.scale,
-    required this.translateY,
-    required this.child,
-  });
-  final double scale;
-  final double translateY;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: Transform.translate(
-        offset: Offset(0, translateY),
-        child: Transform.scale(scale: scale, child: child),
-      ),
-    );
-  }
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
 // Draggable card — gesture, spring-back, fly-off
 // ══════════════════════════════════════════════════════════════════════════════
-
-const double _kThreshold = 90.0;
-
-
-
-class _DraggableCard extends StatefulWidget {
-  const _DraggableCard({
-    super.key,
-    required this.child,
-    required this.onSwiped,
-    required this.onProgress,
-    this.onPullUp,
-    this.locked = false,
-    this.topRightBadge,
-    this.onDragEngaged,
-    this.onDragReleased,
-  });
-  final Widget child;
-  final ValueChanged<bool> onSwiped;
-  final ValueChanged<double> onProgress;
-
-  /// La main prend la carte pour la glisser à l'horizontale / la lâche : la
-  /// barre du bas se range, puis revient. Le tirage vers le HAUT (panneau
-  /// d'infos) n'appelle ni l'un ni l'autre ; les boutons ✕ / ❤ non plus.
-  final VoidCallback? onDragEngaged;
-  final VoidCallback? onDragReleased;
-
-  /// Fired when the gesture was a real upward pull — the info panel opens
-  /// instead of the card flying off.
-  final VoidCallback? onPullUp;
-
-  /// True while the panel is up: the card must not swipe under it.
-  final bool locked;
-
-  /// Floating chip pinned to the card's top-right corner (undo). It lives
-  /// INSIDE the card's transform so it slides and tilts with it during a
-  /// swipe.
-  final Widget? topRightBadge;
-
-  @override
-  State<_DraggableCard> createState() => _DraggableCardState();
-}
-
-class _DraggableCardState extends State<_DraggableCard>
-    with SingleTickerProviderStateMixin {
-  Offset _pos = Offset.zero;
-  bool _flying = false;
-  int _gen = 0;
-
-  // Créé dans initState, PAS paresseusement : un late final jamais lu
-  // était créé… dans dispose(), sur un élément déjà démonté → exception à
-  // chaque carte retirée sans avoir été glissée.
-  late final AnimationController _ctrl;
-  Animation<Offset>? _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this)..addListener(_tick);
-  }
-
-  void _tick() {
-    final a = _anim;
-    if (a == null) return;
-    setState(() {
-      _pos = a.value;
-      widget.onProgress((_pos.dx.abs() / _kThreshold).clamp(0.0, 1.0));
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  void _animateTo(Offset target, Duration dur, Curve curve, {VoidCallback? done}) {
-    final g = ++_gen;
-    _anim = Tween<Offset>(begin: _pos, end: target)
-        .animate(CurvedAnimation(parent: _ctrl, curve: curve));
-    _ctrl
-      ..duration = dur
-      ..value = 0;
-    _ctrl.forward().then((_) {
-      if (mounted && _gen == g && _ctrl.status == AnimationStatus.completed) {
-        done?.call();
-      }
-    });
-  }
-
-  void _springBack() {
-    _animateTo(Offset.zero, const Duration(milliseconds: 500), Curves.elasticOut,
-        done: () {
-      if (mounted) {
-        setState(() => _pos = Offset.zero);
-        widget.onProgress(0);
-      }
-    });
-  }
-
-  void _flyOff(bool right, {bool fromButton = false}) {
-    _flying = true;
-    _animateTo(
-      // Bouton : la carte part en légère montée (arc naturel) et sa course
-      // épouse l'animation de la croix / du cœur (~400 ms, mêmes courbes
-      // « material » que Fx2bButton) au lieu de filer avant elle.
-      Offset(right ? 1000.0 : -1000.0, fromButton ? _pos.dy - 70 : _pos.dy),
-      Duration(milliseconds: fromButton ? 420 : 280),
-      fromButton ? const Cubic(.4, 0, .2, 1) : Curves.easeIn,
-      done: () {
-        if (mounted) widget.onSwiped(right);
-      },
-    );
-  }
-
-  void programmaticSwipe(bool right) {
-    if (_flying) return;
-    _flyOff(right, fromButton: true);
-  }
-
-  // Position au pointer-down, pour savoir si le geste a vraiment dépassé le
-  // seuil de drag. Tant que ce n'est pas le cas, on ne bouge pas la carte et
-  // on laisse le tap (changement de photo) passer sans concurrence dans
-  // l'arène de gestes — un simple GestureDetector(onPan...) "gagne" sur le
-  // moindre micro-mouvement (souris web ~1px) et avale tous les taps.
-  Offset? _dragOrigin;
-  bool _dragEngaged = false;
-  static const double _kDragEngageSlop = 6.0;
-
-  /// Which way the finger committed once it passed the slop. An upward pull
-  /// belongs to the info panel; anything else is the Tinder swipe. Deciding
-  /// once, at engage time, keeps a sloppy diagonal from doing both.
-  bool _pullingUp = false;
-  static const double _kPullUpThreshold = 48.0;
-
-  @override
-  Widget build(BuildContext context) {
-    final angle = (_pos.dx / 320.0) * 0.20;
-
-    return Listener(
-      onPointerDown: (e) {
-        _dragOrigin = e.position;
-        _dragEngaged = false;
-      },
-      onPointerMove: (e) {
-        if (_flying || widget.locked) return;
-        final origin = _dragOrigin;
-        if (!_dragEngaged) {
-          if (origin == null ||
-              (e.position - origin).distance < _kDragEngageSlop) {
-            return; // micro-mouvement : pas encore un drag, laisse le tap gagner
-          }
-          final d = e.position - origin;
-          // Franchement vers le haut → c'est le panneau qu'on tire, pas la carte.
-          _pullingUp = d.dy < 0 && d.dy.abs() > d.dx.abs();
-          _dragEngaged = true;
-          _ctrl.stop();
-          _anim = null;
-          if (!_pullingUp) widget.onDragEngaged?.call();
-        }
-        if (_pullingUp) {
-          // On laisse la carte immobile : le panneau fera l'animation.
-          _pos += Offset(0, e.delta.dy);
-          return;
-        }
-        setState(() {
-          _pos += Offset(e.delta.dx, e.delta.dy * 0.3);
-          widget.onProgress((_pos.dx.abs() / _kThreshold).clamp(0.0, 1.0));
-        });
-      },
-      onPointerUp: (_) {
-        final wasEngaged = _dragEngaged;
-        final wasPullingUp = _pullingUp;
-        final travelled = _pos;
-        _dragEngaged = false;
-        _pullingUp = false;
-        _dragOrigin = null;
-        if (wasEngaged && !wasPullingUp) widget.onDragReleased?.call();
-        if (!wasEngaged || _flying) return;
-        if (wasPullingUp) {
-          _pos = Offset.zero;
-          if (travelled.dy <= -_kPullUpThreshold) widget.onPullUp?.call();
-          return;
-        }
-        if (_pos.dx.abs() >= _kThreshold) {
-          _flyOff(_pos.dx > 0);
-        } else {
-          _springBack();
-        }
-      },
-      onPointerCancel: (_) {
-        if (_dragEngaged && !_pullingUp) widget.onDragReleased?.call();
-        _dragEngaged = false;
-        _dragOrigin = null;
-      },
-      child: Transform.translate(
-        offset: _pos,
-        child: Transform.rotate(
-          angle: angle,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              widget.child,
-              // Plus de tampons LIKE / NOPE pendant le glissement (retirés à
-              // la demande) : seul le « pop » du bouton ✕ / ❤ signale le choix.
-              // Pastille filtre / retour — dans le transform de la carte, donc
-              // elles glissent et s'inclinent avec elle.
-              if (widget.topRightBadge != null)
-                Positioned(top: 12, right: 12, child: widget.topRightBadge!),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Tinder card — full-bleed photo carousel + info overlay
@@ -3286,7 +2588,6 @@ class _DraggableCardState extends State<_DraggableCard>
 
 class _TinderCard extends StatefulWidget {
   const _TinderCard({
-    super.key,
     required this.profile,
     required this.photos,
     this.preview = false,
@@ -4156,266 +3457,6 @@ class _PhotoDots extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Interest chip — dark pill (Tinder style)
-// ══════════════════════════════════════════════════════════════════════════════
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Barre d'actions — ✕ (clair) · message direct (Premium) · ❤ (rose)
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _SwipeActionBar extends StatelessWidget {
-  const _SwipeActionBar({
-    required this.onNope,
-    required this.onLike,
-    required this.onMessage,
-    required this.popSide,
-  });
-
-  final VoidCallback onNope;
-  final VoidCallback onLike;
-  final VoidCallback onMessage;
-
-  /// -1 = la carte vient de partir à gauche (✕ fait son pop), 1 = à droite (❤).
-  final ValueNotifier<int> popSide;
-
-  /// « Pop » : le bouton grossit à 1,4× avec une lueur, puis revient avec un
-  /// léger rebond. Aucun pop si les animations sont réduites.
-  Widget _pop(BuildContext context,
-      {required bool cross,
-      required Color glow,
-      required double glowAlpha,
-      required double glowBlur,
-      required Widget Function(double t) button}) {
-    final reduce = MediaQuery.disableAnimationsOf(context);
-    return ValueListenableBuilder<int>(
-      valueListenable: popSide,
-      builder: (context, side, _) {
-        final on = !reduce && side == (cross ? -1 : 1);
-        return TweenAnimationBuilder<double>(
-          tween: Tween(end: on ? 1.0 : 0.0),
-          duration: Duration(milliseconds: on ? 160 : 450),
-          curve: on ? Curves.easeOutCubic : Curves.easeOutBack,
-          builder: (context, t, _) => Transform.scale(
-            scale: 1 + 0.4 * t,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: glow.withValues(alpha: glowAlpha * t.clamp(0.0, 1.0)),
-                    blurRadius: glowBlur * t.clamp(0.0, 1.0),
-                  ),
-                ],
-              ),
-              child: button(t),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Semantics(
-          button: true,
-          label: 'Nope',
-          child: _pop(
-            context,
-            cross: true,
-            glow: const Color(0xFFFF4D4D),
-            glowAlpha: 0.85,
-            glowBlur: 34,
-            button: (t) => SwaycoCrossButton(
-                size: _kFxSize, onTap: onNope, emphasis: t),
-          ),
-        ),
-        const SizedBox(width: 18),
-        _DirectMessageButton(onTap: onMessage),
-        const SizedBox(width: 18),
-        Semantics(
-          button: true,
-          label: 'Like',
-          child: _pop(
-            context,
-            cross: false,
-            // Le ❤ de l'app est vert : la lueur reprend SA couleur.
-            glow: const Color(0xFF2FD486),
-            glowAlpha: 0.9,
-            glowBlur: 38,
-            button: (_) => SwaycoHeartButton(size: _kFxSize, onTap: onLike),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Le message direct — l'accès privilégié : rond au dégradé de marque, bulle
-/// blanche, pastille ✦ jaune en haut à droite, et un anneau qui pulse en
-/// boucle pour dire qu'il se passe quelque chose de spécial ici.
-class _DirectMessageButton extends StatefulWidget {
-  const _DirectMessageButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  State<_DirectMessageButton> createState() => _DirectMessageButtonState();
-}
-
-class _DirectMessageButtonState extends State<_DirectMessageButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2300),
-  )..repeat();
-  bool _pressed = false;
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: 'Message',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _pressed ? 0.92 : 1,
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
-          child: SizedBox(
-            width: _kMessageSize,
-            height: _kMessageSize,
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.center,
-              children: [
-                // Anneau pulsé : 1 → 1.42, opacité .65 → 0, ease-out.
-                AnimatedBuilder(
-                  animation: _pulse,
-                  builder: (_, _) {
-                    final t = Curves.easeOut.transform(_pulse.value);
-                    return IgnorePointer(
-                      child: Transform.scale(
-                        scale: 1 + 0.42 * t,
-                        child: Container(
-                          width: _kMessageSize,
-                          height: _kMessageSize,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: SC.brandBlue.withValues(alpha: 0.65 * (1 - t)),
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                Container(
-                  width: _kMessageSize,
-                  height: _kMessageSize,
-                  decoration: const BoxDecoration(
-                    gradient: SC.brandGradient,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x732B7FFF),
-                        blurRadius: 20,
-                        offset: Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.chat_bubble_rounded,
-                    size: 21,
-                    color: Colors.white,
-                  ),
-                ),
-                // ✦ en haut à droite : pastille jaune, liseré fond de page.
-                Positioned(
-                  top: -4,
-                  right: -4,
-                  child: Container(
-                    width: 16,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: SC.accent,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: SC.bg, width: 1.5),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Text(
-                      '✦',
-                      style: TextStyle(
-                        color: SC.onAccent,
-                        fontSize: 9,
-                        height: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Le retour arrière posé sur la photo : 44, verre sombre (black .22, blur
-/// 12), même liseré que les bulles pays (blanc 20 %, 1 px), icône blanche. Verre Flutter et non natif : une
-/// platform view dans la carte qu'on balaie scintillait (commit 051f0fd).
-class _CardUndoButton extends StatelessWidget {
-  const _CardUndoButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: ClipOval(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.22),
-              shape: BoxShape.circle,
-              border: Border.all(color: SC.glassBorderStrong),
-            ),
-            child: Icon(
-              Icons.replay_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Empty / end-of-deck

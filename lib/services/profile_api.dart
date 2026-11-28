@@ -40,6 +40,7 @@ class RemoteProfile {
     this.boostedUntil,
     this.isAi = false,
     this.isVerified = false,
+    this.createdAt,
     this.age,
     this.heightCm,
     this.job = '',
@@ -206,6 +207,16 @@ class RemoteProfile {
   /// trigger ignore toute écriture d'un client.
   final bool isVerified;
 
+  /// Date d'inscription.
+  final DateTime? createdAt;
+
+  /// Inscrit depuis moins de 3 jours : la pastille « Nouveau » du fil.
+  bool get isNewcomer {
+    final since = createdAt;
+    return since != null &&
+        DateTime.now().difference(since) < const Duration(days: 3);
+  }
+
   bool get isBoosted {
     final until = boostedUntil;
     return until != null && until.isAfter(DateTime.now());
@@ -306,6 +317,7 @@ class RemoteProfile {
     boostedUntil: _parseDate(m['boosted_until']),
     isAi: m['is_ai'] == true,
     isVerified: m['is_verified'] == true,
+    createdAt: _parseDate(m['created_at']),
   );
 
   /// Returns a copy with the given fields overridden. Used by the few call
@@ -378,6 +390,7 @@ class RemoteProfile {
     boostedUntil: boostedUntil,
     isAi: isAi,
     isVerified: isVerified,
+    createdAt: createdAt,
   );
 }
 

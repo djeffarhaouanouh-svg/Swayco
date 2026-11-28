@@ -14,6 +14,8 @@ import 'package:image_picker/image_picker.dart';
 import '../services/analytics.dart';
 
 import '../services/app_strings.dart';
+import '../widgets/peer_profile_view.dart';
+import '../widgets/round_flag.dart';
 import '../services/notif_enable_flow.dart';
 import '../services/swayco_sounds.dart';
 import '../services/block_api.dart';
@@ -47,7 +49,6 @@ import '../widgets/profile_info_card.dart';
 import '../widgets/settings_hero.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/location_picker_sheet.dart';
-import '../widgets/match_overlay.dart';
 import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
@@ -336,12 +337,12 @@ class _ProfileScreenState extends State<ProfileScreen>
         unawaited(NotifEnableFlow.askAfterFirstLike(context));
       }
       if (res.matched) {
+        MatchCelebration.markShown(_targetId);
         setState(() {
           _matched = true;
           _iLiked = false;
           _peerLikedMe = false;
         });
-        await _celebrateMatch();
       }
     } catch (e) {
       if (!mounted) return;
@@ -376,8 +377,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         'friend_request_sent',
         props: {'source': 'profile', 'kind': 'match'},
       );
-      if (!mounted) return;
-      await _celebrateMatch();
+      MatchCelebration.markShown(_targetId);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -389,31 +389,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       ).showSnackBar(SnackBar(
           content: Text(friendlyError(e))));
     }
-  }
-
-  /// The "It's a match!" celebration. Needs MY profile too â in viewer mode
-  /// `_remote` holds the PEER, so pull mine for the card.
-  Future<void> _celebrateMatch() async {
-    MatchCelebration.markShown(_targetId);
-    final me = isSupabaseReady ? await ProfileApi.fetchById(_deviceId) : null;
-    final peer = _remote;
-    if (!mounted || peer == null) return;
-    final meProfile = me ??
-        RemoteProfile(
-          id: _deviceId,
-          handle: '',
-          displayName: '',
-          language: AppStrings.currentBcp47.value,
-          avatarColor: '',
-          avatarUrl: '',
-        );
-    await showMatchOverlay(
-      context,
-      me: meProfile,
-      peer: peer,
-      onSayHi: _openChatWithPeer,
-    );
-    if (mounted) await _reload(silent: true);
   }
 
   Future<void> _openChatWithPeer() async {
@@ -1028,10 +1003,193 @@ class _ProfileScreenState extends State<ProfileScreen>
     // Le profil d'un PAIR (userId != null) règle sa propre barre comme Messages :
     // elle se range au défilement, revient 0,5 s après. L'aperçu de ma carte
     // garde sa barre fixe.
+    // Le profil d'un pair n'a plus de barre du bas : rien à ranger.
+    if (widget.userId != null && !widget.preview) return page;
     if (widget.userId != null) return NavAutoHide(child: page);
     return widget.preview
         ? page
         : NavAutoHide(tab: NavTab.profile, child: page);
+  }
+
+  /// ⋮ : retirer des amis, signaler, bloquer.
+  Widget _moreMenu() {
+    return PopupMenuButton<String>(
+      tooltip: AppStrings.t('tooltip_more'),
+      padding: EdgeInsets.zero,
+      color: SC.menu,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: SC.glassBorder),
+      ),
+      onSelected: (v) {
+        if (v == 'unmatch') _unmatchPeer();
+        if (v == 'report') _reportPeer();
+        if (v == 'block') _toggleBlock();
+      },
+      itemBuilder: (ctx) => [
+        if (_matched)
+          PopupMenuItem<String>(
+            value: 'unmatch',
+            child: Row(
+              children: [
+                Icon(
+                  Icons.heart_broken_outlined,
+                  size: 18,
+                  color: SC.textPrimary,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  AppStrings.t('unmatch'),
+                  style: TextStyle(
+                    color: SC.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        PopupMenuItem<String>(
+          value: 'report',
+          child: Row(
+            children: [
+              const Icon(
+                Icons.flag_outlined,
+                size: 18,
+                color: Color(0xFFE53935),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                AppStrings.t('report'),
+                style: const TextStyle(
+                  color: Color(0xFFE53935),
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'block',
+          child: Row(
+            children: [
+              Icon(
+                _peerBlocked
+                    ? Icons.lock_open
+                    : Icons.block,
+                size: 18,
+                color: const Color(0xFFE53935),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                AppStrings.t(
+                  _peerBlocked ? 'unblock' : 'block',
+                ),
+                style: const TextStyle(
+                  color: Color(0xFFE53935),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      child: const _GlassCircle(icon: Icons.more_vert),
+    );
+  }
+
+  /// Le profil d'un pair (voir [PeerProfileView]).
+  Widget _buildPeer(BuildContext context) {
+    final remote = _remote;
+    final back = _GlassCircle(
+      icon: Icons.arrow_back_rounded,
+      onTap: () => Navigator.of(context).maybePop(),
+    );
+    if (_loading) {
+      return Scaffold(
+        backgroundColor: SC.bg,
+        body: Stack(
+          children: [
+            Center(child: CircularProgressIndicator(color: SC.accentFg)),
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 6,
+              left: 14,
+              child: back,
+            ),
+          ],
+        ),
+      );
+    }
+    final photos = [
+      for (final u in remote?.photos ?? const <String>[])
+        if (u.isNotEmpty) u,
+    ];
+    final avatar = remote?.bestAvatarUrl ?? '';
+    final name = _displayName.isEmpty
+        ? AppStrings.t('profile_anonymous')
+        : _displayName;
+    final popular = (remote?.isPro ?? false) || (remote?.isPlus ?? false);
+    final passport = (_IdentitySection._hasFacts(remote) ||
+            (remote?.interests.isNotEmpty ?? false))
+        ? remote
+        : null;
+    return Scaffold(
+      body: PeerProfileView(
+        profile: remote,
+        name: name,
+        backgroundUrl: photos.isNotEmpty ? photos.first : avatar,
+        avatarUrl: avatar.isNotEmpty
+            ? avatar
+            : (photos.isNotEmpty ? photos.first : ''),
+        online: _peerOnline,
+        badge: popular
+            ? _PopularPill(
+                onAvatar: true,
+                message: AppStrings.t('profile_popular_body', args: {
+                  'name': name.split(RegExp(r'\s+')).first,
+                }),
+              )
+            : null,
+        back: back,
+        menu: _moreMenu(),
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            // Bloqué par moi : un seul « Débloquer ».
+            child: _peerBlocked
+                ? PeerPrimaryButton(
+                    label: AppStrings.t('unblock'),
+                    icon: Icons.lock_open,
+                    onTap: _toggleBlock,
+                  )
+                : PeerActionRow(
+                    friends: _matched,
+                    requested: _iLiked,
+                    onMessage: _openChatWithPeer,
+                    onFriend: _peerBlockedMe
+                        ? null
+                        : (_peerLikedMe ? _acceptPeer : _likePeer),
+                  ),
+          ),
+          if (remote != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+              child: PeerBioCard(profile: remote),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
+            child: _ProfileSectionHeader(
+              AppStrings.t('peer_photos_section'),
+              suffix: photos.isEmpty ? '' : '(${photos.length})',
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: _PeerMediaStack(
+              photos: photos,
+              profile: passport,
+              flush: true,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildPage(BuildContext context) {
@@ -1044,6 +1202,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         countryFlagFor(_remote?.country ?? '') ??
         lang?.flag ??
         '';
+    // Le profil de quelqu'un d'autre : photo en fond et panneau qui monte.
+    if (widget.userId != null && !widget.preview) return _buildPeer(context);
     return Scaffold(
       // Onglet Profil : transparent en clair (le shell pose fond + halo) ;
       // le profil d'un autre est une page poussée, donc opaque.
@@ -1199,85 +1359,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         // En aperÃ§u de mon propre profil : pas de menu â®
                         // (rien Ã  signaler / bloquer sur soi-mÃªme).
                         if (!widget.preview)
-                        PopupMenuButton<String>(
-                          tooltip: AppStrings.t('tooltip_more'),
-                          padding: EdgeInsets.zero,
-                          color: SC.menu,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: BorderSide(color: SC.glassBorder),
-                          ),
-                          onSelected: (v) {
-                            if (v == 'unmatch') _unmatchPeer();
-                            if (v == 'report') _reportPeer();
-                            if (v == 'block') _toggleBlock();
-                          },
-                          itemBuilder: (ctx) => [
-                            if (_matched)
-                              PopupMenuItem<String>(
-                                value: 'unmatch',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.heart_broken_outlined,
-                                      size: 18,
-                                      color: SC.textPrimary,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      AppStrings.t('unmatch'),
-                                      style: TextStyle(
-                                        color: SC.textPrimary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            PopupMenuItem<String>(
-                              value: 'report',
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.flag_outlined,
-                                    size: 18,
-                                    color: Color(0xFFE53935),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    AppStrings.t('report'),
-                                    style: const TextStyle(
-                                      color: Color(0xFFE53935),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem<String>(
-                              value: 'block',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    _peerBlocked
-                                        ? Icons.lock_open
-                                        : Icons.block,
-                                    size: 18,
-                                    color: const Color(0xFFE53935),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    AppStrings.t(
-                                      _peerBlocked ? 'unblock' : 'block',
-                                    ),
-                                    style: const TextStyle(
-                                      color: Color(0xFFE53935),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          child: const _GlassCircle(icon: Icons.more_vert),
-                        ),
+                        _moreMenu(),
                       ],
                     ),
                   ),
@@ -2048,7 +2130,10 @@ class _IdentitySection extends StatelessWidget {
 /// boutons posés sur la couverture.
 /// « POPULAIRE » : pastille jaune posée à côté de la flèche retour d'un profil.
 class _PopularPill extends StatelessWidget {
-  const _PopularPill({this.message = ''});
+  const _PopularPill({this.message = '', this.onAvatar = false});
+
+  /// Posé au bas de la photo de profil : plus petit, cerné du fond de la page.
+  final bool onAvatar;
 
   /// Le petit texte qui s'affiche quand on reste appuyé sur le badge.
   final String message;
@@ -2098,10 +2183,20 @@ class _PopularPill extends StatelessWidget {
 
   Widget _pillBody() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      padding: onAvatar
+          ? const EdgeInsets.symmetric(horizontal: 9, vertical: 3)
+          : const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
       decoration: BoxDecoration(
         color: const Color(0xFFF4FF1F),
         borderRadius: BorderRadius.circular(999),
+        border: onAvatar
+            ? Border.all(
+                color: SC.light
+                    ? const Color(0xFFF3F4F8)
+                    : const Color(0xFF0E0E0E),
+                width: 2,
+              )
+            : null,
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFF4FF1F).withValues(alpha: 0.2),
@@ -2111,9 +2206,10 @@ class _PopularPill extends StatelessWidget {
       ),
       child: Text(
         AppStrings.t('paywall_popular').toUpperCase(),
-        style: const TextStyle(
-          color: Color(0xFF04123A),
-          fontSize: 11,
+        maxLines: 1,
+        style: TextStyle(
+          color: const Color(0xFF04123A),
+          fontSize: onAvatar ? 9.5 : 11,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.5,
         ),
@@ -2244,7 +2340,14 @@ class _DashedRRectPainter extends CustomPainter {
 
 /// Grille 2 colonnes de photos sur le profil d'un pair. Tap : viewer plein ecran.
 class _PeerMediaStack extends StatelessWidget {
-  const _PeerMediaStack({required this.photos, this.profile});
+  const _PeerMediaStack({
+    required this.photos,
+    this.profile,
+    this.flush = false,
+  });
+
+  /// Bord à bord, 2 px d'écart, tuiles droites (profil d'un pair).
+  final bool flush;
 
   final List<String> photos;
 
@@ -2253,7 +2356,6 @@ class _PeerMediaStack extends StatelessWidget {
 
   // Grille d'avant la DA : 2 colonnes, vignettes 3 / 4 (hauteur / largeur).
   static const double _aspect = 216 / 162;
-  static const double _spacing = 8;
   static const int _columns = 2;
 
   @override
@@ -2263,28 +2365,53 @@ class _PeerMediaStack extends StatelessWidget {
     // Le passeport est la page 0 de la visionneuse : les photos suivent.
     final offset = passport != null ? 1 : 0;
 
+    final spacing = flush ? 2.0 : 8.0;
+    final radius = flush ? 0.0 : 20.0;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final tileWidth =
-            (constraints.maxWidth - _spacing * (_columns - 1)) / _columns;
+            (constraints.maxWidth - spacing * (_columns - 1)) / _columns;
         final tileHeight = tileWidth * _aspect;
         return Wrap(
-          spacing: _spacing,
-          runSpacing: _spacing,
+          spacing: spacing,
+          runSpacing: spacing,
           children: [
             if (passport != null)
               SizedBox(
                 width: tileWidth,
                 height: tileHeight,
-                child: PassportTile(
-                  profile: passport,
-                  onTap: () => showPhotoViewer(
-                    context,
-                    photos: photos,
-                    index: 0,
-                    viewerMode: true,
-                    passportProfile: passport,
-                  ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    PassportTile(
+                      profile: passport,
+                      radius: radius,
+                      onTap: () => showPhotoViewer(
+                        context,
+                        photos: photos,
+                        index: 0,
+                        viewerMode: true,
+                        passportProfile: passport,
+                      ),
+                    ),
+                    if (flush)
+                      Positioned(
+                        top: 34,
+                        right: 8,
+                        // ⤢ : la carte complète, sans animation.
+                        child: _ExpandPassport(
+                          onTap: () => showPhotoViewer(
+                            context,
+                            photos: photos,
+                            index: 0,
+                            viewerMode: true,
+                            passportProfile: passport,
+                            animatePassport: false,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             for (var i = 0; i < photos.length; i++)
@@ -2294,6 +2421,7 @@ class _PeerMediaStack extends StatelessWidget {
                 child: _PhotoCell(
                   photoUrl: photos[i],
                   viewerMode: true,
+                  radius: radius,
                   onTap: () => showPhotoViewer(
                     context,
                     photos: photos,
@@ -2308,6 +2436,40 @@ class _PeerMediaStack extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Le petit rond en verre ⤢ posé sur la tuile passeport.
+class _ExpandPassport extends StatelessWidget {
+  const _ExpandPassport({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: ClipOval(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.13),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+            ),
+            child: Icon(
+              Icons.open_in_full_rounded,
+              size: 14,
+              color: SC.light ? const Color(0xFF04123A) : Colors.white,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -2535,6 +2697,8 @@ Future<void> showPhotoViewer(
   bool viewerMode = false,
   RemoteProfile? passportProfile,
   bool wholePhoto = false,
+  RemoteProfile? footerProfile,
+  bool animatePassport = true,
 }) {
   if (photos.isEmpty && passportProfile == null) return Future<void>.value();
   final pageCount = photos.length + (passportProfile != null ? 1 : 0);
@@ -2549,6 +2713,8 @@ Future<void> showPhotoViewer(
         viewerMode: viewerMode,
         passportProfile: passportProfile,
         wholePhoto: wholePhoto,
+        footerProfile: footerProfile,
+        animatePassport: animatePassport,
       ),
       // Fade + grow-in (scale from 90%) instead of a flat fade, so the photo
       // eases open instead of popping.
@@ -2574,7 +2740,13 @@ class _PhotoViewer extends StatefulWidget {
     this.viewerMode = false,
     this.passportProfile,
     this.wholePhoto = false,
+    this.footerProfile,
+    this.animatePassport = true,
   });
+
+  /// Non nul : sous la photo, les points puis le drapeau, le prénom et le pays.
+  final RemoteProfile? footerProfile;
+  final bool animatePassport;
   final List<String> photos;
   final int initialIndex;
   final bool viewerMode;
@@ -2599,8 +2771,9 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   /// L'animation du Discover ne se joue qu'à l'OUVERTURE par un tap sur la
   /// tuile passeport — pas quand on revient dessus en feuilletant les photos
   /// (flèches, glissement gauche / droite).
-  late bool _animatePassport =
-      widget.passportProfile != null && widget.initialIndex == 0;
+  late bool _animatePassport = widget.animatePassport &&
+      widget.passportProfile != null &&
+      widget.initialIndex == 0;
 
   /// Hauteur dont le passeport a besoin pour tout montrer sans défiler (mesurée
   /// par le panneau) ; null tant qu'elle n'est pas connue.
@@ -2817,7 +2990,10 @@ class _PhotoViewerState extends State<_PhotoViewer> {
     final aspect = discoverCardAspect(context);
     var frameW = size.width - 28;
     var frameH = frameW / aspect;
-    final maxH = size.height * 0.82;
+    // Le bas (points, nom) prend sa place sous la photo.
+    final footer = widget.footerProfile;
+    final footerH = footer == null ? 0.0 : 84.0;
+    final maxH = size.height * (footer == null ? 0.82 : 0.72);
     if (frameH > maxH) {
       frameH = maxH;
       frameW = frameH * aspect;
@@ -2831,13 +3007,16 @@ class _PhotoViewerState extends State<_PhotoViewer> {
       backgroundColor: Colors.black.withValues(alpha: 0.78),
       body: Stack(
         children: [
-          Listener(
+          Positioned.fill(
+            bottom: footerH,
+            child: Listener(
             onPointerDown: (_) => setState(() => _pointers++),
             onPointerUp: (_) =>
                 setState(() => _pointers = (_pointers - 1).clamp(0, 10)),
             onPointerCancel: (_) =>
                 setState(() => _pointers = (_pointers - 1).clamp(0, 10)),
             child: PageView.builder(
+              padEnds: true,
               controller: _pc,
               itemCount: _pageCount,
               physics: (_pointers >= 2 || _zoomed)
@@ -2856,13 +3035,14 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                   ? _passportPage(frameW, frameH)
                   : _photoPage(pi - _passportOffset, frameW, frameH),
             ),
+            ),
           ),
           // Side arrows when there's more than one photo.
           if (multi) ...[
             Positioned(
               left: 6,
               top: 0,
-              bottom: 0,
+              bottom: footerH,
               child: Center(
                 child: _circleBtn(
                   Icons.chevron_left_rounded,
@@ -2874,7 +3054,7 @@ class _PhotoViewerState extends State<_PhotoViewer> {
             Positioned(
               right: 6,
               top: 0,
-              bottom: 0,
+              bottom: footerH,
               child: Center(
                 child: _circleBtn(
                   Icons.chevron_right_rounded,
@@ -2884,8 +3064,92 @@ class _PhotoViewerState extends State<_PhotoViewer> {
               ),
             ),
           ],
+          if (footer != null)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: MediaQuery.paddingOf(context).bottom + 18,
+              child: IgnorePointer(
+                child: _ViewerFooter(
+                  profile: footer,
+                  count: _pageCount,
+                  index: _index,
+                ),
+              ),
+            ),
         ],
       ),
+    );
+  }
+}
+
+/// Sous la photo ouverte depuis le fil : les points, puis le drapeau, le prénom
+/// et le pays.
+class _ViewerFooter extends StatelessWidget {
+  const _ViewerFooter({
+    required this.profile,
+    required this.count,
+    required this.index,
+  });
+
+  final RemoteProfile profile;
+  final int count;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = profile.displayName.trim();
+    final first = name.isEmpty ? '' : name.split(RegExp(r'\s+')).first;
+    final country = profile.country.trim();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (count > 1)
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < count; i++)
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    width: i == index ? 20 : 6,
+                    height: 6,
+                    margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                    decoration: BoxDecoration(
+                      color: Colors.white
+                          .withValues(alpha: i == index ? 1 : 0.4),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            RoundFlag(
+              country: country,
+              language: profile.language,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                [first, country].where((s) => s.isNotEmpty).join(' · '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -3905,8 +4169,10 @@ class _PhotoCell extends StatelessWidget {
     required this.onTap,
     this.onDelete,
     this.isPrimary = false,
+    this.radius = 20,
   });
 
+  final double radius;
   final String? photoUrl;
   final bool viewerMode;
   final VoidCallback onTap;
@@ -3926,7 +4192,7 @@ class _PhotoCell extends StatelessWidget {
     final showDeleteAction = !viewerMode && hasPhoto && onDelete != null;
     return Material(
       color: SC.menu,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(radius),
       clipBehavior: Clip.antiAlias,
       child: Stack(
         fit: StackFit.expand,

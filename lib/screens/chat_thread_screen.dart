@@ -25,6 +25,7 @@ import '../services/chat_reads.dart';
 import '../services/chat_unread.dart';
 import '../services/friendship_api.dart';
 import '../services/special_request.dart';
+import '../widgets/new_contact_gate.dart';
 import '../services/message_reactions.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
@@ -1544,6 +1545,26 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
+  bool _gating = false;
+
+  /// Première fois qu'on écrit à cette personne : la limite du jour des comptes
+  /// gratuits s'applique (voir NewContacts). Répondre est toujours permis.
+  Future<bool> _mayWrite() async {
+    if (_isGroup || _messages.isNotEmpty) return true;
+    if (_gating) return false;
+    _gating = true;
+    try {
+      return await allowNewContact(
+        context,
+        meId: _myId,
+        peerId: widget.peerDeviceId,
+        source: 'chat',
+      );
+    } finally {
+      _gating = false;
+    }
+  }
+
   Future<void> _send() async {
     // Mode « modifier » : le rond d'envoi valide la modification.
     if (_editing != null) {
@@ -1558,6 +1579,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       setState(() => _error = AppStrings.t('chat_send_failed'));
       return;
     }
+    if (!await _mayWrite() || !mounted) return;
     setState(() => _sending = true);
     try {
       // La photo d'abord (elle porte la citation), puis le texte s'il y en a.
@@ -1770,6 +1792,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// dit).
   Future<void> _sendVideoFile(XFile file) async {
     if (!mounted) return;
+    if (!await _mayWrite() || !mounted) return;
     final size = await file.length();
     if (size > ChatApi.maxVideoBytes) {
       if (mounted) setState(() => _error = AppStrings.t('chat_video_too_big'));
@@ -1837,6 +1860,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       setState(() => _error = AppStrings.t('chat_send_failed'));
       return;
     }
+    if (!await _mayWrite() || !mounted) return;
     final gif = await showGifPicker(context);
     if (gif == null || !mounted) return;
     setState(() => _sending = true);
@@ -1874,6 +1898,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       setState(() => _error = AppStrings.t('chat_send_failed'));
       return;
     }
+    if (!await _mayWrite() || !mounted) return;
     setState(() => _sending = true);
     try {
       await ChatApi.sendVoice(

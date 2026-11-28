@@ -10,6 +10,7 @@ import 'attribution.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
 import 'review_prompt.dart';
+import 'supabase_service.dart';
 
 /// Vrai si [url] pointe un fichier VIDÉO (extension `.mp4`, `.mov`, `.m4v`,
 /// `.webm`, `.3gp`), requête et ancre ignorées.
@@ -365,6 +366,27 @@ abstract final class ChatApi {
         .toList();
     list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     return List<ChatMessage>.unmodifiable(list);
+  }
+
+  /// Y a-t-il au moins un message dans cette conversation (écrit par [from] si
+  /// précisé) ? `null` : lecture ratée, on ne sait pas.
+  static Future<bool?> hasMessage(
+    String conversationId, {
+    String from = '',
+  }) async {
+    if (!isSupabaseReady) return null;
+    try {
+      var query = _client
+          .from('messages')
+          .select('sender')
+          .eq('conversation_id', conversationId);
+      if (from.isNotEmpty) query = query.eq('sender', from);
+      final rows = await query.limit(1);
+      return (rows as List).isNotEmpty;
+    } catch (e) {
+      debugPrint('ChatApi.hasMessage failed: $e');
+      return null;
+    }
   }
 
   /// Taille de la fenêtre de messages (la même pour la lecture directe et le

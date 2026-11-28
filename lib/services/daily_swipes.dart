@@ -39,6 +39,27 @@ class DailySwipes {
     await p.setInt(_kCount, n + 1);
   }
 
+  static const _kSeen = 'swipes_seen';
+
+  /// Le profil [id] vient d'être vu dans le fil : compté une seule fois par
+  /// jour, même si on repasse dessus.
+  static Future<void> markSeen(String id) {
+    // À la file : deux cartes dépassées d'un coup comptent pour deux.
+    return _queue = _queue.then((_) async {
+      final p = await SharedPreferences.getInstance();
+      final today = _today();
+      final raw = p.getStringList(_kSeen) ?? const <String>[];
+      final seen = raw.isNotEmpty && raw.first == today
+          ? raw.sublist(1)
+          : <String>[];
+      if (seen.contains(id)) return;
+      await p.setStringList(_kSeen, [today, ...seen, id]);
+      await increment();
+    }).catchError((_) {});
+  }
+
+  static Future<void> _queue = Future<void>.value();
+
   static Future<void> reset() async {
     final p = await SharedPreferences.getInstance();
     await p.setString(_kDay, _today());

@@ -16,7 +16,14 @@ import 'profile_info_card.dart';
 /// passeport (âge, métier, signe, ce qui définit la personne) dans le format
 /// d'une photo. Un appui l'ouvre dans la visionneuse, comme une image.
 class PassportTile extends StatelessWidget {
-  const PassportTile({super.key, required this.profile, required this.onTap});
+  const PassportTile({
+    super.key,
+    required this.profile,
+    required this.onTap,
+    this.radius = 20,
+  });
+
+  final double radius;
 
   final RemoteProfile profile;
   final VoidCallback onTap;
@@ -41,11 +48,11 @@ class PassportTile extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: light ? Colors.white : const Color(0xFF161B2E),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(radius),
           border: Border.all(color: accent.withValues(alpha: 0.5)),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(19),
+          borderRadius: BorderRadius.circular(radius > 1 ? radius - 1 : 0),
           child: Stack(
             children: [
               // Dégradé du bas, aux couleurs du persona.
