@@ -803,8 +803,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     final collapsed = _collapsed;
-    final rowTop = safeTop + _DiscoverHeader.height;
-    final listTop = collapsed ? safeTop + 47 : rowTop + _CountryRow.height;
+    // La ligne du logo, avec un peu d'air : sans barre d'état (web) le filtre
+    // rangé touchait le bord et était coupé.
+    final headTop = math.max(safeTop + 4, 12.0);
+    final rowTop = headTop + _DiscoverHeader.height;
+    final listTop = collapsed ? headTop + 47 : rowTop + _CountryRow.height;
     final filterSize = collapsed ? 40.0 : 60.0;
     final bottomSpace = math.max(
       130.0,
@@ -894,7 +897,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           children: [
             // ── Logo + Pro ────────────────────────────────────────────────
             Positioned(
-              top: safeTop,
+              top: headTop,
               left: 0,
               right: 0,
               child: const _DiscoverHeader(),
@@ -937,7 +940,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             AnimatedPositioned(
               duration: move,
               curve: curve,
-              top: collapsed ? safeTop - 3 : rowTop + 6,
+              top: collapsed ? headTop - 3 : rowTop + 6,
               left: collapsed ? 14 : 16,
               width: filterSize,
               height: filterSize,
