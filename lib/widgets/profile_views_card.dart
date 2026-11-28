@@ -3,16 +3,18 @@ import 'package:flutter/material.dart';
 import '../services/app_strings.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_views_api.dart';
+import '../services/revenue_cat.dart';
 import '../theme/swayco_theme.dart';
 import 'popup_kit.dart' show popupDisplay;
-import 'profile_avatar.dart';
+import 'profile_views_kit.dart';
 
-/// « Vues du profil » sur mon profil : les dernières têtes, le nombre de la
-/// semaine, les nouvelles en jaune. Un tap ouvre la liste.
+/// « Vues du profil » sur mon profil : les dernières têtes (floutées en
+/// gratuit), le nombre de la semaine, les nouvelles en jaune. Un tap ouvre
+/// l'écran.
 class ProfileViewsCard extends StatefulWidget {
   const ProfileViewsCard({super.key, required this.onOpen});
 
-  /// Ouvre la liste ; la future se termine au retour.
+  /// Ouvre l'écran ; la future se termine au retour.
   final Future<void> Function() onOpen;
 
   @override
@@ -20,7 +22,7 @@ class ProfileViewsCard extends StatefulWidget {
 }
 
 class _ProfileViewsCardState extends State<ProfileViewsCard> {
-  List<ProfileView>? _views;
+  ProfileViewsData? _data;
   int _fresh = 0;
 
   @override
@@ -42,12 +44,12 @@ class _ProfileViewsCardState extends State<ProfileViewsCard> {
 
   Future<void> _load() async {
     try {
-      final views = await ProfileViewsApi.thisWeek();
+      final data = await ProfileViewsApi.load();
       final seen = await ProfileViewsApi.lastSeen();
       if (!mounted) return;
       setState(() {
-        _views = views;
-        _fresh = views.where((v) => v.at.isAfter(seen)).length;
+        _data = data;
+        _fresh = data.newSince(seen);
       });
     } catch (e) {
       // Table absente ou réseau : la carte reste cachée plutôt que d'annoncer
@@ -58,10 +60,11 @@ class _ProfileViewsCardState extends State<ProfileViewsCard> {
 
   @override
   Widget build(BuildContext context) {
-    final views = _views;
-    if (views == null) return const SizedBox.shrink();
-    final light = SC.light;
-    final faces = views.take(3).toList();
+    final data = _data;
+    if (data == null) return const SizedBox.shrink();
+    final now = DateTime.now();
+    final faces = data.visitors(7, now).take(3).toList();
+    final muted = SC.textPrimary.withValues(alpha: 0.7);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () async {
@@ -71,49 +74,44 @@ class _ProfileViewsCardState extends State<ProfileViewsCard> {
       child: Container(
         margin: const EdgeInsets.only(top: 14),
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: light ? const Color(0xFFF8F9FC) : null,
-          gradient: light
-              ? null
-              : const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0x1AFFFFFF), Color(0x0AFFFFFF)],
-                ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: light ? const Color(0x1A04123A) : const Color(0x29FFFFFF),
-          ),
-        ),
+        decoration: viewsCardDecoration(),
         child: Row(
           children: [
             SizedBox(
               width: faces.isEmpty ? 34 : 34 + 22.0 * (faces.length - 1),
               height: 34,
               child: faces.isEmpty
-                  ? Icon(Icons.visibility_outlined,
-                      size: 26, color: SC.textMuted)
-                  : Stack(
-                      children: [
-                        for (final (i, v) in faces.indexed)
-                          Positioned(
-                            left: 22.0 * i,
-                            child: Container(
-                              padding: const EdgeInsets.all(1.5),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: light
-                                    ? const Color(0xFFF8F9FC)
-                                    : const Color(0xFF1B1D2E),
-                              ),
-                              child: ProfileAvatar(
-                                displayName: v.profile.displayName,
-                                avatarUrl: v.profile.bestAvatarUrl,
-                                size: 31,
+                  ? Icon(
+                      data.settings.history
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      size: 26,
+                      color: SC.textMuted,
+                    )
+                  : ValueListenableBuilder<bool>(
+                      valueListenable: RevenueCat.proActive,
+                      builder: (_, pro, _) => Stack(
+                        children: [
+                          for (final (i, v) in faces.indexed)
+                            Positioned(
+                              left: 22.0 * i,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: SC.light
+                                      ? Colors.white
+                                      : const Color(0xFF1B1B1F),
+                                ),
+                                child: VisitorFace(
+                                  profile: v.profile,
+                                  size: 30,
+                                  blurred: !pro,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
             ),
             const SizedBox(width: 14),
@@ -134,14 +132,13 @@ class _ProfileViewsCardState extends State<ProfileViewsCard> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    AppStrings.t('profile_views_week',
-                        args: {'n': '${views.length}'}),
+                    data.settings.history
+                        ? AppStrings.t('profile_views_week',
+                            args: {'n': '${data.count(7, now)}'})
+                        : AppStrings.t('profile_views_off'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: SC.textPrimary.withValues(alpha: 0.7),
-                      fontSize: 12.5,
-                    ),
+                    style: TextStyle(color: muted, fontSize: 12.5),
                   ),
                 ],
               ),
@@ -154,13 +151,13 @@ class _ProfileViewsCardState extends State<ProfileViewsCard> {
                 padding: const EdgeInsets.symmetric(horizontal: 7),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF4FF1F),
+                  color: kViewsYellow,
                   borderRadius: BorderRadius.circular(99),
                 ),
                 child: Text(
                   '$_fresh',
                   style: const TextStyle(
-                    color: Color(0xFF04123A),
+                    color: kViewsInk,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
@@ -168,8 +165,7 @@ class _ProfileViewsCardState extends State<ProfileViewsCard> {
               ),
             ],
             const SizedBox(width: 6),
-            Icon(Icons.chevron_right_rounded,
-                size: 22, color: SC.textPrimary.withValues(alpha: 0.7)),
+            Icon(Icons.chevron_right_rounded, size: 22, color: muted),
           ],
         ),
       ),

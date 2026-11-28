@@ -9,6 +9,8 @@
 //   say_hello         amis depuis 24 h, aucun message echange
 //   unread_message    un message recu il y a 24 h n'a pas ete ouvert
 //   boost_ending      le Boost se termine dans ~1 h
+//   profile_views     nouvelles visites du profil, pour qui l'a demande (une
+//                     fois par jour au plus, migration 0100)
 //   weekly_recap      le dimanche soir : amis, pays, demandes de la semaine
 //   country_open      un pays attendu vient d'ouvrir (table `country_open`,
 //                     migration 0070) : prevenir sa liste d'attente
@@ -109,6 +111,20 @@ const T = {
     zh: ['你的加速即将结束', '在列表顶部还剩约 1 小时。'],
     ja: ['ブーストがまもなく終了', 'リストの先頭に表示されるのはあと約1時間です。'],
     ko: ['부스트가 곧 끝나요', '목록 맨 위에 약 1시간 남았어요.'],
+  },
+  profile_views: {
+    fr: ['Vues du profil', 'Nouvelles visites : {n}'],
+    en: ['Profile views', 'New visits: {n}'],
+    es: ['Visitas al perfil', 'Nuevas visitas: {n}'],
+    de: ['Profilaufrufe', 'Neue Aufrufe: {n}'],
+    it: ['Visite al profilo', 'Nuove visite: {n}'],
+    pt: ['Visitas ao perfil', 'Novas visitas: {n}'],
+    nl: ['Profielweergaven', 'Nieuwe bezoeken: {n}'],
+    ar: ['مشاهدات الملف', 'زيارات جديدة: {n}'],
+    ru: ['Просмотры профиля', 'Новые визиты: {n}'],
+    zh: ['资料访客', '新访客：{n}'],
+    ja: ['プロフィールの閲覧', '新しい訪問：{n}'],
+    ko: ['프로필 조회', '새 방문: {n}'],
   },
   // {country} = le pays, dans la langue du destinataire (Intl.DisplayNames).
   country_open: {
@@ -418,6 +434,64 @@ async function boostEnding(ctx) {
   return sent;
 }
 
+/**
+ * « Nouvelles visites » : seulement pour qui a allume le reglage (et garde son
+ * historique). Rien si une notification de ce genre est partie dans les 24 h ;
+ * `ref` = la date, donc jamais deux le meme jour. Tables absentes => 0.
+ */
+async function profileViews(ctx) {
+  const { sb } = ctx;
+  const { data: wants, error } = await sb
+    .from('profile_view_settings')
+    .select('user_id')
+    .eq('notify', true)
+    .eq('history', true)
+    .limit(5000);
+  if (error || !wants || wants.length === 0) return 0;
+  const since = new Date(Date.now() - DAY).toISOString();
+  const ids = wants.map((w) => w.user_id);
+  let sent = 0;
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const [{ data: views }, { data: logged, error: lErr }] = await Promise.all([
+      sb.from('profile_views')
+        .select('viewed_id, viewer_id')
+        .in('viewed_id', chunk)
+        .gte('viewed_at', since)
+        .limit(5000),
+      sb.from('notif_log')
+        .select('user_id')
+        .eq('kind', 'profile_views')
+        .in('user_id', chunk)
+        .gte('sent_at', since),
+    ]);
+    // Journal illisible : mieux vaut se taire que renvoyer.
+    if (lErr) continue;
+    const already = new Set((logged || []).map((r) => r.user_id));
+    const visitors = new Map(); // uid -> Set(visiteurs)
+    for (const v of views || []) {
+      if (already.has(v.viewed_id)) continue;
+      if (!visitors.has(v.viewed_id)) visitors.set(v.viewed_id, new Set());
+      visitors.get(v.viewed_id).add(v.viewer_id);
+    }
+    if (visitors.size === 0) continue;
+    const people = await profilesById(sb, [...visitors.keys()]);
+    const day = new Date().toISOString().slice(0, 10);
+    for (const [uid, set] of visitors) {
+      const p = people.get(uid);
+      const [title, body] = pick('profile_views', p && p.language);
+      const ok = await deliver(ctx, uid, p, 'profile_views', day, {
+        title,
+        body: fill(body, { n: set.size }),
+        type: 'profile_views',
+        data: { count: String(set.size) },
+      });
+      if (ok) sent += 1;
+    }
+  }
+  return sent;
+}
+
 /** Nom du pays dans la langue de la personne (ISO2 -> Intl.DisplayNames). */
 function regionName(iso, lang) {
   const code = String(lang || 'en').toLowerCase().split(/[-_]/)[0];
@@ -560,6 +634,7 @@ async function runOnce(ctx) {
       unread_message: unreadMessages,
       weekly_recap: weeklyRecap,
       country_open: countryOpen,
+      profile_views: profileViews,
     })) {
       try {
         out[name] = await fn(ctx);
@@ -589,5 +664,5 @@ function start({ supabase, notifyUser }) {
   console.log(`[engage] scheduler on (every ${TICK_MS / 60000} min, cap ${DAILY_CAP}/day)`);
 }
 
-module.exports = { start, runOnce, _test: { pick, fill, isoWeek, awake, localParts, tzOf } };
+module.exports = { start, runOnce, _test: { pick, fill, isoWeek, awake, localParts, tzOf, profileViews } };
 // build trigger 2026-10-09

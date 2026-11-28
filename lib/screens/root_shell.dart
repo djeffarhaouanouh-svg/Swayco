@@ -45,6 +45,7 @@ import 'official_thread_screen.dart';
 import 'discover_screen.dart';
 import 'friend_requests_screen.dart';
 import 'profile_screen.dart';
+import 'profile_views_screen.dart';
 
 /// Hosts the tab pages and the full-width glass bottom-nav (flush to the
 /// screen bottom) with a sliding pill that animates between selected tabs.
@@ -273,6 +274,21 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         NavTab.select(NavTab.demandes);
       case 'boost_ending':
         NavTab.select(NavTab.profile);
+      case 'profile_views':
+        // « Nouvelles visites » : l'onglet Profil, puis la liste des vues.
+        NavTab.select(NavTab.profile);
+        unawaited(() async {
+          NavigatorState? nav;
+          for (var i = 0; i < 40; i++) {
+            nav = rootNavigatorKey.currentState;
+            if (nav != null) break;
+            await Future<void>.delayed(const Duration(milliseconds: 150));
+          }
+          if (nav == null || !mounted) return;
+          await nav.push<void>(MaterialPageRoute<void>(
+            builder: (_) => const ProfileViewsScreen(),
+          ));
+        }());
       case 'weekly_recap':
       case 'special_left':
       case 'swipes_back':
