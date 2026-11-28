@@ -17,6 +17,13 @@ void main() {
   const view = Size(390, 700);
   const bottom = 124.0;
 
+  final sent = <String>[];
+  final composing = <bool>[];
+  setUp(() {
+    sent.clear();
+    composing.clear();
+  });
+
   Future<(ScrollController, List<String>, List<String>)> pump(
     WidgetTester tester,
   ) async {
@@ -40,6 +47,12 @@ void main() {
           likedIds: const {},
           onToggleLike: (p) => liked.add(p.id),
           onOpenProfile: (p) => opened.add(p.id),
+          canWrite: (_) async => true,
+          onSend: (p, text) async {
+            sent.add('${p.id}:$text');
+            return true;
+          },
+          onComposing: composing.add,
           onSeen: (_) {},
           onScrollMoved: (_, _) {},
           nextAdGap: () => 100,
@@ -79,8 +92,9 @@ void main() {
     await tester.fling(
         find.byType(CustomScrollView), const Offset(0, -80), 600);
     await tester.pumpAndSettle();
-    // Une carte de plus, pas davantage (430 de haut + 14 d'espace).
-    expect(c.offset - second, closeTo(444, 1));
+    // Une carte de plus, pas davantage (430 de haut + 27 de boutons qui
+    // dépassent + 14 d'espace).
+    expect(c.offset - second, closeTo(471, 1));
     expectShown(tester, 2);
   });
 
@@ -152,15 +166,18 @@ void main() {
     expect(c.offset, 0);
   });
 
-  testWidgets('toucher la photo ouvre le profil, le cœur aime',
+  testWidgets('toucher la photo ouvre le profil, cœur et ami aiment',
       (tester) async {
     final (_, opened, liked) = await pump(tester);
     await tester.tapAt(const Offset(195, 200));
     await tester.pump();
     expect(opened, ['p0']);
-    await tester.tap(find.byIcon(Icons.favorite_rounded).first);
+    await tester.tap(find.byIcon(Icons.favorite_border_rounded).first);
     await tester.pump();
     expect(liked, ['p0']);
+    await tester.tap(find.byIcon(Icons.person_add_rounded).first);
+    await tester.pump();
+    expect(liked, ['p0', 'p0']);
     expect(opened, ['p0']);
   });
 
@@ -208,6 +225,9 @@ void main() {
                     likedIds: const {},
                     onToggleLike: (_) {},
                     onOpenProfile: (_) {},
+                    canWrite: (_) async => true,
+                    onSend: (_, _) async => true,
+                    onComposing: (_) {},
                     onSeen: (_) {},
                     onScrollMoved: moved,
                     nextAdGap: () => 100,
@@ -233,7 +253,7 @@ void main() {
       // Petit écran : posée juste au-dessus de la barre du bas, une fois la
       // liste agrandie (haut à 50), et non à l'ancienne place.
       // (la photo est 7 px à l'intérieur du cadre).
-      expect(card.bottom, closeTo(view.height - bottom - 4 - 7, 2));
+      expect(card.bottom, closeTo(view.height - bottom - 4 - 27 - 7, 2));
       expect(card.top, greaterThan(50));
     }
     expect(toggles, 1);
@@ -248,7 +268,87 @@ void main() {
         .ancestor(of: find.text('Nom2'), matching: find.byType(ClipRRect))
         .first);
     expect(back.top, greaterThanOrEqualTo(140));
+    // (la place des boutons qui dépassent comprise)
     expect(back.bottom, lessThanOrEqualTo(view.height - bottom + 1));
+  });
+
+  testWidgets('la carte garde sa taille, les boutons chevauchent son bas',
+      (tester) async {
+    await pump(tester);
+    final photo = tester.getRect(find
+        .ancestor(of: find.text('Nom0'), matching: find.byType(ClipRRect))
+        .first);
+    final message = tester.getRect(find
+        .ancestor(
+            of: find.byIcon(Icons.chat_bubble_rounded).first,
+            matching: find.byType(Container))
+        .first);
+    // Le bas de la carte : 7 px sous la photo ; le bouton est à cheval dessus.
+    expect(message.center.dy, closeTo(photo.bottom + 7, 1));
+    expect(message.height, 54);
+    expect(tester.getRect(find.text('Nom0')).bottom, lessThan(message.top));
+  });
+
+  testWidgets('écrire : la carte rétrécit, le brouillon reste, l’envoi part',
+      (tester) async {
+    final (c, opened, _) = await pump(tester);
+    await tester.fling(
+        find.byType(CustomScrollView), const Offset(0, -80), 600);
+    await tester.pumpAndSettle();
+    final offset = c.offset;
+    Rect photo() => tester.getRect(find
+        .ancestor(of: find.text('Nom1'), matching: find.byType(ClipRRect))
+        .last);
+    final before = photo().height;
+    // Le bouton de CETTE carte (celui de la précédente dépasse encore).
+    final message = find.descendant(
+        of: find.byKey(const ValueKey('card-p1')),
+        matching: find.text('Message'));
+
+    await tester.tap(message);
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsOneWidget);
+    expect(composing, [true]);
+    // Le clavier monte : la liste perd 290 px, la carte rétrécit.
+    tester.view.viewInsets = const FakeViewPadding(bottom: 290);
+    await tester.pumpAndSettle();
+    expect(photo().height, lessThan(before - 80));
+    expect(photo().bottom,
+        lessThan(tester.getRect(find.byType(TextField)).top));
+    expect(find.byIcon(Icons.person_add_rounded).hitTestable(), findsNothing);
+
+    final one = photo().height;
+    await tester.enterText(find.byType(TextField),
+        'Salut !\nUne deuxième ligne\nune troisième\nune quatrième\ncinq');
+    await tester.pumpAndSettle();
+    // Le champ grandit (4 lignes au plus), la carte rétrécit encore.
+    expect(photo().height, lessThan(one - 40));
+
+    // Toucher la carte referme ; le brouillon revient.
+    await tester.tapAt(photo().center);
+    tester.view.resetViewInsets();
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    expect(composing, [true, false]);
+    expect(opened, isEmpty);
+    expect(c.offset, closeTo(offset, 1));
+
+    await tester.tap(message);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('une quatrième'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'Salut !');
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+    expect(sent, ['p1:Salut !']);
+    expect(find.byType(TextField), findsNothing);
+    expect(c.offset, closeTo(offset, 1));
+
+    // Après l'envoi, le brouillon est vide.
+    await tester.tap(message);
+    await tester.pumpAndSettle();
+    expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text, '');
   });
 
   testWidgets('les photos défilent dans la carte', (tester) async {

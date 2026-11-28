@@ -8,6 +8,7 @@ import 'package:flutter/gestures.dart'
         PointerScrollEvent,
         PointerSignalEvent;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/ad_service.dart';
 import '../services/app_strings.dart';
@@ -24,7 +25,6 @@ typedef FeedEntry = ({RemoteProfile profile, List<String> photos});
 
 const Color _kInk = Color(0xFF04123A);
 const Color _kYellow = Color(0xFFF4FF1F);
-const Color _kHeart = Color(0xFFFF5C8A);
 const Color _kBlue = Color(0xFF1F5EFF);
 const Color _kCyan = Color(0xFF18DDEA);
 
@@ -35,6 +35,10 @@ const double _kPhotoRadius = 26;
 const double _kSide = 14;
 const double _kGap = 14;
 const double _kTopPad = 8;
+
+/// Les boutons chevauchent le bas de la carte : autant dedans que dehors.
+const double _kButton = 54;
+const double _kOverhang = _kButton / 2;
 
 /// En dessous, la publicité (bannière 300 × 250 et son bouton) ne tient plus.
 const double _kMinCardHeight = 380;
@@ -49,6 +53,9 @@ class DiscoverFeed extends StatefulWidget {
     required this.likedIds,
     required this.onToggleLike,
     required this.onOpenProfile,
+    required this.canWrite,
+    required this.onSend,
+    required this.onComposing,
     required this.onSeen,
     required this.onScrollMoved,
     required this.nextAdGap,
@@ -64,6 +71,15 @@ class DiscoverFeed extends StatefulWidget {
 
   /// Toucher la carte : la page profil (c'est là qu'on écrit).
   final ValueChanged<RemoteProfile> onOpenProfile;
+
+  /// Puis-je écrire à cette personne ? (limite du jour des comptes gratuits)
+  final Future<bool> Function(RemoteProfile) canWrite;
+
+  /// Envoie le message ; `true` quand il est parti.
+  final Future<bool> Function(RemoteProfile, String) onSend;
+
+  /// Le champ de message s'ouvre / se ferme.
+  final ValueChanged<bool> onComposing;
 
   /// Une carte vient d'être dépassée : un profil « vu ».
   final ValueChanged<RemoteProfile> onSeen;
@@ -101,6 +117,91 @@ class _DiscoverFeedState extends State<DiscoverFeed> {
 
   /// Dernier cran de molette reçu : une rafale (pavé tactile) = une carte.
   DateTime _lastWheel = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// La photo affichée par chaque carte (gardée quand on écrit).
+  final Map<String, int> _page = {};
+
+  // ── Écrire ────────────────────────────────────────────────────────────────
+
+  FeedEntry? _writing;
+  bool _sending = false;
+  final _draft = TextEditingController();
+  final Map<String, String> _drafts = {};
+  late final FocusNode _focus = FocusNode()..addListener(_onFocus);
+
+  /// D'où la carte part pour rétrécir, et où remettre la liste ensuite.
+  double _fromTop = _kTopPad;
+  int _heldItem = 0;
+
+  Future<void> _openComposer(FeedEntry entry, int item) async {
+    final p = entry.profile;
+    if (_writing != null) return;
+    if (!await widget.canWrite(p) || !mounted || _writing != null) return;
+    HapticFeedback.selectionClick();
+    final viewport = _viewportKey.currentContext?.findRenderObject();
+    final card = _cardKeys[p.id]?.currentContext?.findRenderObject();
+    _fromTop = viewport is RenderBox && card is RenderBox && card.attached
+        ? card.localToGlobal(Offset.zero, ancestor: viewport).dy
+        : _kTopPad;
+    _heldItem = item;
+    _snap.frozen = true;
+    final text = _drafts[p.id] ?? '';
+    _draft.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    setState(() => _writing = entry);
+    widget.onComposing(true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _writing != null) _focus.requestFocus();
+    });
+  }
+
+  /// Le clavier s'en va : le champ se referme.
+  void _onFocus() {
+    if (!_focus.hasFocus && !_sending) _closeComposer();
+  }
+
+  /// Referme le champ ; ce qui est écrit reste en brouillon.
+  void _closeComposer() {
+    final entry = _writing;
+    if (entry == null) return;
+    _drafts[entry.profile.id] = _draft.text;
+    setState(() => _writing = null);
+    _focus.unfocus();
+    widget.onComposing(false);
+    // La liste revient sur la même carte.
+    _snap
+      ..frozen = false
+      ..hold(_heldItem);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.controller.hasClients) return;
+      final position = widget.controller.position;
+      position.jumpTo(_snap.offsetOf(_heldItem, position));
+    });
+  }
+
+  Future<void> _submit() async {
+    final entry = _writing;
+    final text = _draft.text.trim();
+    if (entry == null || text.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    final ok = await widget.onSend(entry.profile, text);
+    if (!mounted) return;
+    setState(() => _sending = false);
+    if (!ok || _writing?.profile.id != entry.profile.id) return;
+    _draft.clear();
+    if (_seen.add(entry.profile.id)) widget.onSeen(entry.profile);
+    _closeComposer();
+  }
+
+  @override
+  void dispose() {
+    _focus.removeListener(_onFocus);
+    _focus.dispose();
+    _draft.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -202,18 +303,27 @@ class _DiscoverFeedState extends State<DiscoverFeed> {
           _kMinCardHeight,
           math.min(natural, widget.maxCardHeight),
         );
-        final extent = height + _kGap;
+        // La carte, puis la moitié des boutons qui dépasse dessous.
+        final block = height + _kOverhang;
+        final extent = block + _kGap;
+        final writing = _writing;
         _snap
           ..count = items.length
           ..extent = extent
-          ..cardHeight = height
+          ..cardHeight = block
           ..topPad = _kTopPad
           ..bottomInset = math.max(0, widget.bottomSpace - 24);
         return Stack(
           key: _viewportKey,
           children: [
             Positioned.fill(
-              child: NotificationListener<ScrollNotification>(
+              // Cachée mais gardée pendant qu'on écrit.
+              child: Visibility(
+                visible: writing == null,
+                maintainState: true,
+                maintainSize: true,
+                maintainAnimation: true,
+                child: NotificationListener<ScrollNotification>(
                 onNotification: (n) {
                   if (n.depth != 0 || n.metrics.axis != Axis.vertical) {
                     return false;
@@ -262,13 +372,19 @@ class _DiscoverFeedState extends State<DiscoverFeed> {
                                 return _KeepAlive(
                                   key: ValueKey('ad-${item.ad}'),
                                   child: _wheel(
-                                    DiscoverAdCard(
-                                      onDone: () {
-                                        if (mounted) {
-                                          setState(
-                                              () => _adDone.add(item.ad));
-                                        }
-                                      },
+                                    Align(
+                                      alignment: Alignment.topCenter,
+                                      child: SizedBox(
+                                        height: height,
+                                        child: DiscoverAdCard(
+                                          onDone: () {
+                                            if (mounted) {
+                                              setState(
+                                                  () => _adDone.add(item.ad));
+                                            }
+                                          },
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 );
@@ -277,15 +393,38 @@ class _DiscoverFeedState extends State<DiscoverFeed> {
                               return KeyedSubtree(
                                 key: ValueKey('card-${p.id}'),
                                 child: _wheel(
-                                  KeyedSubtree(
-                                    key: _keyOf(p.id),
-                                    child: _FeedCard(
-                                      entry: entry,
-                                      liked: widget.likedIds.contains(p.id),
-                                      onOpenProfile: () =>
-                                          widget.onOpenProfile(p),
-                                      onLike: () => widget.onToggleLike(p),
-                                    ),
+                                  Stack(
+                                    children: [
+                                      Positioned(
+                                        left: 0,
+                                        right: 0,
+                                        top: 0,
+                                        height: height,
+                                        child: KeyedSubtree(
+                                          key: _keyOf(p.id),
+                                          child: _FeedCard(
+                                            entry: entry,
+                                            page: _page[p.id] ?? 0,
+                                            onPage: (n) => _page[p.id] = n,
+                                            onTap: () =>
+                                                widget.onOpenProfile(p),
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        left: 0,
+                                        right: 0,
+                                        top: height - _kOverhang,
+                                        height: _kButton,
+                                        child: _Actions(
+                                          liked:
+                                              widget.likedIds.contains(p.id),
+                                          onMessage: () =>
+                                              _openComposer(entry, i),
+                                          onLike: () => widget.onToggleLike(p),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               );
@@ -300,6 +439,7 @@ class _DiscoverFeedState extends State<DiscoverFeed> {
                       ),
                     ],
                   ),
+                ),
                 ),
               ),
             ),
@@ -319,9 +459,77 @@ class _DiscoverFeedState extends State<DiscoverFeed> {
               height: 96,
               child: _Fade(top: false),
             ),
+            if (writing != null)
+              Positioned.fill(
+                child: PopScope(
+                  canPop: false,
+                  onPopInvokedWithResult: (_, _) => _closeComposer(),
+                  child: _composeLayer(writing, height),
+                ),
+              ),
           ],
         );
       },
+    );
+  }
+
+  /// Écrire : la carte rétrécit au-dessus du champ posé sur le clavier. Elle
+  /// prend la place qui reste, donc rapetisse encore quand le message grandit.
+  Widget _composeLayer(FeedEntry entry, double cardHeight) {
+    final p = entry.profile;
+    final first = p.displayName.trim().split(RegExp(r'\s+')).first;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _closeComposer,
+      child: Column(
+        children: [
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, box) {
+                final room = math.max(0.0, box.maxHeight - 2 * _kTopPad);
+                final small = math.min(cardHeight, room);
+                return TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: 1),
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 300),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, t, _) {
+                    final from = math.min(cardHeight, box.maxHeight);
+                    return Stack(
+                      children: [
+                        Positioned(
+                          left: _kSide,
+                          right: _kSide,
+                          top: _fromTop + (_kTopPad - _fromTop) * t,
+                          height: from + (small - from) * t,
+                          child: _FeedCard(
+                            entry: entry,
+                            page: _page[p.id] ?? 0,
+                            onPage: (n) => _page[p.id] = n,
+                            onTap: _closeComposer,
+                            writing: true,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          // Toucher le champ ou l'envoi ne ferme pas le clavier.
+          TextFieldTapRegion(
+            child: _Composer(
+              controller: _draft,
+              focusNode: _focus,
+              name: first,
+              sending: _sending,
+              onSend: _submit,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -392,22 +600,28 @@ class _KeepAliveState extends State<_KeepAlive>
 class _FeedCard extends StatelessWidget {
   const _FeedCard({
     required this.entry,
-    required this.liked,
-    required this.onOpenProfile,
-    required this.onLike,
+    required this.page,
+    required this.onPage,
+    required this.onTap,
+    this.writing = false,
   });
 
   final FeedEntry entry;
-  final bool liked;
-  final VoidCallback onOpenProfile;
-  final VoidCallback onLike;
+  final int page;
+  final ValueChanged<int> onPage;
+
+  /// Toucher la carte : le profil ; pendant qu'on écrit, fermer le clavier.
+  final VoidCallback onTap;
+
+  /// Rétrécie au-dessus du champ : la photo, le prénom et le pays seulement.
+  final bool writing;
 
   @override
   Widget build(BuildContext context) {
     final light = SC.light;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onOpenProfile,
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(_kFrame),
         decoration: BoxDecoration(
@@ -419,22 +633,21 @@ class _FeedCard extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(_kPhotoRadius),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _CardPhotos(entry: entry),
-              Positioned(
-                left: 16,
-                right: 84, // la place du cœur
-                bottom: 14,
-                child: _CardInfo(profile: entry.profile),
+          child: _CardPhotos(
+            entry: entry,
+            page: page,
+            onPage: onPage,
+            badges: !writing,
+            overlay: Positioned(
+              left: 16,
+              right: 16,
+              // Au-dessus des boutons qui chevauchent le bas.
+              bottom: writing ? 14 : 30,
+              // On peut faire défiler les photos en partant du texte.
+              child: IgnorePointer(
+                child: _CardInfo(profile: entry.profile, chips: !writing),
               ),
-              Positioned(
-                right: 12,
-                bottom: 12,
-                child: _HeartButton(liked: liked, onTap: onLike),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -444,17 +657,29 @@ class _FeedCard extends StatelessWidget {
 
 /// Le carrousel : on fait défiler les photos de gauche à droite dans la carte.
 class _CardPhotos extends StatefulWidget {
-  const _CardPhotos({required this.entry});
+  const _CardPhotos({
+    required this.entry,
+    required this.page,
+    required this.onPage,
+    required this.overlay,
+    required this.badges,
+  });
 
   final FeedEntry entry;
+  final int page;
+  final ValueChanged<int> onPage;
+
+  /// Le nom et les puces, posés sur la photo.
+  final Widget overlay;
+  final bool badges;
 
   @override
   State<_CardPhotos> createState() => _CardPhotosState();
 }
 
 class _CardPhotosState extends State<_CardPhotos> {
-  final _pages = PageController();
-  int _index = 0;
+  late final PageController _pages = PageController(initialPage: widget.page);
+  late int _index = widget.page;
 
   @override
   void dispose() {
@@ -488,7 +713,10 @@ class _CardPhotosState extends State<_CardPhotos> {
             controller: _pages,
             physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
             itemCount: photos.length,
-            onPageChanged: (i) => setState(() => _index = i),
+            onPageChanged: (i) {
+              widget.onPage(i);
+              setState(() => _index = i);
+            },
             itemBuilder: (context, i) => Image.network(
               photos[i],
               fit: BoxFit.cover,
@@ -516,6 +744,7 @@ class _CardPhotosState extends State<_CardPhotos> {
             ),
           ),
         ),
+        widget.overlay,
         if (dots > 1)
           Positioned(
             left: 0,
@@ -544,7 +773,7 @@ class _CardPhotosState extends State<_CardPhotos> {
               ),
             ),
           ),
-        if (popular || p.isNewcomer)
+        if (widget.badges && (popular || p.isNewcomer))
           Positioned(
             top: 12,
             left: 12,
@@ -577,9 +806,10 @@ class _CardPhotosState extends State<_CardPhotos> {
 
 /// « Prénom, âge », le drapeau et le pays, puis les puces qui tiennent.
 class _CardInfo extends StatelessWidget {
-  const _CardInfo({required this.profile});
+  const _CardInfo({required this.profile, this.chips = true});
 
   final RemoteProfile profile;
+  final bool chips;
 
   static const _shadow = [Shadow(color: Color(0x80000000), blurRadius: 6)];
 
@@ -590,7 +820,7 @@ class _CardInfo extends StatelessWidget {
     final title = p.age != null ? '$name, ${p.age}' : name;
     final country = p.country.trim();
     final persona = personaCategoryByLabel(p.personaCategory);
-    final chips = <String>[
+    final labels = <String>[
       if (persona != null)
         '${persona.emoji} ${personaCategoryLabel(p.personaCategory)}',
       for (final tag in p.interests) interestPillText(tag),
@@ -657,9 +887,9 @@ class _CardInfo extends StatelessWidget {
             ],
           ),
         ],
-        if (chips.isNotEmpty) ...[
+        if (chips && labels.isNotEmpty) ...[
           const SizedBox(height: 8),
-          _ChipRow(labels: chips),
+          _ChipRow(labels: labels),
         ],
       ],
     );
@@ -770,8 +1000,176 @@ class _Badge extends StatelessWidget {
   }
 }
 
-/// Le cœur en verre posé sur la photo : rose sur verre au repos, rose plein et
-/// lumineux une fois liké, avec un « pop ».
+/// Message (dégradé bleu), ami et cœur (verre), à cheval sur le bas de la
+/// carte.
+class _Actions extends StatelessWidget {
+  const _Actions({
+    required this.liked,
+    required this.onMessage,
+    required this.onLike,
+  });
+
+  /// Demande envoyée (ou déjà amis) : le cœur et l'ami le disent tous deux.
+  final bool liked;
+  final VoidCallback onMessage;
+  final VoidCallback onLike;
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = SC.light ? _kInk : Colors.white;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Flexible(child: _MessageButton(onTap: onMessage)),
+        const SizedBox(width: 10),
+        _GlassButton(
+          label: AppStrings.t('add_friend_short'),
+          selected: liked,
+          onTap: onLike,
+          child: Icon(
+            liked ? Icons.how_to_reg_rounded : Icons.person_add_rounded,
+            size: 23,
+            color: ink,
+          ),
+        ),
+        const SizedBox(width: 10),
+        _HeartButton(liked: liked, onTap: onLike),
+      ],
+    );
+  }
+}
+
+class _MessageButton extends StatelessWidget {
+  const _MessageButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        height: _kButton,
+        padding: const EdgeInsets.symmetric(horizontal: 30),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [_kBlue, Color(0xFF2B7FFF), _kCyan],
+            stops: [0, 0.52, 1],
+          ),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: const Color(0x47FFFFFF)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x802B7FFF),
+              blurRadius: 26,
+              offset: Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Center(
+          widthFactor: 1,
+          // Une langue longue ou un petit écran : le tout rétrécit.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.chat_bubble_rounded,
+                    size: 21, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(
+                  AppStrings.t('profile_message'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Un rond de verre de 54 px (verre Flutter, pas de vue native).
+class _GlassButton extends StatelessWidget {
+  const _GlassButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.child,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final light = SC.light;
+    return Semantics(
+      button: true,
+      label: label,
+      toggled: selected,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            // Ombre dehors seulement (sous le verre, elle le noircirait), et
+            // sans décalage : décalée, elle dessinait un second rond.
+            boxShadow: [
+              BoxShadow(
+                color: light
+                    ? const Color(0x2E04123A)
+                    : const Color(0x4D000000),
+                blurRadius: 14,
+                blurStyle: BlurStyle.outer,
+              ),
+            ],
+          ),
+          child: ClipOval(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(
+                width: _kButton,
+                height: _kButton,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  // Le reflet du haut.
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: light
+                        ? const [Color(0xB3FFFFFF), Color(0x8CFFFFFF)]
+                        : const [Color(0x3DFFFFFF), Color(0x24FFFFFF)],
+                    stops: const [0, 0.5],
+                  ),
+                  border: Border.all(
+                    color: light
+                        ? const Color(0x2404123A)
+                        : const Color(0x4DFFFFFF),
+                  ),
+                ),
+                child: Center(child: child),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Le cœur : en contour au repos, il se remplit au toucher, avec un « pop ».
 class _HeartButton extends StatefulWidget {
   const _HeartButton({required this.liked, required this.onTap});
 
@@ -811,46 +1209,141 @@ class _HeartButtonState extends State<_HeartButton>
   @override
   Widget build(BuildContext context) {
     final liked = widget.liked;
-    return Semantics(
-      button: true,
-      toggled: liked,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: liked
-                ? const [BoxShadow(color: Color(0x99FF5C8A), blurRadius: 22)]
-                : null,
+    return _GlassButton(
+      label: AppStrings.t('discover_like_label'),
+      selected: liked,
+      onTap: widget.onTap,
+      child: AnimatedBuilder(
+        animation: _pop,
+        builder: (context, child) =>
+            Transform.scale(scale: _scale(_pop.value), child: child),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: Icon(
+            liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+            key: ValueKey(liked),
+            size: 24,
+            color: SC.light ? _kInk : Colors.white,
           ),
-          child: ClipOval(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                width: 56,
-                height: 56,
+        ),
+      ),
+    );
+  }
+}
+
+/// La barre posée sur le clavier : le champ (jusqu'à 4 lignes) et l'envoi.
+class _Composer extends StatelessWidget {
+  const _Composer({
+    required this.controller,
+    required this.focusNode,
+    required this.name,
+    required this.sending,
+    required this.onSend,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String name;
+  final bool sending;
+  final VoidCallback onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    final light = SC.light;
+    final ink = light ? _kInk : Colors.white;
+    // Un tap sur la barre ne ferme rien.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {},
+      child: Container(
+        color: light ? const Color(0xF5FFFFFF) : const Color(0xF50E0E0E),
+        padding: EdgeInsets.fromLTRB(
+            12, 10, 12, 10 + MediaQuery.paddingOf(context).bottom),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 48),
+                alignment: Alignment.centerLeft,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: liked ? _kHeart : const Color(0x2EFFFFFF),
-                  border: Border.all(color: const Color(0x4DFFFFFF)),
+                  color: light
+                      ? const Color(0xFFF3F4F8)
+                      : const Color(0x1AFFFFFF),
+                  borderRadius: BorderRadius.circular(26),
+                  border: Border.all(color: _kYellow, width: 1.5),
                 ),
-                child: AnimatedBuilder(
-                  animation: _pop,
-                  builder: (context, child) => Transform.scale(
-                    scale: _scale(_pop.value),
-                    child: child,
-                  ),
-                  child: Icon(
-                    Icons.favorite_rounded,
-                    size: 30,
-                    color: liked ? Colors.white : _kHeart,
+                child: TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  minLines: 1,
+                  maxLines: 4,
+                  textCapitalization: TextCapitalization.sentences,
+                  keyboardType: TextInputType.multiline,
+                  cursorColor: light ? _kBlue : _kYellow,
+                  style: TextStyle(color: ink, fontSize: 15, height: 1.4),
+                  decoration: InputDecoration(
+                    isCollapsed: true,
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    hintText: AppStrings.t('feed_write_to',
+                        args: {'name': name}),
+                    hintMaxLines: 1,
+                    hintStyle: TextStyle(
+                      color: ink.withValues(alpha: 0.5),
+                      fontSize: 15,
+                      height: 1.4,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+            const SizedBox(width: 8),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, _) {
+                final ready = value.text.trim().isNotEmpty;
+                return Semantics(
+                  button: true,
+                  label: AppStrings.t('send_emoji'),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: ready && !sending ? onSend : null,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: ready
+                            ? _kYellow
+                            : ink.withValues(alpha: 0.14),
+                      ),
+                      child: sending
+                          ? const Padding(
+                              padding: EdgeInsets.all(14),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: _kInk,
+                              ),
+                            )
+                          : Icon(
+                              Icons.arrow_upward_rounded,
+                              size: 24,
+                              color: ready
+                                  ? _kInk
+                                  : ink.withValues(alpha: 0.5),
+                            ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );

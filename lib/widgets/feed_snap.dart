@@ -17,6 +17,16 @@ class FeedSnap {
   /// Ce que la barre du bas recouvre quand elle revient.
   double bottomInset = 0;
 
+  /// Pendant qu'on écrit, la liste est cachée et change de hauteur (clavier) :
+  /// on ne l'aimante plus.
+  bool frozen = false;
+
+  /// Revenir sur la carte [i] au prochain recalage.
+  void hold(int i) {
+    _from = i;
+    _target = i;
+  }
+
   /// La carte d'où le geste est parti, puis celle qu'on a décidé d'atteindre.
   int _from = 0;
   int? _target;
@@ -145,6 +155,7 @@ class FeedSnapPhysics extends ScrollPhysics {
     ScrollMetrics position,
     double velocity,
   ) {
+    if (snap.frozen) return null;
     // Hors des bords (rebond, tirer pour recharger) : comme d'habitude.
     if ((velocity <= 0 && position.pixels <= position.minScrollExtent) ||
         (velocity >= 0 && position.pixels >= position.maxScrollExtent)) {

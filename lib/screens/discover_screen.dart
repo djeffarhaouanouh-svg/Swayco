@@ -16,6 +16,9 @@ import '../services/ad_service.dart';
 import '../services/analytics.dart';
 import '../services/app_boot.dart';
 import '../services/app_strings.dart';
+import '../services/chat_api.dart';
+import '../widgets/new_contact_gate.dart';
+import '../widgets/sent_confirmation.dart';
 import '../services/swayco_sounds.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
@@ -376,6 +379,47 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _maybeHideFilterTransition();
   }
 
+  // ── Écrire depuis une carte ───────────────────────────────────────────────
+
+  Future<bool> _canWrite(RemoteProfile peer) => allowNewContact(
+        context,
+        meId: _myId,
+        peerId: peer.id,
+        source: 'discover_feed',
+      );
+
+  Future<bool> _sendFromCard(RemoteProfile peer, String body) async {
+    try {
+      final mine = await ProfileApi.fetchById(_myId);
+      final ids = [_myId, peer.id]..sort();
+      await ChatApi.sendMessage(
+        conversationId: 'dm-${ids[0]}-${ids[1]}',
+        senderId: _myId,
+        senderName: (mine?.displayName.trim().isNotEmpty ?? false)
+            ? mine!.displayName.trim()
+            : 'Moi',
+        recipientId: peer.id,
+        body: body,
+        language: (mine?.language.trim().isNotEmpty ?? false)
+            ? mine!.language.trim()
+            : AppStrings.currentBcp47.value,
+        recipientLang: peer.language,
+      );
+      Analytics.track('message_sent',
+          props: {'source': 'discover_feed', 'type': 'text'});
+      SwaycoSounds.play(SwSound.msgSent);
+      if (!mounted) return true;
+      showSentConfirmation(context, AppStrings.t('dm_sent'));
+      return true;
+    } catch (e) {
+      debugPrint('discover: message from card failed: $e');
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+      return false;
+    }
+  }
+
   // ── Le cœur ───────────────────────────────────────────────────────────────
 
   void _toggleLike(RemoteProfile peer) {
@@ -454,6 +498,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// Pendant qu'on descend, les pays se rangent et le filtre monte sur la ligne
   /// du logo.
   bool _collapsed = false;
+  bool _composing = false;
 
   void _setCollapsed(bool value) {
     if (value == _collapsed) return;
@@ -471,7 +516,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   void _onScrollMoved(ScrollMetrics m, double delta) {
-    if (NavTab.index.value != NavTab.discover) return;
+    if (_composing || NavTab.index.value != NavTab.discover) return;
     final y = m.pixels;
     // Le rebond du bas n'est pas un mouvement de la personne.
     if (y <= m.maxScrollExtent) {
@@ -485,6 +530,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
     // La barre du bas revient 1,9 s après le dernier mouvement.
     NavChrome.showAfter(const Duration(milliseconds: 1900));
+  }
+
+  /// Pendant qu'on écrit : la rangée de pays et la barre du bas s'effacent.
+  void _onComposing(bool open) {
+    setState(() {
+      _composing = open;
+      if (open) _collapsed = true;
+      if (!open && _scroll.hasClients && _scroll.offset < 20) {
+        _collapsed = false;
+      }
+    });
+    open ? NavChrome.hide() : NavChrome.show();
   }
 
   void _onNavTab() {
@@ -543,7 +600,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: p.id)),
     );
     if (!mounted) return;
-    NavChrome.show();
+    if (!_composing) NavChrome.show();
     _likeOverride.remove(p.id);
     await _refreshFriendships();
   }
@@ -554,6 +611,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     setState(() {
       _feedLoading = true;
       _collapsed = false;
+      _composing = false;
       _seenHere.clear();
     });
     NavChrome.show();
@@ -782,6 +840,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         likedIds: _likedIds,
         onToggleLike: _toggleLike,
         onOpenProfile: _openProfile,
+        canWrite: _canWrite,
+        onSend: _sendFromCard,
+        onComposing: _onComposing,
         onSeen: _onSeen,
         onScrollMoved: _onScrollMoved,
         nextAdGap: _nextAdGap,
