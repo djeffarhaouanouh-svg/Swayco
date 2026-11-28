@@ -291,10 +291,9 @@ class _DiscoverFeedState extends State<DiscoverFeed> {
                   // ignore: deprecated_member_use
                   cacheExtent: 900,
                   padding: EdgeInsets.fromLTRB(
-                    // La même marge que la barre du bas.
-                    20,
+                    14,
                     8,
-                    20,
+                    14,
                     // En écrivant : de quoi monter même la dernière carte.
                     composing ? box.maxHeight : widget.bottomSpace,
                   ),

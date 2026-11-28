@@ -824,7 +824,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       );
     } else if (_limitReached) {
       body = Padding(
-        padding: EdgeInsets.fromLTRB(20, 0, 20, bottomSpace - 24),
+        padding: EdgeInsets.fromLTRB(14, 0, 14, bottomSpace - 24),
         child: DailyLimitView(
           seen: _recentSeen.isNotEmpty
               ? List.of(_recentSeen)
@@ -941,7 +941,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               duration: move,
               curve: curve,
               top: collapsed ? headTop - 3 : rowTop + 6,
-              left: 20,
+              left: collapsed ? 14 : 16,
               width: filterSize,
               height: filterSize,
               child: _FilterButton(collapsed: collapsed, onTap: _openGlobe),
@@ -1049,7 +1049,7 @@ class _DiscoverHeader extends StatelessWidget {
     return SizedBox(
       height: height,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -1264,7 +1264,7 @@ class _CountryRowState extends State<_CountryRow> {
               controller: _scroll,
               scrollDirection: Axis.horizontal,
               // La place du bouton filtre, posé par-dessus à gauche.
-              padding: const EdgeInsets.fromLTRB(92, 6, 20, 0),
+              padding: const EdgeInsets.fromLTRB(88, 6, 20, 0),
               itemCount: keys.length,
               separatorBuilder: (_, _) => const SizedBox(width: 12),
               itemBuilder: (_, i) {
