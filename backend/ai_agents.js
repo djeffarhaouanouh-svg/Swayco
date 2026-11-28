@@ -53,11 +53,18 @@ const DEEPSEEK_MODEL = process.env.FIX_MODEL?.trim() || 'deepseek-v4-flash';
 
 // ── Textes localises (memes libelles que lib/services/app_strings.dart) ──────
 const LIKE_BODY = {
-  fr: 'veut être ton ami', en: 'wants to be your friend', es: 'quiere ser tu amigo',
-  de: 'möchte mit dir befreundet sein', it: 'vuole essere tuo amico',
-  pt: 'quer ser teu amigo', nl: 'wil vrienden met je worden', ar: 'يريد أن يكون صديقك',
-  ru: 'хочет с тобой дружить', zh: '想加你为好友', ja: 'あなたの友だちになりたがっています',
-  ko: '당신의 친구가 되고 싶어 해요',
+  fr: 't\'a envoyé un cœur ❤️',
+  en: 'sent you a heart ❤️',
+  es: 'te ha enviado un corazón ❤️',
+  de: 'hat dir ein Herz geschickt ❤️',
+  it: 'ti ha mandato un cuore ❤️',
+  pt: 'enviou-te um coração ❤️',
+  nl: 'heeft je een hartje gestuurd ❤️',
+  ar: 'أرسل لك قلبًا ❤️',
+  ru: 'отправляет тебе сердечко ❤️',
+  zh: '给你发了一个爱心 ❤️',
+  ja: 'あなたにハートを送りました ❤️',
+  ko: '당신에게 하트를 보냈어요 ❤️',
 };
 const MATCH_TITLE = {
   fr: 'Découvre un pays !', en: 'Discover a country!', es: '¡Descubre un país!',

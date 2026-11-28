@@ -10,6 +10,7 @@ import '../services/app_theme.dart';
 import '../services/app_settings.dart';
 import '../services/account_switcher.dart';
 import '../services/app_strings.dart';
+import 'saved_profiles_screen.dart';
 import '../widgets/account_switcher_sheet.dart';
 import 'forgot_password_screen.dart';
 import '../services/ui_variant.dart';
@@ -545,6 +546,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _callLang = code);
   }
 
+  void _openSavedProfiles() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const SavedProfilesScreen()),
+    );
+  }
+
   void _openBlockedUsers() {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(builder: (_) => const _BlockedUsersScreen()),
@@ -659,6 +666,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       label: AppStrings.t('call_language'),
                       trailing: _SubtleText(_callLangLabel),
                       onTap: _openCallLanguagePicker,
+                    ),
+                  ],
+                ),
+
+                _SettingsCard(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.bookmark_border_rounded,
+                      label: AppStrings.t('saved_profiles_title'),
+                      onTap: _openSavedProfiles,
                     ),
                   ],
                 ),

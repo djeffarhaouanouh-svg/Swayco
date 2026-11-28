@@ -14,6 +14,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/analytics.dart';
 
 import '../services/app_strings.dart';
+import '../services/saved_profiles_api.dart';
 import '../widgets/peer_profile_view.dart';
 import '../widgets/round_flag.dart';
 import '../services/notif_enable_flow.dart';
@@ -118,6 +119,10 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool get _isViewingOther => widget.userId != null || widget.preview;
   String get _targetId => widget.userId ?? _deviceId;
 
+  /// Ce profil est-il dans mes enregistrés ? (profil d'un pair)
+  bool _peerSaved = false;
+  bool _savingPeer = false;
+
   @override
   void initState() {
     super.initState();
@@ -187,6 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     // celui de la plus lente, pas la somme.
     final viewer = _isViewingOther;
     final canQuery = isSupabaseReady && deviceId.isNotEmpty;
+    unawaited(_loadSaved());
     final results = await Future.wait<Object?>([
       // Cache local (mon profil seulement) : instantanÃ©, mais il attendait
       // quand mÃªme son tour derriÃ¨re le rÃ©seau.
@@ -1094,6 +1100,36 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  /// Le marque-page : le bouton change tout de suite, et revient si
+  /// l'enregistrement échoue.
+  Future<void> _toggleSaved() async {
+    if (_targetId.isEmpty || _savingPeer) return;
+    final next = !_peerSaved;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _peerSaved = next;
+      _savingPeer = true;
+    });
+    try {
+      await SavedProfilesApi.setSaved(_targetId, next);
+      if (next) Analytics.track('profile_saved');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _peerSaved = !next);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+    } finally {
+      if (mounted) setState(() => _savingPeer = false);
+    }
+  }
+
+  Future<void> _loadSaved() async {
+    final id = widget.userId;
+    if (id == null) return;
+    final saved = await SavedProfilesApi.isSaved(id);
+    if (mounted && !_savingPeer) setState(() => _peerSaved = saved);
+  }
+
   /// Le profil d'un pair (voir [PeerProfileView]).
   Widget _buildPeer(BuildContext context) {
     final remote = _remote;
@@ -1165,6 +1201,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     onFriend: _peerBlockedMe
                         ? null
                         : (_peerLikedMe ? _acceptPeer : _likePeer),
+                    saved: _peerSaved,
+                    onSave: _toggleSaved,
                   ),
           ),
           if (remote != null)

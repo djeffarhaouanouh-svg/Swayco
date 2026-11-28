@@ -687,14 +687,20 @@ class _Avatar extends StatelessWidget {
 // ════════════════════════════════════════════════════════════════════════════
 
 /// Message · demande d'ami · enregistrer.
-class PeerActionRow extends StatefulWidget {
+class PeerActionRow extends StatelessWidget {
   const PeerActionRow({
     super.key,
     required this.friends,
     required this.requested,
     required this.onMessage,
     required this.onFriend,
+    required this.saved,
+    required this.onSave,
   });
+
+  /// Profil enregistré (marque-page).
+  final bool saved;
+  final VoidCallback onSave;
 
   /// Déjà amis.
   final bool friends;
@@ -708,46 +714,35 @@ class PeerActionRow extends StatefulWidget {
   final VoidCallback? onFriend;
 
   @override
-  State<PeerActionRow> createState() => _PeerActionRowState();
-}
-
-class _PeerActionRowState extends State<PeerActionRow> {
-  /// Visuel seulement : l'enregistrement des profils n'existe pas encore.
-  bool _saved = false;
-
-  @override
   Widget build(BuildContext context) {
-    final done = widget.friends || widget.requested;
+    final done = friends || requested;
     return Row(
       children: [
         Expanded(
           child: PeerPrimaryButton(
             label: AppStrings.t('profile_message'),
             icon: Icons.chat_bubble_rounded,
-            onTap: widget.onMessage,
+            onTap: onMessage,
           ),
         ),
-        if (widget.onFriend != null) ...[
+        if (onFriend != null) ...[
           const SizedBox(width: 10),
           _RoundAction(
             label: AppStrings.t(
                 done ? 'peer_friend_sent' : 'peer_friend_add'),
             icon: done ? Icons.how_to_reg_rounded : Icons.person_add_rounded,
-            active: widget.requested,
-            onTap: done ? null : widget.onFriend,
+            active: requested,
+            onTap: done ? null : onFriend,
           ),
         ],
         const SizedBox(width: 10),
         _RoundAction(
-          label: AppStrings.t(_saved ? 'peer_unsave' : 'peer_save'),
-          icon: _saved
+          label: AppStrings.t(saved ? 'peer_unsave' : 'peer_save'),
+          icon: saved
               ? Icons.bookmark_rounded
               : Icons.bookmark_border_rounded,
-          active: _saved,
-          onTap: () {
-            HapticFeedback.selectionClick();
-            setState(() => _saved = !_saved);
-          },
+          active: saved,
+          onTap: onSave,
         ),
       ],
     );

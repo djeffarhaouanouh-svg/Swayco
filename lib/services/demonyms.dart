@@ -51,10 +51,10 @@ const Map<String, ({String frM, String frF, String en, String ja})> kDemonyms = 
   'Philippines': (frM: 'Philippin', frF: 'Philippine', en: 'Filipino', ja: 'フィリピン人'),
 };
 
-/// "Une Brésilienne t'a ajouté 👀" in [lang] (fr / en / ja), for a sender
+/// "Une Brésilienne t'a envoyé un cœur ❤️" in [lang] (fr / en / ja), for a sender
 /// from [country] of [senderGender] ('f' = woman). Null when the country is
 /// unknown or [lang] has no nationality wording — caller then falls back to
-/// the plain "Someone added you 👀".
+/// the plain "Someone sent you a heart ❤️".
 String? addedByNationality({
   required String lang,
   required String country,
@@ -66,12 +66,12 @@ String? addedByNationality({
   switch (lang.trim().toLowerCase().split(RegExp('[-_]')).first) {
     case 'fr':
       return woman
-          ? "Une ${d.frF} t'a ajouté 👀"
-          : "Un ${d.frM} t'a ajouté 👀";
+          ? "Une ${d.frF} t'a envoyé un cœur ❤️"
+          : "Un ${d.frM} t'a envoyé un cœur ❤️";
     case 'en':
-      return 'A ${d.en} ${woman ? 'woman' : 'man'} added you 👀';
+      return 'A ${d.en} ${woman ? 'woman' : 'man'} sent you a heart ❤️';
     case 'ja':
-      return '${d.ja}${woman ? '女性' : '男性'}があなたを追加しました 👀';
+      return '${d.ja}${woman ? '女性' : '男性'}があなたにハートを送りました ❤️';
   }
   return null;
 }
