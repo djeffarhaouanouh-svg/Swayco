@@ -466,18 +466,21 @@ class _PeerProfileViewState extends State<PeerProfileView>
             Positioned(top: safeTop + 6, left: 14, child: widget.back),
             Positioned(top: safeTop + 6, right: 14, child: widget.menu),
             Positioned(
-              right: 14,
+              left: 0,
+              right: 0,
               bottom: MediaQuery.paddingOf(context).bottom +
                   18 +
                   widget.bottomInset,
-              child: ValueListenableBuilder<bool>(
-                valueListenable: _showBackToTop,
-                builder: (context, show, _) => IgnorePointer(
-                  ignoring: !show,
-                  child: AnimatedOpacity(
-                    opacity: show ? 1 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: _BackToTop(onTap: _backToTop),
+              child: Center(
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _showBackToTop,
+                  builder: (context, show, _) => IgnorePointer(
+                    ignoring: !show,
+                    child: AnimatedOpacity(
+                      opacity: show ? 1 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: _BackToTop(onTap: _backToTop),
+                    ),
                   ),
                 ),
               ),
