@@ -11,6 +11,7 @@ import '../services/app_strings.dart';
 import '../services/profile_api.dart';
 import '../theme/swayco_theme.dart';
 import 'discover_ad_card.dart';
+import 'interest_chip.dart' show interestPillText;
 import 'round_flag.dart';
 import 'translated_profile_text.dart';
 import 'voice_intro_player.dart';
@@ -564,7 +565,9 @@ class _FeedCard extends StatelessWidget {
                                           durationMs: p.voiceIntroDurationMs,
                                           compact: true,
                                         )
-                                      : bio.isEmpty
+                                      : bio.isEmpty && p.interests.isNotEmpty
+                                          ? _InterestPills(tags: p.interests)
+                                          : bio.isEmpty
                                       ? Text(
                                           AppStrings.t('peer_bio_empty'),
                                           maxLines: 3,
@@ -621,6 +624,85 @@ class _FeedCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Sans bio ni audio : quelques centres d'intérêt, sur deux lignes au plus.
+class _InterestPills extends StatelessWidget {
+  const _InterestPills({required this.tags});
+
+  final List<String> tags;
+
+  static const double _gap = 5;
+  static const double _pill = 25;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(
+      color: _ink(0.85),
+      fontSize: 11.5,
+      fontWeight: FontWeight.w700,
+      height: 1.2,
+    );
+    return LayoutBuilder(
+      builder: (context, box) {
+        // Autant de puces entières que deux lignes en acceptent.
+        final scaler = MediaQuery.textScalerOf(context);
+        final shown = <String>[];
+        var line = 1;
+        var used = 0.0;
+        for (final tag in tags) {
+          final label = interestPillText(tag);
+          final painter = TextPainter(
+            text: TextSpan(
+              text: label,
+              style: DefaultTextStyle.of(context).style.merge(style),
+            ),
+            textDirection: TextDirection.ltr,
+            textScaler: scaler,
+            maxLines: 1,
+          )..layout();
+          final width = painter.width + 20;
+          painter.dispose();
+          if (width > box.maxWidth) continue;
+          final next = used == 0 ? width : used + _gap + width;
+          if (next <= box.maxWidth) {
+            used = next;
+          } else {
+            if (line == 2) break;
+            line++;
+            used = width;
+          }
+          shown.add(label);
+        }
+        return Wrap(
+          spacing: _gap,
+          runSpacing: _gap,
+          children: [
+            for (final label in shown)
+              Container(
+                height: _pill,
+                padding: const EdgeInsets.symmetric(horizontal: 9),
+                decoration: BoxDecoration(
+                  color: SC.light
+                      ? const Color(0xFFF0F2F8)
+                      : const Color(0x1AFFFFFF),
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(
+                    color: SC.light
+                        ? const Color(0x2404123A)
+                        : const Color(0x33FFFFFF),
+                  ),
+                ),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(label, maxLines: 1, style: style),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

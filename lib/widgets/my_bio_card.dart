@@ -10,7 +10,6 @@ import '../services/profile_api.dart';
 import '../services/voice_intro_api.dart';
 import '../services/voice_recorder.dart';
 import '../theme/swayco_theme.dart';
-import 'info_bento.dart' show InfoGlassFrame;
 import 'voice_intro_player.dart';
 
 /// Ma bio, sur ma page profil : un texte court OU une présentation vocale. Tant
@@ -22,7 +21,11 @@ class MyBioCard extends StatefulWidget {
     required this.onSaveText,
     required this.onVoiceChanged,
     required this.confirm,
+    required this.header,
   });
+
+  /// Le titre de la section ; le crayon se pose à sa droite.
+  final Widget header;
 
   final RemoteProfile? profile;
   final Future<void> Function(String) onSaveText;
@@ -180,39 +183,116 @@ class _MyBioCardState extends State<MyBioCard> {
     }
   }
 
+  /// Le crayon : écrire, ou (re)faire l'audio.
+  void _edit() {
+    if (_recorder.active || _busy) return;
+    if (_onAudio) {
+      unawaited(_startRecording());
+    } else {
+      _focus.requestFocus();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return InfoGlassFrame(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+    final light = SC.light;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: widget.header),
+            Semantics(
+              button: true,
+              label: AppStrings.t('profile_bio_section'),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _edit,
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: light
+                        ? const Color(0xFFF8F9FC)
+                        : const Color(0x1AFFFFFF),
+                    border: Border.all(
+                      color: light
+                          ? const Color(0x1F04123A)
+                          : const Color(0x33FFFFFF),
+                    ),
+                  ),
+                  child: Icon(Icons.edit_rounded,
+                      size: 18, color: SC.textPrimary),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+          decoration: BoxDecoration(
+            color: light ? const Color(0xFFF8F9FC) : null,
+            gradient: light
+                ? null
+                : const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x1AFFFFFF), Color(0x0AFFFFFF)],
+                  ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: light ? const Color(0x1A04123A) : const Color(0x29FFFFFF),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _Tab(
-                icon: Icons.edit_rounded,
-                label: AppStrings.t('voice_intro_tab_text'),
-                selected: !_onAudio,
-                onTap: () {
-                  if (_recorder.active) return;
-                  setState(() => _audioTab = false);
-                },
+              // Écrit / Vocal.
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: light
+                      ? const Color(0x0D04123A)
+                      : const Color(0x80060812),
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(
+                    color: light
+                        ? const Color(0x1404123A)
+                        : const Color(0x1FFFFFFF),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    _Tab(
+                      icon: Icons.edit_note_rounded,
+                      label: AppStrings.t('voice_intro_tab_text'),
+                      selected: !_onAudio,
+                      onTap: () {
+                        if (_recorder.active) return;
+                        setState(() => _audioTab = false);
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    _Tab(
+                      icon: Icons.mic_rounded,
+                      label: AppStrings.t('voice_intro_tab_audio'),
+                      selected: _onAudio,
+                      onTap: () {
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        setState(() => _audioTab = true);
+                      },
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 8),
-              _Tab(
-                icon: Icons.mic_rounded,
-                label: AppStrings.t('voice_intro_tab_audio'),
-                selected: _onAudio,
-                onTap: () {
-                  FocusManager.instance.primaryFocus?.unfocus();
-                  setState(() => _audioTab = true);
-                },
-              ),
+              const SizedBox(height: 14),
+              if (_onAudio) _audio() else _written(),
             ],
           ),
-          const SizedBox(height: 12),
-          if (_onAudio) _audio() else _written(),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -272,6 +352,8 @@ class _MyBioCardState extends State<MyBioCard> {
                 url: p.voiceIntroUrl,
                 durationMs: p.voiceIntroDurationMs,
               ),
+              const SizedBox(height: 10),
+              _note(AppStrings.t('voice_intro_audio_shown')),
               const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -407,22 +489,19 @@ class _Tab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = selected ? SC.onAccent : SC.textPrimary;
+    final fg = selected
+        ? SC.onAccent
+        : SC.textPrimary.withValues(alpha: 0.8);
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          height: 38,
+          height: 36,
           decoration: BoxDecoration(
             color: selected ? SC.accent : Colors.transparent,
             borderRadius: BorderRadius.circular(99),
-            border: Border.all(
-              color: selected
-                  ? SC.accent
-                  : SC.textMuted.withValues(alpha: 0.35),
-            ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -437,7 +516,7 @@ class _Tab extends StatelessWidget {
                   style: TextStyle(
                     color: fg,
                     fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),

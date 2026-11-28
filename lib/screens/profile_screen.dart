@@ -23,7 +23,6 @@ import '../services/notif_enable_flow.dart';
 import '../services/swayco_sounds.dart';
 import '../services/block_api.dart';
 import '../services/chat_unread.dart';
-import '../services/friend_request_unread.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/age_range.dart';
@@ -31,7 +30,6 @@ import '../services/fact_emojis.dart';
 import '../services/interests.dart';
 import '../services/job_sectors.dart';
 import '../services/languages.dart';
-import '../services/locations.dart';
 import '../services/match_celebration.dart';
 import '../services/nav_chrome.dart';
 import '../services/nav_tab.dart';
@@ -53,13 +51,11 @@ import '../widgets/settings_hero.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/location_picker_sheet.dart';
 import '../widgets/popup_kit.dart';
-import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_animations.dart';
 import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_popups_extra.dart';
-import '../widgets/translated_profile_text.dart';
 import '../widgets/wheel_picker_sheet.dart';
 import '../widgets/boost_button.dart';
 import '../widgets/pro_banner.dart';
@@ -68,9 +64,8 @@ import 'photo_crop_screen.dart';
 // L'aperÃ§u "ma carte" vit dans le Discover : il rÃ©utilise le widget de carte
 // du feed pour que l'aperÃ§u soit le rendu rÃ©el, pas une copie qui dÃ©rive.
 import 'discover_screen.dart'
-    show MyCardPreviewScreen, ProfileInfoPanel, discoverCardAspect;
+    show ProfileInfoPanel, discoverCardAspect;
 import '../widgets/passport_tile.dart';
-import 'onboarding_screen.dart';
 import 'settings_screen.dart';
 import '../services/friendly_error.dart';
 
@@ -418,27 +413,20 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Future<void> _openEditor() async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (ctx) => OnboardingScreen(
-          editing: true,
-          onCompleted: () => Navigator.of(ctx).pop(),
-        ),
-      ),
-    );
-    await _reload();
-  }
-
   /// Bouton Åil : ouvre MA CARTE Discover telle que les autres la voient â
   /// mes photos, mon nom, et le panneau d'infos (bio / Ã¢ge / intÃ©rÃªts) tel
   /// qu'il se dÃ©plie chez eux. Pas la page profil : c'est la carte qui dÃ©cide
   /// si on te like.
   Future<void> _openSelfPreview() async {
+    if (_deviceId.isEmpty) return;
+    VoiceIntroPlayer.stopActive();
     await Navigator.of(context).push<void>(
       // Apparaît sur place, comme la pop-up globe.
-      fadeScaleRoute<void>((_) => const MyCardPreviewScreen()),
+      fadeScaleRoute<void>(
+        (_) => ProfileScreen(userId: _deviceId, preview: true),
+      ),
     );
+    VoiceIntroPlayer.stopActive();
   }
 
   String get _displayName {
@@ -1007,17 +995,10 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   Widget build(BuildContext context) {
     final page = _buildPage(context);
-    // Seulement l'onglet Profil : la page d'un pair ou l'aperçu de ma carte sont
-    // poussés par-dessus, avec leur propre barre, qu'ils ne doivent pas ranger.
-    // Le profil d'un PAIR (userId != null) règle sa propre barre comme Messages :
-    // elle se range au défilement, revient 0,5 s après. L'aperçu de ma carte
-    // garde sa barre fixe.
-    // Le profil d'un pair n'a plus de barre du bas : rien à ranger.
-    if (widget.userId != null && !widget.preview) return page;
-    if (widget.userId != null) return NavAutoHide(child: page);
-    return widget.preview
-        ? page
-        : NavAutoHide(tab: NavTab.profile, child: page);
+    // La barre du bas ne se range qu'au défilement de MON onglet : le profil
+    // d'un autre (et l'aperçu du mien) est poussé par-dessus, sans barre.
+    if (widget.userId != null) return page;
+    return NavAutoHide(tab: NavTab.profile, child: page);
   }
 
   /// ⋮ : retirer des amis, signaler, bloquer.
@@ -1164,7 +1145,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         ? AppStrings.t('profile_anonymous')
         : _displayName;
     final popular = (remote?.isPro ?? false) || (remote?.isPlus ?? false);
-    final passport = (_IdentitySection._hasFacts(remote) ||
+    final passport = (_hasFacts(remote) ||
             (remote?.interests.isNotEmpty ?? false))
         ? remote
         : null;
@@ -1186,8 +1167,10 @@ class _ProfileScreenState extends State<ProfileScreen>
               )
             : null,
         back: back,
-        menu: _moreMenu(),
+        menu: widget.preview ? const SizedBox.shrink() : _moreMenu(),
         children: [
+          // Aperçu de mon profil : aucune action.
+          if (!widget.preview)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18),
             // Bloqué par moi : un seul « Débloquer ».
@@ -1210,7 +1193,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
           if (remote != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+              padding: EdgeInsets.fromLTRB(18, widget.preview ? 0 : 18, 18, 0),
               child: PeerBioCard(profile: remote),
             ),
           Padding(
@@ -1233,937 +1216,154 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildPage(BuildContext context) {
-    final lang = findLanguageByCode(_languageCode);
-    // Flag shown right of the name: the COUNTRY flag once a location is set
-    // (the spoken language doesn't always match â a Brazilian speaks
-    // Portuguese), else the language flag. This is NOT the language card's
-    // flag, which stays the spoken language on purpose.
-    final nameFlag =
-        countryFlagFor(_remote?.country ?? '') ??
-        lang?.flag ??
-        '';
-    // Le profil de quelqu'un d'autre : photo en fond et panneau qui monte.
-    if (widget.userId != null && !widget.preview) return _buildPeer(context);
-    return Scaffold(
-      // Onglet Profil : transparent en clair (le shell pose fond + halo) ;
-      // le profil d'un autre est une page poussée, donc opaque.
-      backgroundColor: _isViewingOther ? SC.bg : SC.tabBg,
-      // No header bar. When viewing someone else, the back button + â® menu
-      // float directly over the content (added to the Stack below) so the
-      // whole profile reads as one continuous page. The "my profile" tab is
-      // mounted in IndexedStack, so it never needed a back affordance.
-      body: ColoredBox(
-        color: SC.bg,
-        child: Stack(
-          children: [
-            SafeArea(
-              top: false,
-              bottom: false,
-              child: RefreshIndicator(
-                color: SC.accentFg,
-                backgroundColor: SC.menu,
-                onRefresh: _reload,
-                child: _loading
-                    ? ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: [
-                          SizedBox(height: MediaQuery.paddingOf(context).top + 120),
-                          Center(
-                            child: Column(
-                              children: [
-                                CircularProgressIndicator(
-                                  color: SC.accentFg,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  AppStrings.t('profile_loading'),
-                                  style: TextStyle(color: SC.textMuted),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      )
-                    : ListView(
-                        controller: _peerScroll,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        // Reserve room for the floating bottom nav (height 54 + 12 gap)
-                        // plus the device's bottom safe-area inset, otherwise the last
-                        // card gets occluded.
-                        // Gouttière latérale de 16 : PILE la même que la liste
-                        // des pages Likes / Messages (fromLTRB(16, ...)), pour
-                        // que les cartes ("Compte", "Mes infos"…) s'alignent
-                        // sur le bord gauche des cartes de ces pages.
-                        // Pleine largeur : la couverture va jusqu'aux bords et sous la barre
-                        // d'état ; chaque section pose sa propre gouttière.
-                        padding: EdgeInsets.only(
-                          bottom: 32 + 64 + MediaQuery.paddingOf(context).bottom,
-                        ),
-                        children: [
-                          _IdentitySection(
-                            // Raw name (may be empty) â the section shows the
-                            // "anonymous" fallback itself in viewer mode and
-                            // an editable field on my own profile.
-                            displayName: _displayName,
-                            flag: nameFlag,
-                            country: _remote?.country ?? '',
-                            handle: _handle,
-                            online: _peerOnline,
-                            popular: _isViewingOther &&
-                                ((_remote?.isPro ?? false) ||
-                                    (_remote?.isPlus ?? false)),
-                            bio: _remote?.bio ?? '',
-                            interests: _remote?.interests ?? const [],
-                            photos: _remote?.photos ?? const [],
-                            avatarUrl: _remote?.avatarUrl ?? '',
-                            onReorderPhotos: _reorderPhotos,
-                            viewerMode: _isViewingOther,
-                            matched: _matched,
-                            iLiked: _iLiked,
-                            peerLikedMe: _peerLikedMe,
-                            peerBlocked: _peerBlocked,
-                            peerBlockedMe: _peerBlockedMe,
-                            onEditName: _saveName,
-                            onEditBio: _saveBio,
-                            onEditInterests: _saveInterests,
-                            personalInfo: _remote,
-                            onSavePersonalInfo: _savePersonalInfo,
-                            onVoiceChanged: () => _reload(silent: true),
-                            onPickPhoto: _pickAndAddPhoto,
-                            onPickAvatar: _pickAndSetAvatar,
-                            onRemovePhoto: _removePhoto,
-                            onEdit: _openEditor,
-                            onSettings: _openSettings,
-                            onEditAccount: _openEditAccountSheet,
-                            onPreview: _openSelfPreview,
-                            preview: widget.preview,
-                            onLikePeer: _likePeer,
-                            onAcceptPeer: _acceptPeer,
-                            onToggleBlock: _toggleBlock,
-                            onMessagePeer: _openChatWithPeer,
-                            aboveGallery: (!_isViewingOther && !widget.preview)
-                                ? const ProBanner()
-                                : null,
-                            coverCenter: (!_isViewingOther && !widget.preview)
-                                ? BoostPill(
-                                    boostedUntil: _remote?.boostedUntil,
-                                    onPurchased: _awaitBoostCredit,
-                                  )
-                                : null,
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-            // Floating controls over the content â no header bar. Back on the
-            // left, the report/block â® menu on the right; both sit
-            // transparently on top of the scrolling profile.
-            if (_isViewingOther)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: AnimatedBuilder(
-                  animation: _peerScroll,
-                  builder: (context, child) => Transform.translate(
-                    offset: Offset(
-                      0,
-                      -(_peerScroll.hasClients ? _peerScroll.offset : 0.0),
-                    ),
-                    child: child,
-                  ),
-                  child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    // Un peu d'air : le retour ne colle plus au bord (sans
-                    // pour autant le pousser vers le centre).
-                    padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
-                    child: Row(
-                      children: [
-                        _GlassCircle(
-                          icon: Icons.arrow_back_rounded,
-                          onTap: () => Navigator.of(context).maybePop(),
-                        ),
-                        if ((_remote?.isPro ?? false) ||
-                            (_remote?.isPlus ?? false)) ...[
-                          const SizedBox(width: 10),
-                          _PopularPill(
-                            message: AppStrings.t('profile_popular_body', args: {
-                              'name': (_remote?.displayName ?? '')
-                                  .trim()
-                                  .split(RegExp(r'\s+'))
-                                  .first,
-                            }),
-                          ),
-                        ],
-                        const Spacer(),
-                        // En aperÃ§u de mon propre profil : pas de menu â®
-                        // (rien Ã  signaler / bloquer sur soi-mÃªme).
-                        if (!widget.preview)
-                        _moreMenu(),
-                      ],
-                    ),
-                  ),
-                  ),
-                ),
-              ),
-            // When viewing someone else's profile this screen is a route
-            // pushed on top of [RootShell], so the shell's floating nav bar
-            // is hidden. Re-render it here and route taps back to the shell.
-            // Pair : un tap n'importe où rappelle la barre rangée.
-            if (widget.userId != null)
-              Positioned.fill(
-                child: ValueListenableBuilder<bool>(
-                  valueListenable: NavChrome.autoHidden,
-                  builder: (context, auto, _) =>
-                      auto ? const NavTapRestore() : const SizedBox.shrink(),
-                ),
-              ),
-            if (_isViewingOther)
-              Positioned(
-                left: GlassNavBar.floatSide,
-                right: GlassNavBar.floatSide,
-                bottom: MediaQuery.paddingOf(context).bottom +
-                    GlassNavBar.floatBottom,
-                child: _tuckForPeer(ValueListenableBuilder<int>(
-                  valueListenable: NavTab.index,
-                  builder: (context, navIndex, _) => ValueListenableBuilder<int>(
-                    valueListenable: ChatUnread.count,
-                    builder: (context, unread, _) =>
-                        ValueListenableBuilder<int>(
-                          valueListenable: FriendRequestUnread.count,
-                          builder: (context, pending, _) => GlassNavBar(
-                            selected: navIndex,
-                            unreadChat: unread,
-                            unreadRequests: pending,
-                            onSelect: (i) {
-                              NavTab.select(i);
-                              Navigator.of(
-                                context,
-                              ).popUntil((route) => route.isFirst);
-                            },
-                          ),
-                        ),
-                  ),
-                )),
-              ),
-            // La poignée que laisse la barre rangée (profil d'un pair).
-            if (widget.userId != null)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: NavChrome.handleZone,
-                child: NavHandle(
-                  color: SC.light
-                      ? SC.brandBlueDeep.withValues(alpha: 0.35)
-                      : Colors.white.withValues(alpha: 0.55),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// La barre du profil d'un pair glisse / se resserre comme celle du shell ;
-  /// celle de l'aperçu reste fixe.
-  Widget _tuckForPeer(Widget bar) =>
-      widget.userId != null ? NavTuckAway(child: bar) : bar;
-}
-
-/// Insta-style identity section: avatar with camera badge on the left,
-/// followers/following counts inline on the right; below, the display name,
-/// handle, bio (tap-to-edit) and a compact Discover photo preview, then a
-/// row with Edit and Settings buttons. Replaces the previous bunch of
-/// separate stacked cards (header / stats / bio / discover photo / buttons).
-class _IdentitySection extends StatelessWidget {
-  const _IdentitySection({
-    required this.displayName,
-    this.flag = '',
-    this.country = '',
-    required this.handle,
-    this.online = false,
-    this.popular = false,
-    required this.bio,
-    required this.interests,
-    required this.photos,
-    required this.avatarUrl,
-    this.onReorderPhotos,
-    required this.onEditName,
-    required this.onEditBio,
-    this.onPickAvatar,
-    this.onEditInterests,
-    this.personalInfo,
-    this.onSavePersonalInfo,
-    this.onVoiceChanged,
-    required this.onPickPhoto,
-    required this.onRemovePhoto,
-    required this.onEdit,
-    required this.onSettings,
-    this.onEditAccount,
-    this.onPreview,
-    this.aboveGallery,
-    this.coverCenter,
-    this.preview = false,
-    this.viewerMode = false,
-    this.matched = false,
-    this.iLiked = false,
-    this.peerLikedMe = false,
-    this.peerBlocked = false,
-    this.peerBlockedMe = false,
-    this.onLikePeer,
-    this.onAcceptPeer,
-    this.onToggleBlock,
-    this.onMessagePeer,
-  });
-
-  final String displayName;
-
-  /// Country flag emoji shown right of the name ('' to hide).
-  final String flag;
-
-  /// The user's stored country name (e.g. 'Japon'). Selects which interests
-  /// taxonomy the own-profile picker shows. Empty in viewer mode.
-  final String country;
-  final String handle;
-
-  /// Viewer-mode only: show a green "online" line under the handle.
-  final bool online;
-
-  /// Viewer-mode only: la personne est populaire (Pro / Plus) → pastille
-  /// « POPULAIRE » à droite du @pseudo et lueur jaune derrière le nom.
-  final bool popular;
-  final String bio;
-
-  /// "Centres d'intÃ©rÃªt" the user picked (predefined tags). Rendered as
-  /// colour-coded chips; editable on my own profile (opens the picker),
-  /// read-only otherwise.
-  final List<String> interests;
-
-  /// Photo gallery ("Tes photos"). Drives the Discover card via `photos[0]`.
-  /// Editable (add / remove) on my own profile, read-only otherwise.
-  final List<String> photos;
-
-  /// The profile picture (PDP) shown in the round bubble â an independent
-  /// image, no longer tied to `photos[0]`. Empty falls back to initials.
-  final String avatarUrl;
-
-  /// Which gallery photo currently shows in Discover â gets the cyan ring.
-  /// Nouveau rang d'une photo dans la galerie : positions FINALES, la liste
-  /// est déjà celle d'après le déplacement. Voir _reorderPhotos.
-  final void Function(int from, int to)? onReorderPhotos;
-
-  /// Persist the edited display name (own profile, inline).
-  final Future<void> Function(String) onEditName;
-  final Future<void> Function(String) onEditBio;
-  final Future<void> Function()? onVoiceChanged;
-
-  /// Persist the edited interests list. Null in viewer mode (read-only).
-  final Future<void> Function(List<String>)? onEditInterests;
-
-  /// The profile row behind the "Mes infos" section (age, height, job, star
-  /// sign, looking for) â the same facts the Discover card's panel shows.
-  final RemoteProfile? personalInfo;
-  final Future<void> Function({
-    Object? age,
-    Object? heightCm,
-    Object? job,
-    Object? zodiac,
-    Object? personaCategory,
-    Object? nationality,
-    Object? originMother,
-    Object? originFather,
-  })? onSavePersonalInfo;
-
-  /// Own profile: append a photo to the gallery.
-  final VoidCallback onPickPhoto;
-
-  /// Own profile: pick + set the independent PDP (avatar). Null in viewer.
-  final VoidCallback? onPickAvatar;
-
-  /// Own profile: remove the given gallery photo by URL.
-  final void Function(String url) onRemovePhoto;
-
-  /// Own profile: open the name / language editor (legacy path).
-  final VoidCallback onEdit;
-
-  /// Own profile: open Settings (gear next to the name).
-  final Future<void> Function() onSettings;
-
-  /// Own profile: pencil beside the PDP â account edit bottom sheet.
-  final VoidCallback? onEditAccount;
-
-  /// Own profile: ouvre l'aperÃ§u "vu de l'extÃ©rieur" (bouton Åil).
-  final VoidCallback? onPreview;
-
-  /// Own profile only: shown just above the "Mes photos" header (Boost).
-  final Widget? aboveGallery;
-
-  /// Pastille « Booster mon profil » au centre de la barre du haut (mon profil).
-  final Widget? coverCenter;
-
-  /// True quand CETTE instance EST l'aperÃ§u (rendu viewer sur mes donnÃ©es) :
-  /// masque toutes les actions relationnelles.
-  final bool preview;
-
-  /// True when this section is rendering someone else's profile read-only.
-  /// Hides editing affordances and swaps Edit/ParamÃ¨tres for Message /
-  /// Follow-back.
-  final bool viewerMode;
-
-  /// Viewer-mode only: we liked each other â it's a match.
-  final bool matched;
-
-  /// Viewer-mode only: my like is still waiting for their answer.
-  final bool iLiked;
-
-  /// Viewer-mode only: they liked me â one tap on "Accepter" makes it a match.
-  final bool peerLikedMe;
-
-  /// Viewer-mode only: have I blocked the displayed peer? When true the
-  /// action stack collapses to a single "DÃ©bloquer" button â the follow
-  /// relation and Message CTA are meaningless on a profile I've cut off.
-  final bool peerBlocked;
-
-  /// Viewer-mode only: has the displayed peer blocked ME? When true the match
-  /// actions are hidden â the edge is dead on their side, so offering to
-  /// manage it is misleading.
-  final bool peerBlockedMe;
-
-  /// Viewer-mode only: like the peer ("Matcher").
-  final VoidCallback? onLikePeer;
-
-  /// Viewer-mode only: accept the like they already sent me ("Accepter").
-  final VoidCallback? onAcceptPeer;
-
-  /// Viewer-mode only: block / unblock the displayed peer. Drives the
-  /// "DÃ©bloquer" action button shown while [peerBlocked] is true.
-  final VoidCallback? onToggleBlock;
-
-  /// Viewer-mode only: opens the DM thread with this peer.
-  final VoidCallback? onMessagePeer;
-
-  // Pulled from AppStrings so it follows the user's chosen interface
-  // language (fr / en / es supplied; others fall back to en).
-
-  /// Opens the "Centres d'intÃ©rÃªt" picker (a styled bottom sheet of coloured
-  /// category groups) and persists the new selection.
-  @override
-  Widget build(BuildContext context) {
-    return viewerMode ? _buildViewer(context) : _buildOwn(context);
-  }
-
-  // ── Habillage 6b : photo plein cadre ──────────────────────────────────────
-
-  /// Hauteur de la couverture, barre d'état comprise (elle démarre à y = 0).
-  static const double _coverHeight = 380;
-
-  /// Le fond de la page, pour le fondu de la couverture.
-  static Color get _pageBg => SC.bg;
-
-  /// La couverture : la PDP — à défaut la première photo — en plein cadre,
-  /// recouverte d'un fondu qui la raccorde au fond de la page. Sur mon profil
-  /// un tap = choisir une nouvelle PDP.
-  Widget _cover({required bool editable, required double alignY}) {
-    final pdp = avatarUrl.isNotEmpty
-        ? avatarUrl
-        : (photos.isNotEmpty ? photos.first : '');
-    // Un avatar_url périmé retombe sur la première photo de la galerie.
-    final fallback = photos.isNotEmpty ? photos.first : '';
-    Widget placeholder() => ColoredBox(
-          color: const Color(0xFF1B2A55),
-          child: Center(
-            child: editable
-                ? Icon(Icons.photo_camera, size: 56, color: SC.fgA(0.54))
-                : ProfileAvatar(displayName: displayName, size: 120),
-          ),
-        );
-    Widget image;
-    if (pdp.isEmpty) {
-      image = placeholder();
-    } else {
-      image = Image.network(
-        pdp,
-        fit: BoxFit.cover,
-        alignment: Alignment(0, alignY),
-        width: double.infinity,
-        height: double.infinity,
-        frameBuilder: popInFrameBuilder,
-        errorBuilder: (_, _, _) => fallback.isEmpty || fallback == pdp
-            ? placeholder()
-            : Image.network(
-                fallback,
-                fit: BoxFit.cover,
-                alignment: Alignment(0, alignY),
-                width: double.infinity,
-                height: double.infinity,
-                errorBuilder: (_, _, _) => placeholder(),
-              ),
+  /// Mon profil : la même mise en page que celui des autres (photo en fond,
+  /// panneau qui monte), avec de quoi tout modifier.
+  Widget _buildMine(BuildContext context) {
+    final remote = _remote;
+    if (_loading) {
+      return Scaffold(
+        backgroundColor: SC.bg,
+        body: Center(child: CircularProgressIndicator(color: SC.accentFg)),
       );
     }
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: editable ? onPickAvatar : null,
-      child: Stack(
-        fit: StackFit.expand,
+    final photos = [
+      for (final u in remote?.photos ?? const <String>[])
+        if (u.isNotEmpty) u,
+    ];
+    final avatar = remote?.bestAvatarUrl ?? '';
+    final name = _displayName.isEmpty
+        ? AppStrings.t('profile_anonymous')
+        : _displayName;
+    final popular = (remote?.isPro ?? false) || (remote?.isPlus ?? false);
+    Widget section(Widget child, {double top = 24}) => Padding(
+          padding: EdgeInsets.fromLTRB(18, top, 18, 0),
+          child: child,
+        );
+    return Scaffold(
+      body: PeerProfileView(
+        profile: remote,
+        name: name,
+        // Le fond est la première photo de la galerie.
+        backgroundUrl: photos.isNotEmpty ? photos.first : avatar,
+        avatarUrl: avatar.isNotEmpty
+            ? avatar
+            : (photos.isNotEmpty ? photos.first : ''),
+        online: false,
+        startExpanded: false,
+        bottomInset: GlassNavBar.totalReservedHeight,
+        subtitle: Text(
+          _handle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.ibmPlexMono(
+            fontSize: 12,
+            color: SC.textPrimary.withValues(alpha: 0.75),
+          ),
+        ),
+        badge: popular ? const _PopularPill(onAvatar: true) : null,
+        cornerBadge: const _CameraBadge(),
+        onAvatarCornerTap: _openEditAccountSheet,
+        back: _GlassCircle(
+          icon: Icons.arrow_back_rounded,
+          // L'onglet n'est pas une page empilée : on revient à Discover.
+          onTap: () => NavTab.select(NavTab.discover),
+        ),
+        menu: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _GlassCircle(
+              icon: Icons.visibility_outlined,
+              tooltip: AppStrings.t('profile_preview'),
+              onTap: _openSelfPreview,
+            ),
+            const SizedBox(width: 8),
+            SettingsHeroButton(onOpen: _openSettings),
+          ],
+        ),
         children: [
-          image,
-          if (popular && !editable)
-            const Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 240,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: Alignment(-0.4, 0.7),
-                      radius: 1.0,
-                      colors: [Color(0x33F4FF1F), Color(0x00F4FF1F)],
-                    ),
-                  ),
+          ValueListenableBuilder<bool>(
+            valueListenable: RevenueCat.proActive,
+            builder: (_, pro, _) => pro
+                ? const SizedBox.shrink()
+                : section(const ProBanner(), top: 0),
+          ),
+          section(
+            BoostButton(
+              boostedUntil: remote?.boostedUntil,
+              onPurchased: _awaitBoostCredit,
+              hero: true,
+            ),
+            top: 14,
+          ),
+          section(
+            _ProfileSectionHeader(
+              AppStrings.t('profile_photos_section'),
+              suffix: photos.isEmpty ? '' : '(${photos.length})',
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: _PhotoGallery(
+              photos: photos,
+              onPick: _pickAndAddPhoto,
+              onRemove: _removePhoto,
+              onReorderPhotos: _reorderPhotos,
+            ),
+          ),
+          section(
+            _DiscoverVisibilityHint(
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => const SettingsScreen(),
                 ),
               ),
             ),
-          IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    _pageBg.withValues(alpha: 0.35),
-                    _pageBg.withValues(alpha: 0),
-                    _pageBg.withValues(alpha: 0.75),
-                    _pageBg,
-                  ],
-                  // Opaque un peu AVANT le bord : sinon la dernière ligne de pixels
-                  // laisse transparaître la photo (fine ligne claire).
-                  stops: const [0, 0.30, 0.78, 0.985],
-                ),
+            top: 10,
+          ),
+          section(
+            MyBioCard(
+              header: _ProfileSectionHeader(
+                AppStrings.t('profile_bio_section'),
               ),
-            ),          ),
+              profile: remote,
+              onSaveText: _saveBio,
+              onVoiceChanged: () => _reload(silent: true),
+              confirm: (title, body, action) async =>
+                  await showSwaycoConfirm(
+                    context: context,
+                    title: title,
+                    body: body,
+                    confirmLabel: action,
+                  ) ==
+                  true,
+            ),
+          ),
+          section(_ProfileSectionHeader(AppStrings.t('info_section_title'))),
+          section(
+            _PersonalInfoSection(
+              profile: remote,
+              onSave: _savePersonalInfo,
+            ),
+            top: 12,
+          ),
+          section(
+            _InterestsSection(
+              interests: remote?.interests ?? const [],
+              onSave: _saveInterests,
+              country: remote?.country ?? '',
+            ),
+          ),
+          section(_ProfileSectionHeader(AppStrings.t('contact_title'))),
+          section(const _ContactCard(), top: 12),
         ],
       ),
     );
   }
 
-  /// Le drapeau du pays (vrai drapeau, hauteur 22), l'emoji à défaut.
-  Widget _flagImage() {
-    final iso = countryIso2For(country);
-    if (iso.isEmpty) {
-      return flag.isEmpty
-          ? const SizedBox.shrink()
-          : Text(flag, style: const TextStyle(fontSize: 20, height: 1));
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(3),
-      child: Image.network(
-        'https://flagcdn.com/w80/${iso.toLowerCase()}.png',
-        height: 22,
-        errorBuilder: (_, _, _) => flag.isEmpty
-            ? const SizedBox(height: 22)
-            : Text(flag, style: const TextStyle(fontSize: 20, height: 1)),
-      ),
-    );
-  }
-
-  /// Prénom (Unbounded-like 36) + drapeau, puis @pseudo — posés sur le bas de
-  /// la couverture. [editableName] : le prénom s'édite en place (mon profil).
-  Widget _identityBlock({required bool editableName}) {
-    final nameStyle = popupDisplay(
-      fontSize: 36,
-      letterSpacing: -1.8,
-      height: 1,
-      // Clair : le nom est posé sur le fondu BLANC de la couverture → encre.
-      color: SC.light ? SC.textPrimary : Colors.white,
-    ).copyWith(
-      shadows: SC.light
-          ? const []
-          : const [Shadow(color: Color(0x66000000), blurRadius: 12)],
-    );
-    final shown = displayName.trim().isEmpty
-        ? AppStrings.t('profile_anonymous')
-        : displayName;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Flexible(
-              child: editableName
-                  // _InlineEditable pose 8 px de marge : on les reprend pour
-                  // que le prénom s'aligne sur le @pseudo.
-                  ? Transform.translate(
-                      offset: const Offset(-8, 0),
-                      child: _InlineEditable(
-                        value: displayName,
-                        placeholder: AppStrings.t('profile_anonymous'),
-                        onSave: onEditName,
-                        maxLength: profileNameMaxLength,
-                        style: nameStyle,
-                      ),
-                    )
-                  : Text(
-                      shown,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: nameStyle,
-                    ),
-            ),
-            // Mon propre drapeau ne s'affiche pas : on voit celui des autres,
-            // pas le sien (pour ne pas inciter à inventer une origine).
-            if (!editableName && (flag.isNotEmpty || country.isNotEmpty)) ...[
-              const SizedBox(width: 10),
-              _flagImage(),
-            ],
-          ],
-        ),
-        SizedBox(height: editableName ? 0 : 6),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Le point vert « en ligne » est retiré à la demande : on n'affiche
-            // plus si le pair est connecté (le paramètre [online] reste, inutilisé).
-            Flexible(
-              child: Text(
-                handle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.ibmPlexMono(
-                  fontSize: 12,
-                  color: SC.light
-                      ? SC.textSecondary
-                      : SC.fg.withValues(alpha: 0.7),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// Mon profil — 6b : couverture plein cadre (œil + engrenage en verre),
-  /// prénom / drapeau / @pseudo posés sur le fondu et bouton caméra ; puis
-  /// Boost, « Mes photos » (vignettes 104 × 138) et le panneau « Mes infos ».
-  Widget _buildOwn(BuildContext context) {
-    final safeTop = MediaQuery.paddingOf(context).top;
-    final photosCount = photos.isEmpty ? '' : '(${photos.length})';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: _coverHeight,
-          child: Stack(
-            children: [
-              Positioned.fill(child: _cover(editable: true, alignY: -0.45)),
-              Positioned(
-                top: safeTop + 6,
-                left: 14,
-                right: 14,
-                child: Row(
-                  children: [
-                    // Retour : ramène sur Discover (l'onglet de ma page profil n'est
-                    // pas une route poussée, il n'y a rien à dépiler).
-                    _GlassCircle(
-                      icon: Icons.arrow_back_rounded,
-                      onTap: () => NavTab.select(NavTab.discover),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      // Colle a droite, contre l'oeil.
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: coverCenter ?? const SizedBox.shrink(),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _GlassCircle(
-                      icon: Icons.visibility_outlined,
-                      tooltip: AppStrings.t('profile_preview'),
-                      onTap: onPreview ?? () {},
-                    ),
-                    const SizedBox(width: 8),
-                    // Au tap, il glisse jusqu'à la place du retour puis les
-                    // Réglages s'ouvrent (voir settings_hero.dart).
-                    SettingsHeroButton(onOpen: onSettings),
-                  ],
-                ),
-              ),
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: 30,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(child: _identityBlock(editableName: true)),
-                    const SizedBox(width: 12),
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: onPickAvatar,
-                      child: Container(
-                        width: 46,
-                        height: 46,
-                        decoration: const BoxDecoration(
-                          color: SC.accent,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.photo_camera,
-                          size: 22,
-                          color: SC.onAccent,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Abonn? Pro : le bandeau dispara?t (l'abonnement se g?re dans
-        // R?glages) et sa marge avec lui, le Boost touche ? Mes photos ?.
-        if (aboveGallery != null)
-          ValueListenableBuilder<bool>(
-            valueListenable: RevenueCat.proActive,
-            builder: (_, pro, _) => pro
-                ? const SizedBox.shrink()
-                : Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                    child: aboveGallery!,
-                  ),
-          ),
-        // « Mes photos (n) » + « +40 pts ».
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
-          child: _ProfileSectionHeader(
-            AppStrings.t('profile_photos_section'),
-            suffix: photosCount,
-          ),
-        ),
-        const SizedBox(height: 12),
-        // La rangée déborde à droite : pas de marge de ce côté.
-        Padding(
-          padding: const EdgeInsets.only(left: 18),
-          child: _PhotoGallery(
-            photos: photos,
-            viewerMode: false,
-            onPick: onPickPhoto,
-            onRemove: onRemovePhoto,
-            onReorderPhotos: onReorderPhotos,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-          // Sous la rangée : mène aux Réglages, où vit « Me cacher de mon
-          // pays ».
-          child: _DiscoverVisibilityHint(
-            onTap: () => Navigator.of(context).push<void>(
-              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-            ),
-          ),
-        ),
-        // « Bio » : un texte court ou une présentation vocale.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
-          child: _ProfileSectionHeader(AppStrings.t('profile_bio_section')),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-          child: MyBioCard(
-            profile: personalInfo,
-            onSaveText: onEditBio,
-            onVoiceChanged: onVoiceChanged ?? () async {},
-            confirm: (title, body, action) async =>
-                await showSwaycoConfirm(
-                  context: context,
-                  title: title,
-                  body: body,
-                  confirmLabel: action,
-                ) ==
-                true,
-          ),
-        ),
-        // « Mes infos » : un seul panneau — faits perso, puis les centres
-        // d'intérêt.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
-          child: _ProfileSectionHeader(AppStrings.t('info_section_title')),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-          child: _PersonalInfoSection(
-            profile: personalInfo,
-            onSave: onSavePersonalInfo,
-            bottom: _InterestsSection(
-              interests: interests,
-              onSave: onEditInterests,
-              country: country,
-              compact: true,
-            ),
-          ),
-        ),
-        // « Contact » : un mail à l'équipe, juste sous « Mes infos ».
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
-          child: _ProfileSectionHeader(AppStrings.t('contact_title')),
-        ),
-        const Padding(
-          padding: EdgeInsets.fromLTRB(18, 12, 18, 0),
-          child: _ContactCard(),
-        ),
-      ],
-    );
-  }
-
-  /// Le profil d'un autre — 6b : même couverture (retour et ⋮ sont posés par
-  /// la page), identité sur le fondu, Message / Matched en pilules, puis la
-  /// grille « Ses photos » et le panneau bio + centres d'intérêt en lecture
-  /// seule.
-  Widget _buildViewer(BuildContext context) {
-    final emptyBio = bio.trim().isEmpty;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: _coverHeight,
-          child: Stack(
-            children: [
-              Positioned.fill(child: _cover(editable: false, alignY: -0.4)),
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: 30,
-                child: _identityBlock(editableName: false),
-              ),
-            ],
-          ),
-        ),
-        // Actions. Bloqué par moi → un seul « Débloquer » ; sinon Message (entre
-        // matchs seulement) + une action de match selon la relation :
-        //  · matchés → « Matched » (inerte) ;
-        //  · il m'a liké → « Accepter » (un tap = match) ;
-        //  · j'ai liké, sans réponse → « Envoyé » ;
-        //  · rien → « Matcher » (envoie le like).
-        // Aperçu de mon propre profil : aucune action.
-        if (!preview)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (peerBlocked)
-                  _GradientActionButton(
-                    label: AppStrings.t('unblock'),
-                    icon: Icons.lock_open,
-                    onTap: onToggleBlock ?? () {},
-                  )
-                else ...[
-                  if (matched) ...[
-                    _GradientActionButton(
-                      label: AppStrings.t('profile_message'),
-                      icon: Icons.chat_bubble,
-                      onTap: onMessagePeer ?? () {},
-                      glass: true,
-                    ),
-                    if (!peerBlockedMe) const SizedBox(height: 10),
-                  ],
-                  if (!peerBlockedMe) ...[
-                    if (matched)
-                      _GradientActionButton(
-                        label: AppStrings.t('match_matched'),
-                        icon: Icons.favorite,
-                        onTap: () {},
-                      )
-                    else if (peerLikedMe)
-                      _GradientActionButton(
-                        label: AppStrings.t('match_cta'),
-                        icon: Icons.favorite,
-                        onTap: onAcceptPeer ?? () {},
-                      )
-                    else if (iLiked)
-                      _GradientActionButton(
-                        label: AppStrings.t('friendship_sent'),
-                        icon: Icons.schedule,
-                        onTap: () {},
-                        subdued: true,
-                      )
-                    else
-                      _GradientActionButton(
-                        label: AppStrings.t('match_cta'),
-                        icon: Icons.favorite_border,
-                        onTap: onLikePeer ?? () {},
-                      ),
-                  ],
-                ],
-              ],
-            ),
-          ),
-        // La bio, juste au-dessus des photos (le passeport est la 1re tuile de la
-        // grille, il n'y a plus de carte d'infos en bas).
-        if (!emptyBio)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 22, 18, 0),
-            child: InfoGlassFrame(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Un titre, comme les autres blocs : sans lui on ne voit pas
-                  // d'où sort ce texte.
-                  Text(
-                    AppStrings.t('profile_bio_section').toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: bentoLabelStyle(),
-                  ),
-                  const SizedBox(height: 8),
-                  TranslatedProfileText(
-                    // Traduite dans la langue de l'interface quand elle diffère
-                    // de celle que le pair parle.
-                    text: bio,
-                    profileId: personalInfo?.id ?? handle,
-                    field: 'bio',
-                    fromLang: personalInfo?.language ?? '',
-                    showNote: true,
-                    textAlign: TextAlign.start,
-                    style: TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 15,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        // « Ses photos (n) » + grille 2 colonnes.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 26, 18, 0),
-          child: _ProfileSectionHeader(
-            AppStrings.t('peer_photos_section'),
-            suffix: photos.isEmpty ? '' : '(${photos.length})',
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-          child: _PeerMediaStack(
-            photos: photos,
-            // Le passeport est la 1re tuile de la grille (et la 1re page de la
-            // visionneuse) quand il y a de quoi y mettre.
-            profile: (_hasFacts(personalInfo) || interests.isNotEmpty)
-                ? personalInfo
-                : null,
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _buildPage(BuildContext context) => widget.userId != null
+      ? _buildPeer(context)
+      : _buildMine(context);
 
   static bool _hasFacts(RemoteProfile? p) =>
       p != null &&
@@ -2174,6 +1374,7 @@ class _IdentitySection extends StatelessWidget {
           p.originMother.trim().isNotEmpty ||
           p.originFather.trim().isNotEmpty);
 }
+
 /// Rond de 44 en verre (blanc 13 %, bord blanc 30 % de 1,2 px, flou 20) — les
 /// boutons posés sur la couverture.
 /// « POPULAIRE » : pastille jaune posée à côté de la flèche retour d'un profil.
@@ -2517,6 +1718,29 @@ class _ExpandPassport extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Le rond jaune « appareil photo » posé sur ma photo de profil.
+class _CameraBadge extends StatelessWidget {
+  const _CameraBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFFF4FF1F),
+        border: Border.all(
+          color: SC.light ? const Color(0xFFF3F4F8) : const Color(0xFF0E0E0E),
+          width: 3,
+        ),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: const FittedBox(
+        child: Icon(Icons.photo_camera, color: Color(0xFF04123A)),
       ),
     );
   }
@@ -3158,7 +2382,6 @@ class _ViewerFooter extends StatelessWidget {
 class _PhotoGallery extends StatelessWidget {
   const _PhotoGallery({
     required this.photos,
-    required this.viewerMode,
     required this.onPick,
     required this.onRemove,
     this.onReorderPhotos,
@@ -3166,31 +2389,28 @@ class _PhotoGallery extends StatelessWidget {
 
   final List<String> photos;
 
-  /// Toujours false dÃ©sormais â le profil d'un pair passe par [_PeerMediaStack].
-  /// Le param reste pour ne pas casser les points d'appel.
-  final bool viewerMode;
   final VoidCallback onPick;
   final void Function(String url) onRemove;
   // Own profile: reorder the gallery by dragging a tile (final positions).
   final void Function(int from, int to)? onReorderPhotos;
 
   // Portrait tiles (3:4) â a single horizontal, scrollable row of larger tiles.
-  static const double _spacing = 10;
+  static const double _spacing = 8;
 
   @override
   Widget build(BuildContext context) {
     final canAdd = photos.length < profilePhotosMax;
     // "Tes photos" agrandies : une rangÃ©e horizontale de grandes tuiles (la
     // tuile "+" d'abord), qu'on fait dÃ©filer.
-    const double tileWidth = 104;
-    const double tileHeight = 138;
+    const double tileWidth = 158;
+    const double tileHeight = 158 * 4 / 3;
     final count = (canAdd ? 1 : 0) + photos.length;
     final offset = canAdd ? 1 : 0;
     return SizedBox(
       height: tileHeight,
       child: ReorderableListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
         // Pas de poignée dessinée : c'est l'appui long SUR la photo qui la
         // décroche (voir ReorderableDelayedDragStartListener plus bas). Une
         // poignée sur une grille de photos n'aurait nulle part où se poser.
@@ -3275,7 +2495,6 @@ class _PhotoGallery extends StatelessWidget {
                     index: photoIndex,
                   ),
                   onDelete: () => onRemove(url),
-                  isPrimary: photoIndex == 0,
                 ),
               ),
             ),
@@ -3297,7 +2516,6 @@ class _PersonalInfoSection extends StatelessWidget {
   const _PersonalInfoSection({
     required this.profile,
     required this.onSave,
-    this.bottom,
   });
 
   final RemoteProfile? profile;
@@ -3311,9 +2529,6 @@ class _PersonalInfoSection extends StatelessWidget {
     Object? originMother,
     Object? originFather,
   })? onSave;
-
-  /// Rendu EN BAS du panneau, sous les lignes d'infos (les centres d'intÃ©rÃªt).
-  final Widget? bottom;
 
   @override
   Widget build(BuildContext context) {
@@ -3437,7 +2652,6 @@ class _PersonalInfoSection extends StatelessWidget {
             onPersona: pickPersona,
             onMother: pickMother,
             onFather: pickFather,
-            interestsBody: bottom,
           ),
         ],
       ),
@@ -3606,7 +2820,6 @@ class _InterestsSection extends StatefulWidget {
     required this.interests,
     required this.onSave,
     this.country = '',
-    this.compact = false,
   });
 
   final List<String> interests;
@@ -3614,10 +2827,6 @@ class _InterestsSection extends StatefulWidget {
 
   /// The user's country â selects which interests taxonomy the picker shows.
   final String country;
-
-  /// Rendu dans le panneau "Mes infos" : un petit libellÃ© muet faÃ§on ligne
-  /// d'info au lieu du gros titre de section (et pas de badge +20).
-  final bool compact;
 
   @override
   State<_InterestsSection> createState() => _InterestsSectionState();
@@ -3701,19 +2910,8 @@ class _InterestsSectionState extends State<_InterestsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (widget.compact)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(
-              '$kFactEmojiInterests ${AppStrings.t('profile_interests_section').toUpperCase()}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: bentoLabelStyle(),
-            ),
-          )        else ...[
-          _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
-          const SizedBox(height: 12),
-        ],
+        _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
+        const SizedBox(height: 12),
         // Les chips choisis + le chip "Ajouter". N'importe lequel ouvre la
         // feuille de sÃ©lection, qui se pose PAR-DESSUS la page.
         Wrap(
@@ -4152,7 +3350,6 @@ class _PhotoCell extends StatelessWidget {
     required this.viewerMode,
     required this.onTap,
     this.onDelete,
-    this.isPrimary = false,
     this.radius = 20,
   });
 
@@ -4164,9 +3361,6 @@ class _PhotoCell extends StatelessWidget {
   /// When non-null and a photo is set on my own profile, a small trash
   /// button appears top-right to delete the photo.
   final VoidCallback? onDelete;
-
-  /// Premiere photo de la galerie : elle seule porte le lisere cyan.
-  final bool isPrimary;
 
   @override
   Widget build(BuildContext context) {
@@ -4231,112 +3425,12 @@ class _PhotoCell extends StatelessWidget {
                 ),
               ),
             ),
-          // Le lisere cyan ne designe QUE la premiere photo de la galerie
-          // (la photo de profil) : sur les suivantes il transformait la rangee
-          // en mur de cadres. Pas sur la cellule vide, qui n'est pas une photo.
-          if (hasPhoto && isPrimary)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: SC.accent, width: 2),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
   }
 }
 
-class _GradientActionButton extends StatelessWidget {
-  const _GradientActionButton({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.subdued = false,
-    this.glass = false,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  /// Muted, non-emphasised style — the inert "Envoyé" state.
-  final bool subdued;
-
-  /// Le bouton « Message » : pilule au dégradé de marque (bleu). Les autres
-  /// sont jaunes.
-  final bool glass;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = glass || subdued ? Colors.white : SC.onAccent;
-    // Scale the icon+label down to fit when a translation is long (German /
-    // Russian / katakana run wider) instead of overflowing.
-    final content = FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 21, color: fg),
-          const SizedBox(width: 10),
-          Text(label, style: popupDisplay(fontSize: 14, color: fg)),
-        ],
-      ),
-    );
-    final BoxDecoration decoration;
-    if (glass) {
-      decoration = BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [SC.brandBlueDeep, SC.brandBlue, SC.brandCyan],
-          stops: [0, 0.52, 1],
-        ),
-        borderRadius: BorderRadius.circular(999),
-        boxShadow: [
-          BoxShadow(
-            color: SC.brandBlue.withValues(alpha: 0.4),
-            blurRadius: 30,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      );
-    } else if (subdued) {
-      decoration = BoxDecoration(
-        color: SC.menu,
-        borderRadius: BorderRadius.circular(999),
-      );
-    } else {
-      decoration = BoxDecoration(
-        color: SC.accent,
-        borderRadius: BorderRadius.circular(999),
-        boxShadow: [
-          BoxShadow(
-            color: SC.accent.withValues(alpha: 0.28),
-            blurRadius: 28,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      );
-    }
-    return Pressable(
-      bounce: true,
-      onTap: onTap,
-      child: Container(
-        height: 54,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        alignment: Alignment.center,
-        decoration: decoration,
-        child: content,
-      ),
-    );
-  }
-}
 /// Bottom sheet opened by the PDP pencil — same chrome as the language wheel
 /// (handle, dark panel, rounded top). Avatar on top, then name / city / live lang.
 class _EditAccountSheet extends StatelessWidget {

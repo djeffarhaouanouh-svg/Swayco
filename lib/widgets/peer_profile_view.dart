@@ -47,7 +47,25 @@ class PeerProfileView extends StatefulWidget {
     required this.menu,
     required this.children,
     this.badge,
+    this.subtitle,
+    this.cornerBadge,
+    this.onAvatarCornerTap,
+    this.startExpanded = true,
+    this.bottomInset = 0,
   });
+
+  /// Sous le nom, à la place des puces ville · heure · en ligne.
+  final Widget? subtitle;
+
+  /// Petit rond sur la photo de profil (l'appareil photo, sur mon profil).
+  final Widget? cornerBadge;
+  final VoidCallback? onAvatarCornerTap;
+
+  /// Le panneau s'ouvre en haut ; sinon au milieu.
+  final bool startExpanded;
+
+  /// Place prise en bas par la barre de navigation.
+  final double bottomInset;
 
   final RemoteProfile? profile;
   final String name;
@@ -138,8 +156,8 @@ class _PeerProfileViewState extends State<PeerProfileView>
     var mid = height * 470 / 844;
     if (mid < lowest) mid = lowest;
     if (full == _full && mid == _mid) return;
-    // À l'ouverture le panneau est en haut.
-    final wasFull = _top.value < 0 || _expanded;
+    // À l'ouverture, la position demandée.
+    final wasFull = _top.value < 0 ? widget.startExpanded : _expanded;
     _full = full;
     _mid = mid;
     // Posé avant la position : l'écouteur n'a alors rien à reconstruire.
@@ -339,7 +357,10 @@ class _PeerProfileViewState extends State<PeerProfileView>
               right: 12,
               top: nameTop + nameSize * 1.1 + 10,
               child: IgnorePointer(
-                child: Opacity(opacity: chipsOpacity, child: _chips()),
+                child: Opacity(
+                  opacity: chipsOpacity,
+                  child: widget.subtitle ?? _chips(),
+                ),
               ),
             ),
             // Le panneau.
@@ -437,6 +458,8 @@ class _PeerProfileViewState extends State<PeerProfileView>
                 diameter: photo,
                 border: 3 - eb,
                 badge: widget.badge,
+                cornerBadge: widget.cornerBadge,
+                onCornerTap: widget.onAvatarCornerTap,
                 badgeOpacity: _unit(1 - eb / 0.3),
               ),
             ),
@@ -444,7 +467,9 @@ class _PeerProfileViewState extends State<PeerProfileView>
             Positioned(top: safeTop + 6, right: 14, child: widget.menu),
             Positioned(
               right: 14,
-              bottom: MediaQuery.paddingOf(context).bottom + 18,
+              bottom: MediaQuery.paddingOf(context).bottom +
+                  18 +
+                  widget.bottomInset,
               child: ValueListenableBuilder<bool>(
                 valueListenable: _showBackToTop,
                 builder: (context, show, _) => IgnorePointer(
@@ -497,7 +522,9 @@ class _PeerProfileViewState extends State<PeerProfileView>
           physics: _expanded
               ? const ClampingScrollPhysics()
               : const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.only(bottom: 40 + safeBottom),
+          padding: EdgeInsets.only(
+            bottom: 40 + safeBottom + widget.bottomInset,
+          ),
           children: widget.children,
         ),
       ),
@@ -644,7 +671,12 @@ class _Avatar extends StatelessWidget {
     required this.border,
     required this.badge,
     required this.badgeOpacity,
+    this.cornerBadge,
+    this.onCornerTap,
   });
+
+  final Widget? cornerBadge;
+  final VoidCallback? onCornerTap;
 
   final String url;
   final double diameter;
@@ -689,6 +721,24 @@ class _Avatar extends StatelessWidget {
             ),
           ),
         ),
+        // En bas à droite ; en haut à droite quand « Populaire » occupe le bas.
+        if (cornerBadge != null && badgeOpacity > 0)
+          Positioned(
+            right: -2,
+            top: badge == null ? null : -2,
+            bottom: badge == null ? -2 : null,
+            child: Opacity(
+              opacity: badgeOpacity,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onCornerTap,
+                child: SizedBox.square(
+                  dimension: diameter * 0.3 < 22 ? 22 : diameter * 0.3,
+                  child: cornerBadge,
+                ),
+              ),
+            ),
+          ),
         if (badge != null && badgeOpacity > 0)
           Positioned(
             left: -40,
