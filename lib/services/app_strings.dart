@@ -1236,6 +1236,7 @@ abstract final class AppStrings {
     'peer_save': 'Enregistrer',
     'peer_unsave': 'Retirer des enregistrés',
     'coming_soon': 'Bientôt disponible',
+    'back_to_top': 'Retour en haut',
     'login_err_generic': 'Une erreur est survenue. Réessaie dans un instant.',
     'friend_limit_week': 'Tu as atteint ta limite de nouvelles personnes pour cette semaine. Passe à Pro pour en ajouter sans limite.',
     'login_check_inbox':
@@ -2515,6 +2516,7 @@ abstract final class AppStrings {
     'peer_save': 'Save',
     'peer_unsave': 'Remove from saved',
     'coming_soon': 'Coming soon',
+    'back_to_top': 'Back to top',
     'login_err_generic': 'Something went wrong. Please try again in a moment.',
     'friend_limit_week': 'You\'ve reached this week\'s limit for new connections. Go Pro to add more without limits.',
     'login_check_inbox': 'Check your inbox — we sent you a confirmation link.',
@@ -3846,6 +3848,7 @@ abstract final class AppStrings {
     'peer_save': 'Guardar',
     'peer_unsave': 'Quitar de guardados',
     'coming_soon': 'Próximamente',
+    'back_to_top': 'Volver arriba',
     'login_err_generic': 'Algo salió mal. Inténtalo de nuevo en un momento.',
     'friend_limit_week': 'Has alcanzado el límite de nuevas conexiones de esta semana. Pásate a Pro para añadir más sin límite.',
     'login_check_inbox':
@@ -5117,6 +5120,7 @@ abstract final class AppStrings {
     'peer_save': 'Speichern',
     'peer_unsave': 'Aus Gespeicherten entfernen',
     'coming_soon': 'Bald verfügbar',
+    'back_to_top': 'Nach oben',
     'login_err_generic': 'Etwas ist schiefgelaufen. Versuche es gleich noch einmal.',
     'friend_limit_week': 'Du hast das Limit für neue Kontakte in dieser Woche erreicht. Mit Pro kannst du unbegrenzt weitere hinzufügen.',
     'login_check_inbox':
@@ -6393,6 +6397,7 @@ abstract final class AppStrings {
     'peer_save': 'Salva',
     'peer_unsave': 'Rimuovi dai salvati',
     'coming_soon': 'Prossimamente',
+    'back_to_top': 'Torna su',
     'login_err_generic': 'Qualcosa è andato storto. Riprova tra un attimo.',
     'friend_limit_week': 'Hai raggiunto il limite di nuove connessioni di questa settimana. Passa a Pro per aggiungerne senza limiti.',
     'login_check_inbox':
@@ -7669,6 +7674,7 @@ abstract final class AppStrings {
     'peer_save': 'Guardar',
     'peer_unsave': 'Remover dos guardados',
     'coming_soon': 'Em breve',
+    'back_to_top': 'Voltar ao topo',
     'login_err_generic': 'Ocorreu um erro. Tenta de novo daqui a pouco.',
     'friend_limit_week': 'Atingiste o limite de novas ligações desta semana. Passa ao Pro para adicionar sem limites.',
     'login_check_inbox':
@@ -8903,6 +8909,7 @@ abstract final class AppStrings {
     'peer_save': 'Salvar',
     'peer_unsave': 'Remover dos salvos',
     'coming_soon': 'Em breve',
+    'back_to_top': 'Voltar ao topo',
     'login_err_generic': 'Algo deu errado. Tente de novo em instantes.',
     'friend_limit_week': 'Você atingiu o limite de novas conexões desta semana. Assine o Pro para adicionar sem limites.',
     'login_check_inbox': 'Verifique sua caixa de entrada — enviamos um link de confirmação para você.',
@@ -10173,6 +10180,7 @@ abstract final class AppStrings {
     'peer_save': 'Opslaan',
     'peer_unsave': 'Uit opgeslagen verwijderen',
     'coming_soon': 'Binnenkort beschikbaar',
+    'back_to_top': 'Terug naar boven',
     'login_err_generic': 'Er ging iets mis. Probeer het zo meteen opnieuw.',
     'friend_limit_week': 'Je hebt de limiet voor nieuwe contacten van deze week bereikt. Ga naar Pro om onbeperkt toe te voegen.',
     'login_check_inbox':
@@ -11434,6 +11442,7 @@ abstract final class AppStrings {
     'peer_save': 'حفظ',
     'peer_unsave': 'إزالة من المحفوظات',
     'coming_soon': 'قريبًا',
+    'back_to_top': 'العودة إلى الأعلى',
     'login_err_generic': 'حدث خطأ ما. حاول مجددًا بعد قليل.',
     'friend_limit_week': 'وصلت إلى حد الأصدقاء الجدد لهذا الأسبوع. اشترك في Pro للإضافة دون حدود.',
     'login_check_inbox': 'تحقق من صندوق الوارد — أرسلنا لك رابط تأكيد.',
@@ -12707,6 +12716,7 @@ abstract final class AppStrings {
     'peer_save': 'Сохранить',
     'peer_unsave': 'Убрать из сохранённых',
     'coming_soon': 'Скоро',
+    'back_to_top': 'Наверх',
     'login_err_generic': 'Что-то пошло не так. Попробуй ещё раз чуть позже.',
     'friend_limit_week': 'Ты достиг недельного лимита новых знакомств. Оформи Pro, чтобы добавлять без ограничений.',
     'login_check_inbox':
@@ -13930,6 +13940,7 @@ abstract final class AppStrings {
     'peer_save': '收藏',
     'peer_unsave': '取消收藏',
     'coming_soon': '敬请期待',
+    'back_to_top': '回到顶部',
     'login_err_generic': '出了点问题，请稍后再试。',
     'friend_limit_week': '你已达到本周新增好友的上限。升级 Pro 即可不限数量添加。',
     'login_check_inbox': '请查收邮箱 — 我们已向你发送了一个确认链接。',
@@ -15157,6 +15168,7 @@ abstract final class AppStrings {
     'peer_save': '保存',
     'peer_unsave': '保存を解除',
     'coming_soon': '近日公開',
+    'back_to_top': '上に戻る',
     'login_err_generic': '問題が発生しました。しばらくしてからもう一度お試しください。',
     'friend_limit_week': '今週の新しいつながりの上限に達しました。Proにすると無制限に追加できます。',
     'login_check_inbox': '受信トレイを確認してください — 確認リンクを送信しました。',
@@ -16379,6 +16391,7 @@ abstract final class AppStrings {
     'peer_save': '저장',
     'peer_unsave': '저장 취소',
     'coming_soon': '곧 제공돼요',
+    'back_to_top': '맨 위로',
     'login_err_generic': '문제가 생겼어요. 잠시 후 다시 시도해 주세요.',
     'friend_limit_week': '이번 주 새 인연 추가 한도에 도달했어요. Pro로 업그레이드하면 제한 없이 추가할 수 있어요.',
     'login_check_inbox': '받은편지함을 확인하세요 — 확인 링크를 보내드렸어요.',

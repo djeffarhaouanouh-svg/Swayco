@@ -81,16 +81,41 @@ class _PeerProfileViewState extends State<PeerProfileView>
   /// Le geste en cours sur le contenu a-t-il commencé panneau non déployé ?
   bool _draggingContent = false;
 
+  /// Au bas de la page : le bouton « retour en haut » se montre.
+  final _showBackToTop = ValueNotifier<bool>(false);
+
   @override
   void initState() {
     super.initState();
     _top.addListener(_onTop);
+    _content.addListener(_onContentScroll);
+  }
+
+  void _onContentScroll() {
+    // Après l'image : une correction de défilement peut arriver en pleine mise
+    // en page.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_content.hasClients) return;
+      final position = _content.position;
+      _showBackToTop.value =
+          position.pixels > 120 && position.extentAfter < 240;
+    });
+  }
+
+  void _backToTop() {
+    HapticFeedback.selectionClick();
+    _content.animateTo(
+      0,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
   void dispose() {
     _top.dispose();
     _content.dispose();
+    _showBackToTop.dispose();
     super.dispose();
   }
 
@@ -402,6 +427,21 @@ class _PeerProfileViewState extends State<PeerProfileView>
             ),
             Positioned(top: safeTop + 6, left: 14, child: widget.back),
             Positioned(top: safeTop + 6, right: 14, child: widget.menu),
+            Positioned(
+              right: 14,
+              bottom: MediaQuery.paddingOf(context).bottom + 18,
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _showBackToTop,
+                builder: (context, show, _) => IgnorePointer(
+                  ignoring: !show,
+                  child: AnimatedOpacity(
+                    opacity: show ? 1 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: _BackToTop(onTap: _backToTop),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -460,6 +500,50 @@ class _PeerProfileViewState extends State<PeerProfileView>
             chip,
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Le petit rond à chevron des cartes, tourné vers le haut.
+class _BackToTop extends StatelessWidget {
+  const _BackToTop({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final light = SC.light;
+    return Semantics(
+      button: true,
+      label: AppStrings.t('back_to_top'),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            // Posé sur les photos : un fond assez plein pour rester lisible.
+            color: light ? const Color(0xE6F8F9FC) : const Color(0xCC202642),
+            border: Border.all(
+              color: light ? const Color(0x2404123A) : const Color(0x47FFFFFF),
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x40000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Icon(
+            Icons.keyboard_arrow_up_rounded,
+            size: 28,
+            color: _ink(0.85),
+          ),
+        ),
       ),
     );
   }
