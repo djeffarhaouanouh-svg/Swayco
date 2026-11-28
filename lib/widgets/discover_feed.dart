@@ -570,7 +570,9 @@ class _FeedCard extends StatelessWidget {
                         if (composer == null)
                           Row(
                             children: [
-                              Flexible(
+                              // « Message » prend toute la place, le cœur
+                              // reste tout à droite.
+                              Expanded(
                                 child: _MessageButton(onTap: onMessage),
                               ),
                               const SizedBox(width: 8),
@@ -780,7 +782,6 @@ class _MessageButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         height: 44,
-        constraints: const BoxConstraints(maxWidth: 122),
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           // En clair, un dégradé plus foncé : le cyan se fondait dans le fond.
