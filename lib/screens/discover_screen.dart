@@ -607,12 +607,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     await _refreshFriendships();
   }
 
-  void _openPhotos(({RemoteProfile profile, List<String> photos}) card) {
+  void _openPhotos(
+    ({RemoteProfile profile, List<String> photos}) card,
+    int index,
+  ) {
     FocusManager.instance.primaryFocus?.unfocus();
     showPhotoViewer(
       context,
       photos: card.photos,
-      index: 0,
+      index: index,
       viewerMode: true,
       footerProfile: card.profile,
     );

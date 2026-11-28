@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -56,7 +57,8 @@ class DiscoverFeed extends StatefulWidget {
   final Set<String> likedIds;
   final ValueChanged<RemoteProfile> onToggleLike;
   final ValueChanged<RemoteProfile> onOpenProfile;
-  final ValueChanged<FeedEntry> onOpenPhotos;
+  /// Toucher la photo : la visionneuse s'ouvre sur la photo affichée.
+  final void Function(FeedEntry entry, int index) onOpenPhotos;
 
   /// Puis-je écrire à cette personne ? (limite du jour des comptes gratuits)
   final Future<bool> Function(RemoteProfile) canWrite;
@@ -322,7 +324,8 @@ class _DiscoverFeedState extends State<DiscoverFeed> {
                           entry: entry,
                           liked: widget.likedIds.contains(p.id),
                           onOpenProfile: () => widget.onOpenProfile(p),
-                          onOpenPhotos: () => widget.onOpenPhotos(entry),
+                          onOpenPhotos: (index) =>
+                              widget.onOpenPhotos(entry, index),
                           onLike: () => widget.onToggleLike(p),
                           onMessage: () => _toggleComposer(p),
                           composer: writing
@@ -413,7 +416,7 @@ class _FeedCard extends StatelessWidget {
   final FeedEntry entry;
   final bool liked;
   final VoidCallback onOpenProfile;
-  final VoidCallback onOpenPhotos;
+  final ValueChanged<int> onOpenPhotos;
   final VoidCallback onLike;
   final VoidCallback onMessage;
 
@@ -591,19 +594,39 @@ class _FeedCard extends StatelessWidget {
   }
 }
 
-class _CardPhoto extends StatelessWidget {
+class _CardPhoto extends StatefulWidget {
   const _CardPhoto({required this.entry, required this.onTap});
 
   final FeedEntry entry;
-  final VoidCallback onTap;
+  final ValueChanged<int> onTap;
+
+  @override
+  State<_CardPhoto> createState() => _CardPhotoState();
+}
+
+class _CardPhotoState extends State<_CardPhoto> {
+  final _pages = PageController();
+  int _index = 0;
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final p = entry.profile;
-    final dots = entry.photos.length > 5 ? 5 : entry.photos.length;
+    final p = widget.entry.profile;
+    final photos = widget.entry.photos;
+    final dots = photos.length > 5 ? 5 : photos.length;
+    final index = _index.clamp(0, photos.length - 1);
+    // Au-delà de 5 photos, le point avance en proportion.
+    final active = photos.length <= 5
+        ? index
+        : (index * 4 / (photos.length - 1)).round();
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      onTap: () => widget.onTap(index),
       child: SizedBox(
         width: _kPhotoWidth,
         child: ClipRRect(
@@ -612,12 +635,27 @@ class _CardPhoto extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               const ColoredBox(color: Color(0xFF26304F)),
-              Image.network(
-                entry.photos.first,
-                fit: BoxFit.cover,
-                alignment: const Alignment(0, -0.4),
-                gaplessPlayback: true,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ScrollConfiguration(
+                // La souris aussi fait défiler (web).
+                behavior: ScrollConfiguration.of(context).copyWith(
+                  dragDevices: PointerDeviceKind.values.toSet(),
+                  scrollbars: false,
+                  overscroll: false,
+                ),
+                child: PageView.builder(
+                  controller: _pages,
+                  physics: const PageScrollPhysics(
+                      parent: ClampingScrollPhysics()),
+                  itemCount: photos.length,
+                  onPageChanged: (i) => setState(() => _index = i),
+                  itemBuilder: (context, i) => Image.network(
+                    photos[i],
+                    fit: BoxFit.cover,
+                    alignment: const Alignment(0, -0.4),
+                    gaplessPlayback: true,
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                  ),
+                ),
               ),
               Positioned(
                 top: 8,
@@ -649,12 +687,14 @@ class _CardPhoto extends StatelessWidget {
                 right: 0,
                 bottom: 0,
                 height: 44,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0x00000000), Color(0x66000000)],
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x00000000), Color(0x66000000)],
+                      ),
                     ),
                   ),
                 ),
@@ -665,16 +705,17 @@ class _CardPhoto extends StatelessWidget {
                   right: 0,
                   bottom: 10,
                   child: Row(
+                    key: ValueKey('dots-${p.id}-$active'),
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       for (var i = 0; i < dots; i++)
                         Container(
-                          width: i == 0 ? 16 : 4,
+                          width: i == active ? 16 : 4,
                           height: 4,
                           margin: const EdgeInsets.symmetric(horizontal: 2),
                           decoration: BoxDecoration(
                             color: Colors.white
-                                .withValues(alpha: i == 0 ? 1 : 0.55),
+                                .withValues(alpha: i == active ? 1 : 0.55),
                             borderRadius: BorderRadius.circular(99),
                           ),
                         ),
