@@ -332,7 +332,9 @@ class _ProfileScreenState extends State<ProfileScreen>
         props: {'source': 'profile', 'kind': res.matched ? 'match' : 'like'},
       );
       if (!mounted) return;
-      if (!res.matched) unawaited(NotifEnableFlow.askAfterFirstLike(context));
+      if (!res.matched && res.friendship != null) {
+        unawaited(NotifEnableFlow.askAfterFirstLike(context));
+      }
       if (res.matched) {
         setState(() {
           _matched = true;

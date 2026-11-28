@@ -756,7 +756,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         setState(() => _myFriendships = [..._myFriendships, f]);
       }
       // Premier like : « On te prévient dès qu'elle ou il te répond » (une fois).
-      if (!res.matched) unawaited(NotifEnableFlow.askAfterFirstLike(context));
+      if (!res.matched && f != null) {
+        unawaited(NotifEnableFlow.askAfterFirstLike(context));
+      }
       if (res.matched) {
         // Back on a match already celebrated (undo, then like again): no replay.
         if (!MatchCelebration.shown.contains(peer.id)) {

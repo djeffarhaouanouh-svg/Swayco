@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app_strings.dart';
 import 'attribution.dart';
 import 'demonyms.dart';
+import 'account_guard.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
 import 'supabase_service.dart';
@@ -193,6 +194,9 @@ abstract final class FriendshipApi {
     // references it (friendships_requester_fkey), and a boot-time sync
     // skipped on a flaky launch would otherwise crash with 23503.
     await ProfileApi.ensureMyProfileRow();
+    if (AccountGuard.isGone(meId)) {
+      return (friendship: null, matched: false, created: false);
+    }
 
     // 1. They already liked me → accepting their row IS the match.
     final reverse = await _c
@@ -253,6 +257,9 @@ abstract final class FriendshipApi {
       if (e.code != '23503') rethrow;
       ProfileApi.forgetEnsuredProfileRow();
       await ProfileApi.ensureMyProfileRow();
+      if (AccountGuard.isGone(meId)) {
+        return (friendship: null, matched: false, created: false);
+      }
       inserted = await insertPending();
     }
     // Fire-and-forget push: peer gets a "X veut te matcher" notif. Best

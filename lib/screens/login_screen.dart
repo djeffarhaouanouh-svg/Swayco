@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/account_guard.dart';
 import '../services/app_strings.dart';
 import '../services/swayco_sounds.dart';
 import '../services/auth_service.dart';
@@ -52,6 +53,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (widget.initialEmail.isNotEmpty) {
       _emailCtrl.text = widget.initialEmail;
       _mode = _Mode.signIn;
+    }
+    if (AccountGuard.takeNotice()) {
+      _error = AppStrings.t('login_account_gone');
     }
   }
   bool _busy = false;

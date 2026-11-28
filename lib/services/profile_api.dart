@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'account_guard.dart';
 import 'auth_service.dart';
 import 'continents.dart';
 import 'debug_overlay.dart';
@@ -583,7 +584,12 @@ abstract final class ProfileApi {
     );
     // Only latch success — a failed write (network blip) should retry on the
     // next action instead of staying silently un-healed for the session.
-    if (lastSync?.ok == true) _profileRowEnsured = true;
+    if (lastSync?.ok == true) {
+      _profileRowEnsured = true;
+    } else if ((lastSync?.error ?? '').contains('23503')) {
+      // La base refuse de recréer ma ligne : le compte n'existe peut-être plus.
+      await AccountGuard.signOutIfDeleted();
+    }
   }
 
   /// Envoie le selfie de vérification : dépôt dans le bucket PRIVÉ

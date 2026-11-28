@@ -1225,6 +1225,7 @@ abstract final class AppStrings {
     'login_err_weak_password': 'Mot de passe trop faible. Choisis-en un plus long ou plus varié.',
     'login_err_rate_limit': 'Trop de tentatives. Patiente quelques minutes puis réessaie.',
     'login_err_network': 'Pas de connexion. Vérifie ton réseau et réessaie.',
+    'login_account_gone': 'Ce compte n’existe plus. Crée un nouveau compte ou connecte-toi avec un autre.',
     'login_err_generic': 'Une erreur est survenue. Réessaie dans un instant.',
     'friend_limit_week': 'Tu as atteint ta limite de nouvelles personnes pour cette semaine. Passe à Pro pour en ajouter sans limite.',
     'login_check_inbox':
@@ -2493,6 +2494,7 @@ abstract final class AppStrings {
     'login_err_weak_password': 'Password too weak. Pick a longer or more varied one.',
     'login_err_rate_limit': 'Too many attempts. Wait a few minutes and try again.',
     'login_err_network': 'No connection. Check your network and try again.',
+    'login_account_gone': 'This account no longer exists. Create a new one or sign in with another.',
     'login_err_generic': 'Something went wrong. Please try again in a moment.',
     'friend_limit_week': 'You\'ve reached this week\'s limit for new connections. Go Pro to add more without limits.',
     'login_check_inbox': 'Check your inbox — we sent you a confirmation link.',
@@ -3813,6 +3815,7 @@ abstract final class AppStrings {
     'login_err_weak_password': 'Contraseña demasiado débil. Elige una más larga o variada.',
     'login_err_rate_limit': 'Demasiados intentos. Espera unos minutos y vuelve a intentarlo.',
     'login_err_network': 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
+    'login_account_gone': 'Esta cuenta ya no existe. Crea una nueva o inicia sesión con otra.',
     'login_err_generic': 'Algo salió mal. Inténtalo de nuevo en un momento.',
     'friend_limit_week': 'Has alcanzado el límite de nuevas conexiones de esta semana. Pásate a Pro para añadir más sin límite.',
     'login_check_inbox':
@@ -5073,6 +5076,7 @@ abstract final class AppStrings {
     'login_err_weak_password': 'Passwort zu schwach. Wähle ein längeres oder abwechslungsreicheres.',
     'login_err_rate_limit': 'Zu viele Versuche. Warte ein paar Minuten und versuche es erneut.',
     'login_err_network': 'Keine Verbindung. Prüfe dein Netzwerk und versuche es erneut.',
+    'login_account_gone': 'Dieses Konto gibt es nicht mehr. Erstelle ein neues oder melde dich mit einem anderen an.',
     'login_err_generic': 'Etwas ist schiefgelaufen. Versuche es gleich noch einmal.',
     'friend_limit_week': 'Du hast das Limit für neue Kontakte in dieser Woche erreicht. Mit Pro kannst du unbegrenzt weitere hinzufügen.',
     'login_check_inbox':
@@ -6338,6 +6342,7 @@ abstract final class AppStrings {
     'login_err_weak_password': 'Password troppo debole. Scegline una più lunga o varia.',
     'login_err_rate_limit': 'Troppi tentativi. Attendi qualche minuto e riprova.',
     'login_err_network': 'Nessuna connessione. Controlla la rete e riprova.',
+    'login_account_gone': 'Questo account non esiste più. Creane uno nuovo o accedi con un altro.',
     'login_err_generic': 'Qualcosa è andato storto. Riprova tra un attimo.',
     'friend_limit_week': 'Hai raggiunto il limite di nuove connessioni di questa settimana. Passa a Pro per aggiungerne senza limiti.',
     'login_check_inbox':
@@ -7603,6 +7608,7 @@ abstract final class AppStrings {
     'login_err_weak_password': 'Palavra-passe demasiado fraca. Escolhe uma mais longa ou variada.',
     'login_err_rate_limit': 'Demasiadas tentativas. Aguarda uns minutos e tenta de novo.',
     'login_err_network': 'Sem ligação. Verifica a tua rede e tenta de novo.',
+    'login_account_gone': 'Esta conta já não existe. Cria uma nova ou inicia sessão com outra.',
     'login_err_generic': 'Ocorreu um erro. Tenta de novo daqui a pouco.',
     'friend_limit_week': 'Atingiste o limite de novas ligações desta semana. Passa ao Pro para adicionar sem limites.',
     'login_check_inbox':
@@ -8826,6 +8832,7 @@ abstract final class AppStrings {
     'login_err_weak_password': 'Senha muito fraca. Escolha uma mais longa ou variada.',
     'login_err_rate_limit': 'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
     'login_err_network': 'Sem conexão. Verifique sua rede e tente de novo.',
+    'login_account_gone': 'Essa conta não existe mais. Crie uma nova ou entre com outra.',
     'login_err_generic': 'Algo deu errado. Tente de novo em instantes.',
     'friend_limit_week': 'Você atingiu o limite de novas conexões desta semana. Assine o Pro para adicionar sem limites.',
     'login_check_inbox': 'Verifique sua caixa de entrada — enviamos um link de confirmação para você.',
@@ -10085,6 +10092,7 @@ abstract final class AppStrings {
     'login_err_weak_password': 'Wachtwoord te zwak. Kies een langer of gevarieerder wachtwoord.',
     'login_err_rate_limit': 'Te veel pogingen. Wacht een paar minuten en probeer het opnieuw.',
     'login_err_network': 'Geen verbinding. Controleer je netwerk en probeer het opnieuw.',
+    'login_account_gone': 'Dit account bestaat niet meer. Maak een nieuw account aan of log in met een ander.',
     'login_err_generic': 'Er ging iets mis. Probeer het zo meteen opnieuw.',
     'friend_limit_week': 'Je hebt de limiet voor nieuwe contacten van deze week bereikt. Ga naar Pro om onbeperkt toe te voegen.',
     'login_check_inbox':
@@ -11335,6 +11343,7 @@ abstract final class AppStrings {
     'login_err_weak_password': 'كلمة المرور ضعيفة جدًا. اختر كلمة أطول أو أكثر تنوعًا.',
     'login_err_rate_limit': 'محاولات كثيرة جدًا. انتظر بضع دقائق ثم حاول مجددًا.',
     'login_err_network': 'لا يوجد اتصال. تحقق من الشبكة وحاول مجددًا.',
+    'login_account_gone': 'لم يعد هذا الحساب موجودًا. أنشئ حسابًا جديدًا أو سجّل الدخول بحساب آخر.',
     'login_err_generic': 'حدث خطأ ما. حاول مجددًا بعد قليل.',
     'friend_limit_week': 'وصلت إلى حد الأصدقاء الجدد لهذا الأسبوع. اشترك في Pro للإضافة دون حدود.',
     'login_check_inbox': 'تحقق من صندوق الوارد — أرسلنا لك رابط تأكيد.',
@@ -12597,6 +12606,7 @@ abstract final class AppStrings {
     'login_err_weak_password': 'Слишком слабый пароль. Выбери подлиннее или посложнее.',
     'login_err_rate_limit': 'Слишком много попыток. Подожди несколько минут и попробуй снова.',
     'login_err_network': 'Нет соединения. Проверь сеть и попробуй снова.',
+    'login_account_gone': 'Этого аккаунта больше нет. Создай новый или войди в другой.',
     'login_err_generic': 'Что-то пошло не так. Попробуй ещё раз чуть позже.',
     'friend_limit_week': 'Ты достиг недельного лимита новых знакомств. Оформи Pro, чтобы добавлять без ограничений.',
     'login_check_inbox':
@@ -13809,6 +13819,7 @@ abstract final class AppStrings {
     'login_err_weak_password': '密码太弱，请换一个更长或更复杂的密码。',
     'login_err_rate_limit': '尝试次数过多，请等几分钟后再试。',
     'login_err_network': '没有网络连接，请检查网络后重试。',
+    'login_account_gone': '该账号已不存在。请注册新账号或登录其他账号。',
     'login_err_generic': '出了点问题，请稍后再试。',
     'friend_limit_week': '你已达到本周新增好友的上限。升级 Pro 即可不限数量添加。',
     'login_check_inbox': '请查收邮箱 — 我们已向你发送了一个确认链接。',
@@ -15025,6 +15036,7 @@ abstract final class AppStrings {
     'login_err_weak_password': 'パスワードが弱すぎます。もっと長く、または複雑なものにしてください。',
     'login_err_rate_limit': '試行回数が多すぎます。数分待ってからもう一度お試しください。',
     'login_err_network': '接続できません。ネットワークを確認してもう一度お試しください。',
+    'login_account_gone': 'このアカウントは存在しません。新しく作成するか、別のアカウントでログインしてください。',
     'login_err_generic': '問題が発生しました。しばらくしてからもう一度お試しください。',
     'friend_limit_week': '今週の新しいつながりの上限に達しました。Proにすると無制限に追加できます。',
     'login_check_inbox': '受信トレイを確認してください — 確認リンクを送信しました。',
@@ -16236,6 +16248,7 @@ abstract final class AppStrings {
     'login_err_weak_password': '비밀번호가 너무 약해요. 더 길거나 다양한 문자를 써 주세요.',
     'login_err_rate_limit': '시도가 너무 많아요. 몇 분 뒤에 다시 시도해 주세요.',
     'login_err_network': '연결되지 않았어요. 네트워크를 확인하고 다시 시도해 주세요.',
+    'login_account_gone': '이 계정은 더 이상 존재하지 않아요. 새 계정을 만들거나 다른 계정으로 로그인하세요.',
     'login_err_generic': '문제가 생겼어요. 잠시 후 다시 시도해 주세요.',
     'friend_limit_week': '이번 주 새 인연 추가 한도에 도달했어요. Pro로 업그레이드하면 제한 없이 추가할 수 있어요.',
     'login_check_inbox': '받은편지함을 확인하세요 — 확인 링크를 보내드렸어요.',

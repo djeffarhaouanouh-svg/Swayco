@@ -39,6 +39,7 @@ import 'services/local_notifications.dart';
 import 'services/notif_enable_flow.dart';
 import 'services/notification_client.dart';
 import 'services/open_thread.dart';
+import 'services/account_guard.dart';
 import 'services/account_switcher.dart';
 import 'services/friend_request_unread.dart';
 import 'services/nav_tab.dart';
@@ -320,7 +321,8 @@ class LiveKitTranslateApp extends StatefulWidget {
   State<LiveKitTranslateApp> createState() => _LiveKitTranslateAppState();
 }
 
-class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
+class _LiveKitTranslateAppState extends State<LiveKitTranslateApp>
+    with WidgetsBindingObserver {
   static const _minSplash = Duration(seconds: 3);
 
   bool _loading = true;
@@ -361,6 +363,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future<void>.delayed(_minSplash, () {
       if (mounted) setState(() => _minSplashElapsed = true);
     });
@@ -404,7 +407,16 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Le compte a pu être supprimé pendant que l'app dormait.
+    if (state == AppLifecycleState.resumed && _authed && !_loading) {
+      unawaited(AccountGuard.checkOnResume());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authSub?.cancel();
     AccountSwitcher.changed.removeListener(_onAccountChanged);
     // Only dispose if we actually constructed it — accessing the field
@@ -500,6 +512,12 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         })().timeout(const Duration(seconds: 8), onTimeout: () {
           debugPrint('bootstrap: authed-state load timed out — entering app');
         });
+        // Compte supprimé, déconnecté à l'instant : écran de connexion.
+        if (!AuthService.isAuthenticated) {
+          authed = false;
+          needsOnboarding = false;
+          unawaited(UserPrefs.clearAccountIdentity());
+        }
       }
       debugPrint('bootstrap: done');
     } catch (e, s) {
@@ -557,6 +575,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       }
     }
     if (!mounted) return;
+    // Déconnecté en cours de route (compte qui n'existe plus).
+    if (!AuthService.isAuthenticated) {
+      _onSignedOut();
+      return;
+    }
     setState(() {
       _authed = true;
       _activeUid = AuthService.currentUserId;
@@ -596,6 +619,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   }
 
   void _onSignedOut() {
+    // Compte supprimé : on referme les pages ouvertes par-dessus, sinon l'écran
+    // de connexion reste caché derrière elles.
+    if (AccountGuard.hasNotice) {
+      rootNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+    }
     _activeUid = '';
     setState(() {
       _loading = false;
@@ -619,6 +647,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     if (!isSupabaseReady) return false;
     try {
       final remote = await ProfileApi.fetchById(uid);
+      // Pas de ligne : nouveau compte… ou compte supprimé.
+      if (remote == null && await AccountGuard.signOutIfDeleted()) {
+        return false;
+      }
       return remote == null || remote.displayName.trim().isEmpty;
     } catch (_) {
       // On network failure, don't trap a returning user in onboarding —

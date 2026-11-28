@@ -393,7 +393,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
-      _toast('$e');
+      _toast(friendlyError(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
