@@ -102,12 +102,19 @@ class SettingsHeroButton extends StatefulWidget {
 
 class _SettingsHeroButtonState extends State<SettingsHeroButton>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: _kSlide);
+  // Créé à l'ouverture : créé à la demande, il naissait dans dispose() quand le
+  // bouton n'avait jamais été touché.
+  late final AnimationController _c;
   bool _busy = false;
 
   /// Vrai pendant que c'est le rond de l'overlay qu'on voit.
   bool _hidden = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: _kSlide);
+  }
 
   @override
   void dispose() {
@@ -271,10 +278,15 @@ class SettingsBackButton extends StatefulWidget {
 
 class _SettingsBackButtonState extends State<SettingsBackButton>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: _kSlide);
+  late final AnimationController _c;
   bool _busy = false;
   bool _hidden = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: _kSlide);
+  }
 
   @override
   void dispose() {
