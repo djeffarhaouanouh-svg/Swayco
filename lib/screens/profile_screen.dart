@@ -1344,15 +1344,14 @@ class _ProfileScreenState extends State<ProfileScreen>
             _PersonalInfoSection(
               profile: remote,
               onSave: _savePersonalInfo,
+              // Les centres d'intérêt restent DANS la carte.
+              bottom: _InterestsSection(
+                interests: remote?.interests ?? const [],
+                onSave: _saveInterests,
+                country: remote?.country ?? '',
+              ),
             ),
             top: 12,
-          ),
-          section(
-            _InterestsSection(
-              interests: remote?.interests ?? const [],
-              onSave: _saveInterests,
-              country: remote?.country ?? '',
-            ),
           ),
           section(_ProfileSectionHeader(AppStrings.t('contact_title'))),
           section(const _ContactCard(), top: 12),
@@ -2516,7 +2515,11 @@ class _PersonalInfoSection extends StatelessWidget {
   const _PersonalInfoSection({
     required this.profile,
     required this.onSave,
+    this.bottom,
   });
+
+  /// Rendu en bas de la carte : les centres d'intérêt.
+  final Widget? bottom;
 
   final RemoteProfile? profile;
   final Future<void> Function({
@@ -2652,6 +2655,7 @@ class _PersonalInfoSection extends StatelessWidget {
             onPersona: pickPersona,
             onMother: pickMother,
             onFather: pickFather,
+            interestsBody: bottom,
           ),
         ],
       ),
@@ -2910,8 +2914,16 @@ class _InterestsSectionState extends State<_InterestsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
-        const SizedBox(height: 12),
+        // Le libellé de la case, comme les autres lignes d'infos.
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(
+            '$kFactEmojiInterests ${AppStrings.t('profile_interests_section').toUpperCase()}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: bentoLabelStyle(),
+          ),
+        ),
         // Les chips choisis + le chip "Ajouter". N'importe lequel ouvre la
         // feuille de sÃ©lection, qui se pose PAR-DESSUS la page.
         Wrap(
