@@ -12,7 +12,6 @@ import '../services/profile_api.dart';
 import '../theme/swayco_theme.dart';
 import 'interest_chip.dart';
 import 'popup_kit.dart' show popupDisplay;
-import 'round_flag.dart';
 import 'translated_profile_text.dart';
 import 'voice_intro_player.dart';
 import 'voice_intro_translation.dart';
@@ -437,8 +436,6 @@ class _PeerProfileViewState extends State<PeerProfileView>
                 url: widget.avatarUrl,
                 diameter: photo,
                 border: 3 - eb,
-                country: widget.profile?.country ?? '',
-                language: widget.profile?.language ?? '',
                 badge: widget.badge,
                 badgeOpacity: _unit(1 - eb / 0.3),
               ),
@@ -645,8 +642,6 @@ class _Avatar extends StatelessWidget {
     required this.url,
     required this.diameter,
     required this.border,
-    required this.country,
-    required this.language,
     required this.badge,
     required this.badgeOpacity,
   });
@@ -654,8 +649,6 @@ class _Avatar extends StatelessWidget {
   final String url;
   final double diameter;
   final double border;
-  final String country;
-  final String language;
   final Widget? badge;
   final double badgeOpacity;
 
@@ -694,16 +687,6 @@ class _Avatar extends StatelessWidget {
                           color: Colors.white54),
                     ),
             ),
-          ),
-        ),
-        Positioned(
-          right: 0,
-          bottom: 0,
-          child: RoundFlag(
-            country: country,
-            language: language,
-            size: diameter * 0.31,
-            ring: true,
           ),
         ),
         if (badge != null && badgeOpacity > 0)
