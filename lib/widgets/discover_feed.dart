@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
@@ -22,9 +23,12 @@ const Color _kHeart = Color(0xFFFF3B5C);
 const Color _kBlue = Color(0xFF1F5EFF);
 const Color _kCyan = Color(0xFF18DDEA);
 
-/// Hauteur de la photo, et donc du corps de la carte.
-const double _kPhotoHeight = 198;
-const double _kPhotoWidth = 124;
+/// La photo de la carte (« photo centrée ») : 160 × 244 sur un écran de 390. Sur
+/// un écran plus étroit elle rétrécit, pour laisser sa place à la colonne.
+const double _kPhotoWidth = 160;
+const double _kPhotoHeight = 244;
+const double _kPhotoShare = 0.476;
+const double _kMinCardHeight = 198;
 
 /// Hauteur donnée à une carte publicitaire dans le fil.
 const double _kAdHeight = 400;
@@ -464,126 +468,140 @@ class _FeedCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              height: _kPhotoHeight,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _CardPhoto(entry: entry, onTap: onOpenPhotos),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+            LayoutBuilder(
+              builder: (context, box) {
+                final photoWidth =
+                    math.min(_kPhotoWidth, box.maxWidth * _kPhotoShare);
+                final height = math.max(
+                  _kMinCardHeight,
+                  photoWidth * _kPhotoHeight / _kPhotoWidth,
+                );
+                return SizedBox(
+                  height: height,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _CardPhoto(
+                            entry: entry,
+                            width: photoWidth,
+                            onTap: onOpenPhotos,
+                          ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Row(
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: _ink(1),
+                                            fontSize: 19,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: -0.4,
+                                          ),
+                                        ),
+                                      ),
+                                      if (p.isVerified) ...[
+                                        const SizedBox(width: 6),
+                                        const Icon(Icons.verified_rounded,
+                                            size: 17, color: _kBlue),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _ink(light ? 0.07 : 0.12),
+                                  ),
+                                  child: Icon(Icons.chevron_right_rounded,
+                                      size: 20, color: _ink(0.7)),
+                                ),
+                              ],
+                            ),
+                            if (country.isNotEmpty) ...[
+                              const SizedBox(height: 5),
+                              Row(
                                 children: [
+                                  RoundFlag(
+                                      country: country, language: p.language),
+                                  const SizedBox(width: 7),
                                   Flexible(
                                     child: Text(
-                                      title,
+                                      country,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        color: _ink(1),
-                                        fontSize: 19,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: -0.4,
+                                        color: _ink(0.72),
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
-                                  if (p.isVerified) ...[
-                                    const SizedBox(width: 6),
-                                    const Icon(Icons.verified_rounded,
-                                        size: 17, color: _kBlue),
-                                  ],
                                 ],
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              width: 26,
-                              height: 26,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _ink(light ? 0.07 : 0.12),
-                              ),
-                              child: Icon(Icons.chevron_right_rounded,
-                                  size: 20, color: _ink(0.7)),
-                            ),
-                          ],
-                        ),
-                        if (country.isNotEmpty) ...[
-                          const SizedBox(height: 5),
-                          Row(
-                            children: [
-                              RoundFlag(
-                                  country: country, language: p.language),
-                              const SizedBox(width: 7),
-                              Flexible(
-                                child: Text(
-                                  country,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: _ink(0.72),
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                            ],
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: ClipRect(
+                                  child: bio.isEmpty
+                                      ? Text(
+                                          AppStrings.t('peer_bio_empty'),
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: _ink(0.45),
+                                            fontSize: 12.5,
+                                            height: 1.4,
+                                          ),
+                                        )
+                                      : TranslatedProfileText(
+                                          text: bio,
+                                          profileId: p.id,
+                                          field: 'bio',
+                                          fromLang: p.language,
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: _ink(0.72),
+                                            fontSize: 12.5,
+                                            height: 1.4,
+                                          ),
+                                        ),
                                 ),
                               ),
-                            ],
-                          ),
-                        ],
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: ClipRect(
-                              child: bio.isEmpty
-                                  ? Text(
-                                      AppStrings.t('peer_bio_empty'),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: _ink(0.45),
-                                        fontSize: 12.5,
-                                        height: 1.4,
-                                      ),
-                                    )
-                                  : TranslatedProfileText(
-                                      text: bio,
-                                      profileId: p.id,
-                                      field: 'bio',
-                                      fromLang: p.language,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: _ink(0.72),
-                                        fontSize: 12.5,
-                                        height: 1.4,
-                                      ),
-                                    ),
                             ),
-                          ),
-                        ),
-                        if (composer == null)
-                          Row(
-                            children: [
-                              // « Message » prend toute la place, le cœur
-                              // reste tout à droite.
-                              Expanded(
-                                child: _MessageButton(onTap: onMessage),
+                            if (composer == null)
+                              Row(
+                                children: [
+                                  // « Message » prend toute la place, le cœur
+                                  // reste tout à droite.
+                                  Expanded(
+                                    child: _MessageButton(onTap: onMessage),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _HeartButton(liked: liked, onTap: onLike),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              _HeartButton(liked: liked, onTap: onLike),
-                            ],
-                          ),
-                      ],
-                    ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
             if (composer != null) ...[
               const SizedBox(height: 12),
@@ -597,8 +615,13 @@ class _FeedCard extends StatelessWidget {
 }
 
 class _CardPhoto extends StatefulWidget {
-  const _CardPhoto({required this.entry, required this.onTap});
+  const _CardPhoto({
+    required this.entry,
+    required this.width,
+    required this.onTap,
+  });
 
+  final double width;
   final FeedEntry entry;
   final ValueChanged<int> onTap;
 
@@ -630,7 +653,7 @@ class _CardPhotoState extends State<_CardPhoto> {
       behavior: HitTestBehavior.opaque,
       onTap: () => widget.onTap(index),
       child: SizedBox(
-        width: _kPhotoWidth,
+        width: widget.width,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
           child: Stack(
@@ -653,7 +676,8 @@ class _CardPhotoState extends State<_CardPhoto> {
                   itemBuilder: (context, i) => Image.network(
                     photos[i],
                     fit: BoxFit.cover,
-                    alignment: const Alignment(0, -0.4),
+                    // Cadrée sur le visage.
+                    alignment: const Alignment(0, -0.3),
                     gaplessPlayback: true,
                     errorBuilder: (_, _, _) => const SizedBox.shrink(),
                   ),
