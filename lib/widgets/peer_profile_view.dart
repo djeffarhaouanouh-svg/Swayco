@@ -1,5 +1,6 @@
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/gestures.dart' show VelocityTracker;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
@@ -30,8 +31,8 @@ double _unit(double x) => x.clamp(0.0, 1.0).toDouble();
 /// x²(3 − 2x)
 double _smooth(double x) => x * x * (3 - 2 * x);
 
-/// Le profil de quelqu'un d'autre : sa photo en plein fond, et un panneau qu'on
-/// tire vers le haut. Deux positions (milieu, plein écran) ; la photo de profil
+/// Le profil de quelqu'un d'autre : sa photo en plein fond, et un panneau
+/// ouvert en haut qu'on peut tirer vers le bas. Deux positions (haute, basse) ; la photo de profil
 /// rétrécit en montant, le fond se floute et la barre du haut apparaît.
 class PeerProfileView extends StatefulWidget {
   const PeerProfileView({
@@ -81,6 +82,10 @@ class _PeerProfileViewState extends State<PeerProfileView>
   /// Le geste en cours sur le contenu a-t-il commencé panneau non déployé ?
   bool _draggingContent = false;
 
+  /// Panneau déployé, contenu tout en haut : le doigt qui descend l'emmène.
+  bool _pulling = false;
+  VelocityTracker? _pullSpeed;
+
   /// Au bas de la page : le bouton « retour en haut » se montre.
   final _showBackToTop = ValueNotifier<bool>(false);
 
@@ -129,26 +134,37 @@ class _PeerProfileViewState extends State<PeerProfileView>
   void _layout(double height, double safeTop) {
     final full = safeTop + 124;
     final lowest = safeTop + 250;
-    var mid = height * 380 / 844;
+    var mid = height * 470 / 844;
     if (mid < lowest) mid = lowest;
     if (full == _full && mid == _mid) return;
-    final wasFull = _top.value >= 0 && _expanded;
+    // À l'ouverture le panneau est en haut.
+    final wasFull = _top.value < 0 || _expanded;
     _full = full;
     _mid = mid;
     // Posé avant la position : l'écouteur n'a alors rien à reconstruire.
     _expanded = wasFull;
-    // Première mise en page : le panneau s'ouvre au milieu. Ensuite (rotation,
-    // fenêtre redimensionnée) il garde sa position.
+    // Ensuite (rotation, fenêtre redimensionnée) il garde sa position.
     _top.value = wasFull ? full : mid;
   }
 
-  void _drag(DragUpdateDetails d) {
+  void _drag(DragUpdateDetails d) => _move(d.delta.dy);
+
+  void _move(double dy) {
     _top.stop();
-    _top.value = (_top.value + d.delta.dy).clamp(_full - 12, _mid + 24);
+    _top.value = (_top.value + dy).clamp(_full - 12, _mid + 24);
   }
 
-  void _release(DragEndDetails d) {
-    final velocity = d.velocity.pixelsPerSecond.dy;
+  void _release(DragEndDetails d) => _settle(d.velocity.pixelsPerSecond.dy);
+
+  void _endPull() {
+    if (_pulling) {
+      _pulling = false;
+      _settle(_pullSpeed?.getVelocity().pixelsPerSecond.dy ?? 0);
+    }
+    _pullSpeed = null;
+  }
+
+  void _settle(double velocity) {
     final projected = _top.value + velocity * 0.15;
     final target = (projected - _full).abs() < (projected - _mid).abs()
         ? _full
@@ -449,24 +465,42 @@ class _PeerProfileViewState extends State<PeerProfileView>
   }
 
   Widget _panelBody(double safeBottom) {
-    // Non déployé : tirer le contenu tire le panneau. Déployé : il défile.
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onVerticalDragStart: (_) => _draggingContent = !_expanded,
-      onVerticalDragUpdate: (d) {
-        if (_draggingContent) _drag(d);
+    // Non déployé : tirer le contenu tire le panneau. Déployé : il défile, et
+    // une fois tout en haut, tirer encore vers le bas redescend le panneau.
+    return Listener(
+      onPointerDown: (e) => _pullSpeed = VelocityTracker.withKind(e.kind),
+      onPointerMove: (e) {
+        _pullSpeed?.addPosition(e.timeStamp, e.position);
+        if (_draggingContent) return;
+        if (!_pulling) {
+          final atTop = !_content.hasClients || _content.offset <= 0;
+          final down = e.delta.dy > 0 && e.delta.dy > e.delta.dx.abs();
+          if (!down || !atTop || !_expanded) return;
+          _pulling = true;
+        }
+        _move(e.delta.dy);
       },
-      onVerticalDragEnd: (d) {
-        if (_draggingContent) _release(d);
-        _draggingContent = false;
-      },
-      child: ListView(
-        controller: _content,
-        physics: _expanded
-            ? const ClampingScrollPhysics()
-            : const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.only(bottom: 40 + safeBottom),
-        children: widget.children,
+      onPointerUp: (_) => _endPull(),
+      onPointerCancel: (_) => _endPull(),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onVerticalDragStart: (_) =>
+            _draggingContent = !_expanded && !_pulling,
+        onVerticalDragUpdate: (d) {
+          if (_draggingContent) _drag(d);
+        },
+        onVerticalDragEnd: (d) {
+          if (_draggingContent) _release(d);
+          _draggingContent = false;
+        },
+        child: ListView(
+          controller: _content,
+          physics: _expanded
+              ? const ClampingScrollPhysics()
+              : const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.only(bottom: 40 + safeBottom),
+          children: widget.children,
+        ),
       ),
     );
   }
