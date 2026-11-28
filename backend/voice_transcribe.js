@@ -40,7 +40,7 @@ function ownFolderPrefix(supabaseUrl, uid) {
  * `/storage/v1/object/public/voice-messages/<uid>/…`. Un hôte quelconque, un
  * autre bucket ou le dossier de quelqu'un d'autre restent refusés.
  */
-function isOwnVoiceUrl(url, supabaseUrl, uid) {
+function isOwnVoiceUrl(url, supabaseUrl, uid, bucket = 'voice-messages') {
   let u;
   try {
     u = new URL(String(url || ''));
@@ -55,7 +55,7 @@ function isOwnVoiceUrl(url, supabaseUrl, uid) {
   const host = u.host.toLowerCase();
   const hostOk = (configured && host === configured) || host.endsWith('.supabase.co');
   if (!hostOk) return false;
-  return u.pathname.startsWith(`/storage/v1/object/public/voice-messages/${uid}/`);
+  return u.pathname.startsWith(`/storage/v1/object/public/${bucket}/${uid}/`);
 }
 
 /**
@@ -262,6 +262,83 @@ async function transcribeVoiceMessage({
   return { status: 200, body: { ok: true } };
 }
 
+// ── Présentation vocale du profil ────────────────────────────────
+/**
+ * Transcrit MA présentation vocale (profiles.voice_intro_url, bucket
+ * `voice-intros`, mon dossier) et écrit le texte dans
+ * `profiles.voice_intro_transcript`, pour la traduction affichée sous l'audio.
+ * `uid` vient du JWT vérifié, l'adresse est lue en base.
+ *
+ * @returns {Promise<{status:number, body:object}>}
+ */
+async function transcribeVoiceIntro({
+  sb,
+  uid,
+  supabaseUrl,
+  openaiKey,
+  model = 'whisper-1',
+  grokKey = '',
+  grokBase = 'https://api.x.ai/v1',
+  provider = '',
+  fetchImpl = fetch,
+}) {
+  if (!sb || !(openaiKey || grokKey)) {
+    return { status: 503, body: { error: 'transcription_not_configured' } };
+  }
+  const { data: prof, error } = await sb
+    .from('profiles')
+    .select('voice_intro_url, language')
+    .eq('id', uid)
+    .maybeSingle();
+  if (error) return { status: 502, body: { error: 'lookup_failed' } };
+  const url = String((prof && prof.voice_intro_url) || '');
+  if (!url) return { status: 404, body: { error: 'not_found' } };
+  if (!isOwnVoiceUrl(url, supabaseUrl, uid, 'voice-intros')) {
+    return { status: 400, body: { error: 'not_a_voice_intro' } };
+  }
+  const lang = primaryTag(prof.language);
+
+  let audio;
+  try {
+    const r = await fetchImpl(url);
+    if (!r.ok) return { status: 502, body: { error: 'audio_unreachable' } };
+    audio = Buffer.from(await r.arrayBuffer());
+  } catch (_) {
+    return { status: 502, body: { error: 'audio_unreachable' } };
+  }
+  if (audio.length === 0 || audio.length > MAX_BYTES) {
+    return { status: 400, body: { error: 'audio_size' } };
+  }
+  const ext = (/\.(m4a|webm|ogg|mp3|wav)$/i.exec(url) || [, 'm4a'])[1].toLowerCase();
+  const mime = { m4a: 'audio/mp4', webm: 'audio/webm', ogg: 'audio/ogg', mp3: 'audio/mpeg', wav: 'audio/wav' }[ext];
+
+  let text = '';
+  let failure = 'stt_error';
+  for (const p of sttOrder({ provider, openaiKey, grokKey })) {
+    const res = await runStt({
+      p, audio, ext, mime, lang, openaiKey, model, grokKey, grokBase, fetchImpl,
+    });
+    if (res.ok) {
+      text = res.text;
+      failure = '';
+      break;
+    }
+    failure = res.error;
+  }
+  if (failure) return { status: 502, body: { error: failure } };
+  if (isWhisperGhost(text)) return { status: 200, body: { ok: true, empty: true } };
+
+  // Seulement si c'est toujours le même enregistrement.
+  const { error: upErr } = await sb
+    .from('profiles')
+    .update({ voice_intro_transcript: text, voice_intro_lang: validTag(lang) ? lang : '' })
+    .eq('id', uid)
+    .eq('voice_intro_url', url);
+  if (upErr) return { status: 502, body: { error: 'update_failed' } };
+  console.log(`[voice] intro transcribed lang=${lang || '?'} chars=${text.length}`);
+  return { status: 200, body: { ok: true } };
+}
+
 // ── Transcription automatique ───────────────────────────────────────────────
 // Chaque vocal est transcrit PAR LE SERVEUR, sans dépendre de l'app de
 // l'expéditeur (fermée, hors ligne, ou un compte IA : personne n'appellerait la
@@ -373,6 +450,7 @@ function startVoiceTranscriber({ supabase, supabaseUrl, openaiKey, model, grokKe
 module.exports = {
   isWhisperGhost,
   transcribeVoiceMessage,
+  transcribeVoiceIntro,
   ownFolderPrefix,
   createVoiceTranscriber,
   startVoiceTranscriber,

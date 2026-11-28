@@ -14,6 +14,8 @@ import 'interest_chip.dart';
 import 'popup_kit.dart' show popupDisplay;
 import 'round_flag.dart';
 import 'translated_profile_text.dart';
+import 'voice_intro_player.dart';
+import 'voice_intro_translation.dart';
 
 const Color _kInk = Color(0xFF04123A);
 const Color _kYellow = Color(0xFFF4FF1F);
@@ -132,7 +134,7 @@ class _PeerProfileViewState extends State<PeerProfileView>
   }
 
   void _layout(double height, double safeTop) {
-    final full = safeTop + 124;
+    final full = safeTop + 142;
     final lowest = safeTop + 250;
     var mid = height * 470 / 844;
     if (mid < lowest) mid = lowest;
@@ -908,8 +910,8 @@ class _RoundAction extends StatelessWidget {
 // La bio
 // ════════════════════════════════════════════════════════════════════════════
 
-/// Carte « BIO » : le texte, la présentation vocale (pas encore disponible) et
-/// les centres d'intérêt.
+/// Carte « BIO » : la présentation vocale ou le texte, puis les centres
+/// d'intérêt.
 class PeerBioCard extends StatelessWidget {
   const PeerBioCard({super.key, required this.profile});
 
@@ -959,7 +961,15 @@ class PeerBioCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          if (bio.isEmpty)
+          // L'audio, s'il existe ; sinon le texte.
+          if (profile.hasVoiceIntro) ...[
+            VoiceIntroPlayer(
+              url: profile.voiceIntroUrl,
+              durationMs: profile.voiceIntroDurationMs,
+            ),
+            if (profile.voiceIntroTranscript.trim().isNotEmpty)
+              VoiceIntroTranslation(profile: profile),
+          ] else if (bio.isEmpty)
             Text(
               AppStrings.t('peer_bio_empty'),
               style: TextStyle(color: _ink(0.5), fontSize: 14, height: 1.4),
@@ -975,8 +985,6 @@ class PeerBioCard extends StatelessWidget {
               textAlign: TextAlign.start,
               style: TextStyle(color: _ink(1), fontSize: 15, height: 1.4),
             ),
-          const SizedBox(height: 12),
-          const _VoicePlaceholder(),
           if (profile.interests.isNotEmpty) ...[
             const SizedBox(height: 14),
             Wrap(
@@ -1012,87 +1020,6 @@ class PeerBioCard extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-/// Le lecteur de présentation vocale, en attente de la fonction : il dit
-/// « bientôt disponible » quand on le touche.
-class _VoicePlaceholder extends StatelessWidget {
-  const _VoicePlaceholder();
-
-  static const _bars = <double>[
-    8, 14, 10, 20, 13, 24, 16, 10, 18, 26, 14, 9, 17, 22, 12, 8, 14, 10, 18, 12,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final light = SC.light;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(
-          SnackBar(content: Text(AppStrings.t('coming_soon'))),
-        );
-      },
-      child: Container(
-        height: 52,
-        padding: const EdgeInsets.fromLTRB(7, 0, 18, 0),
-        decoration: BoxDecoration(
-          color: light ? const Color(0x0D04123A) : const Color(0x80060812),
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(
-            color: light ? const Color(0x1A04123A) : const Color(0x24FFFFFF),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: light ? _kInk : Colors.white,
-              ),
-              child: Icon(
-                Icons.play_arrow_rounded,
-                size: 24,
-                color: light ? Colors.white : _kInk,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  for (final h in _bars)
-                    Container(
-                      width: 3,
-                      height: h,
-                      decoration: BoxDecoration(
-                        color: light
-                            ? const Color(0x3304123A)
-                            : const Color(0x59FFFFFF),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              '--:--',
-              style: GoogleFonts.ibmPlexMono(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: _ink(0.7),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -14,6 +14,8 @@ import 'package:image_picker/image_picker.dart';
 import '../services/analytics.dart';
 
 import '../services/app_strings.dart';
+import '../widgets/my_bio_card.dart';
+import '../widgets/voice_intro_player.dart';
 import '../services/saved_profiles_api.dart';
 import '../widgets/peer_profile_view.dart';
 import '../widgets/round_flag.dart';
@@ -398,6 +400,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _openChatWithPeer() async {
+    VoiceIntroPlayer.stopActive();
     if (_deviceId.isEmpty || _targetId.isEmpty) return;
     final ids = [_deviceId, _targetId]..sort();
     final convId = 'dm-${ids[0]}-${ids[1]}';
@@ -1326,6 +1329,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onEditInterests: _saveInterests,
                             personalInfo: _remote,
                             onSavePersonalInfo: _savePersonalInfo,
+                            onVoiceChanged: () => _reload(silent: true),
                             onPickPhoto: _pickAndAddPhoto,
                             onPickAvatar: _pickAndSetAvatar,
                             onRemovePhoto: _removePhoto,
@@ -1493,6 +1497,7 @@ class _IdentitySection extends StatelessWidget {
     this.onEditInterests,
     this.personalInfo,
     this.onSavePersonalInfo,
+    this.onVoiceChanged,
     required this.onPickPhoto,
     required this.onRemovePhoto,
     required this.onEdit,
@@ -1553,6 +1558,7 @@ class _IdentitySection extends StatelessWidget {
   /// Persist the edited display name (own profile, inline).
   final Future<void> Function(String) onEditName;
   final Future<void> Function(String) onEditBio;
+  final Future<void> Function()? onVoiceChanged;
 
   /// Persist the edited interests list. Null in viewer mode (read-only).
   final Future<void> Function(List<String>)? onEditInterests;
@@ -1641,7 +1647,6 @@ class _IdentitySection extends StatelessWidget {
 
   // Pulled from AppStrings so it follows the user's chosen interface
   // language (fr / en / es supplied; others fall back to en).
-  static String get _bioPlaceholder => AppStrings.t('profile_bio_placeholder');
 
   /// Opens the "Centres d'intÃ©rÃªt" picker (a styled bottom sheet of coloured
   /// category groups) and persists the new selection.
@@ -1940,7 +1945,6 @@ class _IdentitySection extends StatelessWidget {
           child: _ProfileSectionHeader(
             AppStrings.t('profile_photos_section'),
             suffix: photosCount,
-            trailing: const _RewardHint(points: 40),
           ),
         ),
         const SizedBox(height: 12),
@@ -1965,32 +1969,38 @@ class _IdentitySection extends StatelessWidget {
             ),
           ),
         ),
-        // « Mes infos » : un seul panneau — bio, faits perso, puis les centres
+        // « Bio » : un texte court ou une présentation vocale.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
+          child: _ProfileSectionHeader(AppStrings.t('profile_bio_section')),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+          child: MyBioCard(
+            profile: personalInfo,
+            onSaveText: onEditBio,
+            onVoiceChanged: onVoiceChanged ?? () async {},
+            confirm: (title, body, action) async =>
+                await showSwaycoConfirm(
+                  context: context,
+                  title: title,
+                  body: body,
+                  confirmLabel: action,
+                ) ==
+                true,
+          ),
+        ),
+        // « Mes infos » : un seul panneau — faits perso, puis les centres
         // d'intérêt.
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
-          child: _ProfileSectionHeader(
-            AppStrings.t('info_section_title'),
-            trailing: const _RewardHint(),
-          ),
+          child: _ProfileSectionHeader(AppStrings.t('info_section_title')),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
           child: _PersonalInfoSection(
             profile: personalInfo,
             onSave: onSavePersonalInfo,
-            top: _InlineEditable(
-              value: bio,
-              placeholder: _bioPlaceholder,
-              onSave: onEditBio,
-              maxLength: profileBioMaxLength,
-              maxLines: 3,
-              style: TextStyle(
-                color: SC.textPrimary,
-                fontSize: 15,
-                height: 1.4,
-              ),
-            ),
             bottom: _InterestsSection(
               interests: interests,
               onSave: onEditInterests,
@@ -2598,14 +2608,11 @@ class _ContactCard extends StatelessWidget {
 }
 
 class _ProfileSectionHeader extends StatelessWidget {
-  const _ProfileSectionHeader(this.title, {this.trailing, this.suffix = ''});
+  const _ProfileSectionHeader(this.title, {this.suffix = ''});
   final String title;
 
   /// Le « (n) » après le titre, en blanc 55 %.
   final String suffix;
-
-  /// Optional widget pinned to the right of the title (la pastille « +40 pts »).
-  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -2634,7 +2641,6 @@ class _ProfileSectionHeader extends StatelessWidget {
             ),
           ),
         ),
-        if (trailing != null) ...[const SizedBox(width: 8), trailing!],
       ],
     );
   }
@@ -2674,55 +2680,6 @@ class _EmptyPhotosPlaceholder extends StatelessWidget {
   }
 }
 
-/// Small cyan reward hint shown on the right of a section header to
-/// nudge the user to complete it.
-class _RewardHint extends StatelessWidget {
-  const _RewardHint({this.points = 20});
-  final int points;
-  @override
-  Widget build(BuildContext context) {
-    // Sombre : pastille en verre, comme les ronds du haut. Clair : le jaune ne
-    // se lit que EN FOND, avec du texte encre → pastille jaune pleine.
-    final label = Text(
-      '+$points pts',
-      maxLines: 1,
-      softWrap: false,
-      style: TextStyle(
-        color: SC.light ? SC.onAccent : Colors.white,
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
-      ),
-    );
-    if (SC.light) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: SC.accent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: label,
-      );
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: SC.fill.withValues(alpha: 0.13), boxShadow: SC.lift,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: SC.stroke.withValues(alpha: 0.3),
-              width: 1.2,
-            ),
-          ),
-          child: label,
-        ),
-      ),
-    );
-  }
-}
 /// Full-screen overlay for profile photos. Swipe or use the side arrows to
 /// move between several photos; pinch to zoom; the â in the photo's top-right
 /// corner (or a tap on the backdrop) dismisses. Plus rien d'autre : la carte
@@ -3340,7 +3297,6 @@ class _PersonalInfoSection extends StatelessWidget {
   const _PersonalInfoSection({
     required this.profile,
     required this.onSave,
-    this.top,
     this.bottom,
   });
 
@@ -3355,9 +3311,6 @@ class _PersonalInfoSection extends StatelessWidget {
     Object? originMother,
     Object? originFather,
   })? onSave;
-
-  /// Rendu EN HAUT du panneau, au-dessus des lignes d'infos (la bio).
-  final Widget? top;
 
   /// Rendu EN BAS du panneau, sous les lignes d'infos (les centres d'intÃ©rÃªt).
   final Widget? bottom;
@@ -3473,7 +3426,6 @@ class _PersonalInfoSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (top != null) ...[top!, const SizedBox(height: 12)],
           ProfileInfoCard(
             profile: p,
             showHeader: false,
@@ -3499,7 +3451,6 @@ class _InlineEditable extends StatefulWidget {
     required this.onSave,
     required this.maxLength,
     required this.style,
-    this.maxLines = 1,
   });
   final String value;
   final String placeholder;
@@ -3509,7 +3460,6 @@ class _InlineEditable extends StatefulWidget {
   /// Text style used both for the display text and the field â so editing
   /// looks like the static text it replaces.
   final TextStyle style;
-  final int maxLines;
 
   @override
   State<_InlineEditable> createState() => _InlineEditableState();
@@ -3559,7 +3509,7 @@ class _InlineEditableState extends State<_InlineEditable> {
           child: Text(
             empty ? widget.placeholder : widget.value,
             textAlign: TextAlign.center,
-            maxLines: widget.maxLines,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: empty
                 ? widget.style.copyWith(
@@ -3577,8 +3527,7 @@ class _InlineEditableState extends State<_InlineEditable> {
       autofocus: true,
       textAlign: TextAlign.center,
       maxLength: widget.maxLength,
-      maxLines: widget.maxLines,
-      minLines: 1,
+      maxLines: 1,
       cursorColor: SC.accentFg,
       textInputAction: TextInputAction.done,
       style: widget.style.copyWith(color: SC.textPrimary),
@@ -3762,10 +3711,7 @@ class _InterestsSectionState extends State<_InterestsSection> {
               style: bentoLabelStyle(),
             ),
           )        else ...[
-          _ProfileSectionHeader(
-            AppStrings.t('profile_interests_section'),
-            trailing: const _RewardHint(),
-          ),
+          _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
           const SizedBox(height: 12),
         ],
         // Les chips choisis + le chip "Ajouter". N'importe lequel ouvre la

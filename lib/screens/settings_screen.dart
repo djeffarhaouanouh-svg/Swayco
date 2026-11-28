@@ -10,6 +10,7 @@ import '../services/app_theme.dart';
 import '../services/app_settings.dart';
 import '../services/account_switcher.dart';
 import '../services/app_strings.dart';
+import '../services/voice_intro_api.dart';
 import 'saved_profiles_screen.dart';
 import '../widgets/account_switcher_sheet.dart';
 import 'forgot_password_screen.dart';
@@ -448,6 +449,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       //    subscription doesn't outlive the account.
       await NotificationClient.unregister(uid);
       await IosCallKit.unregisterToken(uid);
+      // Les fichiers audio ne suivent pas la suppression de la ligne.
+      await VoiceIntroApi.removeAllFiles();
       // 2. Wipe the legacy local profile copy.
       await ProfileApi.deleteMyProfile(uid);
       // 3. Server-side wipe via the SECURITY DEFINER RPC: deletes the

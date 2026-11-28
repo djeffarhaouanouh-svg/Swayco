@@ -41,6 +41,10 @@ class RemoteProfile {
     this.isAi = false,
     this.isVerified = false,
     this.createdAt,
+    this.voiceIntroUrl = '',
+    this.voiceIntroDurationMs = 0,
+    this.voiceIntroTranscript = '',
+    this.voiceIntroLang = '',
     this.age,
     this.heightCm,
     this.job = '',
@@ -207,6 +211,16 @@ class RemoteProfile {
   /// trigger ignore toute écriture d'un client.
   final bool isVerified;
 
+  /// Présentation vocale (migration 0098) : adresse, durée, ce qui est dit
+  /// (écrit par le serveur) et sa langue. Tant qu'elle existe, elle s'affiche à
+  /// la place de la bio.
+  final String voiceIntroUrl;
+  final int voiceIntroDurationMs;
+  final String voiceIntroTranscript;
+  final String voiceIntroLang;
+
+  bool get hasVoiceIntro => voiceIntroUrl.trim().isNotEmpty;
+
   /// Date d'inscription.
   final DateTime? createdAt;
 
@@ -318,6 +332,10 @@ class RemoteProfile {
     isAi: m['is_ai'] == true,
     isVerified: m['is_verified'] == true,
     createdAt: _parseDate(m['created_at']),
+    voiceIntroUrl: m['voice_intro_url']?.toString() ?? '',
+    voiceIntroDurationMs: _parseIntOrNull(m['voice_intro_duration_ms']) ?? 0,
+    voiceIntroTranscript: m['voice_intro_transcript']?.toString() ?? '',
+    voiceIntroLang: m['voice_intro_lang']?.toString() ?? '',
   );
 
   /// Returns a copy with the given fields overridden. Used by the few call
@@ -391,6 +409,10 @@ class RemoteProfile {
     isAi: isAi,
     isVerified: isVerified,
     createdAt: createdAt,
+    voiceIntroUrl: voiceIntroUrl,
+    voiceIntroDurationMs: voiceIntroDurationMs,
+    voiceIntroTranscript: voiceIntroTranscript,
+    voiceIntroLang: voiceIntroLang,
   );
 }
 

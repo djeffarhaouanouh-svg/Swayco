@@ -56,6 +56,7 @@ import '../widgets/sent_confirmation.dart';
 import '../widgets/sparkles.dart';
 import '../widgets/swayco_wordmark.dart';
 import '../widgets/translated_profile_text.dart';
+import '../widgets/voice_intro_player.dart';
 import 'paywall_screen.dart';
 import '../services/daily_swipes.dart';
 import '../widgets/daily_limit_view.dart';
@@ -551,7 +552,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   void _onNavTab() {
-    if (NavTab.index.value != NavTab.discover) NavChrome.show();
+    if (NavTab.index.value != NavTab.discover) {
+      NavChrome.show();
+      VoiceIntroPlayer.stopActive();
+    }
   }
 
   void _onSeen(RemoteProfile p) {
@@ -598,6 +602,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   Future<void> _openProfile(RemoteProfile p) async {
     FocusManager.instance.primaryFocus?.unfocus();
+    VoiceIntroPlayer.stopActive();
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: p.id)),
     );

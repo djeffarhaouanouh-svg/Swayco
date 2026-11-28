@@ -11,7 +11,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const { AccessToken } = require('livekit-server-sdk');
 const { notifyUser, scheduleNotify } = require('./notify');
-const { transcribeVoiceMessage, startVoiceTranscriber, voiceStatus } = require('./voice_transcribe');
+const { transcribeVoiceMessage, transcribeVoiceIntro, startVoiceTranscriber, voiceStatus } = require('./voice_transcribe');
 const { onlineNotif } = require('./nationalities');
 const { track, ingestEvents, countryFromReq } = require('./analytics');
 const {
@@ -2394,6 +2394,29 @@ app.post('/messages/voice/transcribe', _limTight, async (req, res) => {
     return res.status(out.status).json(out.body);
   } catch (e) {
     console.error('/messages/voice/transcribe error', e);
+    return res.status(500).json({ error: 'transcribe_failed' });
+  }
+});
+
+// Transcription de MA présentation vocale (profil). Le JWT dit qui ; l'adresse
+// du fichier est lue en base. Voir voice_transcribe.js.
+app.post('/profile/voice-intro/transcribe', _limTight, async (req, res) => {
+  const uid = await stripeAuthUserId(req);
+  if (!uid) return res.status(401).json({ error: 'unauthenticated' });
+  try {
+    const out = await transcribeVoiceIntro({
+      sb: supabase(),
+      uid,
+      supabaseUrl: SUPABASE_URL,
+      openaiKey: OPENAI_API_KEY,
+      model: WHISPER_MODEL,
+      grokKey: GROK_API_KEY,
+      grokBase: GROK_BASE,
+      provider: process.env.VOICE_STT_PROVIDER?.trim(),
+    });
+    return res.status(out.status).json(out.body);
+  } catch (e) {
+    console.error('/profile/voice-intro/transcribe error', e);
     return res.status(500).json({ error: 'transcribe_failed' });
   }
 });

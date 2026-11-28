@@ -373,3 +373,40 @@ test('url check: still refuses foreign hosts, http, other buckets and other peop
     assert.equal(f.calls.length, 0, `fetched ${audio_url}`);
   }
 });
+// ── Présentation vocale du profil ────────────────────────────────
+const { transcribeVoiceIntro } = require('./voice_transcribe');
+
+function introSb(url) {
+  const writes = [];
+  const sb = {
+    from: () => ({
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { voice_intro_url: url, language: 'pt-BR' } }) }) }),
+      update: (values) => ({ eq: () => ({ eq: async (col, v) => { writes.push({ values, col, v }); return {}; } }) }),
+    }),
+  };
+  return { sb, writes };
+}
+const introFetch = async (u) => (String(u).includes('openai')
+  ? { ok: true, text: async () => JSON.stringify({ text: 'Oi, eu sou a Lou e moro em Lyon.' }) }
+  : { ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer });
+
+test('intro: transcribes my own recording onto my profile', async () => {
+  const url = 'https://x.supabase.co/storage/v1/object/public/voice-intros/me/1.m4a';
+  const { sb, writes } = introSb(url);
+  const out = await transcribeVoiceIntro({ sb, uid: 'me', supabaseUrl: 'https://x.supabase.co', openaiKey: 'k', fetchImpl: introFetch });
+  assert.equal(out.status, 200);
+  assert.deepEqual(writes, [{ values: { voice_intro_transcript: 'Oi, eu sou a Lou e moro em Lyon.', voice_intro_lang: 'pt' }, col: 'voice_intro_url', v: url }]);
+});
+
+test('intro: refuses a file that is not in my folder of the intro bucket', async () => {
+  for (const url of [
+    'https://x.supabase.co/storage/v1/object/public/voice-intros/someone/1.m4a',
+    'https://x.supabase.co/storage/v1/object/public/voice-messages/me/1.m4a',
+    'https://evil.example.com/storage/v1/object/public/voice-intros/me/1.m4a',
+  ]) {
+    const { sb, writes } = introSb(url);
+    const out = await transcribeVoiceIntro({ sb, uid: 'me', supabaseUrl: 'https://x.supabase.co', openaiKey: 'k', fetchImpl: async () => { throw new Error('must not fetch'); } });
+    assert.equal(out.status, 400, url);
+    assert.equal(writes.length, 0);
+  }
+});

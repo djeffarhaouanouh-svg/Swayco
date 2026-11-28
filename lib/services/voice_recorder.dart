@@ -69,7 +69,11 @@ double voiceLevelFromDb(double db) => ((db + 45) / 45).clamp(0.0, 1.0);
 /// Le fichier vit dans le dossier temporaire et disparaît dès qu'on envoie ou
 /// qu'on annule.
 class VoiceRecorder extends ChangeNotifier {
-  VoiceRecorder({AudioRecorder? recorder}) : _recorder = recorder;
+  VoiceRecorder({AudioRecorder? recorder, this.maxMs = kVoiceMaxMs})
+      : _recorder = recorder;
+
+  /// Durée au bout de laquelle [onLimit] se déclenche.
+  final int maxMs;
 
   AudioRecorder? _recorder;
 
@@ -152,7 +156,7 @@ class VoiceRecorder extends ChangeNotifier {
         notifyListeners();
       });
       _tick = Timer.periodic(const Duration(milliseconds: 100), (_) {
-        if (!_limitFired && _clock.elapsedMilliseconds >= kVoiceMaxMs) {
+        if (!_limitFired && _clock.elapsedMilliseconds >= maxMs) {
           _limitFired = true;
           onLimit?.call();
         }
@@ -232,7 +236,7 @@ class VoiceRecorder extends ChangeNotifier {
       final kind = kIsWeb ? sniffAudioContainer(bytes) : null;
       return VoiceRecording(
         bytes,
-        ms.clamp(kVoiceMinMs, kVoiceMaxMs),
+        ms.clamp(kVoiceMinMs, maxMs),
         ext: kind?.ext ?? 'm4a',
         contentType: kind?.contentType ?? 'audio/mp4',
       );

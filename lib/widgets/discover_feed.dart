@@ -13,6 +13,8 @@ import '../theme/swayco_theme.dart';
 import 'discover_ad_card.dart';
 import 'round_flag.dart';
 import 'translated_profile_text.dart';
+import 'voice_intro_player.dart';
+import 'voice_intro_translation.dart';
 
 /// Une carte du fil : la personne et ses photos (au moins une).
 typedef FeedEntry = ({RemoteProfile profile, List<String> photos});
@@ -556,7 +558,13 @@ class _FeedCard extends StatelessWidget {
                               child: Align(
                                 alignment: Alignment.centerLeft,
                                 child: ClipRect(
-                                  child: bio.isEmpty
+                                  child: p.hasVoiceIntro
+                                      ? VoiceIntroPlayer(
+                                          url: p.voiceIntroUrl,
+                                          durationMs: p.voiceIntroDurationMs,
+                                          compact: true,
+                                        )
+                                      : bio.isEmpty
                                       ? Text(
                                           AppStrings.t('peer_bio_empty'),
                                           maxLines: 3,
@@ -603,6 +611,9 @@ class _FeedCard extends StatelessWidget {
                 );
               },
             ),
+            // La traduction de l'audio, seulement pendant l'écoute.
+            if (p.hasVoiceIntro && p.voiceIntroTranscript.trim().isNotEmpty)
+              VoiceIntroTranslation(profile: p, divider: true),
             if (composer != null) ...[
               const SizedBox(height: 12),
               composer!,
